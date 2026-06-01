@@ -187,6 +187,18 @@ CREATE TABLE sources (
     language TEXT DEFAULT 'nl',
     summary TEXT,
     processed BOOLEAN DEFAULT FALSE,
+    -- Bronkwaliteit: hoe betrouwbaar is dit type bron?
+    -- Gebaseerd op Wikipedia's "reliable sources" hiërarchie
+    reliability TEXT NOT NULL DEFAULT 'onbeoordeeld' CHECK(reliability IN (
+        'primair',           -- origineel document, dataset, wetgeving (hoogste feitelijke waarde)
+        'academisch',        -- peer-reviewed, proefschrift (hoogste analytische waarde)
+        'institutioneel',    -- WRR, CPB, ACM, SER rapporten
+        'kwaliteitsjournalistiek', -- onderzoeksjournalistiek, longread, FTM/De Groene
+        'regulier',          -- dagblad, omroep, ANP
+        'opinie',            -- column, essay, commentaar
+        'grijs',             -- blog, podcast, social media, onafhankelijk
+        'onbeoordeeld'       -- nog niet geclassificeerd
+    )),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -213,19 +225,47 @@ CREATE TABLE source_locations (
 -- Hiërarchie: relatie → argumenten → citaties (→ bronnen)
 --------------------------------------------------------------
 
--- Argumenten per relatie: de inhoudelijke redeneringen
+-- Argumenten: discussieboom per relatie of entiteit
+-- parent_argument_id = NULL → root-argument (direct op relatie/entiteit)
+-- parent_argument_id = <id> → reactie op een ander argument
 CREATE TABLE arguments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    relation_id INTEGER NOT NULL REFERENCES relations(id),
+    relation_id INTEGER REFERENCES relations(id),        -- optioneel: argument over een relatie
+    entity_id INTEGER REFERENCES entities(id),            -- optioneel: argument over een entiteit
+    parent_argument_id INTEGER REFERENCES arguments(id),  -- NULL = root, anders = reactie op parent
+    -- Welk aspect wordt bediscussieerd? NULL = het bestaan/de kern van de relatie/entiteit
+    property TEXT CHECK(property IN (
+        'existence',         -- bestaat deze relatie/entiteit überhaupt?
+        'active_from',       -- wanneer begon dit?
+        'active_until',      -- wanneer eindigde dit?
+        'certainty',         -- hoe zeker is dit?
+        'influence',         -- hoe sterk is de invloed?
+        'relation_type',     -- klopt het type relatie?
+        'description',       -- klopt de beschrijving?
+        'type',              -- klopt het entiteittype?
+        'role'               -- klopt de toegewezen rol?
+    )),
+    property_value TEXT,     -- voorgestelde waarde (bijv. '2019' voor active_from)
     stance TEXT NOT NULL CHECK(stance IN (
-        'supporting',       -- argument dat de relatie bevestigt
-        'contradicting',    -- argument dat de relatie tegenspreekt
+        'supporting',       -- bevestigt de parent-bewering of relatie/entiteit
+        'contradicting',    -- weerspreekt de parent-bewering of relatie/entiteit
         'contextual'        -- nuancering, noch voor noch tegen
     )),
     claim TEXT NOT NULL,                 -- de kernbewering, kort en bondig
     reasoning TEXT,                      -- uitgebreide redenering / toelichting
     weight REAL CHECK(weight BETWEEN 0.0 AND 1.0),  -- hoe sterk is dit argument
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- Verificatie-status (Wikipedia-stijl)
+    status TEXT NOT NULL DEFAULT 'ongecontroleerd' CHECK(status IN (
+        'ongecontroleerd',   -- net toegevoegd, nog niet beoordeeld
+        'bronvermelding_nodig', -- claim zonder voldoende citaties
+        'betwist',           -- actief betwist door tegenargumenten
+        'geverifieerd',      -- citaties gecontroleerd en bevestigd
+        'verouderd'          -- informatie mogelijk niet meer actueel
+    )),
+    contributed_by TEXT,                 -- wie voegde dit toe (accountability)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Minstens één target verplicht (relatie of entiteit)
+    CHECK (relation_id IS NOT NULL OR entity_id IS NOT NULL)
 );
 
 -- Citaties per argument: verwijzingen naar specifieke bronpassages
@@ -237,6 +277,29 @@ CREATE TABLE citations (
     page TEXT,                           -- pagina / paginabereik ("pp. 45-48")
     section TEXT,                        -- hoofdstuk / sectie ("Hoofdstuk 3: Sourcing")
     context TEXT,                        -- korte toelichting bij het citaat
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--------------------------------------------------------------
+-- AUDIT LOG
+-- Wie veranderde wat, wanneer, en waarom (Wikipedia-stijl versiebeheer)
+--------------------------------------------------------------
+
+CREATE TABLE edit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name TEXT NOT NULL,             -- 'arguments', 'relations', 'entities', etc.
+    record_id INTEGER NOT NULL,           -- id van het gewijzigde record
+    action TEXT NOT NULL CHECK(action IN (
+        'created',           -- nieuw record aangemaakt
+        'updated',           -- bestaand record gewijzigd
+        'deleted',           -- record verwijderd
+        'verified',          -- status → geverifieerd
+        'disputed'           -- status → betwist
+    )),
+    changed_by TEXT,                      -- wie (gebruikersnaam, e-mail, of systeem)
+    old_value TEXT,                       -- vorige waarde (JSON)
+    new_value TEXT,                       -- nieuwe waarde (JSON)
+    reason TEXT,                          -- reden voor de wijziging
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -264,10 +327,16 @@ CREATE INDEX idx_relations_mechanism ON relations(mechanism_id);
 CREATE INDEX idx_sources_type ON sources(source_type);
 CREATE INDEX idx_source_locations_source ON source_locations(source_id);
 CREATE INDEX idx_arguments_relation ON arguments(relation_id);
+CREATE INDEX idx_arguments_entity ON arguments(entity_id);
+CREATE INDEX idx_arguments_parent ON arguments(parent_argument_id);
 CREATE INDEX idx_arguments_stance ON arguments(stance);
 CREATE INDEX idx_citations_argument ON citations(argument_id);
 CREATE INDEX idx_citations_source ON citations(source_id);
 CREATE INDEX idx_mechanisms_filter ON mechanisms(filter);
+CREATE INDEX idx_edit_log_table ON edit_log(table_name, record_id);
+CREATE INDEX idx_edit_log_changed_by ON edit_log(changed_by);
+CREATE INDEX idx_arguments_status ON arguments(status);
+CREATE INDEX idx_sources_reliability ON sources(reliability);
 CREATE INDEX idx_mechanisms_type ON mechanisms(mechanism_type);
 
 --------------------------------------------------------------

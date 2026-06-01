@@ -242,6 +242,141 @@ body {
 .temporal-badge.inactive { background: rgba(231,76,60,0.15); color: #e74c3c; }
 .temporal-period { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
+/* DISCUSSIEBOOM */
+.arg-tree { margin-top: 8px; }
+
+.arg-node {
+  position: relative;
+  margin-left: 16px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--border);
+  margin-bottom: 4px;
+}
+.arg-node.root { margin-left: 0; border-left: none; }
+.arg-node.depth-0 { border-left: none; margin-left: 0; }
+
+.arg-node .arg-header {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.arg-stance {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.arg-stance.supporting { background: rgba(46,204,113,0.2); color: #2ecc71; }
+.arg-stance.contradicting { background: rgba(231,76,60,0.2); color: #e74c3c; }
+.arg-stance.contextual { background: rgba(108,138,255,0.2); color: #6c8aff; }
+
+.arg-claim {
+  font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4;
+}
+.arg-reasoning {
+  font-size: 11px; color: var(--text-dim); line-height: 1.5; margin-top: 4px;
+}
+.arg-weight {
+  font-size: 10px; color: var(--text-muted); margin-top: 2px;
+}
+.arg-citations {
+  margin-top: 6px; padding-left: 8px; border-left: 1px solid var(--border);
+}
+.arg-citation {
+  font-size: 10px; color: var(--text-muted); margin-bottom: 4px; line-height: 1.4;
+}
+.arg-citation .cite-source { color: var(--text-dim); font-weight: 500; }
+.arg-citation .cite-quote { font-style: italic; color: var(--text-dim); }
+
+.arg-children { margin-top: 4px; }
+
+.arg-toggle {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 4px;
+}
+.arg-toggle:hover { background: var(--bg-hover); color: var(--text-dim); }
+
+/* Argument formulier */
+.arg-form {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+.arg-form h5 {
+  font-size: 11px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px;
+}
+.arg-form .form-row {
+  margin-bottom: 8px;
+}
+.arg-form label {
+  display: block; font-size: 10px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px;
+}
+.arg-form input[type="text"],
+.arg-form textarea,
+.arg-form select {
+  width: 100%; background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 7px 10px; color: var(--text); font-size: 12px;
+  font-family: inherit; outline: none; transition: border-color 0.2s;
+}
+.arg-form input:focus, .arg-form textarea:focus, .arg-form select:focus {
+  border-color: var(--accent);
+}
+.arg-form textarea { resize: vertical; min-height: 50px; }
+.arg-form select { appearance: auto; }
+.arg-form select option { background: #1a1a2e; color: var(--text); }
+
+.stance-picker {
+  display: flex; gap: 4px;
+}
+.stance-picker button {
+  flex: 1; padding: 6px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+}
+.stance-picker button:hover { background: var(--bg-hover); }
+.stance-picker button.selected-sup { border-color: #2ecc71; background: rgba(46,204,113,0.15); color: #2ecc71; }
+.stance-picker button.selected-con { border-color: #e74c3c; background: rgba(231,76,60,0.15); color: #e74c3c; }
+.stance-picker button.selected-ctx { border-color: #6c8aff; background: rgba(108,138,255,0.15); color: #6c8aff; }
+
+.arg-form .btn-submit {
+  width: 100%; padding: 8px; border-radius: 6px; border: none;
+  background: rgba(108,138,255,0.2); color: var(--accent);
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  margin-top: 4px;
+}
+.arg-form .btn-submit:hover { background: rgba(108,138,255,0.35); }
+.arg-form .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.arg-form .btn-cancel {
+  width: 100%; padding: 6px; border-radius: 6px; border: none;
+  background: transparent; color: var(--text-muted);
+  font-size: 11px; cursor: pointer; margin-top: 4px;
+}
+.arg-form .btn-cancel:hover { color: var(--text-dim); }
+
+.reply-btn {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 2px;
+}
+.reply-btn:hover { background: var(--bg-hover); color: var(--accent); }
+
+.form-message {
+  font-size: 11px; padding: 6px 8px; border-radius: 4px; margin-top: 6px;
+}
+.form-message.success { background: rgba(46,204,113,0.1); color: #2ecc71; }
+.form-message.error { background: rgba(231,76,60,0.1); color: #e74c3c; }
+
+.arg-summary {
+  display: flex; gap: 10px; font-size: 10px; color: var(--text-muted);
+  margin-bottom: 8px; padding: 6px 8px;
+  background: rgba(255,255,255,0.02); border-radius: 6px;
+}
+.arg-summary .count { font-weight: 600; }
+.arg-summary .count.sup { color: #2ecc71; }
+.arg-summary .count.con { color: #e74c3c; }
+.arg-summary .count.ctx { color: #6c8aff; }
+
 @media (max-width: 900px) {
   :root { --panel-w: 0px; }
   #sidebar { display: none; }
@@ -378,6 +513,319 @@ const FILTER_LABELS = {
   systeemactor: 'Systeemactor', cross_filter: 'Cross-filter',
   overig: 'Overig',
 };
+
+// ============================================================
+// DISCUSSIEBOOM HELPERS
+// ============================================================
+
+// Bouw een boom van argumenten, geïndexeerd op relation_id en entity_id
+const argsByRelation = {};  // relation_id → [root arguments]
+const argsByEntity = {};    // entity_id → [root arguments]
+const argsById = new Map(); // argument id → argument object
+const citationsByArg = {};  // argument_id → [citations]
+
+// Index citations
+(DATA.citations || []).forEach(c => {
+  if (!citationsByArg[c.argument_id]) citationsByArg[c.argument_id] = [];
+  citationsByArg[c.argument_id].push(c);
+});
+
+// Index arguments and build tree
+(DATA.arguments || []).forEach(a => {
+  a.children = [];
+  argsById.set(a.id, a);
+});
+(DATA.arguments || []).forEach(a => {
+  if (a.parent_argument_id) {
+    const parent = argsById.get(a.parent_argument_id);
+    if (parent) parent.children.push(a);
+  } else {
+    // Root argument — index by relation and/or entity
+    if (a.relation_id) {
+      if (!argsByRelation[a.relation_id]) argsByRelation[a.relation_id] = [];
+      argsByRelation[a.relation_id].push(a);
+    }
+    if (a.entity_id) {
+      if (!argsByEntity[a.entity_id]) argsByEntity[a.entity_id] = [];
+      argsByEntity[a.entity_id].push(a);
+    }
+  }
+});
+
+const STANCE_SYMBOLS = { supporting: '+', contradicting: '−', contextual: '~' };
+const PROPERTY_LABELS = {
+  existence: 'Bestaan', active_from: 'Startdatum', active_until: 'Einddatum',
+  certainty: 'Zekerheid', influence: 'Invloed', relation_type: 'Relatietype',
+  description: 'Beschrijving', type: 'Entiteittype', role: 'Rol'
+};
+const STATUS_LABELS = {
+  ongecontroleerd: '?', bronvermelding_nodig: '!', betwist: '⚡',
+  geverifieerd: '✓', verouderd: '⏳'
+};
+const STATUS_COLORS = {
+  ongecontroleerd: 'var(--text-muted)', bronvermelding_nodig: '#f0a030',
+  betwist: '#e74c3c', geverifieerd: '#2ecc71', verouderd: '#7f8c9a'
+};
+
+function countStances(args) {
+  let sup = 0, con = 0, ctx = 0;
+  function walk(list) {
+    list.forEach(a => {
+      if (a.stance === 'supporting') sup++;
+      else if (a.stance === 'contradicting') con++;
+      else ctx++;
+      walk(a.children);
+    });
+  }
+  walk(args);
+  return { sup, con, ctx, total: sup + con + ctx };
+}
+
+function renderArgTree(args) {
+  if (!args || !args.length) return '';
+  const counts = countStances(args);
+
+  let html = `<div class="arg-summary">
+    <span><span class="count">${counts.total}</span> argumenten</span>
+    <span><span class="count sup">${counts.sup}</span> voor</span>
+    <span><span class="count con">${counts.con}</span> tegen</span>
+    <span><span class="count ctx">${counts.ctx}</span> context</span>
+  </div>`;
+  html += '<div class="arg-tree">';
+  args.forEach(a => { html += renderArgNode(a, 0); });
+  html += '</div>';
+  return html;
+}
+
+function renderArgNode(arg, depth) {
+  const cites = citationsByArg[arg.id] || [];
+  const hasChildren = arg.children.length > 0;
+  const depthClass = depth === 0 ? 'root' : '';
+
+  const propLabel = arg.property ? PROPERTY_LABELS[arg.property] || arg.property : null;
+  const propBadge = propLabel ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(108,138,255,0.12);color:var(--accent);margin-right:2px">${propLabel}${arg.property_value ? ': '+arg.property_value : ''}</span>` : '';
+  const statusSym = arg.status ? STATUS_LABELS[arg.status] || '' : '';
+  const statusCol = arg.status ? STATUS_COLORS[arg.status] || 'var(--text-muted)' : '';
+  const statusBadge = statusSym ? `<span style="font-size:10px;color:${statusCol}" title="${arg.status}">${statusSym}</span>` : '';
+
+  let html = `<div class="arg-node ${depthClass} depth-${depth}">
+    <div class="arg-header">
+      <span class="arg-stance ${arg.stance}">${STANCE_SYMBOLS[arg.stance]}</span>
+      ${propBadge}
+      <span class="arg-claim">${arg.claim}</span>
+      ${statusBadge}
+    </div>`;
+
+  if (arg.reasoning) {
+    html += `<div class="arg-reasoning">${arg.reasoning}</div>`;
+  }
+  if (arg.weight != null) {
+    html += `<div class="arg-weight">Gewicht: ${(arg.weight * 100).toFixed(0)}%</div>`;
+  }
+
+  if (cites.length) {
+    html += '<div class="arg-citations">';
+    cites.forEach(c => {
+      html += `<div class="arg-citation">`;
+      html += `<span class="cite-source">${c.source_author || ''} — ${c.source_title || ''}</span>`;
+      if (c.page) html += ` <span>(${c.page})</span>`;
+      if (c.quote) html += `<br><span class="cite-quote">"${c.quote}"</span>`;
+      html += `</div>`;
+    });
+    html += '</div>';
+  }
+
+  // Reageer-knop en slot
+  const relId = arg.relation_id || '';
+  const entId = arg.entity_id || '';
+  html += `<button class="reply-btn" onclick="showReplyForm(${arg.id}, ${relId || 'null'}, ${entId || 'null'})">↩ Reageer</button>`;
+  html += `<div id="reply-slot-${arg.id}"></div>`;
+
+  if (hasChildren) {
+    html += '<div class="arg-children">';
+    arg.children.forEach(child => { html += renderArgNode(child, depth + 1); });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ============================================================
+// ARGUMENT FORMULIER & API
+// ============================================================
+
+function renderArgForm(opts) {
+  // opts: { relation_id, entity_id, parent_argument_id, onSuccess }
+  const formId = 'arg-form-' + Math.random().toString(36).slice(2, 8);
+  const parentLabel = opts.parent_argument_id ? 'Reageer op argument' : 'Nieuw argument';
+
+  return `
+    <div class="arg-form" id="${formId}">
+      <h5>${parentLabel}</h5>
+      <div class="form-row">
+        <label>Positie</label>
+        <div class="stance-picker" id="${formId}-stance">
+          <button type="button" onclick="pickStance('${formId}','supporting',this)" title="Ondersteunend">+ Voor</button>
+          <button type="button" onclick="pickStance('${formId}','contradicting',this)" title="Weerleggend">− Tegen</button>
+          <button type="button" onclick="pickStance('${formId}','contextual',this)" title="Nuancerend">~ Context</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Bewering *</label>
+        <input type="text" id="${formId}-claim" placeholder="De kernbewering, kort en bondig">
+      </div>
+      <div class="form-row">
+        <label>Onderbouwing</label>
+        <textarea id="${formId}-reasoning" placeholder="Uitgebreide redenering of toelichting (optioneel)"></textarea>
+      </div>
+      <div class="form-row" style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label>Eigenschap (optioneel)</label>
+          <select id="${formId}-property">
+            <option value="">— Algemeen —</option>
+            <option value="existence">Bestaan</option>
+            <option value="active_from">Startdatum</option>
+            <option value="active_until">Einddatum</option>
+            <option value="certainty">Zekerheid</option>
+            <option value="influence">Invloed</option>
+            <option value="relation_type">Relatietype</option>
+            <option value="description">Beschrijving</option>
+            <option value="type">Entiteittype</option>
+            <option value="role">Rol</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Waarde</label>
+          <input type="text" id="${formId}-propval" placeholder="bijv. 2006">
+        </div>
+      </div>
+      <div class="form-row" style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label>Gewicht (0-100%)</label>
+          <input type="text" id="${formId}-weight" placeholder="bijv. 70">
+        </div>
+        <div style="flex:1">
+          <label>Je naam</label>
+          <input type="text" id="${formId}-name" placeholder="anoniem">
+        </div>
+      </div>
+      <button class="btn-submit" onclick="submitArgument('${formId}', ${JSON.stringify(opts).replace(/"/g, '&quot;')})">
+        Argument toevoegen
+      </button>
+      <button class="btn-cancel" onclick="document.getElementById('${formId}').remove()">Annuleren</button>
+      <div id="${formId}-msg"></div>
+    </div>`;
+}
+
+function pickStance(formId, stance, btn) {
+  const picker = document.getElementById(formId + '-stance');
+  picker.querySelectorAll('button').forEach(b => b.className = '');
+  const cls = stance === 'supporting' ? 'selected-sup' : stance === 'contradicting' ? 'selected-con' : 'selected-ctx';
+  btn.className = cls;
+  picker.dataset.stance = stance;
+}
+
+async function submitArgument(formId, opts) {
+  const picker = document.getElementById(formId + '-stance');
+  const stance = picker.dataset.stance;
+  const claim = document.getElementById(formId + '-claim').value.trim();
+  const reasoning = document.getElementById(formId + '-reasoning').value.trim();
+  const property = document.getElementById(formId + '-property').value || null;
+  const propVal = document.getElementById(formId + '-propval').value.trim() || null;
+  const weightRaw = document.getElementById(formId + '-weight').value.trim();
+  const name = document.getElementById(formId + '-name').value.trim() || 'anoniem';
+  const msgEl = document.getElementById(formId + '-msg');
+
+  if (!stance) { msgEl.innerHTML = '<div class="form-message error">Kies een positie (voor/tegen/context)</div>'; return; }
+  if (!claim) { msgEl.innerHTML = '<div class="form-message error">Bewering is verplicht</div>'; return; }
+
+  const weight = weightRaw ? Math.min(100, Math.max(0, parseInt(weightRaw))) / 100 : null;
+
+  const body = {
+    relation_id: opts.relation_id || null,
+    entity_id: opts.entity_id || null,
+    parent_argument_id: opts.parent_argument_id || null,
+    stance, claim, reasoning: reasoning || null,
+    property, property_value: propVal,
+    weight, contributed_by: name,
+  };
+
+  try {
+    const resp = await fetch('/api/arguments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!resp.ok) {
+      msgEl.innerHTML = `<div class="form-message error">${result.error || 'Fout bij opslaan'}</div>`;
+      return;
+    }
+    msgEl.innerHTML = '<div class="form-message success">Argument toegevoegd!</div>';
+
+    // Herlaad de discussieboom na 500ms
+    setTimeout(() => {
+      if (opts.relation_id) {
+        reloadRelationDiscussion(opts.relation_id);
+      } else if (opts.entity_id) {
+        reloadEntityDiscussion(opts.entity_id);
+      }
+    }, 500);
+  } catch (e) {
+    msgEl.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`;
+  }
+}
+
+async function reloadRelationDiscussion(relationId) {
+  try {
+    const resp = await fetch(`/api/arguments?relation_id=${relationId}`);
+    const args = await resp.json();
+    // Rebuild tree
+    const roots = buildTreeFromApi(args);
+    argsByRelation[relationId] = roots;
+    // Re-render: find the current relation and re-select it
+    const rel = currentLinks.find(l => l.id === relationId) || DATA.relations.find(l => l.id === relationId);
+    if (rel) selectRelation(rel);
+  } catch (e) { console.error('Reload failed', e); }
+}
+
+async function reloadEntityDiscussion(entityId) {
+  try {
+    const resp = await fetch(`/api/arguments?entity_id=${entityId}`);
+    const args = await resp.json();
+    const roots = buildTreeFromApi(args);
+    argsByEntity[entityId] = roots;
+    const node = currentNodes.find(n => n.id === entityId);
+    if (node) selectNode(node);
+  } catch (e) { console.error('Reload failed', e); }
+}
+
+function buildTreeFromApi(args) {
+  const map = new Map();
+  args.forEach(a => { a.children = []; map.set(a.id, a); });
+  // Index citaties naar het formaat dat renderArgNode verwacht
+  args.forEach(a => { citationsByArg[a.id] = a.citations || []; });
+  const roots = [];
+  args.forEach(a => {
+    if (a.parent_argument_id && map.has(a.parent_argument_id)) {
+      map.get(a.parent_argument_id).children.push(a);
+    } else {
+      roots.push(a);
+    }
+  });
+  return roots;
+}
+
+function showReplyForm(argId, relationId, entityId) {
+  const container = document.getElementById('reply-slot-' + argId);
+  if (!container) return;
+  container.innerHTML = renderArgForm({
+    relation_id: relationId,
+    entity_id: entityId,
+    parent_argument_id: argId,
+  });
+}
 
 // ============================================================
 // PREPARE DATA
@@ -596,6 +1044,35 @@ function buildGraph() {
       return `url(#${prefix}${color.replace('#','')})`;
     });
 
+  // Invisible wider hit-area for clicking on edges
+  const linkHitGroup = g.append('g').attr('class', 'link-hits');
+  linkHitGroup.selectAll('line').data(links).join('line')
+    .attr('stroke', 'transparent')
+    .attr('stroke-width', 14)
+    .style('cursor', 'pointer')
+    .on('click', (event, d) => { event.stopPropagation(); selectRelation(d); })
+    .on('mouseover', (event, d) => {
+      const src = typeof d.source === 'object' ? d.source : entityMap.get(d.source);
+      const tgt = typeof d.target === 'object' ? d.target : entityMap.get(d.target);
+      const relArgs = argsByRelation[d.id] || [];
+      const counts = relArgs.length ? countStances(relArgs) : null;
+      const tooltip = document.getElementById('tooltip');
+      tooltip.innerHTML = `
+        <div class="tt-type" style="color:${getLinkColor(d, isTheory)}">${isTheory ? (d.name || 'Mechanisme') : (RELATION_LABELS[d.relation_type] || d.relation_type)}</div>
+        <div class="tt-name">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
+        ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
+        ${counts ? `<div class="tt-desc" style="margin-top:4px">${counts.total} argumenten: ${counts.sup} voor, ${counts.con} tegen</div>` : ''}
+        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor discussie</div>
+      `;
+      tooltip.classList.add('visible');
+    })
+    .on('mousemove', (event) => {
+      const tooltip = document.getElementById('tooltip');
+      tooltip.style.left = (event.clientX + 16) + 'px';
+      tooltip.style.top = (event.clientY - 8) + 'px';
+    })
+    .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
+
   // Edge labels (theory only)
   if (isTheory) {
     const labelGroup = g.append('g').attr('class', 'edge-labels');
@@ -634,8 +1111,12 @@ function buildGraph() {
     .style('text-shadow', '0 1px 4px rgba(0,0,0,0.8)');
 
   // Tick
+  const linkHitLines = linkHitGroup.selectAll('line');
   simulation.on('tick', () => {
     linkElements
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    linkHitLines
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     if (edgeLabelElements) {
@@ -711,6 +1192,73 @@ function formatPeriod(d) {
   const isActive = d.active !== 0 && d.active !== false;
   const badge = isActive ? '<span class="temporal-badge active">actief</span>' : '<span class="temporal-badge inactive">inactief</span>';
   return `${from} – ${until} ${badge}`;
+}
+
+// ============================================================
+// RELATIE DETAIL (discussieboom)
+// ============================================================
+function selectRelation(r) {
+  const panel = document.getElementById('detail');
+  const content = document.getElementById('detailContent');
+  const src = typeof r.source === 'object' ? r.source : entityMap.get(r.source_id || r.source);
+  const tgt = typeof r.target === 'object' ? r.target : entityMap.get(r.target_id || r.target);
+  const srcName = src ? src.name : (r.source_name || '?');
+  const tgtName = tgt ? tgt.name : (r.target_name || '?');
+  const certPct = Math.round((r.certainty || 0) * 100);
+  const inflPct = Math.round((r.influence || 0) * 100);
+  const color = getLinkColor(r, state.model === 'theory');
+  const period = formatPeriod(r);
+
+  let html = `
+    <div class="detail-header">
+      <div class="entity-type" style="color:${color}">${RELATION_LABELS[r.relation_type] || r.relation_type}${r.mechanism_name ? ' · ' + r.mechanism_name : ''}</div>
+      <h2>${srcName} → ${tgtName}</h2>
+      ${period ? `<div class="temporal-period">${period}</div>` : ''}
+    </div>
+    ${r.description ? `<div class="detail-description">${r.description}</div>` : ''}
+    <div class="detail-section">
+      <h4>Scores</h4>
+      <div style="display:flex;gap:16px;margin-bottom:12px">
+        <span class="score-bar">zekerheid <span class="bar-track"><span class="bar-fill" style="width:${certPct}%;background:var(--accent)"></span></span> ${certPct}%</span>
+        <span class="score-bar">invloed <span class="bar-track"><span class="bar-fill" style="width:${inflPct}%;background:var(--c-advertentie)"></span></span> ${inflPct}%</span>
+      </div>
+    </div>
+  `;
+
+  // Discussieboom
+  const relArgs = argsByRelation[r.id];
+  if (relArgs && relArgs.length) {
+    html += `<div class="detail-section"><h4>Discussie</h4>`;
+    html += renderArgTree(relArgs);
+    html += `</div>`;
+  } else {
+    html += `<div class="detail-section"><h4>Discussie</h4>
+      <div style="font-size:11px;color:var(--text-muted);padding:8px 0">Nog geen argumenten voor deze relatie.</div>
+    </div>`;
+  }
+
+  // Formulier voor nieuw root-argument
+  html += `<div class="detail-section">
+    <button class="arg-toggle" id="new-arg-toggle-rel" onclick="
+      let slot=document.getElementById('new-arg-slot-rel');
+      if(slot.children.length===0){
+        slot.innerHTML=renderArgForm({relation_id:${r.id}});
+        this.textContent='Verberg formulier ▾';
+      } else {
+        slot.innerHTML='';
+        this.textContent='+ Argument toevoegen ▸';
+      }
+    ">+ Argument toevoegen ▸</button>
+    <div id="new-arg-slot-rel"></div>
+  </div>`;
+
+  // Terug-knop naar entiteit
+  if (src) {
+    html += `<div style="margin-top:12px"><button class="arg-toggle" onclick="selectNode(currentNodes.find(n=>n.id===${src.id}))">← ${srcName}</button></div>`;
+  }
+
+  content.innerHTML = html;
+  panel.classList.add('open');
 }
 
 // ============================================================
@@ -888,20 +1436,53 @@ function showInstanceDetail(d, content, color) {
     });
     html += `</div>`;
   }
+
+  // Discussieboom voor deze entiteit
+  const entityArgs = argsByEntity[d.id];
+  if (entityArgs && entityArgs.length) {
+    html += `<div class="detail-section"><h4>Discussie over ${d.name}</h4>`;
+    html += renderArgTree(entityArgs);
+    html += `</div>`;
+  }
+
+  // Formulier voor nieuw argument over deze entiteit
+  html += `<div class="detail-section">
+    <button class="arg-toggle" id="new-arg-toggle-ent" onclick="
+      let slot=document.getElementById('new-arg-slot-ent');
+      if(slot.children.length===0){
+        slot.innerHTML=renderArgForm({entity_id:${d.id}});
+        this.textContent='Verberg formulier ▾';
+      } else {
+        slot.innerHTML='';
+        this.textContent='+ Argument toevoegen ▸';
+      }
+    ">+ Argument toevoegen ▸</button>
+    <div id="new-arg-slot-ent"></div>
+  </div>`;
+
   content.innerHTML = html;
 }
 
 function relationCard(otherName, r, direction) {
   const certPct = Math.round((r.certainty || 0) * 100);
   const inflPct = Math.round((r.influence || 0) * 100);
+  const relArgs = argsByRelation[r.id];
+  const argCount = relArgs ? countStances(relArgs) : null;
+  const argBadge = argCount ? `<span style="font-size:10px;color:var(--text-muted);margin-left:auto;white-space:nowrap">${argCount.total} arg · <span style="color:#2ecc71">${argCount.sup}+</span> <span style="color:#e74c3c">${argCount.con}−</span></span>` : '';
+
+  // Store relation data so we can retrieve it on click
+  const relDataId = `rel-data-${r.id}`;
+
   return `
-    <div class="relation-card">
-      <div class="rel-name">${direction} ${otherName}</div>
+    <div class="relation-card" onclick="selectRelation(currentLinks.find(l=>l.id===${r.id}) || DATA.relations.find(l=>l.id===${r.id}))" style="cursor:pointer">
+      <div style="display:flex;align-items:center">
+        <div class="rel-name">${direction} ${otherName}</div>
+        ${argBadge}
+      </div>
       <div style="font-size:11px;color:var(--text-dim);margin:3px 0">
         ${RELATION_LABELS[r.relation_type] || r.relation_type}
         ${r.mechanism_name ? ` · ${r.mechanism_name}` : ''}
       </div>
-      ${r.description ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${r.description}</div>` : ''}
       <div class="rel-meta">
         <span class="score-bar">zekerheid <span class="bar-track"><span class="bar-fill" style="width:${certPct}%;background:var(--accent)"></span></span> ${certPct}%</span>
         <span class="score-bar">invloed <span class="bar-track"><span class="bar-fill" style="width:${inflPct}%;background:var(--c-advertentie)"></span></span> ${inflPct}%</span>

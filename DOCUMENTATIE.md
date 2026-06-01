@@ -116,12 +116,17 @@ THEORETISCH MODEL          INSTANTIEMODEL              BEWIJS
 | `sources` | Academische bronnen (boeken, artikelen, rapporten) | title, author, source_type, publisher, date_published, language |
 | `source_locations` | Meerdere toegangspunten per bron | source_id, location_type (url/file/doi/isbn/arxiv/handle/archive_url), location |
 
-### Argumenten & citaties
+### Argumenten & citaties (discussieboom)
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `arguments` | Argumenten per relatie (voor/tegen/context) | relation_id, stance, claim, reasoning, weight |
+| `arguments` | Discussieboom: argumenten op relaties of entiteiten, met nesting | relation_id (optioneel), entity_id (optioneel), parent_argument_id (NULL=root), stance, claim, reasoning, weight |
 | `citations` | Bronvermeldingen per argument | argument_id, source_id, quote, page, section, context |
+
+Argumenten vormen een boomstructuur:
+- **Root-argumenten** (`parent_argument_id = NULL`) hangen direct aan een relatie of entiteit
+- **Reacties** (`parent_argument_id = <id>`) reageren op een ander argument
+- Elk argument kan gericht zijn op een **relatie** (`relation_id`) of een **entiteit** (`entity_id`), minstens één is verplicht
 
 ---
 
@@ -162,19 +167,25 @@ Relatie: DPG Media → RTL Nederland [winstmaximalisatie]
   certainty: 0.85  |  influence: 0.70
   │
   ├── [+] SUPPORTING: "ACM moest voorwaarden stellen..."
-  │     └── Citatie → AI-analyse rapport (lokaal bestand)
-  │
-  ├── [-] CONTRADICTING: "ACM-voorwaarden beperken winstmaximalisatie"
-  │     └── Citatie → ACM besluit (2023)
-  │           ├── Citaat: "onafhankelijke stichtingen..."
-  │           ├── Sectie: "Voorwaarden overname"
-  │           └── URL: acm.nl/...
+  │     ├── Citatie → AI-analyse rapport (lokaal bestand)
+  │     │
+  │     └── [−] CONTRADICTING: "ACM-voorwaarden beperken winstmaximalisatie"
+  │           ├── Citatie → ACM besluit (2023)
+  │           │
+  │           └── [+] SUPPORTING: "Voorwaarden zijn niet afdwingbaar na fusie"
+  │                 └── Citatie → FTM onderzoek (2024)
   │
   └── [~] CONTEXTUAL: "Redactiestatuten bieden geen ijzerharde garanties"
         ├── Citatie → Bergman (2014), Hoofdstuk 1
         └── Citatie → Herman & Chomsky (1988), pp. 3-14
-              ├── ISBN: 978-0-375-71449-8
-              └── URL: wikipedia.org/...
+
+Entiteit: DPG Media
+  │
+  ├── [+] SUPPORTING: "DPG heeft een dominante marktpositie in online nieuws"
+  │     └── Citatie → ACM marktanalyse (2023)
+  │
+  └── [−] CONTRADICTING: "Marktaandeel alleen zegt niets over redactionele invloed"
+        └── Citatie → NVJ rapport (2022)
 ```
 
 ### Stances
@@ -370,10 +381,10 @@ ORDER BY s.author;
 3. Voeg locaties toe (URL, DOI, ISBN) via SQL of een script
 4. Analyseer de tekst en voeg entiteiten, relaties en argumenten toe
 
-### Argument toevoegen aan bestaande relatie
+### Argument toevoegen aan een relatie
 
 ```sql
--- 1. Maak het argument aan
+-- 1. Root-argument op een relatie
 INSERT INTO arguments (relation_id, stance, claim, reasoning, weight)
 VALUES (42, 'contradicting',
         'De Volkskrant publiceerde kritisch Shell-dossier',
@@ -386,6 +397,28 @@ VALUES (last_insert_rowid(), 3,
         'Het onderzoeksteam werkte zes maanden aan het dossier',
         'pp. 12-15',
         'Redactioneel verantwoording');
+```
+
+### Reactie op een bestaand argument (discussieboom)
+
+```sql
+-- Tegenargument op argument #15
+INSERT INTO arguments (relation_id, parent_argument_id, stance, claim, reasoning, weight)
+VALUES (42, 15, 'supporting',
+        'Dit was een uitzondering die de regel bevestigt',
+        'Het Shell-dossier was het enige kritische stuk in 5 jaar. Structurele zelfcensuur sluit incidentele doorbraken niet uit.',
+        0.55);
+```
+
+### Argument over een entiteit
+
+```sql
+-- Bewering over een entiteit (bijv. "Is DPG Media een monopolist?")
+INSERT INTO arguments (entity_id, stance, claim, reasoning, weight)
+VALUES (1, 'supporting',
+        'DPG bezit >60% van de online commerciële nieuwsmarkt',
+        'Volgens ACM marktanalyse 2023 is DPG de dominante speler.',
+        0.80);
 ```
 
 ### Certainty herberekenen

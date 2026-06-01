@@ -50,13 +50,34 @@ def export_data():
     cur.execute("SELECT id, name, filter, mechanism_type, description, effect, source_role_id, target_role_id FROM mechanisms")
     mechanisms = [dict(row) for row in cur.fetchall()]
 
-    # Arguments count per relation
+    # Arguments: volledige discussiebomen
     cur.execute("""
-        SELECT relation_id, COUNT(*) as arg_count,
-               GROUP_CONCAT(stance) as stances
-        FROM arguments GROUP BY relation_id
+        SELECT a.id, a.relation_id, a.entity_id, a.parent_argument_id,
+               a.property, a.property_value,
+               a.stance, a.claim, a.reasoning, a.weight, a.status
+        FROM arguments a
+        ORDER BY a.parent_argument_id NULLS FIRST, a.id
     """)
-    arg_counts = {row['relation_id']: dict(row) for row in cur.fetchall()}
+    arguments = [dict(row) for row in cur.fetchall()]
+
+    # Citations per argument
+    cur.execute("""
+        SELECT c.id, c.argument_id, c.quote, c.page, c.section, c.context,
+               s.title as source_title, s.author as source_author
+        FROM citations c
+        JOIN sources s ON c.source_id = s.id
+    """)
+    citations = [dict(row) for row in cur.fetchall()]
+
+    # Argument counts per relation (voor edge labels)
+    arg_counts = {}
+    for a in arguments:
+        rid = a.get('relation_id')
+        if rid:
+            if rid not in arg_counts:
+                arg_counts[rid] = {'arg_count': 0, 'stances': []}
+            arg_counts[rid]['arg_count'] += 1
+            arg_counts[rid]['stances'].append(a['stance'])
 
     conn.close()
 
@@ -79,6 +100,8 @@ def export_data():
         'relations': relations,
         'roles': roles,
         'mechanisms': mechanisms,
+        'arguments': arguments,
+        'citations': citations,
     }
 
 
