@@ -73,10 +73,10 @@ def reassign_entity_primary_roles(cur, roles):
         'flak_producent': {
             'PVV': None,  # partij
         },
-        # mediaverkoper → mediaorganisatie_rol
+        # mediaverkoper → mediaorganisatie
         'mediaverkoper': {
-            'Metro': 'mediaorganisatie_rol',
-            'NU.nl': 'mediaorganisatie_rol',
+            'Metro': 'mediaorganisatie',
+            'NU.nl': 'mediaorganisatie',
         },
         # pr_machine → elite_forum of NULL
         'pr_machine': {
@@ -139,32 +139,32 @@ def reassign_mechanism_roles(cur, roles):
         'denktank_legitimatie': ('denktank', 'columnist_opiniemaker'),
 
         # flak_producent → NULL of specifieke rol
-        'chilling_effect_geweld': (None, 'mediaorganisatie_rol'),
+        'chilling_effect_geweld': (None, 'mediaorganisatie'),
         'geweld_intimidatie': (None, 'journalist'),
         'juridische_dreiging': (None, 'journalist'),
         'publieke_aanval': ('politicus', 'journalist'),
 
         # flak_doelwit → journalist
-        'zelfcensuur': ('mediaorganisatie_rol', 'journalist'),
+        'zelfcensuur': ('mediaorganisatie', 'journalist'),
         'woo_obstructie': (None, 'journalist'),
 
         # officiele_bron → NULL of specifiek
-        'bron_afhankelijkheid': (None, 'mediaorganisatie_rol'),
+        'bron_afhankelijkheid': (None, 'mediaorganisatie'),
         'haagse_stam': ('politicus', 'journalist'),
         'lobby_informatievoorziening': ('lobbyist', 'politicus'),
         'parlementaire_doorbraak': ('parlementair_controleur', None),
 
         # expert_bron → denktank
-        'expert_framing': ('denktank', 'mediaorganisatie_rol'),
+        'expert_framing': ('denktank', 'mediaorganisatie'),
 
-        # mediaverkoper → mediaorganisatie_rol
-        'advertentiedruk': ('adverteerder', 'mediaorganisatie_rol'),
-        'commerciele_afhankelijkheid': ('adverteerder', 'mediaorganisatie_rol'),
-        'platform_advertentie_concentratie': ('techplatform', 'mediaorganisatie_rol'),
+        # mediaverkoper → mediaorganisatie
+        'advertentiedruk': ('adverteerder', 'mediaorganisatie'),
+        'commerciele_afhankelijkheid': ('adverteerder', 'mediaorganisatie'),
+        'platform_advertentie_concentratie': ('techplatform', 'mediaorganisatie'),
 
         # pr_machine → NULL
         'pr_naar_journalist': (None, 'journalist'),
-        'pr_subsidie': (None, 'mediaorganisatie_rol'),
+        'pr_subsidie': (None, 'mediaorganisatie'),
 
         # online_intimidator / slapp_actor → NULL
         'online_intimidatie_journalist': (None, 'journalist'),

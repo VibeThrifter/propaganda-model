@@ -37,16 +37,16 @@ NEW_ENTITIES = [
      None),
 
     # Media die in de bron worden genoemd
-    ("Brandpunt", "mediaorganisatie", "mediaorganisatie_rol",
+    ("Brandpunt", "mediaorganisatie", "mediaorganisatie",
      "KRO-NCRV TV-programma.",
      None),
-    ("RTL Nieuws", "mediaorganisatie", "mediaorganisatie_rol",
+    ("RTL Nieuws", "mediaorganisatie", "mediaorganisatie",
      "Nieuwsredactie van RTL Nederland. Onderdeel RTL Nederland.",
      None),
-    ("De Morgen", "mediaorganisatie", "mediaorganisatie_rol",
+    ("De Morgen", "mediaorganisatie", "mediaorganisatie",
      "Belgische krant, eigendom DPG Media. Van Thillo beïnvloedde redactionele cultuur na overname.",
      '{"land": "BE"}'),
-    ("Gezond Verstand", "mediaorganisatie", "mediaorganisatie_rol",
+    ("Gezond Verstand", "mediaorganisatie", "mediaorganisatie",
      "Alternatief tijdschrift dat zich afzet tegen mainstream consensus. Voorbeeld van reactie op hegemonische naturalisatie.",
      '{"type": "alternatief"}'),
 

@@ -256,7 +256,7 @@ def run():
         ('economische_feedback_loop', 'cross_filter', 'economisch',
          'Dalend vertrouwen → minder abonnees → meer bezuinigingen → slechtere journalistiek → nog minder vertrouwen.',
          'Zelfversterkende negatieve spiraal die alle filters versterkt.',
-         'publiek', 'mediaorganisatie_rol'),
+         'publiek', 'mediaorganisatie'),
     ]
 
     existing_mechs = set(

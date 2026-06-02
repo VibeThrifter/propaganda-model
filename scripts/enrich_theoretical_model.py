@@ -66,19 +66,19 @@ NEW_MECHANISMS = [
      "print, online en TV. Vermindert pluriformiteit op eigenaarsniveau drastisch",
      "Controle over meerdere mediakanalen door dezelfde eigenaar. "
      "Minder concurrerende perspectieven, uniforme bedrijfscultuur over titels heen",
-     "mediaeigenaar", "mediaorganisatie_rol"),
+     "mediaeigenaar", "mediaorganisatie"),
 
     ("acquisitiestrategie", "eigendom",
      "Decennia van overnames en fusies concentreren eigendom: DPG nam PCM, VNU, Sanoma, RTL over; "
      "Mediahuis nam TMG en NRC Media over. Wordt gerechtvaardigd als 'noodzakelijk voor digitaal tijdperk'",
      "Drastische vermindering pluriformiteit. Controle informatievoorziening bij kleine groep",
-     "mediaeigenaar", "mediaorganisatie_rol"),
+     "mediaeigenaar", "mediaorganisatie"),
 
     ("holdingconstructie", "eigendom",
      "Eigendom wordt uitgeoefend via tussenvehikels (Epifin, Mediahuis Partners, VP Exploitatie) "
      "die afstand creëren tussen familie en redactie maar controle behouden",
      "Schijn van onafhankelijkheid terwijl eigendomsmacht intact blijft. Redactiestatuten bieden geen ijzerharde garanties",
-     "overnamevehikel", "mediaorganisatie_rol"),
+     "overnamevehikel", "mediaorganisatie"),
 
     ("systemisch_eigenaarschap", "eigendom",
      "Institutionele beleggers (BlackRock, Vanguard) bezitten via stemrecht de facto alle "
@@ -93,7 +93,7 @@ NEW_MECHANISMS = [
      "Media nemen dit frame onkritisch over in economie- en duurzaamheidskaternen",
      "Neutraliseert systeemkritiek door kapitalisme zelf als oplossing te presenteren. "
      "ESG-metrics dienen meer ter legitimatie dan controle. Greenwashing wordt genormaliseerd",
-     "adverteerder", "mediaorganisatie_rol"),
+     "adverteerder", "mediaorganisatie"),
 
     # ---- SOURCING ----
     ("haagse_stam", "sourcing",
@@ -101,7 +101,7 @@ NEW_MECHANISMS = [
      "Gedeelde ruimte, jargon, ongeschreven regels en diepe onderlinge afhankelijkheid",
      "Cultuur van terughoudendheid en zelfcensuur. Fundamentele kritiek leidt tot uitsluiting. "
      "Parlementaire verslaggeving volgt agenda machthebbers. NL politieke cultuur een van meest gesloten in Westen",
-     "officiele_bron", "mediaorganisatie_rol"),
+     "officiele_bron", "mediaorganisatie"),
 
     ("lobby_informatievoorziening", "sourcing",
      "Lobbyisten leveren kant-en-klare informatie aan parlementsleden voor Kamervragen. "
@@ -144,14 +144,14 @@ NEW_MECHANISMS = [
      "creëert angstcultuur die hele beroepsgroep beïnvloedt. 61% NL journalisten ervaart intimidatie",
      "Misdaadjournalistiek en kritische verslaggeving worden risicovoller. "
      "Hele redacties worden risicomijdender, niet alleen individuele slachtoffers",
-     "flak_producent", "mediaorganisatie_rol"),
+     "flak_producent", "mediaorganisatie"),
 
     ("alternatieve_uitdaging", "flak",
      "Alternatieve media dagen mainstream consensus uit. Appelleren aan groeiend wantrouwen "
      "bij publiek dat voelt dat 'gezond verstand' van media niet strookt met eigen ervaring",
      "Toont dat hegemonie niet totaal is. Maar inhoud vaak feitelijk onjuist, "
      "waardoor legitieme kritiek besmet raakt door associatie met extremen",
-     "alternatief_medium", "mediaorganisatie_rol"),
+     "alternatief_medium", "mediaorganisatie"),
 
     # ---- IDEOLOGIE ----
     ("spectrum_bewaking", "ideologie",
@@ -168,7 +168,7 @@ NEW_MECHANISMS = [
      "van coalitie van actoren over zeer lange periode",
      "Default setting is volgen elite-consensus. Enorme hoeveelheid tegenbewijs en "
      "maatschappelijke druk nodig om narratief duurzaam te veranderen",
-     "mediaorganisatie_rol", "burger"),
+     "mediaorganisatie", "burger"),
 
     ("emergente_bias", "ideologie",
      "Pro-elite bias is geen georkestreerd plan maar emergent, zelforganiserend gevolg van systeem "
@@ -176,14 +176,14 @@ NEW_MECHANISMS = [
      "op basis van dezelfde prikkels produceren uniform nieuwsproduct",
      "Journalist kiest invalshoek niet op bevel eigenaar maar omdat hij weet dat chef het goed vindt, "
      "het online scoort en geen problemen oplevert. De 'black box' is geen controlekamer maar zelforganiserend systeem",
-     "mediaorganisatie_rol", "burger"),
+     "mediaorganisatie", "burger"),
 
     ("academische_blootlegging", "ideologie",
      "Kritische academici leggen structurele filters bloot. Hun werk wordt echter grotendeels genegeerd "
      "door gevestigde mediawetenschap en reguliere media. De hegemonie beschermt zichzelf",
      "Structurele kritiek bereikt zelden het publiek. Discussie blijft steken bij incidenten, "
      "zonder onderliggende systemische oorzaken te benoemen",
-     "academisch_criticus", "mediaorganisatie_rol"),
+     "academisch_criticus", "mediaorganisatie"),
 
     ("parlementaire_doorbraak", "overig",
      "Parlementaire controle kan filters doorbreken. "
@@ -219,7 +219,7 @@ NEW_MECHANISMS = [
      "maar betalen hoge persoonlijke prijs (reputatie, veiligheid, carrière)",
      "Essentiële correctiefunctie op het systeem. Maar het systeem reageert met flak: "
      "juridische dreiging, deplatforming, etikettering",
-     "klokkenluider", "mediaorganisatie_rol"),
+     "klokkenluider", "mediaorganisatie"),
 ]
 
 
