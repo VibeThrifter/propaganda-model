@@ -932,6 +932,8 @@ function initTimeline() {
     document.getElementById('timeLabel').textContent =
       state.timelineYear === null ? 'Alle jaren' : state.timelineYear;
     applyFilters();
+    // Ververs een open detailpaneel zodat de relatielijst het jaar volgt
+    if (state.selectedNode) showDetail(state.selectedNode);
   });
 }
 
@@ -1400,11 +1402,11 @@ function mechCard(m, otherName, direction) {
 function showInstanceDetail(d, content, color) {
   const outgoing = currentLinks.filter(l => {
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
-    return sid === d.id;
+    return sid === d.id && isActiveAt(l, state.timelineYear);
   });
   const incoming = currentLinks.filter(l => {
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
-    return tid === d.id;
+    return tid === d.id && isActiveAt(l, state.timelineYear);
   });
 
   const period = formatPeriod(d);
@@ -1572,10 +1574,14 @@ function applyFilters() {
       const color = getLinkColor(l, isTheory);
       const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
       return `url(#${prefix}${color.replace('#','')})`;
-    });
+    })
+    // Verborgen links niet hoverbaar: geen tooltip op uitgefilterde/verleden relaties
+    .style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
 
   if (edgeLabelElements) {
-    edgeLabelElements.attr('opacity', (l, i) => visibleLinkSet.has(i) ? 1 : 0);
+    edgeLabelElements
+      .attr('opacity', (l, i) => visibleLinkSet.has(i) ? 1 : 0)
+      .style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
   }
 
   // Stats — count only visible
