@@ -229,6 +229,148 @@ def create_citation():
         return jsonify({"error": str(e)}), 400
 
 
+# ── Entiteiten & relaties API ────────────────────────────────
+
+@app.route("/api/entities", methods=["POST"])
+def create_entity():
+    """Nieuwe entiteit (node) toevoegen."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "Geen data"}), 400
+
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Naam is verplicht"}), 400
+
+    etype = (data.get("type") or "").strip()
+    if not etype:
+        return jsonify({"error": "Type is verplicht"}), 400
+
+    primary_role_id = data.get("primary_role_id") or None
+    description = (data.get("description") or "").strip() or None
+    active_from = (data.get("active_from") or "").strip() or None
+    active_until = (data.get("active_until") or "").strip() or None
+    contributed_by = (data.get("contributed_by") or "").strip() or "anoniem"
+
+    conn = get_db()
+    try:
+        cur = conn.execute("""
+            INSERT INTO entities (name, type, primary_role_id, description, active_from, active_until)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (name, etype, primary_role_id, description, active_from, active_until))
+        eid = cur.lastrowid
+
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('entities', ?, 'created', ?, ?, ?)
+        """, (eid, contributed_by, json.dumps({"name": name, "type": etype}),
+              "Nieuwe entiteit toegevoegd"))
+
+        conn.commit()
+        row = conn.execute("""
+            SELECT e.id, e.name, e.type, e.description,
+                   e.active_from, e.active_until, e.active,
+                   r.name as role_name, r.category as filter_category
+            FROM entities e
+            LEFT JOIN roles r ON e.primary_role_id = r.id
+            WHERE e.id = ?
+        """, (eid,)).fetchone()
+        conn.close()
+        return jsonify(dict(row)), 201
+
+    except sqlite3.IntegrityError as e:
+        conn.close()
+        msg = str(e)
+        if "UNIQUE" in msg:
+            return jsonify({"error": f"Er bestaat al een entiteit met de naam '{name}'"}), 400
+        if "CHECK" in msg:
+            return jsonify({"error": f"Ongeldig entiteittype: '{etype}'"}), 400
+        return jsonify({"error": msg}), 400
+
+
+@app.route("/api/relations", methods=["POST"])
+def create_relation():
+    """Nieuwe relatie (edge) tussen twee entiteiten toevoegen."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "Geen data"}), 400
+
+    source_id = data.get("source_id")
+    target_id = data.get("target_id")
+    if not source_id or not target_id:
+        return jsonify({"error": "Bron en doel zijn verplicht"}), 400
+    if source_id == target_id:
+        return jsonify({"error": "Bron en doel mogen niet dezelfde entiteit zijn"}), 400
+
+    rtype = (data.get("relation_type") or "").strip()
+    if not rtype:
+        return jsonify({"error": "Relatietype is verplicht"}), 400
+
+    mechanism_id = data.get("mechanism_id") or None
+    description = (data.get("description") or "").strip() or None
+    bidirectional = 1 if data.get("bidirectional") else 0
+    active_from = (data.get("active_from") or "").strip() or None
+    active_until = (data.get("active_until") or "").strip() or None
+    contributed_by = (data.get("contributed_by") or "").strip() or "anoniem"
+
+    def clamp01(v):
+        if v in (None, ""):
+            return None
+        try:
+            return min(1.0, max(0.0, float(v)))
+        except (ValueError, TypeError):
+            return None
+
+    certainty = clamp01(data.get("certainty"))
+    influence = clamp01(data.get("influence"))
+
+    conn = get_db()
+    for label, eid in (("Bron", source_id), ("Doel", target_id)):
+        if not conn.execute("SELECT 1 FROM entities WHERE id = ?", (eid,)).fetchone():
+            conn.close()
+            return jsonify({"error": f"{label}-entiteit bestaat niet"}), 400
+
+    try:
+        cur = conn.execute("""
+            INSERT INTO relations
+                (source_id, target_id, relation_type, mechanism_id, description,
+                 certainty, influence, bidirectional, active_from, active_until)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (source_id, target_id, rtype, mechanism_id, description,
+              certainty, influence, bidirectional, active_from, active_until))
+        rid = cur.lastrowid
+
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('relations', ?, 'created', ?, ?, ?)
+        """, (rid, contributed_by,
+              json.dumps({"source_id": source_id, "target_id": target_id, "relation_type": rtype}),
+              "Nieuwe relatie toegevoegd"))
+
+        conn.commit()
+        row = conn.execute("""
+            SELECT r.id, r.source_id, r.target_id, r.relation_type,
+                   r.certainty, r.influence, r.bidirectional, r.description,
+                   r.active_from, r.active_until, r.active,
+                   e1.name as source_name, e2.name as target_name,
+                   m.name as mechanism_name, m.filter as mechanism_filter
+            FROM relations r
+            JOIN entities e1 ON r.source_id = e1.id
+            JOIN entities e2 ON r.target_id = e2.id
+            LEFT JOIN mechanisms m ON r.mechanism_id = m.id
+            WHERE r.id = ?
+        """, (rid,)).fetchone()
+        conn.close()
+        return jsonify(dict(row)), 201
+
+    except sqlite3.IntegrityError as e:
+        conn.close()
+        msg = str(e)
+        if "CHECK" in msg:
+            return jsonify({"error": f"Ongeldig relatietype of waarde: '{rtype}'"}), 400
+        return jsonify({"error": msg}), 400
+
+
 if __name__ == "__main__":
     print(f"Database: {DB_PATH}")
     print(f"Open: http://localhost:5000")

@@ -381,6 +381,55 @@ body {
   :root { --panel-w: 0px; }
   #sidebar { display: none; }
 }
+
+/* TOEVOEGEN-KNOP + MODAL */
+.add-btn {
+  background: rgba(108,138,255,0.18); border: 1px solid rgba(108,138,255,0.4);
+  color: var(--accent); padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap; transition: all 0.2s;
+}
+.add-btn:hover { background: rgba(108,138,255,0.32); }
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: none; align-items: flex-start; justify-content: center;
+  padding: 80px 16px 16px; overflow-y: auto;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg-panel); border: 1px solid var(--border-light);
+  border-radius: 12px; box-shadow: var(--shadow);
+  width: 100%; max-width: 460px; padding: 0 0 18px;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { font-size: 14px; font-weight: 600; }
+.modal-close {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 22px; line-height: 1; padding: 0 4px;
+}
+.modal-close:hover { color: var(--text); }
+.modal-tabs { display: flex; gap: 6px; padding: 12px 20px 0; }
+.modal-tabs button {
+  flex: 1; background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-dim); padding: 8px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600; transition: all 0.2s;
+}
+.modal-tabs button.active { background: rgba(108,138,255,0.18); border-color: rgba(108,138,255,0.4); color: var(--accent); }
+.modal .arg-form { margin: 14px 20px 0; padding: 0; background: none; border: none; }
+.modal .arg-form input[type="number"],
+.modal .arg-form input[type="date"] {
+  width: 100%; background: var(--bg-card); border: 1px solid var(--border-light);
+  border-radius: 6px; color: var(--text); padding: 7px 9px; font-size: 12px;
+  font-family: inherit;
+}
+.modal .arg-form .checkbox-row { display: flex; align-items: center; gap: 8px; }
+.modal .arg-form .checkbox-row input { width: auto; }
+.modal .arg-form .form-row.two { display: flex; gap: 10px; }
+.modal .arg-form .form-row.two > div { flex: 1; }
 </style>
 </head>
 <body>
@@ -396,8 +445,23 @@ body {
     <span class="search-icon">&#x1F50D;</span>
     <input type="text" id="search" placeholder="Zoek..." autocomplete="off" spellcheck="false">
   </div>
+  <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen">+ Toevoegen</button>
   <div class="stats" id="stats"></div>
 </header>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Toevoegen aan het model</h3>
+      <button class="modal-close" id="addModalClose" title="Sluiten">&times;</button>
+    </div>
+    <div class="modal-tabs">
+      <button data-addtab="entity" class="active">Entiteit</button>
+      <button data-addtab="relation">Relatie</button>
+    </div>
+    <div id="addModalBody"></div>
+  </div>
+</div>
 
 <aside id="sidebar">
   <div class="panel-section" id="colorModeSection">
@@ -14352,6 +14416,211 @@ document.getElementById('zoomFit').addEventListener('click', () => {
   svgEl.transition().duration(500).call(zoom.transform, d3.zoomIdentity
     .translate(width/2, height/2).scale(0.6).translate(-width/2, -height/2));
 });
+
+// ============================================================
+// TOEVOEGEN: entiteiten & relaties
+// ============================================================
+const ENTITY_TYPE_GROUPS = {
+  'Personen': ['politicus','journalist','voorlichter','lobbyist','columnist','academicus',
+    'mediaeigenaar','toezichthouder_persoon','advocaat','klokkenluider','persoon'],
+  'Organisaties': ['partij','mediaorganisatie','persbureau','bedrijf','adverteerder','lobbygroep',
+    'denktank','overheidsinstelling','toezichthouder','ngo','vakbond','omroep','elite_netwerk',
+    'vermogensbeheerder','pr_bureau','platform','rechterlijke_macht','onderwijsinstelling','burgerinitiatief'],
+};
+
+function entityTypeOptions() {
+  return Object.entries(ENTITY_TYPE_GROUPS).map(([grp, types]) =>
+    `<optgroup label="${grp}">` +
+    types.map(t => `<option value="${t}">${t.replace(/_/g, ' ')}</option>`).join('') +
+    `</optgroup>`).join('');
+}
+function roleOptions() {
+  return '<option value="">— geen —</option>' +
+    DATA.roles.slice().sort((a, b) => a.name.localeCompare(b.name))
+      .map(r => `<option value="${r.id}">${r.name} (${FILTER_LABELS[r.category] || r.category})</option>`).join('');
+}
+function entityOptions() {
+  return '<option value="">— kies —</option>' +
+    DATA.entities.slice().sort((a, b) => a.name.localeCompare(b.name))
+      .map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+}
+function relationTypeOptions() {
+  return Object.entries(RELATION_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+}
+function mechanismOptions() {
+  return '<option value="">— geen —</option>' +
+    DATA.mechanisms.slice().sort((a, b) => a.name.localeCompare(b.name))
+      .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+}
+
+function entityFormHtml() {
+  return `
+  <div class="arg-form">
+    <div class="form-row">
+      <label>Naam *</label>
+      <input type="text" id="ent-name" placeholder="bv. DPG Media" autocomplete="off">
+    </div>
+    <div class="form-row two">
+      <div><label>Type *</label><select id="ent-type">${entityTypeOptions()}</select></div>
+      <div><label>Primaire rol</label><select id="ent-role">${roleOptions()}</select></div>
+    </div>
+    <div class="form-row">
+      <label>Beschrijving</label>
+      <textarea id="ent-desc" placeholder="Korte omschrijving..."></textarea>
+    </div>
+    <div class="form-row two">
+      <div><label>Actief vanaf (jaar)</label><input type="number" id="ent-from" placeholder="bv. 2019"></div>
+      <div><label>Actief tot (jaar)</label><input type="number" id="ent-until" placeholder="optioneel"></div>
+    </div>
+    <div class="form-row">
+      <label>Jouw naam</label>
+      <input type="text" id="ent-by" placeholder="anoniem" autocomplete="off">
+    </div>
+    <div id="ent-msg"></div>
+    <button class="btn-submit" onclick="submitEntity()">Entiteit toevoegen</button>
+    <button class="btn-cancel" onclick="closeAddModal()">Annuleren</button>
+  </div>`;
+}
+
+function relationFormHtml() {
+  return `
+  <div class="arg-form">
+    <div class="form-row"><label>Bron-entiteit *</label><select id="rel-source">${entityOptions()}</select></div>
+    <div class="form-row"><label>Doel-entiteit *</label><select id="rel-target">${entityOptions()}</select></div>
+    <div class="form-row two">
+      <div><label>Relatietype *</label><select id="rel-type">${relationTypeOptions()}</select></div>
+      <div><label>Mechanisme</label><select id="rel-mech">${mechanismOptions()}</select></div>
+    </div>
+    <div class="form-row two">
+      <div><label>Zekerheid (0–100)</label><input type="number" id="rel-cert" min="0" max="100" placeholder="bv. 80"></div>
+      <div><label>Invloed (0–100)</label><input type="number" id="rel-infl" min="0" max="100" placeholder="bv. 60"></div>
+    </div>
+    <div class="form-row">
+      <label>Beschrijving</label>
+      <textarea id="rel-desc" placeholder="Waaruit blijkt deze relatie?"></textarea>
+    </div>
+    <div class="form-row two">
+      <div><label>Actief vanaf (jaar)</label><input type="number" id="rel-from" placeholder="optioneel"></div>
+      <div><label>Actief tot (jaar)</label><input type="number" id="rel-until" placeholder="optioneel"></div>
+    </div>
+    <div class="form-row checkbox-row">
+      <input type="checkbox" id="rel-bidir"><label for="rel-bidir" style="margin:0">Wederzijds (bidirectioneel)</label>
+    </div>
+    <div class="form-row">
+      <label>Jouw naam</label>
+      <input type="text" id="rel-by" placeholder="anoniem" autocomplete="off">
+    </div>
+    <div id="rel-msg"></div>
+    <button class="btn-submit" onclick="submitRelation()">Relatie toevoegen</button>
+    <button class="btn-cancel" onclick="closeAddModal()">Annuleren</button>
+  </div>`;
+}
+
+let addTab = 'entity';
+function openAddModal(tab) {
+  addTab = tab || 'entity';
+  document.querySelectorAll('.modal-tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.addtab === addTab));
+  document.getElementById('addModalBody').innerHTML =
+    addTab === 'entity' ? entityFormHtml() : relationFormHtml();
+  document.getElementById('addModal').classList.add('open');
+}
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('open');
+}
+
+function recomputeDegrees() {
+  const deg = {};
+  DATA.relations.forEach(r => {
+    deg[r.source_id] = (deg[r.source_id] || 0) + 1;
+    deg[r.target_id] = (deg[r.target_id] || 0) + 1;
+  });
+  DATA.entities.forEach(e => { e.degree = deg[e.id] || 0; });
+}
+
+function addEntityToGraph(ent) {
+  ent.filterCat = ent.filter_category || 'overig';
+  ent.degree = 0;
+  DATA.entities.push(ent);
+  entityMap.set(ent.id, ent);
+  if (state.model === 'instance') buildGraph();   // buildGraph roept applyFilters aan
+}
+
+function addRelationToGraph(rel) {
+  DATA.relations.push(rel);
+  instanceLinks.push({ ...rel, source: rel.source_id, target: rel.target_id });
+  recomputeDegrees();
+  if (state.model === 'instance') buildGraph();
+}
+
+async function submitEntity() {
+  const msg = document.getElementById('ent-msg');
+  const name = document.getElementById('ent-name').value.trim();
+  if (!name) { msg.innerHTML = '<div class="form-message error">Naam is verplicht</div>'; return; }
+  const body = {
+    name,
+    type: document.getElementById('ent-type').value,
+    primary_role_id: document.getElementById('ent-role').value || null,
+    description: document.getElementById('ent-desc').value.trim() || null,
+    active_from: document.getElementById('ent-from').value.trim() || null,
+    active_until: document.getElementById('ent-until').value.trim() || null,
+    contributed_by: document.getElementById('ent-by').value.trim() || 'anoniem',
+  };
+  try {
+    const resp = await fetch('/api/entities', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { msg.innerHTML = `<div class="form-message error">${result.error || 'Fout bij opslaan'}</div>`; return; }
+    addEntityToGraph(result);
+    msg.innerHTML = '<div class="form-message success">Entiteit toegevoegd!</div>';
+    setTimeout(() => {
+      closeAddModal();
+      const n = currentNodes && currentNodes.find(x => x.id === result.id);
+      if (n) selectNode(n);
+    }, 600);
+  } catch (e) { msg.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`; }
+}
+
+async function submitRelation() {
+  const msg = document.getElementById('rel-msg');
+  const source_id = parseInt(document.getElementById('rel-source').value, 10) || null;
+  const target_id = parseInt(document.getElementById('rel-target').value, 10) || null;
+  if (!source_id || !target_id) { msg.innerHTML = '<div class="form-message error">Kies een bron en een doel</div>'; return; }
+  if (source_id === target_id) { msg.innerHTML = '<div class="form-message error">Bron en doel mogen niet hetzelfde zijn</div>'; return; }
+  const certRaw = document.getElementById('rel-cert').value.trim();
+  const inflRaw = document.getElementById('rel-infl').value.trim();
+  const body = {
+    source_id, target_id,
+    relation_type: document.getElementById('rel-type').value,
+    mechanism_id: document.getElementById('rel-mech').value || null,
+    certainty: certRaw ? Math.min(100, Math.max(0, parseFloat(certRaw))) / 100 : null,
+    influence: inflRaw ? Math.min(100, Math.max(0, parseFloat(inflRaw))) / 100 : null,
+    description: document.getElementById('rel-desc').value.trim() || null,
+    bidirectional: document.getElementById('rel-bidir').checked,
+    active_from: document.getElementById('rel-from').value.trim() || null,
+    active_until: document.getElementById('rel-until').value.trim() || null,
+    contributed_by: document.getElementById('rel-by').value.trim() || 'anoniem',
+  };
+  try {
+    const resp = await fetch('/api/relations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { msg.innerHTML = `<div class="form-message error">${result.error || 'Fout bij opslaan'}</div>`; return; }
+    addRelationToGraph(result);
+    msg.innerHTML = '<div class="form-message success">Relatie toegevoegd!</div>';
+    setTimeout(() => { closeAddModal(); selectRelation(result); }, 600);
+  } catch (e) { msg.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`; }
+}
+
+document.getElementById('addBtn').addEventListener('click', () => openAddModal('entity'));
+document.getElementById('addModalClose').addEventListener('click', closeAddModal);
+document.getElementById('addModal').addEventListener('click', (e) => {
+  if (e.target.id === 'addModal') closeAddModal();
+});
+document.querySelectorAll('.modal-tabs button').forEach(b =>
+  b.addEventListener('click', () => openAddModal(b.dataset.addtab)));
 
 // ============================================================
 // INIT
