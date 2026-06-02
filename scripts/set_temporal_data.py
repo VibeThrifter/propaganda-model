@@ -45,7 +45,7 @@ ENTITY_PERIODS = {
     "Chris Oomen":                  (None, None, True),
     "John de Mol":                  ("1955", None, True),
     "Maarten van Rossem":           ("1943", None, True),
-    "Rob de Wijk":                  (None, None, True),
+    "Rob de Wijk":                  ("1954", None, True),     # geboortejaar, directeur HCSS
     "Ron Fresen":                   (None, None, True),
     "Willem Schinkel":              (None, None, True),
     "Peter R. de Vries":            ("1956", "2021", False),  # vermoord 2021
@@ -72,7 +72,7 @@ ENTITY_PERIODS = {
     "Groupe Bruxelles Lambert":     ("1902", None, True),
     "Epifin":                       (None, None, True),
     "VP Exploitatie":               (None, None, True),
-    "Concentra":                    (None, None, True),
+    "Concentra":                    ("1880", None, True),     # Belgisch mediabedrijf (Hasselt)
     "Mediahuis Partners":           (None, None, True),
     "BlackRock":                    ("1988", None, True),
     "Vanguard":                     ("1975", None, True),
@@ -121,9 +121,9 @@ ENTITY_PERIODS = {
     "RIVM":                         ("1910", None, True),
     "CPB (Centraal Planbureau)":    ("1945", None, True),
     "Politie":                      (None, None, True),
-    "Ministerie van Defensie":      (None, None, True),
-    "Ministerie van Buitenlandse Zaken": (None, None, True),
-    "Koningshuis":                  (None, None, True),
+    "Ministerie van Defensie":      ("1798", None, True),     # oprichting departement van Oorlog/Marine
+    "Ministerie van Buitenlandse Zaken": ("1798", None, True),  # oprichting departement
+    "Koningshuis":                  ("1815", None, True),     # Koninkrijk der Nederlanden
     "NAVO":                         ("1949", None, True),
     "OMT (Outbreak Management Team)": ("2020", "2023", False),  # opgeheven 2023
     "Tweede Kamer":                 ("1815", None, True),
@@ -136,10 +136,33 @@ ENTITY_PERIODS = {
     # --- Historische bedrijven ---
     "PCM Uitgevers":                ("1965", "2009", False),  # opgegaan in DPG
     "Sanoma Nederland":             ("1999", "2020", False),  # overgenomen door DPG
-    "VNU Media":                    (None, "2007", False),    # overgenomen
-    "TMG (Telegraaf Media Groep)":  (None, "2020", False),   # overgenomen door Mediahuis
-    "NRC Media":                    (None, "2015", False),    # overgenomen door Mediahuis
+    "VNU Media":                    ("1964", "2007", False),  # VNU opgericht 1964, overgenomen
+    "TMG (Telegraaf Media Groep)":  ("1893", "2020", False),  # lijn De Telegraaf N.V., overgenomen door Mediahuis
+    "NRC Media":                    ("2010", "2015", False),  # verzelfstandigd 2010, overgenomen door Mediahuis
     "De Persgroep":                 ("1945", "2019", False),  # hernoemd naar DPG Media
+
+    # --- Overige bedrijven ---
+    "KLM":                          ("1919", None, True),
+    "Microsoft":                    ("1975", None, True),
+    "KPMG":                         ("1987", None, True),     # fusie 1987
+    "Ernst & Young":                ("1989", None, True),     # fusie 1989
+    "Uber":                         ("2009", None, True),
+    "Royal HaskoningDHV":           ("2012", None, True),     # fusie Royal Haskoning + DHV
+    "Hill+Knowlton":                ("1927", None, True),
+
+    # --- Overige politici / personen ---
+    "Jan Peter Balkenende":         ("1956", None, True),     # geboortejaar
+    "Neelie Kroes":                 ("1941", None, True),
+    "Wouter Bos":                   ("1963", None, True),
+    "Camiel Eurlings":              ("1973", None, True),
+    "Hans Hillen":                  ("1947", None, True),
+    "Frank Heemskerk":              ("1969", None, True),
+    "Raymond Knops":                ("1971", None, True),
+    "Eeke van der Veen":            ("1948", None, True),
+    "Bart de Liefde":               ("1976", None, True),
+    "Tijs van den Brink":           ("1976", None, True),
+    "Jack de Vries":                ("1968", None, True),
+    "Afke Schaart":                 ("1973", None, True),
 }
 
 
@@ -255,6 +278,28 @@ def update():
         if cur.rowcount > 0:
             rel_updated += 1
 
+    # 3. Afgeleide active_from voor resterende relaties zonder begindatum.
+    #    Een relatie kan niet bestaan vóór beide betrokken entiteiten: neem het
+    #    laatste (max) active_from van bron en doel. Overschrijft géén bestaande
+    #    (handmatig gecureerde) waarden.
+    cur.execute("""
+        UPDATE relations
+        SET active_from = (
+            SELECT MAX(CAST(e.active_from AS INTEGER))
+            FROM entities e
+            WHERE e.id IN (relations.source_id, relations.target_id)
+              AND e.active_from IS NOT NULL
+        )
+        WHERE active_from IS NULL
+          AND (
+            SELECT MAX(CAST(e.active_from AS INTEGER))
+            FROM entities e
+            WHERE e.id IN (relations.source_id, relations.target_id)
+              AND e.active_from IS NOT NULL
+          ) IS NOT NULL
+    """)
+    rel_derived = cur.rowcount
+
     conn.commit()
 
     # Stats
@@ -274,6 +319,7 @@ def update():
     print(f"{'='*60}")
     print(f"Entiteiten bijgewerkt:  {entity_updated}")
     print(f"Relaties bijgewerkt:    {rel_updated}")
+    print(f"Relaties afgeleid:      {rel_derived}")
     print(f"{'='*60}")
     print(f"Entiteiten met datum:   {dated_e}")
     print(f"Relaties met datum:     {dated_r}")
