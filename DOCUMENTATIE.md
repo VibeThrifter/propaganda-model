@@ -16,10 +16,10 @@ Het systeem onderscheidt twee lagen:
 
 Beschrijft de structuur: welke **rollen** bestaan er in het medialandschap en via welke **mechanismen** oefenen ze invloed uit?
 
-- **Rollen** — abstracte functies die actoren kunnen vervullen (bijv. `mediaeigenaar`, `adverteerder`, `gatekeeper`)
+- **Rollen** — abstracte functies die actoren kunnen vervullen (bijv. `mediaeigenaar`, `adverteerder`, `hoofdredacteur`)
 - **Mechanismen** — processen waarmee de ene rol de andere beïnvloedt (bijv. `pakketjournalistiek`, `etikettering`, `zelfcensuur`)
 
-Elk mechanisme is gekoppeld aan een van de vijf filters van het propagandamodel, plus een categorie `overig` voor moderne fenomenen zoals algoritmische filtering.
+Elk mechanisme is gekoppeld aan een van de vijf filters van het propagandamodel, plus de uitbreidingen `cross_filter` (moderne, filteroverschrijdende mechanismen zoals algoritmische filtering en de draaideur) en `tegenmacht` (krachten die het systeem begrenzen).
 
 ### Laag 2: Instantiemodel (concreet, met namen)
 
@@ -34,41 +34,53 @@ Elke entiteit is gekoppeld aan een of meer rollen uit het theoretisch model. Elk
 
 ## De vijf filters + uitbreidingen
 
+Elk mechanisme is gekoppeld aan één filter; elke rol aan één categorie. Naast de vijf klassieke filters van Herman & Chomsky kent het model drie uitbreidingen die het hedendaagse Nederlandse landschap vangen: **cross-filter** (systemische en moderne mechanismen die meerdere filters overspannen), **tegenmacht** (krachten die het filtersysteem begrenzen of doorbreken) en **systeemactoren** (structurele spelers die in alle filters tegelijk opereren).
+
 ### Filter 1: Eigendom
 De eigendomsstructuur bepaalt de institutionele context van nieuwsproductie. In Nederland bestaat een duopolie: DPG Media en Mediahuis bezitten samen >90% van de online commerciële nieuwsmarkt. De eigenaren (families Van Thillo, Leysen, Baert, Van Puijenbroek) behoren tot de transnationale kapitaalklasse.
 
-**Rollen:** `mediaeigenaar`, `mediaorganisatie_rol`, `aandeelhouder`, `institutioneel_belegger`
-**Mechanismen:** `eigendomsconcentratie`, `winstmaximalisatie`
+**Rollen:** `mediaeigenaar`, `mediaorganisatie_rol`, `aandeelhouder`, `institutioneel_belegger`, `hoofdredacteur`, `overnamevehikel`
+**Mechanismen:** `eigendomsconcentratie`, `winstmaximalisatie`, `cross_media_eigendom`, `holdingconstructie`, `acquisitiestrategie`, `aandeelhouder_druk`, `systemisch_eigenaarschap`, `benoemingspolitiek`, `hoofdredacteur_als_filter`, `redactioneel_budgetcontrole`
 
 ### Filter 2: Advertentie
 Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeur creëert voor content die het consumentistische wereldbeeld bevestigt.
 
-**Rollen:** `adverteerder`, `mediaverkoper`
-**Mechanismen:** `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`
+**Rollen:** `adverteerder`
+**Mechanismen:** `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `commerciele_content_druk`, `stakeholder_capitalism_frame`
 
 ### Filter 3: Sourcing
-Economische druk dwingt redacties tot afhankelijkheid van een beperkt aantal routineuze bronnen: het ANP, de overheid, en door de elite gefinancierde denktanks.
+Economische druk dwingt redacties tot afhankelijkheid van een beperkt aantal routineuze bronnen: het ANP, de overheid, en door de elite gefinancierde denktanks. Toegang (*access*) is hierbij zelf een schaarse hulpbron: wie aan tafel mag krijgt een podium, wie fundamenteel afwijkt verliest die toegang geruisloos (`toegangsdisciplinering`).
 
-**Rollen:** `officiele_bron`, `persbureau`, `expert_bron`, `pr_machine`
-**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `expert_framing`, `pr_subsidie`
+**Rollen:** `persbureau`, `journalist`, `voorlichter`, `lobbyist`, `denktank`
+**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `expert_framing`, `pr_subsidie`, `haagse_stam`, `toegangsdisciplinering`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `pr_naar_journalist`, `persbureau_naar_redactie`, `lobby_informatievoorziening`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_legitimatie`, `denktank_financiering_bias`, `denktank_naar_media`, `denktank_naar_politiek`
 
 ### Filter 4: Flak
-Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur.
+Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur. De hedendaagse *cancelling* — een gast die iets onwelgevalligs zegt en niet meer wordt uitgenodigd — valt hier onder via `deplatforming`.
 
-**Rollen:** `flak_producent`, `flak_doelwit`
-**Mechanismen:** `juridische_dreiging`, `publieke_aanval`, `deplatforming`, `etikettering`, `zelfcensuur`, `geweld_intimidatie`
+**Rollen:** `alternatief_medium`
+**Mechanismen:** `juridische_dreiging`, `publieke_aanval`, `deplatforming`, `etikettering`, `zelfcensuur`, `geweld_intimidatie`, `slapp_tegen_journalist`, `politieke_flak`, `elite_forum_flak`, `morele_chantage`, `onevenwichtig_debat`, `redactioneel_conformisme`, `sociologische_homogeniteit`, `chilling_effect_geweld`, `online_intimidatie_journalist`, `woo_obstructie`, `alternatieve_uitdaging`
 
 ### Filter 5: Ideologie
 Het overkoepelende filter: een neoliberaal, pro-Atlantisch denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). Elite-fora synchroniseren dit wereldbeeld buiten het democratisch proces om.
 
-**Rollen:** `ideoloog`, `gatekeeper`, `elite_forum`
-**Mechanismen:** `overton_bewaking`, `false_balance`, `draaideurconstructie`, `ideologische_synchronisatie`, `hegemonische_naturalisatie`
+**Rollen:** `elite_forum`, `columnist_opiniemaker`, `academisch_criticus`
+**Mechanismen:** `overton_bewaking`, `false_balance`, `draaideurconstructie`, `ideologische_synchronisatie`, `hegemonische_naturalisatie`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `elite_forum_ideologie`, `academische_blootlegging`
 
-### Overig (modern)
-Fenomenen die niet in het originele model van 1988 voorkomen maar essentieel zijn voor het huidige medialandschap.
+### Uitbreiding A: Cross-filter (systemisch & modern)
+Mechanismen die niet in één filter passen maar meerdere filters tegelijk aandrijven of overbruggen — vooral techplatforms, de draaideur tussen journalistiek en politiek, en economische terugkoppeling. Dit vervangt de oude losse categorie "Overig (modern)" uit het oorspronkelijke model.
 
-**Rollen:** `techplatform`, `toezichthouder`, `burger`, `klokkenluider`
-**Mechanismen:** `algoritmische_filtering`
+**Mechanismen:** `algoritmische_filtering`, `algoritmische_socialisatie`, `platform_nieuwsselectie`, `platform_verdienmodel_druk`, `platform_advertentie_concentratie`, `draaideur_journalistiek_politiek`, `draaideur_politiek_journalistiek`, `economische_feedback_loop`, `mediaeigenaar_elite_netwerk`
+
+### Uitbreiding B: Tegenmacht
+Het model is niet deterministisch: het modelleert óók de krachten die het filtersysteem begrenzen of doorbreken. Zulke doorbraken zijn mogelijk, maar vaak incidenteel en onder druk (zie ook `toezicht_tandeloosheid`).
+
+**Rollen:** `onderzoeksjournalist`, `klokkenluider`, `parlementair_controleur`, `toezichthouder`, `vakbond_media`, `burgerinitiatief`
+**Mechanismen:** `onderzoeksjournalist_doorbraak`, `klokkenluider_doorbraak`, `onafhankelijk_medium_tegenwicht`, `parlementaire_controle`, `parlementaire_doorbraak`, `toezichthouder_interventie`, `toezicht_tandeloosheid`, `vakbond_bescherming`, `academische_kritiek`, `burgerinitiatief_druk`
+
+### Systeemactoren
+Structurele spelers die in meerdere filters tegelijk opereren en daarom een eigen rolcategorie vormen (zij vervullen geen eigen filter maar voeden er meerdere).
+
+**Rollen:** `politicus`, `publiek`, `redactie`, `techplatform`
 
 ---
 
@@ -97,31 +109,32 @@ THEORETISCH MODEL          INSTANTIEMODEL              BEWIJS
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `roles` | Abstracte rollen in het medialandschap | name, category (filter), description, examples |
-| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter, description, effect, source_role_id, target_role_id |
+| `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples |
+| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (vijf filters + `cross_filter`/`tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), description, effect, source_role_id, target_role_id |
 
 ### Instantiemodel
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `entities` | Concrete actoren (personen, organisaties, partijen) | name, type, primary_role_id, description, metadata (JSON) |
+| `entities` | Concrete actoren (personen, organisaties, partijen) | name, type, primary_role_id, description, metadata (JSON), active_from/active_until/active (temporeel) |
 | `entity_roles` | Koppeltabel: entiteit kan meerdere rollen vervullen | entity_id, role_id, notes |
-| `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, certainty, influence |
+| `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, description, certainty, influence, bidirectional, active_from/active_until/active (temporeel) |
 | `source_mentions` | Welke entiteiten worden in welke bronnen genoemd | source_id, entity_id, context |
 
 ### Bronnen (academisch)
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `sources` | Academische bronnen (boeken, artikelen, rapporten) | title, author, source_type, publisher, date_published, language |
-| `source_locations` | Meerdere toegangspunten per bron | source_id, location_type (url/file/doi/isbn/arxiv/handle/archive_url), location |
+| `sources` | Academische bronnen (boeken, artikelen, rapporten) | title, author, source_type, publisher, date_published, language, summary, reliability (`primair`/`academisch`/`institutioneel`/…), processed |
+| `source_locations` | Meerdere toegangspunten per bron | source_id, location_type (url/file/doi/isbn/arxiv/handle/archive_url), location, accessed_at, notes |
 
 ### Argumenten & citaties (discussieboom)
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `arguments` | Discussieboom: argumenten op relaties of entiteiten, met nesting | relation_id (optioneel), entity_id (optioneel), parent_argument_id (NULL=root), stance, claim, reasoning, weight |
+| `arguments` | Discussieboom: argumenten op relaties of entiteiten, met nesting | relation_id (optioneel), entity_id (optioneel), parent_argument_id (NULL=root), property/property_value (optioneel: argument over een specifieke eigenschap), stance, claim, reasoning, weight, status (`ongecontroleerd` default), contributed_by |
 | `citations` | Bronvermeldingen per argument | argument_id, source_id, quote, page, section, context |
+| `edit_log` | Auditlog van wijzigingen (aanmaak, statuswijziging) | table_name, record_id, action (`created`/`updated`/`deleted`/`verified`/`disputed`), changed_by, old_value, new_value, reason |
 
 Argumenten vormen een boomstructuur:
 - **Root-argumenten** (`parent_argument_id = NULL`) hangen direct aan een relatie of entiteit
@@ -200,39 +213,43 @@ Entiteit: DPG Media
 
 ## Entiteittypes
 
+De volledige toegestane lijst staat in de `CHECK`-constraint van `entities` in `schema.sql`. De belangrijkste:
+
+**Personen:** `politicus`, `journalist`, `columnist`, `voorlichter`, `lobbyist`, `academicus`, `mediaeigenaar`, `toezichthouder_persoon`, `advocaat`, `klokkenluider`, `persoon`
+
+**Organisaties:**
+
 | Type | Beschrijving | Voorbeelden |
 |---|---|---|
-| `mediaorganisatie` | Nieuwsproducent of -distributeur | DPG Media, NOS, ANP, De Telegraaf |
-| `persoon` | Individu met specifieke rol | Christian Van Thillo, Thomas Leysen, Tabe Bergman |
-| `bedrijf` | Commercieel bedrijf | BlackRock, Shell, Albert Heijn, McKinsey |
-| `lobbygroep` | Belangenorganisatie of elite-forum | Bilderberg Groep, WEF, NAVO |
-| `denktank` | Onderzoeks-/beleidsinstituut | Clingendael, HCSS, Teldersstichting |
-| `overheidsinstelling` | Overheidsorgaan of toezichthouder | ACM, WRR, Belastingdienst |
+| `mediaorganisatie` | Nieuwsproducent of -distributeur (pers/online) | DPG Media, de Volkskrant, De Telegraaf, NRC |
+| `omroep` | Publieke of commerciële omroep | NOS, RTL Nederland |
+| `persbureau` | Persbureau / nieuwsgroothandel | ANP |
+| `bedrijf` | Commercieel bedrijf | Shell, Albert Heijn, McKinsey |
+| `adverteerder` | Bedrijf in adverteerdersrol | (grote landelijke adverteerders) |
+| `vermogensbeheerder` | Institutionele belegger | BlackRock, Vanguard |
+| `elite_netwerk` | Besloten elite-/coördinatieforum | Bilderberg Groep, World Economic Forum |
+| `denktank` | Onderzoeks-/beleidsinstituut | Clingendael, HCSS |
+| `overheidsinstelling` | Overheidsorgaan | Belastingdienst, WRR |
+| `toezichthouder` | Toezichthoudend orgaan | ACM, Commissariaat voor de Media |
 | `partij` | Politieke partij | VVD, CDA, PVV |
-| `politicus` | Individueel politicus | Pieter Omtzigt, Renske Leijten |
-| `journalist` | Individueel journalist | Peter R. de Vries, Ron Fresen |
-| `platform` | Digitaal platform | Google, Meta, TikTok, NU.nl |
-| `ngo` | Non-gouvernementele organisatie | Free Press Unlimited, NVJ, BOinK |
+| `platform` | Digitaal platform | Google, Meta, TikTok |
+| `pr_bureau` | Communicatie-/PR-bureau | — |
+| `ngo`, `vakbond`, `onderwijsinstelling`, `burgerinitiatief`, `rechterlijke_macht`, `lobbygroep` | Maatschappelijke en tegenmacht-actoren | NVJ, vakbonden, universiteiten |
 
 ## Relatietypes
 
-| Type | Beschrijving |
+De volledige lijst staat in de `CHECK`-constraint van `relations` in `schema.sql`, gegroepeerd:
+
+| Groep | Types |
 |---|---|
-| `eigendom` | A bezit B |
-| `financiering` | A financiert B |
-| `lidmaatschap` | A is lid van B (of B van A) |
-| `adverteerder` | A adverteert bij B |
-| `beinvloeding` | A beïnvloedt B (structureel) |
-| `censuur` | A censureert/onderdrukt B |
-| `personeel` | A is in dienst/bestuur van B |
-| `alliantie` | A en B werken samen |
-| `oppositie` | A en B staan tegenover elkaar |
-| `draaideur` | Personeel wisselt tussen A en B |
-| `framing` | A bepaalt het frame waarmee B wordt begrepen |
-| `lobbyt` | A lobbyt bij B |
-| `adviseur` | A adviseert B |
-| `donor` | A doneert aan B |
-| `mediaplatform` | A gebruikt B als mediakanaal |
+| **Eigendom & financiën** | `eigendom`, `financiering`, `adverteerder`, `donor`, `investering` |
+| **Organisatorisch** | `lidmaatschap`, `personeel`, `bestuurder`, `adviseur`, `woordvoerder_van`, `draaideur` |
+| **Informatiestromen** | `bron_van`, `mediaplatform`, `framing`, `citeert` |
+| **Macht & druk** | `lobbyt`, `censuur`, `flak`, `intimidatie`, `regulering`, `zelfcensuur` |
+| **Politiek & ideologisch** | `alliantie`, `oppositie`, `beinvloeding`, `cooptatie`, `etikettering` |
+| **Algoritmisch** | `algoritmische_filtering` |
+
+Meest gebruikt: `beinvloeding` (151), `eigendom` (51), `adverteerder` (40), `lidmaatschap` (24), `personeel` (16), `draaideur` (14).
 
 ---
 
@@ -242,15 +259,25 @@ Entiteit: DPG Media
 propaganda-model/
 ├── schema.sql                          # Databaseschema (alle tabellen)
 ├── DOCUMENTATIE.md                     # Dit bestand
+├── server.py                           # Flask: discussieboom-API + visualisatie op /
 ├── .gitignore                          # Negeert data/*.db, __pycache__, etc.
 │
 ├── data/
 │   └── propaganda_model.db             # SQLite database (niet in git)
 │
+├── web/
+│   ├── template.html                   # BRON van de D3-visualisatie (handmatig bewerken)
+│   └── index.html                      # GEGENEREERD door generate_viz.py (niet bewerken)
+│
 ├── scripts/
 │   ├── init_db.py                      # Database aanmaken vanuit schema.sql
-│   ├── seed_theoretical_model.py       # Laad 19 rollen en 21 mechanismen
-│   ├── seed_from_ai_source.py          # Laad 81 entiteiten en 105 relaties uit AI-analyse
+│   ├── seed_theoretical_model.py       # Basis: rollen + mechanismen (laag 1)
+│   ├── seed_from_ai_source.py          # Basis: entiteiten + relaties (laag 2)
+│   ├── seed_draaideur_relaties.py      # Extra draaideur-relaties
+│   ├── enrich_*.py                     # Verrijken van een bestaande DB (theorie + instanties)
+│   ├── migrate_*.py                    # Schema-/datamigraties (backup-then-migrate)
+│   ├── set_temporal_data.py            # Vult active_from/active_until op entiteiten/relaties
+│   ├── generate_viz.py                 # Regenereert web/index.html uit de DB
 │   └── register_source.py              # Registreer een academische bron via CLI
 │
 └── sources/                            # Bronmateriaal (teksten, transcripts)
@@ -261,6 +288,8 @@ propaganda-model/
     ├── articles/                       # Nieuwsartikelen, columns
     └── interviews/                     # Interview-transcripts
 ```
+
+> De `seed_*`-scripts leggen de basis; de huidige DB-inhoud is daarna uitgebreid via de `enrich_*`- en `migrate_*`-scripts. Een volledige reconstructie draait dus seed → enrich → migrate (de migratiescripts maken telkens een backup `data/propaganda_model_backup_<timestamp>.db`).
 
 ---
 
@@ -346,29 +375,31 @@ ORDER BY s.author;
 
 | Onderdeel | Aantal |
 |---|---|
-| Rollen (theoretisch) | 19 |
-| Mechanismen (theoretisch) | 21 |
-| Entiteiten (concreet) | 81 |
-| Relaties (concreet) | 105 |
-| Argumenten | 107 |
-| Citaties | 108 |
-| Bronnen | 6 |
-| Bronlocaties | 4 |
+| Rollen (theoretisch) | 26 |
+| Mechanismen (theoretisch) | 82 |
+| Entiteiten (concreet) | 121 |
+| Relaties (concreet) | 337 |
+| Argumenten | 316 |
+| Citaties | 3 |
+| Bronnen | 5 |
+| Bronlocaties | 3 |
+
+> Let op: de meeste argumenten zijn automatisch gegenereerde `supporting`-onderbouwingen met status `ongecontroleerd` en nog grotendeels zonder citatie. Het aanvullen van citaties en het controleren van argumentstatus is openstaand werk.
 
 ### Top 10 meest verbonden entiteiten
 
 | Entiteit | Type | Relaties |
 |---|---|---|
-| DPG Media | mediaorganisatie | 25 |
-| NOS | mediaorganisatie | 17 |
-| Mediahuis | mediaorganisatie | 14 |
-| ANP | mediaorganisatie | 10 |
-| Thomas Leysen | persoon | 7 |
-| Bilderberg Groep | lobbygroep | 7 |
-| Belastingdienst | overheidsinstelling | 7 |
-| de Volkskrant | mediaorganisatie | 6 |
-| RTL Nederland | mediaorganisatie | 5 |
-| Christian Van Thillo | persoon | 4 |
+| DPG Media | mediaorganisatie | 46 |
+| NOS | omroep | 43 |
+| Mediahuis | mediaorganisatie | 34 |
+| RTL Nederland | omroep | 33 |
+| de Volkskrant | mediaorganisatie | 28 |
+| De Telegraaf | mediaorganisatie | 24 |
+| AD (Algemeen Dagblad) | mediaorganisatie | 17 |
+| ANP | persbureau | 16 |
+| Bilderberg Groep | elite_netwerk | 15 |
+| World Economic Forum | elite_netwerk | 15 |
 
 ---
 
