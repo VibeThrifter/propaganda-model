@@ -131,8 +131,11 @@ body {
 }
 .filter-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color, var(--text-muted)); flex-shrink: 0; }
 
-.legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 11px; color: var(--text-dim); }
-.legend-item .swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; margin: 0 -6px; border-radius: 4px; font-size: 11px; color: var(--text-dim); cursor: pointer; user-select: none; transition: background 0.12s, color 0.12s; }
+.legend-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.legend-item.inactive .swatch { opacity: 0.4; }
+.legend-item.selected { background: rgba(255,255,255,0.09); color: var(--text); font-weight: 600; }
+.legend-item .swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; transition: opacity 0.12s; }
 .legend-item .count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 10px; }
 
 .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
@@ -240,7 +243,22 @@ body {
 }
 .temporal-badge.active { background: rgba(46,204,113,0.15); color: #2ecc71; }
 .temporal-badge.inactive { background: rgba(231,76,60,0.15); color: #e74c3c; }
-.temporal-period { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.temporal-period { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* Looptijd-sectie in detailpaneel */
+.timespan-row { display: flex; gap: 10px; }
+.timespan-cell {
+  flex: 1; display: flex; flex-direction: column; gap: 3px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px; padding: 8px 10px;
+}
+.timespan-cell .ts-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.timespan-cell .ts-value { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.timespan-cell .ts-discuss {
+  align-self: flex-start; margin-top: 2px; background: none; border: none; padding: 0;
+  font-size: 10px; color: var(--accent); cursor: pointer; opacity: 0.75;
+}
+.timespan-cell .ts-discuss:hover { opacity: 1; text-decoration: underline; }
 
 /* DISCUSSIEBOOM */
 .arg-tree { margin-top: 8px; }
@@ -467,8 +485,8 @@ body {
   <div class="panel-section" id="colorModeSection">
     <h3>Kleuring</h3>
     <div class="view-toggle" id="viewToggle">
-      <button class="active" data-mode="filter">Filter</button>
-      <button data-mode="type">Type</button>
+      <button class="active" data-mode="type">Type</button>
+      <button data-mode="filter">Filter</button>
     </div>
   </div>
   <div class="panel-section">
@@ -537,21 +555,28 @@ const FILTER_COLORS = {
   systeemactor: '#e8c547', cross_filter: '#fd79a8',
   overig: '#7f8c9a',
 };
+// Volgorde is bewust thematisch gegroepeerd; de legenda volgt deze volgorde,
+// zodat verwante types (bv. politicus/partij, journalist/mediaorganisatie) naast elkaar staan.
 const TYPE_COLORS = {
-  // Personen
-  politicus: '#e06060', journalist: '#5dade2', voorlichter: '#85c1e9',
-  lobbyist: '#e67e22', columnist: '#af7ac5', academicus: '#58d68d',
-  mediaeigenaar: '#e74c3c', toezichthouder_persoon: '#1abc9c',
-  advocaat: '#aeb6bf', klokkenluider: '#f7dc6f', persoon: '#7f8c8f',
-  // Organisaties
-  partij: '#c0392b', mediaorganisatie: '#3498db', persbureau: '#2e86c1',
-  bedrijf: '#f0a030', adverteerder: '#f39c12', lobbygroep: '#e67e22',
-  denktank: '#9b59b6', overheidsinstelling: '#1abc9c', toezichthouder: '#16a085',
-  ngo: '#27ae60', vakbond: '#2ecc71', omroep: '#2980b9',
-  elite_netwerk: '#d35400', vermogensbeheerder: '#c0392b',
-  pr_bureau: '#e59866', platform: '#8e44ad',
-  rechterlijke_macht: '#5d6d7e', onderwijsinstelling: '#48c9b0',
-  burgerinitiatief: '#82e0aa',
+  // Politiek & bestuur
+  politicus: '#e06060', partij: '#c0392b',
+  overheidsinstelling: '#1abc9c', toezichthouder: '#16a085',
+  toezichthouder_persoon: '#48c9b0', rechterlijke_macht: '#5d6d7e',
+  // Lobby & invloed
+  lobbyist: '#e67e22', lobbygroep: '#d35400', denktank: '#9b59b6',
+  pr_bureau: '#e59866', elite_netwerk: '#ca6f1e',
+  // Media
+  journalist: '#5dade2', columnist: '#af7ac5', voorlichter: '#85c1e9',
+  mediaeigenaar: '#e74c3c', mediaorganisatie: '#3498db',
+  omroep: '#2980b9', persbureau: '#2e86c1', platform: '#8e44ad',
+  // Economie
+  bedrijf: '#f0a030', adverteerder: '#f39c12', vermogensbeheerder: '#b9770e',
+  // Maatschappij
+  academicus: '#58d68d', onderwijsinstelling: '#1e8449',
+  ngo: '#27ae60', vakbond: '#2ecc71', burgerinitiatief: '#82e0aa',
+  klokkenluider: '#f7dc6f', advocaat: '#aeb6bf',
+  // Overig
+  persoon: '#7f8c8f',
 };
 const RELATION_LABELS = {
   // Eigendom & financiën
@@ -723,6 +748,7 @@ function renderArgForm(opts) {
   // opts: { relation_id, entity_id, parent_argument_id, onSuccess }
   const formId = 'arg-form-' + Math.random().toString(36).slice(2, 8);
   const parentLabel = opts.parent_argument_id ? 'Reageer op argument' : 'Nieuw argument';
+  const sel = v => opts.property === v ? ' selected' : '';
 
   return `
     <div class="arg-form" id="${formId}">
@@ -747,21 +773,21 @@ function renderArgForm(opts) {
         <div style="flex:1">
           <label>Eigenschap (optioneel)</label>
           <select id="${formId}-property">
-            <option value="">— Algemeen —</option>
-            <option value="existence">Bestaan</option>
-            <option value="active_from">Startdatum</option>
-            <option value="active_until">Einddatum</option>
-            <option value="certainty">Zekerheid</option>
-            <option value="influence">Invloed</option>
-            <option value="relation_type">Relatietype</option>
-            <option value="description">Beschrijving</option>
-            <option value="type">Entiteittype</option>
-            <option value="role">Rol</option>
+            <option value=""${sel('')}>— Algemeen —</option>
+            <option value="existence"${sel('existence')}>Bestaan</option>
+            <option value="active_from"${sel('active_from')}>Startdatum</option>
+            <option value="active_until"${sel('active_until')}>Einddatum</option>
+            <option value="certainty"${sel('certainty')}>Zekerheid</option>
+            <option value="influence"${sel('influence')}>Invloed</option>
+            <option value="relation_type"${sel('relation_type')}>Relatietype</option>
+            <option value="description"${sel('description')}>Beschrijving</option>
+            <option value="type"${sel('type')}>Entiteittype</option>
+            <option value="role"${sel('role')}>Rol</option>
           </select>
         </div>
         <div style="flex:1">
           <label>Waarde</label>
-          <input type="text" id="${formId}-propval" placeholder="bijv. 2006">
+          <input type="text" id="${formId}-propval" placeholder="bijv. 2006" value="${opts.property_value || ''}">
         </div>
       </div>
       <div class="form-row" style="display:flex;gap:8px">
@@ -935,12 +961,13 @@ const mechLinks = DATA.mechanisms.map(m => {
 // ============================================================
 let state = {
   model: 'instance',     // 'instance' | 'theory'
-  colorMode: 'filter',
+  colorMode: 'type',
   activeFilters: new Set(Object.keys(FILTER_COLORS)),
   certMin: 0, inflMin: 0,
   selectedNode: null,
   searchTerm: '',
   timelineYear: null,    // null = show all, number = filter to year
+  legendSelection: new Set(),  // leeg = alles tonen; anders alleen geselecteerde legenda-keys
 };
 
 // ============================================================
@@ -1261,6 +1288,50 @@ function formatPeriod(d) {
   return `${from} – ${until} ${badge}`;
 }
 
+// Prominente, bespreekbare looptijd-sectie voor relatie- of entiteit-detail.
+// idField = 'relation_id' of 'entity_id'. Toont begin/einde en knoppen die het
+// argumentformulier openen met de juiste eigenschap (active_from/active_until)
+// voorgeselecteerd — zo wordt elke datum onderdeel van dezelfde discussieboom.
+function renderTimespanSection(d, idField, id) {
+  const isActive = d.active !== 0 && d.active !== false;
+  const from = d.active_from || 'onbekend';
+  const until = d.active_until || (d.active_from ? 'heden' : 'onbekend');
+  const badge = (d.active_from || d.active_until)
+    ? (isActive ? '<span class="temporal-badge active">actief</span>'
+                : '<span class="temporal-badge inactive">inactief</span>')
+    : '';
+  const slotId = `ts-slot-${idField}-${id}`;
+  return `
+    <div class="detail-section">
+      <h4>Looptijd</h4>
+      <div class="timespan-row">
+        <div class="timespan-cell">
+          <span class="ts-label">Begin</span>
+          <span class="ts-value">${from}</span>
+          <button class="ts-discuss" onclick="openTimespanForm('${idField}',${id},'active_from','${slotId}')">bespreek startdatum</button>
+        </div>
+        <div class="timespan-cell">
+          <span class="ts-label">Einde</span>
+          <span class="ts-value">${until} ${badge}</span>
+          <button class="ts-discuss" onclick="openTimespanForm('${idField}',${id},'active_until','${slotId}')">bespreek einddatum</button>
+        </div>
+      </div>
+      <div id="${slotId}"></div>
+    </div>`;
+}
+
+// Open (of sluit) het argumentformulier voor een datum-eigenschap, met de
+// huidige waarde voorgevuld zodat een tegenvoorstel snel kan worden ingediend.
+function openTimespanForm(idField, id, property, slotId) {
+  const slot = document.getElementById(slotId);
+  if (slot.innerHTML) { slot.innerHTML = ''; return; }
+  const item = idField === 'relation_id'
+    ? (currentLinks || []).find(l => l.id === id) || DATA.relations.find(l => l.id === id)
+    : entityMap.get(id);
+  const current = item ? (property === 'active_from' ? item.active_from : item.active_until) : null;
+  slot.innerHTML = renderArgForm({ [idField]: id, property, property_value: current || '' });
+}
+
 // ============================================================
 // RELATIE DETAIL (discussieboom)
 // ============================================================
@@ -1274,13 +1345,11 @@ function selectRelation(r) {
   const certPct = Math.round((r.certainty || 0) * 100);
   const inflPct = Math.round((r.influence || 0) * 100);
   const color = getLinkColor(r, state.model === 'theory');
-  const period = formatPeriod(r);
 
   let html = `
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${RELATION_LABELS[r.relation_type] || r.relation_type}${r.mechanism_name ? ' · ' + r.mechanism_name : ''}</div>
       <h2>${srcName} → ${tgtName}</h2>
-      ${period ? `<div class="temporal-period">${period}</div>` : ''}
     </div>
     ${r.description ? `<div class="detail-description">${r.description}</div>` : ''}
     <div class="detail-section">
@@ -1290,6 +1359,7 @@ function selectRelation(r) {
         <span class="score-bar">invloed <span class="bar-track"><span class="bar-fill" style="width:${inflPct}%;background:var(--c-advertentie)"></span></span> ${inflPct}%</span>
       </div>
     </div>
+    ${renderTimespanSection(r, 'relation_id', r.id)}
   `;
 
   // Discussieboom
@@ -1480,12 +1550,10 @@ function showInstanceDetail(d, content, color) {
     return tid === d.id && isActiveAt(l, state.timelineYear);
   });
 
-  const period = formatPeriod(d);
   let html = `
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${d.type} · ${d.filterCat}</div>
       <h2>${d.name}</h2>
-      ${period ? `<div class="temporal-period">${period}</div>` : ''}
     </div>
   `;
   if (d.description) html += `<div class="detail-description">${d.description}</div>`;
@@ -1493,6 +1561,7 @@ function showInstanceDetail(d, content, color) {
     html += `<div class="detail-section"><h4>Rol</h4>
       <div style="font-size:12px;color:var(--text-dim)">${d.role_name}</div></div>`;
   }
+  html += renderTimespanSection(d, 'entity_id', d.id);
   if (outgoing.length) {
     html += `<div class="detail-section"><h4>Uitgaande relaties (${outgoing.length})</h4>`;
     outgoing.forEach(r => {
@@ -1577,14 +1646,16 @@ function computeVisibleLinks() {
   const search = state.searchTerm.toLowerCase();
   const year = state.timelineYear;
 
+  const legendSel = state.legendSelection;
   const nodePassesFilter = new Map();
   currentNodes.forEach(n => {
     const cat = isTheory ? n.category : n.filterCat;
     const matchFilter = filters.has(cat);
+    const matchLegend = !legendSel.size || legendSel.has(legendKeyOf(n));
     const matchSearch = !search || n.name.toLowerCase().includes(search)
       || (n.description && n.description.toLowerCase().includes(search));
     const matchTime = isTheory || isActiveAt(n, year);
-    nodePassesFilter.set(n.id, matchFilter && matchSearch && matchTime);
+    nodePassesFilter.set(n.id, matchFilter && matchLegend && matchSearch && matchTime);
   });
 
   const visibleLinkSet = new Set();
@@ -1633,6 +1704,11 @@ function applyFilters() {
       const tid = typeof l.target === 'object' ? l.target.id : l.target;
       if (visibleNodes.has(sid)) visibleNodes.add(tid);
       if (visibleNodes.has(tid)) visibleNodes.add(sid);
+    });
+  } else if (state.legendSelection.size) {
+    // Legenda-selectie: toon alle nodes van het geselecteerde type, ook zonder verbindingen
+    currentNodes.forEach(n => {
+      if (nodePassesFilter.get(n.id)) visibleNodes.add(n.id);
     });
   } else {
     nodesWithVisibleLinks.forEach(id => visibleNodes.add(id));
@@ -1688,6 +1764,7 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     document.querySelectorAll('#modelToggle button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.model = btn.dataset.model;
+    state.legendSelection.clear();  // keys verschillen per model
 
     // Show/hide instance-specific controls
     const isTheory = state.model === 'theory';
@@ -1714,12 +1791,19 @@ Object.entries(FILTER_LABELS).forEach(([key, label]) => {
   chipContainer.appendChild(chip);
 });
 
+// Legenda-key van een node, afhankelijk van model + kleurmodus
+function legendKeyOf(node) {
+  if (state.model === 'theory') return node.category;
+  return state.colorMode === 'filter' ? node.filterCat : node.type;
+}
+
 // Legend
 function renderLegend() {
   const legend = document.getElementById('legend');
   const isTheory = state.model === 'theory';
   const items = isTheory ? DATA.roles : DATA.entities;
   const colors = (isTheory || state.colorMode === 'filter') ? FILTER_COLORS : TYPE_COLORS;
+  const sel = state.legendSelection;
   const counts = {};
   items.forEach(e => {
     const key = isTheory ? e.category : (state.colorMode === 'filter' ? e.filterCat : e.type);
@@ -1727,13 +1811,20 @@ function renderLegend() {
   });
   legend.innerHTML = Object.entries(colors)
     .filter(([k]) => counts[k])
-    .sort((a, b) => (counts[b[0]] || 0) - (counts[a[0]] || 0))
     .map(([key, color]) => `
-      <div class="legend-item">
+      <div class="legend-item${sel.size ? (sel.has(key) ? ' selected' : ' inactive') : ''}" data-key="${key}" title="Klik om alleen dit type te tonen (meerdere mogelijk)">
         <span class="swatch" style="background:${color}"></span>
         ${key}
         <span class="count">${counts[key] || 0}</span>
       </div>`).join('');
+  legend.querySelectorAll('.legend-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const key = item.dataset.key;
+      if (sel.has(key)) sel.delete(key); else sel.add(key);
+      renderLegend();
+      applyFilters();
+    });
+  });
 }
 
 // View toggle (color mode)
@@ -1742,6 +1833,7 @@ document.querySelectorAll('#viewToggle button').forEach(btn => {
     document.querySelectorAll('#viewToggle button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.colorMode = btn.dataset.mode;
+    state.legendSelection.clear();  // keys verschillen per kleurmodus
     renderLegend();
     applyFilters();
     // Recolor existing nodes
