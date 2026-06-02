@@ -994,6 +994,7 @@ let simulation = null;
 let currentNodes = null;
 let currentLinks = null;
 let linkElements = null;
+let linkHitElements = null;
 let nodeElements = null;
 let edgeLabelElements = null;
 
@@ -1048,7 +1049,7 @@ function buildGraph() {
 
   // Invisible wider hit-area for clicking on edges
   const linkHitGroup = g.append('g').attr('class', 'link-hits');
-  linkHitGroup.selectAll('line').data(links).join('line')
+  linkHitElements = linkHitGroup.selectAll('line').data(links).join('line')
     .attr('stroke', 'transparent')
     .attr('stroke-width', 14)
     .style('cursor', 'pointer')
@@ -1113,7 +1114,7 @@ function buildGraph() {
     .style('text-shadow', '0 1px 4px rgba(0,0,0,0.8)');
 
   // Tick
-  const linkHitLines = linkHitGroup.selectAll('line');
+  const linkHitLines = linkHitElements;
   simulation.on('tick', () => {
     linkElements
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
@@ -1269,22 +1270,28 @@ function selectRelation(r) {
 function selectNode(d) {
   state.selectedNode = d;
   const isTheory = state.model === 'theory';
-  const activeLinks = isTheory ? currentLinks : currentLinks;
+
+  // Only links that pass the current filters/timeline can be highlighted/hovered
+  const { visibleLinkSet } = computeVisibleLinks();
+
+  // A link counts as "connected" only when it touches d AND is currently visible
+  const isConnected = (l, i) => visibleLinkSet.has(i) &&
+    ((typeof l.source === 'object' ? l.source.id : l.source) === d.id ||
+     (typeof l.target === 'object' ? l.target.id : l.target) === d.id);
 
   const connectedIds = new Set([d.id]);
-  activeLinks.forEach(l => {
+  currentLinks.forEach((l, i) => {
+    if (!isConnected(l, i)) return;
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
-    if (sid === d.id) connectedIds.add(tid);
-    if (tid === d.id) connectedIds.add(sid);
+    connectedIds.add(sid);
+    connectedIds.add(tid);
   });
 
   nodeElements.select('circle').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.08);
   nodeElements.select('text').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.06);
-  linkElements.each(function(l) {
-    const sid = typeof l.source === 'object' ? l.source.id : l.source;
-    const tid = typeof l.target === 'object' ? l.target.id : l.target;
-    const connected = (sid === d.id || tid === d.id);
+  linkElements.each(function(l, i) {
+    const connected = isConnected(l, i);
     const el = d3.select(this);
     el.attr('stroke-opacity', connected ? 0.8 : 0.03);
     el.attr('marker-end', connected ? el.attr('marker-end') || 'none' : 'none');
@@ -1296,12 +1303,12 @@ function selectNode(d) {
     }
     if (connected) el.attr('marker-end', el.attr('data-marker'));
   });
+  // Only connected + visible relations stay hoverable (tooltips live on the hit-lines)
+  if (linkHitElements) {
+    linkHitElements.style('pointer-events', (l, i) => isConnected(l, i) ? 'auto' : 'none');
+  }
   if (edgeLabelElements) {
-    edgeLabelElements.attr('opacity', l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      return (sid === d.id || tid === d.id) ? 1 : 0.1;
-    });
+    edgeLabelElements.attr('opacity', (l, i) => isConnected(l, i) ? 1 : 0.1);
   }
 
   showDetail(d);
@@ -1495,8 +1502,10 @@ function relationCard(otherName, r, direction) {
 // ============================================================
 // FILTERING
 // ============================================================
-function applyFilters() {
-  if (!nodeElements || !linkElements) return;
+// Compute which nodes/links pass the current category + search + timeline + threshold filters.
+// Returns { nodePassesFilter: Map<id,bool>, visibleLinkSet: Set<index> }.
+// Shared by applyFilters and selectNode so selection respects the same visibility rules.
+function computeVisibleLinks() {
   const isTheory = state.model === 'theory';
   const cf = state.certMin;
   const inf = state.inflMin;
@@ -1504,7 +1513,6 @@ function applyFilters() {
   const search = state.searchTerm.toLowerCase();
   const year = state.timelineYear;
 
-  // Step 1: Determine which nodes pass category + search + timeline filter
   const nodePassesFilter = new Map();
   currentNodes.forEach(n => {
     const cat = isTheory ? n.category : n.filterCat;
@@ -1515,8 +1523,6 @@ function applyFilters() {
     nodePassesFilter.set(n.id, matchFilter && matchSearch && matchTime);
   });
 
-  // Step 2: Determine which links are fully visible
-  // A link is visible when both endpoints pass AND thresholds + timeline are met
   const visibleLinkSet = new Set();
   currentLinks.forEach((l, i) => {
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
@@ -1528,6 +1534,17 @@ function applyFilters() {
     }
     visibleLinkSet.add(i);
   });
+
+  return { nodePassesFilter, visibleLinkSet };
+}
+
+function applyFilters() {
+  if (!nodeElements || !linkElements) return;
+  const isTheory = state.model === 'theory';
+  const search = state.searchTerm.toLowerCase();
+
+  // Steps 1 & 2: nodes/links that pass category + search + timeline + thresholds
+  const { nodePassesFilter, visibleLinkSet } = computeVisibleLinks();
 
   // Step 3: Nodes are visible only if they have at least one visible link
   // (or match a search term — search hits stay visible even without links)
@@ -1574,9 +1591,13 @@ function applyFilters() {
       const color = getLinkColor(l, isTheory);
       const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
       return `url(#${prefix}${color.replace('#','')})`;
-    })
-    // Verborgen links niet hoverbaar: geen tooltip op uitgefilterde/verleden relaties
-    .style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
+    });
+
+  // Verborgen links niet hoverbaar: tooltip-handlers zitten op de hit-lijnen,
+  // dus pointer-events daar uitschakelen voor uitgefilterde/verleden relaties
+  if (linkHitElements) {
+    linkHitElements.style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
+  }
 
   if (edgeLabelElements) {
     edgeLabelElements
