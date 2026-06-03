@@ -39,26 +39,36 @@ Elk mechanisme is gekoppeld aan één filter; elke rol aan één categorie. Naas
 ### Filter 1: Eigendom
 De eigendomsstructuur bepaalt de institutionele context van nieuwsproductie. In Nederland bestaat een duopolie: DPG Media en Mediahuis bezitten samen >90% van de online commerciële nieuwsmarkt. De eigenaren (families Van Thillo, Leysen, Baert, Van Puijenbroek) behoren tot de transnationale kapitaalklasse.
 
-Het eigendom wordt zelden direct uitgeoefend maar via een getrapte keten: de uiteindelijke eigenaar/UBO (`mediaeigenaar`, bv. familie Van Thillo) controleert een **Stichting Administratiekantoor (STAK)** (`administratiekantoor`), die via `familiezeggenschap` de zeggenschap concentreert en via `certificaatconstructie` de aandelen van het `overnamevehikel` (holding: Epifin, Mediahuis Partners, VP Exploitatie) certificeert — zeggenschap wordt zo gescheiden van economisch belang en de uiteindelijke eigenaren blijven buiten beeld. De holding bezit vervolgens de mediaorganisatie (`holdingconstructie`). Daartegenover staat als tegenkracht de **borgingsstichting**: een onafhankelijkheidsstichting met een prioriteitsaandeel of vetorecht die de redactionele koers beschermt (bv. Stichting Democratie en Media, 14,27% + prioriteitsaandeel in DPG; zie *Tegenmacht*, `onafhankelijkheidsborging`).
+Cruciaal voor de Nederlandse context: eigendom is hier **familie- en stichtingsgecontroleerd via een getrapte keten**, niet beursgenoteerd met verspreide/institutionele aandeelhouders. Het Angelsaksische beeld uit het oorspronkelijke propagandamodel (beursfondsen, BlackRock op het aandeelhoudersregister van de krant) is hier het *historische/buitenlandse randgeval*: TMG was beursgenoteerd tot Mediahuis het in 2017 van de beurs haalde, en RTL Group/Sanoma noteren bóven een buitenlandse holding. Verspreid beursaandeelhouderschap van een Nederlandse titel is daarom geen apart mechanisme in dit model.
 
-**Rollen:** `mediaeigenaar`, `mediaorganisatie`, `aandeelhouder`, `institutioneel_belegger`, `hoofdredacteur`, `overnamevehikel`, `administratiekantoor`
-**Mechanismen:** `eigendomsconcentratie`, `winstmaximalisatie`, `cross_media_eigendom`, `holdingconstructie`, `certificaatconstructie`, `familiezeggenschap`, `acquisitiestrategie`, `aandeelhouder_druk`, `systemisch_eigenaarschap`, `benoemingspolitiek`, `hoofdredacteur_als_filter`, `redactioneel_budgetcontrole`
+Het eigendom wordt zelden direct uitgeoefend maar via een getrapte keten: de uiteindelijke eigenaar/UBO (`mediaeigenaar`, bv. familie Van Thillo) controleert een **Stichting Administratiekantoor (STAK)** (`administratiekantoor`), die via `familiezeggenschap` de zeggenschap concentreert en via `certificaatconstructie` de aandelen van het `overnamevehikel` (holding: Epifin, Mediahuis Partners, VP Exploitatie) certificeert — zeggenschap wordt zo gescheiden van economisch belang en de uiteindelijke eigenaren blijven buiten beeld. De holding bezit vervolgens de mediaorganisatie (`holdingconstructie`). De STAK is daarbij een controle-**versterker**, geen demper: eigenaarsinvloed is niet "distaal = zwak" — een klein (soms verwaterd) economisch belang wordt hoog in de keten omgezet in volledige, overdrachtsbestendige zeggenschap. Invloed loopt principieel *via* de keten (geen directe shortcut van baas naar titel) en dempt per schakel, behalve waar een controlevehikel haar juist concentreert. Daartegenover staat als tegenkracht de **borgingsstichting**: een onafhankelijkheidsstichting met een prioriteitsaandeel of vetorecht die de redactionele koers beschermt (bv. Stichting Democratie en Media, 14,27% + prioriteitsaandeel in DPG; zie *Tegenmacht*, `onafhankelijkheidsborging`).
+
+Dit is de **commerciële controleketen** — één van twee governance-structuren binnen dit filter. Daarnaast staat het **publieke omroepbestel**: niet elke mediaorganisatie heeft een eigenaar/UBO. Bij de publieke omroep stuurt een `omroepkoepel` (de NPO) van bovenaf — budget, zendtijd en net-profilering (`bestelsturing`) — en zijn de zenders `ledenomroep`en die op grond van hun ledental zendtijd claimen; de zeggenschap loopt via ledental en politieke benoemingen (`politieke_benoeming_omroeptop`), niet via een STAK. De commerciële pers en online-titels hebben dus géén omroepkoepel — zij lopen via de keten hierboven.
+
+Achter béíde structuren ligt een derde, diffuse laag: het systemische aandeelhouderschap. De `aandeelhouder` is één klasse met twee polen, onderscheiden door het *mechanisme* — niet door een aparte rol (een institutionele belegger ís immers een aandeelhouder). De **passieve** pool (BlackRock, Vanguard, pensioenfondsen) is geen pijl naar één media-eigenaar maar een systemische achtergrond achter de hele kapitaalcluster: via gespreid vermogensbeheer mede-eigenaar van zowel de media-holdings als de corporates die elders adverteren en lobbyen (de `belanghebbende`n). Dat gemeenschappelijke klassebelang bij een stabiel systeem is `systemisch_eigenaarschap` (diffuus, lage influence). De **actieve** pool is de blokhouder/controlerende familie (GBL/Frère, KBC) die via bestuurszetels en stemrecht gericht één onderneming stuurt: `strategische_zeggenschap` (specifiek, hoge influence).
+
+**Rollen:** `mediaeigenaar`, `mediaorganisatie`, `aandeelhouder` (passief-systemisch én actief-strategisch), `overnamevehikel`, `administratiekantoor`, `hoofdredacteur`, `omroepkoepel`, `ledenomroep`
+**Mechanismen:** `familiezeggenschap`, `certificaatconstructie`, `holdingconstructie`, `winstmaximalisatie`, `acquisitiestrategie`, `cross_media_eigendom`, `strategische_zeggenschap`, `systemisch_eigenaarschap`, `benoemingspolitiek`, `hoofdredacteur_als_filter`, `redactioneel_budgetcontrole`, `bestelsturing`, `politieke_benoeming_omroeptop`
+
+> De eigendomskant kent geen directe `mediaeigenaar → mediaorganisatie`-pijl: de eigenaarsinvloed loopt strikt via de controleketen `mediaeigenaar → administratiekantoor → overnamevehikel → mediaorganisatie`. De eigenaar heeft daarmee **één uitgaande eigendomspijl — naar de STAK** — die alle eigenaar-niveau-mechanismen draagt (`familiezeggenschap`, `acquisitiestrategie`, `cross_media_eigendom`, en de structurele `eigendomsconcentratie`). De STAK certificeert vervolgens de holding (`certificaatconstructie`: vier effecten — stemmacht-concentratie, cash/controle-ontkoppeling, overnamebestendigheid, UBO-afscherming), en de holding bezit de titel en legt het rendementsregime op (`holdingconstructie`, `winstmaximalisatie`). De redactionele hefbomen liggen ná de keten, op org-niveau: de `mediaorganisatie` benoemt de hoofdredacteur (`benoemingspolitiek`) en stelt het redactiebudget vast (`redactioneel_budgetcontrole`, binnen het door de holding opgelegde rendementsregime). De eigenaar raakt de redactionele laag dus **nooit direct** — zijn invloed is volledig gemedieerd via de keten; alleen zijn persoonlijke elite-netwerk (`mediaeigenaar_elite_netwerk`, F5) loopt rechtstreeks. De `borgingsstichting` zet zich als tegenmacht precies op het benoemingspunt (`onafhankelijkheidsborging` → hoofdredacteur). De macro-concentratie zelf is een emergent systeemkenmerk — zie *Uitbreiding A: Cross-filter*.
 
 ### Filter 2: Advertentie
-Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeur creëert voor content die het consumentistische wereldbeeld bevestigt.
+Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeur creëert voor content die het consumentistische wereldbeeld bevestigt. De `adverteerder` is geen losse actor maar de **advertentie-hoed van een `belanghebbende`**: dezelfde corporate of sector die elders lobbyt of procedeert, zet hier het advertentiebudget in als drukmiddel (`adverteren_als_belang`). Zie *Systeemactoren* voor de principaal-superklasse die door alle filters heen werkt.
 
-**Rollen:** `adverteerder`
-**Mechanismen:** `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `commerciele_content_druk`, `stakeholder_capitalism_frame`
+**Rollen:** `adverteerder` (instrument-rol van `belanghebbende`)
+**Mechanismen:** `adverteren_als_belang`, `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `commerciele_content_druk`, `stakeholder_capitalism_frame`, `staatsreclame_exploitatie`
 
 ### Filter 3: Sourcing
 Economische druk dwingt redacties tot afhankelijkheid van een beperkt aantal routineuze bronnen: het ANP, de overheid, en door de elite gefinancierde denktanks. Toegang (*access*) is hierbij zelf een schaarse hulpbron: wie aan tafel mag krijgt een podium, wie fundamenteel afwijkt verliest die toegang geruisloos (`toegangsdisciplinering`).
+
+Het **persbureau** (ANP) is binnen dit filter de *industriële versterker*: objectief in HÓE het schrijft (zonder oordeel), maar door tijd, geld, klantvraag en routines structureel selectief in WÁT het schrijft — en het propagandamodel gaat juist over dat WÁT. Drie routines drijven die selectie: leunen op de agenda's van officiële instanties — rechtbank, Kamer, politie, persconferenties (`persbureau_brongebondenheid`); de gebundelde vraag van betalende klant-redacties die de "waan van de dag" opschaalt ten koste van structureel ondervraagde thema's (`klantvraag_persbureau`); en de snelheids-/verifieerbaarheidseis die het officieel-controleerbare bevoordeelt boven trage onderzoeksjournalistiek (`verifieerbaarheidsroutine`). Via `pakketjournalistiek` wordt die selectie vervolgens landelijk uniform doorgegeven.
 
 Achter de bronnen zitten **principalen** die de sourcing-stroom voeden via instrumenten — dezelfde logica, twee gedaanten. Corporate: een `belanghebbende` (bedrijf/sector/branche) zet zijn belang om in mediabeeld via lobbyisten, brancheorganisaties en denktanks (`belangenbehartiging`); de soorten lobby verschillen (corporate-sectoraal, branche/koepel, ideologisch/NGO) en goed georganiseerde belangen zijn structureel oververtegenwoordigd. Politiek: de voorlichter heeft altijd een principaal — een **politieke `partij`** (die via `gecoordineerde_voorlichting` één afgestemde boodschap langs de partijlijn levert en via `partijlijn` haar politici aanstuurt) **óf een instituut/ministerie** (`gezagsinstituut`, Rijksvoorlichtingsdienst, departementale woordvoerders, via `institutionele_voorlichting`). De voorlichter en de politicus zijn bewust *aparte* rollen — de toegangs-poortwachter versus de bron — en het smeermiddel is *access*: de off-the-record Nieuwspoort-code "je hebt het niet van mij, maar..." (Luyendijk), die zelfcensuur wekt omdat niemand hem durft te breken.
 
 Naast deze principalen gelden officiële instituties zelf als gezaghebbende routinebron: een `gezagsinstituut` (CPB, DNB, CBS, RIVM, WRR, ministerie, OM) is een **primaire definieerder** (Hall) wiens cijfers en rapporten als neutraal feit gelden en de agenda zetten (`institutioneel_gezag`); de `gezagsexpert` (de "onafhankelijke" hoogleraar/econoom/deskundige) legitimeert de consensus (`expert_legitimatie`).
 
 **Rollen:** `persbureau`, `journalist`, `voorlichter`, `lobbyist`, `denktank`, `belanghebbende`, `gezagsinstituut`, `gezagsexpert`
-**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `expert_framing`, `pr_subsidie`, `haagse_stam`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `pr_naar_journalist`, `lobby_informatievoorziening`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_legitimatie`, `denktank_financiering_bias`, `denktank_naar_media`, `denktank_naar_politiek`
+**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `klantvraag_persbureau`, `verifieerbaarheidsroutine`, `expert_framing`, `pr_subsidie`, `haagse_stam`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `pr_naar_journalist`, `lobby_informatievoorziening`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_legitimatie`, `denktank_financiering_bias`, `denktank_naar_media`, `denktank_naar_politiek`
 
 ### Filter 4: Flak
 Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur. De hedendaagse *cancelling* — een gast die iets onwelgevalligs zegt en niet meer wordt uitgenodigd — valt hier onder via `deplatforming`.
@@ -70,23 +80,35 @@ Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde 
 Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid (`academische_socialisatie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
 
 **Rollen:** `elite_forum`, `columnist_opiniemaker`, `kennisinstituut`
-**Mechanismen:** `overton_bewaking`, `false_balance`, `ideologische_synchronisatie`, `hegemonische_naturalisatie`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `elite_forum_ideologie`
+**Mechanismen:** `overton_bewaking`, `false_balance`, `ideologische_synchronisatie`, `hegemonische_naturalisatie`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `elite_forum_ideologie`, `omroepverzuiling`
 
 ### Uitbreiding A: Cross-filter (systemisch & modern)
 Mechanismen die niet in één filter passen maar meerdere filters tegelijk aandrijven of overbruggen — vooral techplatforms, de draaideur en economische terugkoppeling. Dit vervangt de oude losse categorie "Overig (modern)" uit het oorspronkelijke model. De **draaideur** (`draaideurconstructie`) hoort hier thuis en niet onder ideologie: personeel circuleert tussen vier domeinen — politiek, bedrijfsleven, media/journalistiek en lobby/PR — en verbindt zo eigendom, sourcing én ideologie. Alle richtingen komen voor: minister → corporate bestuur (Eurlings → KLM), politiek ↔ omroep (Hillen, Van den Brink), journalist → woordvoering, lobbyist ↔ overheid/bedrijf. De familie van domein-specifieke spaken maakt dit expliciet, met de politicus als spil: politiek → bedrijfsleven (`draaideur_politiek_bedrijfsleven`), → lobby/PR (`draaideur_politiek_lobby`), → instituties/toezicht (`draaideur_politiek_institutie`) en → media/hoofdredactie (`draaideur_politiek_media`).
 
-**Mechanismen:** `algoritmische_filtering`, `algoritmische_socialisatie`, `platform_nieuwsselectie`, `platform_verdienmodel_druk`, `platform_advertentie_concentratie`, `draaideurconstructie`, `draaideur_journalistiek_politiek`, `draaideur_politiek_bedrijfsleven`, `draaideur_politiek_lobby`, `draaideur_politiek_institutie`, `draaideur_politiek_media`, `economische_feedback_loop`, `mediaeigenaar_elite_netwerk`
+**Mechanismen:** `algoritmische_filtering`, `algoritmische_socialisatie`, `platform_nieuwsselectie`, `platform_verdienmodel_druk`, `platform_advertentie_concentratie`, `draaideurconstructie`, `draaideur_journalistiek_politiek`, `draaideur_politiek_bedrijfsleven`, `draaideur_politiek_lobby`, `draaideur_politiek_institutie`, `draaideur_politiek_media`, `economische_feedback_loop`, `mediaeigenaar_elite_netwerk`, `belang_elite_netwerk`, `eigendomsconcentratie`
 
 ### Uitbreiding B: Tegenmacht
 Het model is niet deterministisch: het modelleert óók de krachten die het filtersysteem begrenzen of doorbreken. Zulke doorbraken zijn mogelijk, maar vaak incidenteel en onder druk (zie ook `toezicht_tandeloosheid`).
 
 **Rollen:** `onderzoeksjournalist`, `klokkenluider`, `parlementair_controleur`, `toezichthouder`, `vakbond_media`, `burgerinitiatief`, `borgingsstichting`
-**Mechanismen:** `onderzoeksjournalist_doorbraak`, `klokkenluider_doorbraak`, `onafhankelijk_medium_tegenwicht`, `parlementaire_controle`, `parlementaire_doorbraak`, `toezichthouder_interventie`, `toezicht_tandeloosheid`, `vakbond_bescherming`, `burgerinitiatief_druk`, `onafhankelijkheidsborging`
+**Mechanismen:** `onderzoeksjournalist_doorbraak`, `klokkenluider_doorbraak`, `onafhankelijk_medium_tegenwicht`, `parlementaire_controle`, `parlementaire_doorbraak`, `toezichthouder_interventie`, `toezicht_tandeloosheid`, `vakbond_bescherming`, `burgerinitiatief_druk`, `onafhankelijkheidsborging`, `redactiestatuut_borging`, `continuiteitsborging`, `afgedwongen_borging`
 
-De `borgingsstichting` (onafhankelijkheidsstichting met prioriteitsaandeel/vetorecht, bv. Stichting Democratie en Media bij DPG) is de tegenpool van het STAK-controlevehikel uit Filter 1: ze biedt een structurele rem op eigenaarsinvloed, maar geen ijzeren garantie (een minderheidsbelang naast de winstgedreven meerderheid).
+De `borgingsstichting` (onafhankelijkheidsstichting met prioriteitsaandeel/vetorecht, bv. Stichting Democratie en Media bij DPG) is de tegenpool van het STAK-controlevehikel uit Filter 1: ze biedt een structurele rem op eigenaarsinvloed, maar geen ijzeren garantie (een minderheidsbelang naast de winstgedreven meerderheid). Ze grijpt aan op beide eigenaarshefbomen op de inhoud: de benoeming van de hoofdredacteur (`onafhankelijkheidsborging`, tegenpool van `benoemingspolitiek`) én — via het redactiestatuut — de onafhankelijkheid van de hele redactie (`redactiestatuut_borging`, tegenpool van `redactioneel_budgetcontrole`), én de continuïteit van de titel zelf (`continuiteitsborging`, veto op verkoop/opheffing). De `toezichthouder` (ACM/CvdM) reguleert intussen niet de eigenaar-als-persoon maar de **concentratie/overname** op het holdingniveau (`toezichthouder_interventie`/`toezicht_tandeloosheid` → `overnamevehikel`); een ACM-interventie kan zo'n borgingsstichting zelfs afdwingen als overnamevoorwaarde (`afgedwongen_borging`, DPG-RTL-voorwaarden).
 
 ### Systeemactoren
 Structurele spelers die in meerdere filters tegelijk opereren en daarom een eigen rolcategorie vormen (zij vervullen geen eigen filter maar voeden er meerdere).
+
+De belangrijkste hiervan is de `belanghebbende`: georganiseerd privaat/elite-belang (bedrijf, sector, branche, overheidsorgaan, ideologische beweging) dat als **principaal-superklasse** door álle vijf filters projecteert — één actor, meerdere hoeden. De vijf filters zijn *kanalen* van invloed; achter meerdere kanalen staat dezelfde principaal. Het model tekent telkens de *eerste schakel* (de principaal raakt de media nooit direct, hij zet een instrument in); de vervolgschakel naar de redactie is een apart mechanisme binnen dat filter:
+
+- **Eigendom (F1):** als eigenaar/holding zelf (`mediaeigenaar`), met de `aandeelhouder` als systemische achtergrond (`systemisch_eigenaarschap`) of actieve blokhouder (`strategische_zeggenschap`) achter de hele kapitaalcluster.
+- **Advertentie (F2):** als `adverteerder`, het advertentiebudget als drukmiddel (`adverteren_als_belang`).
+- **Sourcing (F3):** via ingehuurde `lobbyist`/brancheorganisatie (`belangenbehartiging`) en via gefinancierde `denktank`s (`denktank_financiering_bias`).
+- **Flak (F4):** via juridische dreiging/SLAPP tegen kritische journalisten (`juridische_dreiging`, `slapp_tegen_journalist`).
+- **Ideologie (F5):** via deelname aan elite-fora die het wereldbeeld synchroniseren (`belang_elite_netwerk`, naast `mediaeigenaar_elite_netwerk`).
+
+De superklasse wordt bewust *niet* opgesplitst in subtypes (bedrijf vs. lobby vs. beweging): dat onderscheid zit al in de *instrument-hoed* (adverteerder/lobbyist/denktank) en zou dupliceren. Wél kent een belanghebbende een onafhankelijke **aard**-as die zichtbaar maakt wélk soort belang het is, af te lezen aan het filterprofiel: *commercieel* (bedrijf — F1-eigendom + F2-advertentie, zit zélf in de kapitaalcluster), *sectoraal* (branche/koepel — vooral F3-lobby) of *ideologisch* (waardengedreven beweging — vooral F5/F3). De doorslaggevende scheidslijn is niet de rechtsvorm maar de **machtsalignering**: de `belanghebbende` is per definitie elite-/kapitaal-aligned. Diffuse, niet-elite tegenkrachten met dezelfde vorm (een vakbond, een burgerbeweging) horen daarom *niet* hier maar onder *Tegenmacht* (`vakbond_media`, `burgerinitiatief`) — anders verdwijnt precies het pro-elite-onderscheid dat de hele theorie draagt.
+
+Zo vangt de `belanghebbende` de elite-/kapitaalkant die voorheen versplinterd over de losse filters lag. De politieke tegenhanger is de `partij` als coördinerende principaal (zie Filter 3, `gecoordineerde_voorlichting`): dezelfde sourcing-logica, een andere principaal.
 
 **Rollen:** `politicus`, `publiek`, `redactie`, `techplatform`, `belanghebbende`, `partij`
 
@@ -447,10 +469,10 @@ ORDER BY s.author;
 
 | Onderdeel | Aantal |
 |---|---|
-| Rollen (theoretisch) | 30 |
-| Mechanismen (theoretisch) | 85 |
-| Entiteiten (concreet) | 121 |
-| Relaties (concreet) | 337 |
+| Rollen (theoretisch) | 34 |
+| Mechanismen (theoretisch) | 99 |
+| Entiteiten (concreet) | 146 |
+| Relaties (concreet) | 372 |
 | Argumenten | 316 |
 | Citaties | 3 |
 | Bronnen | 5 |
@@ -462,12 +484,12 @@ ORDER BY s.author;
 
 | Entiteit | Type | Relaties |
 |---|---|---|
-| DPG Media | mediaorganisatie | 46 |
-| NOS | omroep | 43 |
+| DPG Media | mediaorganisatie | 47 |
+| NOS | omroep | 45 |
 | Mediahuis | mediaorganisatie | 34 |
 | RTL Nederland | omroep | 33 |
 | de Volkskrant | mediaorganisatie | 28 |
-| De Telegraaf | mediaorganisatie | 24 |
+| De Telegraaf | mediaorganisatie | 25 |
 | AD (Algemeen Dagblad) | mediaorganisatie | 17 |
 | ANP | persbureau | 16 |
 | Bilderberg Groep | elite_netwerk | 15 |

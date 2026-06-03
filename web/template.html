@@ -1115,30 +1115,34 @@ const merge = glow.append('feMerge');
 merge.append('feMergeNode').attr('in', 'blur');
 merge.append('feMergeNode').attr('in', 'SourceGraphic');
 
-// Arrow
+// Arrow — refX op de pijlpunt (x=7); de lijn wordt in linkArc ingekort tot de
+// node-rand, zodat de punt daar netjes op de (gebogen) lijn aansluit.
 defs.append('marker').attr('id', 'arrow-default')
-  .attr('viewBox', '0 -4 8 8').attr('refX', 24).attr('refY', 0)
+  .attr('viewBox', '0 -4 8 8').attr('refX', 7).attr('refY', 0)
   .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
   .append('path').attr('d', 'M0,-3L7,0L0,3').attr('fill', '#556').attr('opacity', 0.5);
 
 // Colored arrows
 Object.values(FILTER_COLORS).forEach(color => {
   defs.append('marker').attr('id', `arrow-${color.replace('#','')}`)
-    .attr('viewBox', '0 -4 8 8').attr('refX', 24).attr('refY', 0)
+    .attr('viewBox', '0 -4 8 8').attr('refX', 7).attr('refY', 0)
     .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
     .append('path').attr('d', 'M0,-3L7,0L0,3').attr('fill', color).attr('opacity', 0.6);
 });
 
-// Bigger arrows for theory
+// Theory-pijlen: vaste grootte (markerUnits=userSpaceOnUse) zodat ze niet
+// meeschalen met de dikke theorie-lijnen en daardoor te groot worden.
 defs.append('marker').attr('id', 'arrow-theory')
-  .attr('viewBox', '0 -5 10 10').attr('refX', 32).attr('refY', 0)
-  .attr('markerWidth', 8).attr('markerHeight', 8).attr('orient', 'auto')
+  .attr('viewBox', '0 -5 10 10').attr('refX', 9).attr('refY', 0)
+  .attr('markerUnits', 'userSpaceOnUse')
+  .attr('markerWidth', 13).attr('markerHeight', 13).attr('orient', 'auto')
   .append('path').attr('d', 'M0,-4L9,0L0,4').attr('fill', '#667').attr('opacity', 0.5);
 
 Object.values(FILTER_COLORS).forEach(color => {
   defs.append('marker').attr('id', `arrow-theory-${color.replace('#','')}`)
-    .attr('viewBox', '0 -5 10 10').attr('refX', 32).attr('refY', 0)
-    .attr('markerWidth', 8).attr('markerHeight', 8).attr('orient', 'auto')
+    .attr('viewBox', '0 -5 10 10').attr('refX', 9).attr('refY', 0)
+    .attr('markerUnits', 'userSpaceOnUse')
+    .attr('markerWidth', 13).attr('markerHeight', 13).attr('orient', 'auto')
     .append('path').attr('d', 'M0,-4L9,0L0,4').attr('fill', color).attr('opacity', 0.6);
 });
 
@@ -1158,6 +1162,67 @@ let linkElements = null;
 let linkHitElements = null;
 let nodeElements = null;
 let edgeLabelElements = null;
+
+// Hoeveel pixels de parallelle relaties tussen twee knooppunten uit elkaar buigen.
+const PARALLEL_EDGE_SPREAD = 22;
+
+function edgeEndId(v) { return typeof v === 'object' ? v.id : v; }
+
+// Geef elke link een index binnen de groep relaties die hetzelfde knooppunt-paar
+// verbindt (ongeacht richting), plus het totaal. Wordt gebruikt om de boog te bepalen.
+function assignParallelEdges(links) {
+  const groups = new Map();
+  links.forEach(l => {
+    const s = edgeEndId(l.source), t = edgeEndId(l.target);
+    const key = s < t ? `${s}|${t}` : `${t}|${s}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(l);
+  });
+  groups.forEach(arr => arr.forEach((l, i) => {
+    l._pairIndex = i;
+    l._pairCount = arr.length;
+  }));
+}
+
+// Het controlepunt van de kwadratische boog (loodrecht op de verbindingslijn,
+// symmetrisch verdeeld). Richting hangt af van de id-volgorde van het paar, zodat
+// A→B en B→A naar de juiste kant buigen i.p.v. op elkaar te vallen.
+function edgeControlPoint(d) {
+  const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const count = d._pairCount || 1, idx = d._pairIndex || 0;
+  if (count <= 1) return { cx: mx, cy: my, straight: true };
+  const dx = x2 - x1, dy = y2 - y1;
+  const dist = Math.hypot(dx, dy) || 1;
+  const sign = edgeEndId(d.source) < edgeEndId(d.target) ? 1 : -1;
+  const offset = (idx - (count - 1) / 2) * PARALLEL_EDGE_SPREAD * sign;
+  return { cx: mx + (-dy / dist) * offset, cy: my + (dx / dist) * offset, straight: false };
+}
+
+function linkArc(d) {
+  const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+  const c = edgeControlPoint(d);
+  // Raaklijnrichting waarmee de lijn bij het doel aankomt (recht: bron→doel;
+  // gebogen: controlepunt→doel) om het eindpunt langs de lijn in te korten.
+  const tx = c.straight ? (x2 - x1) : (x2 - c.cx);
+  const ty = c.straight ? (y2 - y1) : (y2 - c.cy);
+  const tl = Math.hypot(tx, ty) || 1;
+  const trim = getRadius(d.target) + 3;
+  // Niet inkorten als de lijn daardoor zou omklappen (heel korte edges).
+  const span = Math.hypot(x2 - x1, y2 - y1);
+  const k = span > trim + 4 ? trim : 0;
+  const ex = x2 - (tx / tl) * k;
+  const ey = y2 - (ty / tl) * k;
+  if (c.straight) return `M${x1},${y1}L${ex},${ey}`;
+  return `M${x1},${y1}Q${c.cx},${c.cy} ${ex},${ey}`;
+}
+
+// Apex van de boog (t=0.5 van de kwadratische curve) — daar komt het edge-label.
+function linkLabelPos(d) {
+  const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+  const c = edgeControlPoint(d);
+  return { x: (x1 + 2 * c.cx + x2) / 4, y: (y1 + 2 * c.cy + y2) / 4 };
+}
 
 function buildGraph() {
   // Clear
@@ -1183,6 +1248,10 @@ function buildGraph() {
   currentNodes = nodes;
   currentLinks = links;
 
+  // Meerdere relaties tussen hetzelfde knooppunt-paar uit elkaar buigen,
+  // zodat ze niet op elkaar vallen en elk afzonderlijk hoverbaar zijn.
+  assignParallelEdges(links);
+
   // Simulation
   const chargeStr = isTheory ? -800 : -300;
   const linkDist = isTheory ? 200 : 100;
@@ -1198,7 +1267,8 @@ function buildGraph() {
 
   // Draw links (no dashed lines — timeline slider handles temporal visibility)
   const linkGroup = g.append('g').attr('class', 'links');
-  linkElements = linkGroup.selectAll('line').data(links).join('line')
+  linkElements = linkGroup.selectAll('path').data(links).join('path')
+    .attr('fill', 'none')
     .attr('stroke', d => getLinkColor(d, isTheory))
     .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
     .attr('stroke-opacity', d => isTheory ? 0.5 : 0.15 + (d.certainty || 0.5) * 0.45)
@@ -1210,7 +1280,8 @@ function buildGraph() {
 
   // Invisible wider hit-area for clicking on edges
   const linkHitGroup = g.append('g').attr('class', 'link-hits');
-  linkHitElements = linkHitGroup.selectAll('line').data(links).join('line')
+  linkHitElements = linkHitGroup.selectAll('path').data(links).join('path')
+    .attr('fill', 'none')
     .attr('stroke', 'transparent')
     .attr('stroke-width', 14)
     .style('cursor', 'pointer')
@@ -1277,16 +1348,12 @@ function buildGraph() {
   // Tick
   const linkHitLines = linkHitElements;
   simulation.on('tick', () => {
-    linkElements
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    linkHitLines
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    linkElements.attr('d', linkArc);
+    linkHitLines.attr('d', linkArc);
     if (edgeLabelElements) {
       edgeLabelElements
-        .attr('x', d => (d.source.x + d.target.x) / 2)
-        .attr('y', d => (d.source.y + d.target.y) / 2 - 6);
+        .attr('x', d => linkLabelPos(d).x)
+        .attr('y', d => linkLabelPos(d).y - 6);
     }
     nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
   });
