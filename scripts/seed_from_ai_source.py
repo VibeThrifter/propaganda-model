@@ -182,21 +182,21 @@ ENTITIES = [
      "Socialistische partij.", None),
 
     # --- POLITICI ---
-    ("Pieter Omtzigt", "politicus", "klokkenluider",
+    ("Pieter Omtzigt", "persoon", "klokkenluider",
      "Voormalig CDA-Kamerlid. Criticus van het systeem.",
      '{"partij": "CDA (later NSC)"}'),
-    ("Renske Leijten", "politicus", "klokkenluider",
+    ("Renske Leijten", "persoon", "klokkenluider",
      "SP-Kamerlid.", None),
 
     # --- JOURNALISTEN / EXPERTS ---
-    ("Peter R. de Vries", "journalist", "flak_doelwit",
+    ("Peter R. de Vries", "persoon", "flak_doelwit",
      "Misdaadjournalist, vermoord in 2021. Meest extreme voorbeeld van geweld tegen journalisten in NL.", None),
     ("Maarten van Rossem", "persoon", "expert_bron",
      "Amerikadeskundige en historicus. Kritisch over Irak-oorlog. Werd jarenlang niet meer uitgenodigd als commentator na afwijkende mening over WMD-claims.",
      '{"voorbeeld_van": "uitsluiting afwijkende expert"}'),
     ("Rob de Wijk", "persoon", "expert_bron",
      "Directeur HCSS, veelgevraagd mediacommentator over veiligheid en defensie. Bevestigt doorgaans NAVO-gezind narratief.", None),
-    ("Ron Fresen", "journalist", "expert_bron",
+    ("Ron Fresen", "persoon", "expert_bron",
      "Voormalig NOS-politiek verslaggever. Richtte na carrière een denktank op. Voorbeeld van draaideur media-politiek.", None),
 
     # --- ACADEMICI ---

@@ -58,26 +58,34 @@ CREATE TABLE mechanisms (
 CREATE TABLE entities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
+    -- PRINCIPE: `type` = de structurele VORM (wat is het?), niet de functie.
+    -- Voor organisaties varieert die vorm echt (bedrijf, partij, stichting, omroep, ...);
+    -- voor mensen bestaat er maar één soort: 'persoon'. De FUNCTIE/positie in het model
+    -- hoort altijd in de rol (primary_role_id / entity_roles), niet in `type`.
+    -- De rol-achtige type-waarden hieronder (politicus, adverteerder, mediaeigenaar, ...)
+    -- zijn LEGACY: ze blijven toegestaan zodat de seed/enrich-scripts hun ruwe extractie
+    -- kunnen invoeren, maar worden in de live DB samengevouwen tot hun structurele vorm
+    -- door scripts/migrate_clean_entity_types.py. Gebruik voor NIEUWE data alleen de
+    -- structurele types (de niet-legacy regels). Zie DOCUMENTATIE.md.
     type TEXT NOT NULL CHECK(type IN (
-        -- Personen
-        'politicus',             -- gekozen volksvertegenwoordiger, minister, staatssecretaris
-        'journalist',            -- verslaggever, redacteur, correspondent
-        'voorlichter',           -- woordvoerder, communicatieadviseur, persvoorlichter
-        'lobbyist',              -- belangenbehartiger, public affairs consultant
-        'columnist',             -- opiniemaker, commentator, duider
-        'academicus',            -- wetenschapper, onderzoeker, hoogleraar
-        'mediaeigenaar',         -- aandeelhouder, bestuurder van mediaconglomeraat
-        'toezichthouder_persoon', -- commissaris, lid raad van toezicht
-        'advocaat',              -- jurist, rechtsbijstandverlener
-        'klokkenluider',         -- whistleblower, insider die misstanden onthult
-        'persoon',               -- overige personen
+        -- Personen (structureel: gebruik 'persoon'; functie via rol)
+        'persoon',               -- elke natuurlijke persoon of familie
+        'politicus',             -- LEGACY -> persoon (rol 'politicus')
+        'journalist',            -- LEGACY -> persoon (rol journalist/onderzoeksjournalist)
+        'voorlichter',           -- LEGACY -> persoon (rol 'voorlichter')
+        'lobbyist',              -- LEGACY -> persoon (rol 'lobbyist')
+        'columnist',             -- LEGACY -> persoon (rol 'columnist_opiniemaker')
+        'academicus',            -- LEGACY -> persoon (rol 'gezagsexpert')
+        'mediaeigenaar',         -- LEGACY -> persoon (rol 'mediaeigenaar')
+        'toezichthouder_persoon',-- LEGACY -> persoon (rol 'toezichthouder')
+        'advocaat',              -- LEGACY -> persoon
+        'klokkenluider',         -- LEGACY -> persoon (rol 'klokkenluider')
 
-        -- Organisaties
+        -- Organisaties (structurele/juridische vormen)
         'partij',                -- politieke partij
         'mediaorganisatie',      -- krant, omroep, nieuwssite, tijdschrift
         'persbureau',            -- ANP, Reuters, etc.
         'bedrijf',               -- commercieel bedrijf
-        'adverteerder',          -- bedrijf in rol van adverteerder
         'lobbygroep',            -- belangenorganisatie, branchevereniging
         'denktank',              -- onderzoeksinstituut, policy institute
         'overheidsinstelling',   -- ministerie, inspectie, uitvoeringsorganisatie
@@ -91,7 +99,9 @@ CREATE TABLE entities (
         'platform',              -- digitaal platform (Google, Meta, TikTok)
         'rechterlijke_macht',    -- rechtbank, gerechtshof
         'onderwijsinstelling',   -- universiteit, journalistiekopleiding
-        'burgerinitiatief'       -- burgerbeweging, actiegroep, gedupeerdengroep
+        'burgerinitiatief',      -- burgerbeweging, actiegroep, gedupeerdengroep
+        'stichting',             -- stichting, administratiekantoor (STAK), borgingsstichting
+        'adverteerder'           -- LEGACY -> bedrijf (rol 'adverteerder')
     )),
     primary_role_id INTEGER REFERENCES roles(id),
     description TEXT,
@@ -158,6 +168,29 @@ CREATE TABLE relations (
     influence REAL CHECK(influence BETWEEN 0.0 AND 1.0),
     bidirectional BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--------------------------------------------------------------
+-- KLASSE <-> INSTANTIE: theorie geïnstantieerd door praktijk
+-- Maakt de koppeling expliciet (rol<->entiteit of mechanisme<->relatie) met een
+-- exemplariteit-gewicht: hoe prototypisch is dit praktijkvoorbeeld voor de klasse?
+-- Vormt de basis voor de bottom-up aggregatie van geloofwaardigheid/sterkte.
+--------------------------------------------------------------
+
+CREATE TABLE instantiations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_id      INTEGER REFERENCES roles(id),
+    mechanism_id INTEGER REFERENCES mechanisms(id),
+    entity_id    INTEGER REFERENCES entities(id),
+    relation_id  INTEGER REFERENCES relations(id),
+    exemplarity  REAL DEFAULT 1.0 CHECK(exemplarity BETWEEN 0.0 AND 1.0),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- precies één klasse en precies één instantie; types moeten matchen
+    CHECK ((role_id IS NOT NULL) + (mechanism_id IS NOT NULL) = 1),
+    CHECK ((entity_id IS NOT NULL) + (relation_id IS NOT NULL) = 1),
+    CHECK ((role_id IS NOT NULL AND entity_id IS NOT NULL)
+        OR (mechanism_id IS NOT NULL AND relation_id IS NOT NULL))
 );
 
 --------------------------------------------------------------
@@ -230,8 +263,10 @@ CREATE TABLE source_locations (
 -- parent_argument_id = <id> → reactie op een ander argument
 CREATE TABLE arguments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    relation_id INTEGER REFERENCES relations(id),        -- optioneel: argument over een relatie
-    entity_id INTEGER REFERENCES entities(id),            -- optioneel: argument over een entiteit
+    relation_id INTEGER REFERENCES relations(id),        -- optioneel: argument over een relatie (praktijk)
+    entity_id INTEGER REFERENCES entities(id),            -- optioneel: argument over een entiteit (praktijk)
+    role_id INTEGER REFERENCES roles(id),                 -- optioneel: literatuur-argument over een rol (theorie)
+    mechanism_id INTEGER REFERENCES mechanisms(id),       -- optioneel: literatuur-argument over een mechanisme (theorie)
     parent_argument_id INTEGER REFERENCES arguments(id),  -- NULL = root, anders = reactie op parent
     -- Welk aspect wordt bediscussieerd? NULL = het bestaan/de kern van de relatie/entiteit
     property TEXT CHECK(property IN (
@@ -264,8 +299,9 @@ CREATE TABLE arguments (
     )),
     contributed_by TEXT,                 -- wie voegde dit toe (accountability)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- Minstens één target verplicht (relatie of entiteit)
-    CHECK (relation_id IS NOT NULL OR entity_id IS NOT NULL)
+    -- Minstens één target verplicht: praktijk (relatie/entiteit) óf theorie (rol/mechanisme)
+    CHECK (relation_id IS NOT NULL OR entity_id IS NOT NULL
+        OR role_id IS NOT NULL OR mechanism_id IS NOT NULL)
 );
 
 -- Citaties per argument: verwijzingen naar specifieke bronpassages
@@ -324,10 +360,18 @@ CREATE INDEX idx_relations_source ON relations(source_id);
 CREATE INDEX idx_relations_target ON relations(target_id);
 CREATE INDEX idx_relations_type ON relations(relation_type);
 CREATE INDEX idx_relations_mechanism ON relations(mechanism_id);
+CREATE UNIQUE INDEX idx_inst_role_entity ON instantiations(role_id, entity_id) WHERE role_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_inst_mech_relation ON instantiations(mechanism_id, relation_id) WHERE mechanism_id IS NOT NULL;
+CREATE INDEX idx_inst_role ON instantiations(role_id);
+CREATE INDEX idx_inst_mechanism ON instantiations(mechanism_id);
+CREATE INDEX idx_inst_entity ON instantiations(entity_id);
+CREATE INDEX idx_inst_relation ON instantiations(relation_id);
 CREATE INDEX idx_sources_type ON sources(source_type);
 CREATE INDEX idx_source_locations_source ON source_locations(source_id);
 CREATE INDEX idx_arguments_relation ON arguments(relation_id);
 CREATE INDEX idx_arguments_entity ON arguments(entity_id);
+CREATE INDEX idx_arguments_role ON arguments(role_id);
+CREATE INDEX idx_arguments_mechanism ON arguments(mechanism_id);
 CREATE INDEX idx_arguments_parent ON arguments(parent_argument_id);
 CREATE INDEX idx_arguments_stance ON arguments(stance);
 CREATE INDEX idx_citations_argument ON citations(argument_id);

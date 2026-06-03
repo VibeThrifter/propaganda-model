@@ -342,6 +342,11 @@ body {
 }
 .arg-form textarea { resize: vertical; min-height: 50px; }
 .arg-form select { appearance: auto; }
+.arg-form .field-hint {
+  font-size: 10px; color: var(--text-muted); margin-top: 3px;
+  text-transform: none; letter-spacing: 0; font-weight: 400; line-height: 1.3;
+}
+.arg-form .field-hint em { font-style: italic; color: var(--text); }
 .arg-form select option { background: #1a1a2e; color: var(--text); }
 
 .stance-picker {
@@ -408,6 +413,23 @@ body {
 }
 .add-btn:hover { background: rgba(108,138,255,0.32); }
 
+.admin-btn {
+  background: transparent; border: 1px solid var(--border-light);
+  color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap; transition: all 0.2s;
+}
+.admin-btn:hover { color: var(--text-dim); border-color: var(--text-muted); }
+.admin-btn.active {
+  background: rgba(231,76,60,0.18); border-color: rgba(231,76,60,0.5); color: #e74c3c;
+}
+.btn-danger {
+  background: rgba(231,76,60,0.14); border: 1px solid rgba(231,76,60,0.45);
+  color: #e74c3c; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600; transition: all 0.2s;
+}
+.btn-danger:hover { background: rgba(231,76,60,0.28); }
+.admin-hint { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+
 .modal-overlay {
   position: fixed; inset: 0; z-index: 500;
   background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
@@ -464,6 +486,7 @@ body {
     <input type="text" id="search" placeholder="Zoek..." autocomplete="off" spellcheck="false">
   </div>
   <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen">+ Toevoegen</button>
+  <button id="adminToggle" class="admin-btn" title="Adminmodus aan/uit: toont verwijderknoppen">Admin</button>
   <div class="stats" id="stats"></div>
 </header>
 
@@ -473,10 +496,7 @@ body {
       <h3>Toevoegen aan het model</h3>
       <button class="modal-close" id="addModalClose" title="Sluiten">&times;</button>
     </div>
-    <div class="modal-tabs">
-      <button data-addtab="entity" class="active">Entiteit</button>
-      <button data-addtab="relation">Relatie</button>
-    </div>
+    <div class="modal-tabs" id="addModalTabs"></div>
     <div id="addModalBody"></div>
   </div>
 </div>
@@ -555,28 +575,26 @@ const FILTER_COLORS = {
   systeemactor: '#e8c547', cross_filter: '#fd79a8',
   overig: '#7f8c9a',
 };
-// Volgorde is bewust thematisch gegroepeerd; de legenda volgt deze volgorde,
-// zodat verwante types (bv. politicus/partij, journalist/mediaorganisatie) naast elkaar staan.
+// Kleuren per STRUCTURELE entiteitsvorm (kleurmodus "type"). Personen vormen één
+// categorie; hun functie in het model kleurt via de kleurmodus "filter".
+// Volgorde is bewust thematisch gegroepeerd; de legenda volgt deze volgorde.
 const TYPE_COLORS = {
+  // Personen (één structurele soort)
+  persoon: '#8e9aaf',
   // Politiek & bestuur
-  politicus: '#e06060', partij: '#c0392b',
-  overheidsinstelling: '#1abc9c', toezichthouder: '#16a085',
-  toezichthouder_persoon: '#48c9b0', rechterlijke_macht: '#5d6d7e',
+  partij: '#c0392b', overheidsinstelling: '#1abc9c', toezichthouder: '#16a085',
+  rechterlijke_macht: '#5d6d7e',
   // Lobby & invloed
-  lobbyist: '#e67e22', lobbygroep: '#d35400', denktank: '#9b59b6',
-  pr_bureau: '#e59866', elite_netwerk: '#ca6f1e',
+  lobbygroep: '#d35400', denktank: '#9b59b6', pr_bureau: '#e59866',
+  elite_netwerk: '#ca6f1e',
   // Media
-  journalist: '#5dade2', columnist: '#af7ac5', voorlichter: '#85c1e9',
-  mediaeigenaar: '#e74c3c', mediaorganisatie: '#3498db',
-  omroep: '#2980b9', persbureau: '#2e86c1', platform: '#8e44ad',
-  // Economie
-  bedrijf: '#f0a030', adverteerder: '#f39c12', vermogensbeheerder: '#b9770e',
+  mediaorganisatie: '#3498db', omroep: '#2980b9', persbureau: '#2e86c1',
+  platform: '#8e44ad',
+  // Economie & eigendom
+  bedrijf: '#f0a030', vermogensbeheerder: '#b9770e', stichting: '#b7950b',
   // Maatschappij
-  academicus: '#58d68d', onderwijsinstelling: '#1e8449',
-  ngo: '#27ae60', vakbond: '#2ecc71', burgerinitiatief: '#82e0aa',
-  klokkenluider: '#f7dc6f', advocaat: '#aeb6bf',
-  // Overig
-  persoon: '#7f8c8f',
+  onderwijsinstelling: '#1e8449', ngo: '#27ae60', vakbond: '#2ecc71',
+  burgerinitiatief: '#82e0aa',
 };
 const RELATION_LABELS = {
   // Eigendom & financiën
@@ -599,7 +617,7 @@ const RELATION_LABELS = {
 const FILTER_LABELS = {
   eigendom: '1. Eigendom', advertentie: '2. Advertentie', sourcing: '3. Sourcing',
   flak: '4. Flak', ideologie: '5. Ideologie',
-  systeemactor: 'Systeemactor', cross_filter: 'Cross-filter',
+  systeemactor: 'Systeemactor', tegenmacht: 'Tegenmacht', cross_filter: 'Cross-filter',
   overig: 'Overig',
 };
 
@@ -607,9 +625,11 @@ const FILTER_LABELS = {
 // DISCUSSIEBOOM HELPERS
 // ============================================================
 
-// Bouw een boom van argumenten, geïndexeerd op relation_id en entity_id
+// Bouw een boom van argumenten, geïndexeerd op relation_id, entity_id, role_id, mechanism_id
 const argsByRelation = {};  // relation_id → [root arguments]
 const argsByEntity = {};    // entity_id → [root arguments]
+const argsByRole = {};      // role_id → [root arguments]  (literatuur over een rol)
+const argsByMechanism = {}; // mechanism_id → [root arguments] (literatuur over een mechanisme)
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
 
@@ -637,6 +657,14 @@ const citationsByArg = {};  // argument_id → [citations]
     if (a.entity_id) {
       if (!argsByEntity[a.entity_id]) argsByEntity[a.entity_id] = [];
       argsByEntity[a.entity_id].push(a);
+    }
+    if (a.role_id) {
+      if (!argsByRole[a.role_id]) argsByRole[a.role_id] = [];
+      argsByRole[a.role_id].push(a);
+    }
+    if (a.mechanism_id) {
+      if (!argsByMechanism[a.mechanism_id]) argsByMechanism[a.mechanism_id] = [];
+      argsByMechanism[a.mechanism_id].push(a);
     }
   }
 });
@@ -835,6 +863,8 @@ async function submitArgument(formId, opts) {
   const body = {
     relation_id: opts.relation_id || null,
     entity_id: opts.entity_id || null,
+    role_id: opts.role_id || null,
+    mechanism_id: opts.mechanism_id || null,
     parent_argument_id: opts.parent_argument_id || null,
     stance, claim, reasoning: reasoning || null,
     property, property_value: propVal,
@@ -860,6 +890,10 @@ async function submitArgument(formId, opts) {
         reloadRelationDiscussion(opts.relation_id);
       } else if (opts.entity_id) {
         reloadEntityDiscussion(opts.entity_id);
+      } else if (opts.role_id) {
+        reloadTheoryDiscussion('role_id', opts.role_id);
+      } else if (opts.mechanism_id) {
+        reloadTheoryDiscussion('mechanism_id', opts.mechanism_id);
       }
     }, 500);
   } catch (e) {
@@ -889,6 +923,40 @@ async function reloadEntityDiscussion(entityId) {
     const node = currentNodes.find(n => n.id === entityId);
     if (node) selectNode(node);
   } catch (e) { console.error('Reload failed', e); }
+}
+
+// Literatuur-discussie over een rol/mechanisme herladen + theoriescores verversen
+async function reloadTheoryDiscussion(field, id) {
+  try {
+    const resp = await fetch(`/api/arguments?${field}=${id}`);
+    const args = await resp.json();
+    const roots = buildTreeFromApi(args);
+    if (field === 'role_id') argsByRole[id] = roots; else argsByMechanism[id] = roots;
+    await refreshScores();   // herberekent geloofwaardigheid/sterkte
+    if (field === 'role_id') {
+      const node = currentNodes.find(n => n.id === id);
+      if (node) selectNode(node);
+    } else {
+      const ml = currentLinks.find(l => l.id === id);
+      if (ml) selectRelation(ml);
+    }
+  } catch (e) { console.error('Reload failed', e); }
+}
+
+// Haal verse afgeleide scores op en werk DATA + visualisatie bij
+async function refreshScores() {
+  try {
+    const resp = await fetch('/api/scores');
+    if (!resp.ok) return;
+    const s = await resp.json();
+    DATA.relations.forEach(r => { if (s.relations[r.id] != null) r.derived_certainty = s.relations[r.id]; });
+    DATA.entities.forEach(e => { if (s.entities[e.id] != null) e.derived_certainty = s.entities[e.id]; });
+    DATA.roles.forEach(r => { if (s.roles[r.id]) Object.assign(r, s.roles[r.id]); });
+    DATA.mechanisms.forEach(m => { if (s.mechanisms[m.id]) Object.assign(m, s.mechanisms[m.id]); });
+    // mechLinks zijn losse kopieën van de mechanismen — ook bijwerken voor de codering
+    mechLinks.forEach(ml => { if (s.mechanisms[ml.id]) Object.assign(ml, s.mechanisms[ml.id]); });
+    if (state.model === 'theory') buildGraph();
+  } catch (e) { console.error('Scores verversen mislukt', e); }
 }
 
 function buildTreeFromApi(args) {
@@ -965,6 +1033,8 @@ let state = {
   activeFilters: new Set(Object.keys(FILTER_COLORS)),
   certMin: 0, inflMin: 0,
   selectedNode: null,
+  selectedRelation: null,
+  adminMode: false,
   searchTerm: '',
   timelineYear: null,    // null = show all, number = filter to year
   legendSelection: new Set(),  // leeg = alles tonen; anders alleen geselecteerde legenda-keys
@@ -1130,7 +1200,7 @@ function buildGraph() {
   const linkGroup = g.append('g').attr('class', 'links');
   linkElements = linkGroup.selectAll('line').data(links).join('line')
     .attr('stroke', d => getLinkColor(d, isTheory))
-    .attr('stroke-width', d => isTheory ? 2.5 : 1 + (d.influence || 0.5) * 2.5)
+    .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
     .attr('stroke-opacity', d => isTheory ? 0.5 : 0.15 + (d.certainty || 0.5) * 0.45)
     .attr('marker-end', d => {
       const color = getLinkColor(d, isTheory);
@@ -1259,7 +1329,11 @@ function buildGraph() {
 // HELPERS
 // ============================================================
 function getRadius(d) {
-  if (state.model === 'theory') return 12 + Math.sqrt(d.degree || 1) * 5;
+  // Theoretisch model: grootte ∝ sterkte (geloofwaardigheid-gewogen invloed van de instanties);
+  // valt terug op graad zolang er nog geen sterkte is berekend.
+  if (state.model === 'theory') {
+    return (d.sterkte != null) ? 10 + d.sterkte * 22 : 12 + Math.sqrt(d.degree || 1) * 5;
+  }
   return 5 + Math.sqrt(d.degree || 1) * 3;
 }
 
@@ -1336,8 +1410,16 @@ function openTimespanForm(idField, id, property, slotId) {
 // RELATIE DETAIL (discussieboom)
 // ============================================================
 function selectRelation(r) {
+  state.selectedRelation = r;
+  state.selectedNode = null;
   const panel = document.getElementById('detail');
   const content = document.getElementById('detailContent');
+  // In het theoretische model is "r" een mechanisme (klasse), geen praktijk-relatie.
+  if (state.model === 'theory') {
+    showMechanismDetail(r, content);
+    panel.classList.add('open');
+    return;
+  }
   const src = typeof r.source === 'object' ? r.source : entityMap.get(r.source_id || r.source);
   const tgt = typeof r.target === 'object' ? r.target : entityMap.get(r.target_id || r.target);
   const srcName = src ? src.name : (r.source_name || '?');
@@ -1394,8 +1476,44 @@ function selectRelation(r) {
     html += `<div style="margin-top:12px"><button class="arg-toggle" onclick="selectNode(currentNodes.find(n=>n.id===${src.id}))">← ${srcName}</button></div>`;
   }
 
+  // Adminmodus: relatie verwijderen (praktijklaag). Mechanismen lopen via showMechanismDetail.
+  if (state.adminMode) {
+    html += `<div class="detail-section" style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+      <button class="btn-danger" onclick="deleteRelation(${r.id})">🗑 Relatie verwijderen</button>
+      <div class="admin-hint">Verwijdert deze relatie en alle bijbehorende argumenten definitief uit de database.</div>
+    </div>`;
+  }
+
   content.innerHTML = html;
   panel.classList.add('open');
+}
+
+// Detailpaneel voor een mechanisme (theoretische relatie/klasse).
+function showMechanismDetail(m, content) {
+  const src = roleMap.get(typeof m.source === 'object' ? m.source.id : m.source);
+  const tgt = roleMap.get(typeof m.target === 'object' ? m.target.id : m.target);
+  const color = FILTER_COLORS[m.filter] || 'var(--text)';
+  let html = `<div class="detail-header">
+    <div class="entity-type" style="color:${color}">${FILTER_LABELS[m.filter] || m.filter}${m.mechanism_type ? ' · ' + m.mechanism_type : ''}</div>
+    <h2>${m.name}</h2>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:4px">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
+  </div>`;
+  if (m.description) html += `<div class="detail-description">${m.description}</div>`;
+  if (m.effect) {
+    html += `<div class="detail-section"><h4>Effect</h4>
+      <div style="font-size:12px;color:var(--c-advertentie);line-height:1.6">${m.effect}</div></div>`;
+  }
+  html += renderTheoryScores(m);
+  html += renderInstanceList('mechanism_id', m.id);
+  html += renderLiteratureSection('mechanism_id', m.id, argsByMechanism[m.id]);
+  if (state.adminMode) {
+    const relCount = DATA.relations.filter(rr => rr.mechanism_id === m.id).length;
+    html += `<div class="detail-section" style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+      <button class="btn-danger" onclick="deleteMechanism(${m.id})">🗑 Mechanisme verwijderen</button>
+      <div class="admin-hint">${relCount ? `${relCount} praktijk-relatie(s) verliezen de koppeling, maar blijven bestaan.` : 'Geen praktijk-relaties gekoppeld.'}</div>
+    </div>`;
+  }
+  content.innerHTML = html;
 }
 
 // ============================================================
@@ -1403,6 +1521,7 @@ function selectRelation(r) {
 // ============================================================
 function selectNode(d) {
   state.selectedNode = d;
+  state.selectedRelation = null;
   const isTheory = state.model === 'theory';
 
   // Only links that pass the current filters/timeline can be highlighted/hovered
@@ -1450,6 +1569,7 @@ function selectNode(d) {
 
 function deselectNode() {
   state.selectedNode = null;
+  state.selectedRelation = null;
   // Re-apply filters so timeline visibility is respected
   applyFilters();
   document.getElementById('detail').classList.remove('open');
@@ -1467,6 +1587,137 @@ function showDetail(d) {
     showInstanceDetail(d, content, color);
   }
   panel.classList.add('open');
+}
+
+// Twee scorebalken + opsplitsing literatuur/praktijk voor een theorie-element.
+function renderTheoryScores(d) {
+  const pct = v => Math.round((v || 0) * 100);
+  return `<div class="detail-section">
+    <h4>Geloofwaardigheid &amp; sterkte</h4>
+    <div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">
+      <span class="score-bar">geloofwaardig <span class="bar-track"><span class="bar-fill" style="width:${pct(d.geloofwaardigheid)}%;background:var(--accent)"></span></span> ${pct(d.geloofwaardigheid)}%</span>
+      <span class="score-bar">sterkte <span class="bar-track"><span class="bar-fill" style="width:${pct(d.sterkte)}%;background:var(--c-advertentie)"></span></span> ${pct(d.sterkte)}%</span>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);line-height:1.7">
+      opgebouwd uit <b style="color:var(--text-dim)">literatuur</b> (${d.n_bronnen || 0} bron-arg., ${pct(d.literatuur_geloofw)}%)
+      &oplus; <b style="color:var(--text-dim)">praktijk</b> (${d.n_instanties || 0} voorbeeld(en), ${pct(d.praktijk_geloofw)}%)
+    </div>
+  </div>`;
+}
+
+// Literatuur-discussie (argumenten/citaties direct op de theorie) + invoerformulier.
+function renderLiteratureSection(field, id, roots) {
+  let html = `<div class="detail-section"><h4>Literatuuronderbouwing</h4>`;
+  if (roots && roots.length) {
+    html += renderArgTree(roots);
+  } else {
+    html += `<div style="font-size:11px;color:var(--text-muted);padding:6px 0">Nog geen bronnen/argumenten. Voeg een bron toe (bijv. een boek of rapport) met een citaat — de betrouwbaarheid van die bron bepaalt het gewicht.</div>`;
+  }
+  const slot = `lit-slot-${field}-${id}`, toggle = `lit-toggle-${field}-${id}`;
+  const opts = field === 'role_id' ? `{role_id:${id}}` : `{mechanism_id:${id}}`;
+  html += `<button class="arg-toggle" id="${toggle}" onclick="
+      let s=document.getElementById('${slot}');
+      if(s.children.length===0){ s.innerHTML=renderArgForm(${opts}); this.textContent='Verberg formulier ▾'; }
+      else { s.innerHTML=''; this.textContent='+ Bron/argument toevoegen ▸'; }
+    ">+ Bron/argument toevoegen ▸</button>
+    <div id="${slot}"></div></div>`;
+  return html;
+}
+
+function entityById(id) { return entityMap.get(id) || DATA.entities.find(e => e.id === id); }
+function relationById(id) { return DATA.relations.find(r => r.id === id); }
+
+// Lijst van gekoppelde praktijkvoorbeelden (uit instantiations) + exemplariteit; admin kan beheren.
+function renderInstanceList(field, id) {
+  const isRole = field === 'role_id';
+  const insts = (DATA.instantiations || []).filter(it => it[field] === id);
+  let html = `<div class="detail-section"><h4>Praktijkvoorbeelden (${insts.length})</h4>`;
+  if (!insts.length) {
+    html += `<div style="font-size:11px;color:var(--text-muted);padding:4px 0">Nog geen gekoppelde ${isRole ? 'entiteiten' : 'relaties'}.</div>`;
+  }
+  insts.forEach(it => {
+    let label, dc;
+    if (isRole) { const e = entityById(it.entity_id); label = e ? e.name : ('entiteit #' + it.entity_id); dc = e ? e.derived_certainty : null; }
+    else { const r = relationById(it.relation_id); label = r ? `${r.source_name} → ${r.target_name}` : ('relatie #' + it.relation_id); dc = r ? r.derived_certainty : null; }
+    const ex = Math.round((it.exemplarity != null ? it.exemplarity : 1) * 100);
+    html += `<div class="relation-card" style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div class="rel-name">${label}</div>
+        <div style="font-size:10px;color:var(--text-muted)">exemplariteit ${ex}%${dc != null ? ` · zekerheid ${Math.round(dc * 100)}%` : ''}</div>
+      </div>
+      ${state.adminMode ? `<button class="btn-danger" style="padding:3px 8px;font-size:10px;white-space:nowrap" onclick="unlinkInstantiation(${it.id}, '${field}', ${id})">ontkoppel</button>` : ''}
+    </div>`;
+  });
+  if (state.adminMode) {
+    const slot = `inst-add-${field}-${id}`;
+    html += `<button class="arg-toggle" onclick="
+        let s=document.getElementById('${slot}');
+        if(s.children.length===0){ s.innerHTML=renderInstanceAddForm('${field}',${id}); this.textContent='Verberg ▾'; }
+        else { s.innerHTML=''; this.textContent='+ Voorbeeld koppelen ▸'; }
+      ">+ Voorbeeld koppelen ▸</button><div id="${slot}"></div>`;
+  }
+  return html + `</div>`;
+}
+
+function renderInstanceAddForm(field, id) {
+  const isRole = field === 'role_id';
+  const linked = new Set((DATA.instantiations || []).filter(it => it[field] === id)
+    .map(it => isRole ? it.entity_id : it.relation_id));
+  let options;
+  if (isRole) {
+    options = DATA.entities.filter(e => !linked.has(e.id)).slice().sort((a, b) => a.name.localeCompare(b.name))
+      .map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  } else {
+    options = DATA.relations.filter(r => !linked.has(r.id)).slice()
+      .sort((a, b) => (a.source_name || '').localeCompare(b.source_name || ''))
+      .map(r => `<option value="${r.id}">${r.source_name} → ${r.target_name}</option>`).join('');
+  }
+  const fid = `instform-${field}-${id}`;
+  return `<div class="arg-form">
+    <div class="form-row"><label>${isRole ? 'Entiteit' : 'Relatie'}</label><select id="${fid}-target">${options}</select></div>
+    <div class="form-row"><label>Exemplariteit (0–100): hoe prototypisch?</label><input type="number" id="${fid}-ex" min="0" max="100" value="100"></div>
+    <div id="${fid}-msg"></div>
+    <button class="btn-submit" onclick="submitInstantiation('${field}',${id},'${fid}')">Koppelen</button>
+  </div>`;
+}
+
+async function submitInstantiation(field, id, fid) {
+  const msg = document.getElementById(fid + '-msg');
+  const target = parseInt(document.getElementById(fid + '-target').value, 10);
+  const exRaw = document.getElementById(fid + '-ex').value.trim();
+  if (!target) { msg.innerHTML = '<div class="form-message error">Kies een voorbeeld</div>'; return; }
+  const body = { exemplarity: exRaw ? Math.min(100, Math.max(0, parseFloat(exRaw))) / 100 : 1.0 };
+  if (field === 'role_id') { body.role_id = id; body.entity_id = target; }
+  else { body.mechanism_id = id; body.relation_id = target; }
+  try {
+    const resp = await fetch('/api/instantiations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { msg.innerHTML = `<div class="form-message error">${result.error || 'Fout'}</div>`; return; }
+    DATA.instantiations.push(result);
+    await refreshScores();
+    rerenderTheoryPanel(field, id);
+  } catch (e) { msg.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`; }
+}
+
+async function unlinkInstantiation(iid, field, id) {
+  if (!confirm('Deze koppeling losmaken? De entiteit/relatie zelf blijft bestaan.')) return;
+  try {
+    const resp = await fetch(`/api/instantiations/${iid}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { alert(result.error || 'Fout'); return; }
+    DATA.instantiations = DATA.instantiations.filter(it => it.id !== iid);
+    await refreshScores();
+    rerenderTheoryPanel(field, id);
+  } catch (e) { alert('Netwerkfout: ' + e.message); }
+}
+
+function rerenderTheoryPanel(field, id) {
+  if (field === 'role_id') { const n = currentNodes.find(x => x.id === id); if (n) selectNode(n); }
+  else { const ml = currentLinks.find(l => l.id === id); if (ml) selectRelation(ml); }
 }
 
 function showTheoryDetail(d, content, color) {
@@ -1490,6 +1741,8 @@ function showTheoryDetail(d, content, color) {
     <div class="detail-description">${d.description || ''}</div>
   `;
 
+  html += renderTheoryScores(d);
+
   if (d.examples) {
     html += `<div class="detail-section">
       <h4>Voorbeelden</h4>
@@ -1497,17 +1750,8 @@ function showTheoryDetail(d, content, color) {
     </div>`;
   }
 
-  if (entityCount > 0) {
-    html += `<div class="detail-section">
-      <h4>Concrete entiteiten met deze rol (${entityCount})</h4>`;
-    DATA.entities.filter(e => e.role_name === d.name).forEach(e => {
-      html += `<div class="relation-card">
-        <div class="rel-name">${e.name}</div>
-        <div style="font-size:10px;color:var(--text-muted)">${e.type}</div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
+  html += renderInstanceList('role_id', d.id);
+  html += renderLiteratureSection('role_id', d.id, argsByRole[d.id]);
 
   if (outMechs.length) {
     html += `<div class="detail-section"><h4>Uitgaande mechanismen (${outMechs.length})</h4>`;
@@ -1525,6 +1769,21 @@ function showTheoryDetail(d, content, color) {
       html += mechCard(m, src ? src.name : '?', 'van');
     });
     html += `</div>`;
+  }
+
+  // Adminmodus: rol verwijderen
+  if (state.adminMode) {
+    const mechCount = DATA.mechanisms.filter(m => m.source_role_id === d.id || m.target_role_id === d.id).length;
+    const parts = [];
+    if (entityCount) parts.push(`${entityCount} entiteit(en)`);
+    if (mechCount) parts.push(`${mechCount} mechanisme(n)`);
+    const note = parts.length
+      ? `De rol wordt losgemaakt van ${parts.join(' en ')}; die blijven zelf bestaan.`
+      : 'Geen koppelingen aan deze rol.';
+    html += `<div class="detail-section" style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+      <button class="btn-danger" onclick="deleteRole(${d.id})">🗑 Rol verwijderen</button>
+      <div class="admin-hint">${note}</div>
+    </div>`;
   }
 
   content.innerHTML = html;
@@ -1601,6 +1860,15 @@ function showInstanceDetail(d, content, color) {
     ">+ Argument toevoegen ▸</button>
     <div id="new-arg-slot-ent"></div>
   </div>`;
+
+  // Adminmodus: verwijderen
+  if (state.adminMode) {
+    const relCount = DATA.relations.filter(r => r.source_id === d.id || r.target_id === d.id).length;
+    html += `<div class="detail-section" style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+      <button class="btn-danger" onclick="deleteEntity(${d.id})">🗑 Entiteit verwijderen</button>
+      <div class="admin-hint">Verwijdert deze entiteit definitief uit de database${relCount ? `, samen met ${relCount} relatie(s) en hun argumenten` : ''}.</div>
+    </div>`;
+  }
 
   content.innerHTML = html;
 }
@@ -1765,6 +2033,7 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     btn.classList.add('active');
     state.model = btn.dataset.model;
     state.legendSelection.clear();  // keys verschillen per model
+    closeAddModal();                // tabs/formulieren verschillen per model
 
     // Show/hide instance-specific controls
     const isTheory = state.model === 'theory';
@@ -1877,13 +2146,18 @@ document.getElementById('zoomFit').addEventListener('click', () => {
 // ============================================================
 // TOEVOEGEN: entiteiten & relaties
 // ============================================================
+// Soort entiteit = de structurele VORM. Personen vormen één soort; de functie hoort
+// in de rol. Organisaties hebben echt verschillende vormen.
 const ENTITY_TYPE_GROUPS = {
-  'Personen': ['politicus','journalist','voorlichter','lobbyist','columnist','academicus',
-    'mediaeigenaar','toezichthouder_persoon','advocaat','klokkenluider','persoon'],
-  'Organisaties': ['partij','mediaorganisatie','persbureau','bedrijf','adverteerder','lobbygroep',
-    'denktank','overheidsinstelling','toezichthouder','ngo','vakbond','omroep','elite_netwerk',
-    'vermogensbeheerder','pr_bureau','platform','rechterlijke_macht','onderwijsinstelling','burgerinitiatief'],
+  'Personen': ['persoon'],
+  'Organisaties': ['partij','mediaorganisatie','omroep','persbureau','bedrijf','lobbygroep',
+    'denktank','overheidsinstelling','toezichthouder','ngo','vakbond','elite_netwerk',
+    'vermogensbeheerder','pr_bureau','platform','rechterlijke_macht','onderwijsinstelling',
+    'burgerinitiatief','stichting'],
 };
+// Volgorde waarin rollen per filter in de dropdown gegroepeerd worden.
+const ROLE_CAT_ORDER = ['eigendom','advertentie','sourcing','flak','ideologie',
+  'systeemactor','tegenmacht','cross_filter','overig'];
 
 function entityTypeOptions() {
   return Object.entries(ENTITY_TYPE_GROUPS).map(([grp, types]) =>
@@ -1891,10 +2165,18 @@ function entityTypeOptions() {
     types.map(t => `<option value="${t}">${t.replace(/_/g, ' ')}</option>`).join('') +
     `</optgroup>`).join('');
 }
+// Rollen gegroepeerd per filter — de filter is de betekenisvolle as, niet de losse rolnaam.
 function roleOptions() {
+  const byCat = {};
+  DATA.roles.forEach(r => { (byCat[r.category] = byCat[r.category] || []).push(r); });
+  const cats = ROLE_CAT_ORDER.filter(c => byCat[c])
+    .concat(Object.keys(byCat).filter(c => !ROLE_CAT_ORDER.includes(c)));
   return '<option value="">— geen —</option>' +
-    DATA.roles.slice().sort((a, b) => a.name.localeCompare(b.name))
-      .map(r => `<option value="${r.id}">${r.name} (${FILTER_LABELS[r.category] || r.category})</option>`).join('');
+    cats.map(c =>
+      `<optgroup label="${FILTER_LABELS[c] || c}">` +
+      byCat[c].slice().sort((a, b) => a.name.localeCompare(b.name))
+        .map(r => `<option value="${r.id}">${r.name}</option>`).join('') +
+      `</optgroup>`).join('');
 }
 function entityOptions() {
   return '<option value="">— kies —</option>' +
@@ -1909,6 +2191,94 @@ function mechanismOptions() {
     DATA.mechanisms.slice().sort((a, b) => a.name.localeCompare(b.name))
       .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
 }
+// Theorie-dropdowns
+const ROLE_CATEGORIES = ['eigendom','advertentie','sourcing','flak','ideologie','systeemactor','tegenmacht','overig'];
+const MECH_FILTERS = ['eigendom','advertentie','sourcing','flak','ideologie','cross_filter','tegenmacht','overig'];
+const MECH_TYPES = ['structureel','procedureel','psychologisch','economisch','juridisch','technologisch','discursief'];
+function catOptions(list, selected) {
+  return list.map(c => `<option value="${c}"${c === selected ? ' selected' : ''}>${FILTER_LABELS[c] || c}</option>`).join('');
+}
+function mechTypeOptions() {
+  return '<option value="">— optioneel —</option>' +
+    MECH_TYPES.map(t => `<option value="${t}">${t}</option>`).join('');
+}
+// Rol-keuze voor mechanisme bron/doel, gegroepeerd per filter
+function roleSelectOptions() {
+  const byCat = {};
+  DATA.roles.forEach(r => { (byCat[r.category] = byCat[r.category] || []).push(r); });
+  const cats = ROLE_CAT_ORDER.filter(c => byCat[c])
+    .concat(Object.keys(byCat).filter(c => !ROLE_CAT_ORDER.includes(c)));
+  return '<option value="">— kies rol —</option>' +
+    cats.map(c =>
+      `<optgroup label="${FILTER_LABELS[c] || c}">` +
+      byCat[c].slice().sort((a, b) => a.name.localeCompare(b.name))
+        .map(r => `<option value="${r.id}">${r.name}</option>`).join('') +
+      `</optgroup>`).join('');
+}
+
+function roleFormHtml() {
+  return `
+  <div class="arg-form">
+    <div class="form-row">
+      <label>Naam *</label>
+      <input type="text" id="role-name" placeholder="bv. mediaeigenaar" autocomplete="off">
+      <div class="field-hint">Een functie/rol in het model, zonder eigennaam</div>
+    </div>
+    <div class="form-row">
+      <label>Categorie (filter) *</label>
+      <select id="role-cat">${catOptions(ROLE_CATEGORIES, 'eigendom')}</select>
+    </div>
+    <div class="form-row">
+      <label>Beschrijving *</label>
+      <textarea id="role-desc" placeholder="Wat doet deze rol binnen het propagandamodel?"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Voorbeelden</label>
+      <textarea id="role-ex" placeholder="Generieke voorbeelden (optioneel)"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Jouw naam</label>
+      <input type="text" id="role-by" placeholder="anoniem" autocomplete="off">
+    </div>
+    <div id="role-msg"></div>
+    <button class="btn-submit" onclick="submitRole()">Rol toevoegen</button>
+    <button class="btn-cancel" onclick="closeAddModal()">Annuleren</button>
+  </div>`;
+}
+
+function mechanismFormHtml() {
+  return `
+  <div class="arg-form">
+    <div class="form-row">
+      <label>Naam *</label>
+      <input type="text" id="mech-name" placeholder="bv. benoemingspolitiek" autocomplete="off">
+    </div>
+    <div class="form-row two">
+      <div><label>Filter *</label><select id="mech-filter">${catOptions(MECH_FILTERS, 'eigendom')}</select></div>
+      <div><label>Type mechanisme</label><select id="mech-type">${mechTypeOptions()}</select></div>
+    </div>
+    <div class="form-row two">
+      <div><label>Bron-rol *</label><select id="mech-source">${roleSelectOptions()}</select></div>
+      <div><label>Doel-rol *</label><select id="mech-target">${roleSelectOptions()}</select></div>
+    </div>
+    <div class="form-row">
+      <label>Beschrijving *</label>
+      <textarea id="mech-desc" placeholder="Hoe werkt dit mechanisme?"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Effect *</label>
+      <textarea id="mech-effect" placeholder="Wat is het effect op de berichtgeving?"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Jouw naam</label>
+      <input type="text" id="mech-by" placeholder="anoniem" autocomplete="off">
+    </div>
+    <div class="field-hint">Een mechanisme verschijnt als verbindingslijn tussen de gekozen bron- en doel-rol.</div>
+    <div id="mech-msg"></div>
+    <button class="btn-submit" onclick="submitMechanism()">Mechanisme toevoegen</button>
+    <button class="btn-cancel" onclick="closeAddModal()">Annuleren</button>
+  </div>`;
+}
 
 function entityFormHtml() {
   return `
@@ -1918,8 +2288,10 @@ function entityFormHtml() {
       <input type="text" id="ent-name" placeholder="bv. DPG Media" autocomplete="off">
     </div>
     <div class="form-row two">
-      <div><label>Type *</label><select id="ent-type">${entityTypeOptions()}</select></div>
-      <div><label>Primaire rol</label><select id="ent-role">${roleOptions()}</select></div>
+      <div><label>Soort entiteit *</label><select id="ent-type">${entityTypeOptions()}</select>
+        <div class="field-hint">Wat het <em>is</em> (persoon of organisatievorm)</div></div>
+      <div><label>Functie in model</label><select id="ent-role">${roleOptions()}</select>
+        <div class="field-hint">Welke rol het <em>speelt</em> binnen de vijf filters</div></div>
     </div>
     <div class="form-row">
       <label>Beschrijving</label>
@@ -1973,13 +2345,23 @@ function relationFormHtml() {
   </div>`;
 }
 
+// Welke tabs/formulieren horen bij welk model
+const ADD_TABS = {
+  instance: [['entity', 'Entiteit'], ['relation', 'Relatie']],
+  theory:   [['role', 'Rol'], ['mechanism', 'Mechanisme']],
+};
+const ADD_FORMS = {
+  entity: entityFormHtml, relation: relationFormHtml,
+  role: roleFormHtml, mechanism: mechanismFormHtml,
+};
 let addTab = 'entity';
 function openAddModal(tab) {
-  addTab = tab || 'entity';
-  document.querySelectorAll('.modal-tabs button').forEach(b =>
-    b.classList.toggle('active', b.dataset.addtab === addTab));
-  document.getElementById('addModalBody').innerHTML =
-    addTab === 'entity' ? entityFormHtml() : relationFormHtml();
+  const tabs = ADD_TABS[state.model] || ADD_TABS.instance;
+  const valid = tabs.map(t => t[0]);
+  addTab = (tab && valid.includes(tab)) ? tab : valid[0];
+  document.getElementById('addModalTabs').innerHTML = tabs.map(([key, label]) =>
+    `<button class="${key === addTab ? 'active' : ''}" onclick="openAddModal('${key}')">${label}</button>`).join('');
+  document.getElementById('addModalBody').innerHTML = ADD_FORMS[addTab]();
   document.getElementById('addModal').classList.add('open');
 }
 function closeAddModal() {
@@ -2008,6 +2390,238 @@ function addRelationToGraph(rel) {
   instanceLinks.push({ ...rel, source: rel.source_id, target: rel.target_id });
   recomputeDegrees();
   if (state.model === 'instance') buildGraph();
+}
+
+function removeRelationFromGraph(id) {
+  DATA.relations = DATA.relations.filter(r => r.id !== id);
+  const idx = instanceLinks.findIndex(l => l.id === id);
+  if (idx >= 0) instanceLinks.splice(idx, 1);
+  recomputeDegrees();
+  if (state.model === 'instance') buildGraph();
+}
+
+function removeEntityFromGraph(id) {
+  DATA.entities = DATA.entities.filter(e => e.id !== id);
+  entityMap.delete(id);
+  // Relaties die deze entiteit raken verdwijnen mee
+  DATA.relations = DATA.relations.filter(r => r.source_id !== id && r.target_id !== id);
+  for (let i = instanceLinks.length - 1; i >= 0; i--) {
+    const l = instanceLinks[i];
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === id || tid === id) instanceLinks.splice(i, 1);
+  }
+  recomputeDegrees();
+  if (state.model === 'instance') buildGraph();
+}
+
+async function deleteRelation(id) {
+  const rel = DATA.relations.find(r => r.id === id);
+  const label = rel ? `${rel.source_name || '?'} → ${rel.target_name || '?'}` : `#${id}`;
+  if (!confirm(`Relatie "${label}" definitief uit de database verwijderen?\n\nBijbehorende argumenten worden óók verwijderd.`)) return;
+  try {
+    const resp = await fetch(`/api/relations/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changed_by: 'admin' }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    removeRelationFromGraph(id);
+    deselectNode();
+  } catch (e) { alert('Netwerkfout: ' + e.message); }
+}
+
+async function deleteEntity(id) {
+  const ent = entityMap.get(id) || DATA.entities.find(e => e.id === id);
+  const name = ent ? ent.name : `#${id}`;
+  const relCount = DATA.relations.filter(r => r.source_id === id || r.target_id === id).length;
+  const warn = relCount ? `\n\nLet op: ${relCount} relatie(s) en bijbehorende argumenten worden óók verwijderd.` : '';
+  if (!confirm(`Entiteit "${name}" definitief uit de database verwijderen?${warn}`)) return;
+  try {
+    const resp = await fetch(`/api/entities/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changed_by: 'admin' }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    removeEntityFromGraph(id);
+    deselectNode();
+  } catch (e) { alert('Netwerkfout: ' + e.message); }
+}
+
+function setAdminMode(on) {
+  state.adminMode = !!on;
+  try { localStorage.setItem('pm-admin', state.adminMode ? '1' : '0'); } catch (e) {}
+  const btn = document.getElementById('adminToggle');
+  if (btn) {
+    btn.classList.toggle('active', state.adminMode);
+    btn.textContent = state.adminMode ? 'Admin ●' : 'Admin';
+  }
+  // Heropen het actieve detailpaneel zodat de verwijderknop verschijnt/verdwijnt
+  if (state.selectedRelation) selectRelation(state.selectedRelation);
+  else if (state.selectedNode) selectNode(state.selectedNode);
+}
+
+// ── Theoretisch model: in-memory bijwerken ───────────────────
+function recomputeRoleDegrees() {
+  DATA.roles.forEach(r => { r.degree = 0; });
+  mechLinks.forEach(m => {
+    const s = roleMap.get(typeof m.source === 'object' ? m.source.id : m.source);
+    const t = roleMap.get(typeof m.target === 'object' ? m.target.id : m.target);
+    if (s) s.degree++;
+    if (t) t.degree++;
+  });
+}
+
+function addRoleToGraph(role) {
+  role.filterCat = role.category;
+  role.degree = 0;
+  DATA.roles.push(role);
+  roleMap.set(role.id, role);
+  if (state.model === 'theory') buildGraph();
+}
+
+function addMechanismToGraph(mech) {
+  DATA.mechanisms.push(mech);
+  if (mech.source_role_id && mech.target_role_id) {
+    mechLinks.push({ ...mech, source: mech.source_role_id, target: mech.target_role_id, filterCat: mech.filter });
+  }
+  recomputeRoleDegrees();
+  if (state.model === 'theory') buildGraph();
+}
+
+function removeRoleFromGraph(id) {
+  const role = roleMap.get(id) || DATA.roles.find(r => r.id === id);
+  const roleName = role ? role.name : null;
+  DATA.roles = DATA.roles.filter(r => r.id !== id);
+  roleMap.delete(id);
+  // Mechanismen die deze rol als bron/doel hadden: koppeling los + edge weg
+  for (let i = mechLinks.length - 1; i >= 0; i--) {
+    const s = typeof mechLinks[i].source === 'object' ? mechLinks[i].source.id : mechLinks[i].source;
+    const t = typeof mechLinks[i].target === 'object' ? mechLinks[i].target.id : mechLinks[i].target;
+    if (s === id || t === id) mechLinks.splice(i, 1);
+  }
+  DATA.mechanisms.forEach(m => {
+    if (m.source_role_id === id) m.source_role_id = null;
+    if (m.target_role_id === id) m.target_role_id = null;
+  });
+  // Entiteiten die deze rol als hoofdrol hadden: label losmaken (server zet primary_role_id NULL)
+  if (roleName) DATA.entities.forEach(e => { if (e.role_name === roleName) e.role_name = null; });
+  recomputeRoleDegrees();
+  if (state.model === 'theory') buildGraph();
+}
+
+function removeMechanismFromGraph(id) {
+  DATA.mechanisms = DATA.mechanisms.filter(m => m.id !== id);
+  const idx = mechLinks.findIndex(m => m.id === id);
+  if (idx >= 0) mechLinks.splice(idx, 1);
+  // Praktijk-relaties die dit mechanisme gebruikten: koppeling losmaken (relatie blijft)
+  DATA.relations.forEach(r => { if (r.mechanism_id === id) { r.mechanism_id = null; r.mechanism_name = null; } });
+  instanceLinks.forEach(l => { if (l.mechanism_id === id) { l.mechanism_id = null; l.mechanism_name = null; } });
+  recomputeRoleDegrees();
+  if (state.model === 'theory') buildGraph();
+}
+
+// ── Theorie: toevoegen ───────────────────────────────────────
+async function submitRole() {
+  const msg = document.getElementById('role-msg');
+  const name = document.getElementById('role-name').value.trim();
+  const description = document.getElementById('role-desc').value.trim();
+  if (!name) { msg.innerHTML = '<div class="form-message error">Naam is verplicht</div>'; return; }
+  if (!description) { msg.innerHTML = '<div class="form-message error">Beschrijving is verplicht</div>'; return; }
+  const body = {
+    name, category: document.getElementById('role-cat').value,
+    description, examples: document.getElementById('role-ex').value.trim() || null,
+    contributed_by: document.getElementById('role-by').value.trim() || 'anoniem',
+  };
+  try {
+    const resp = await fetch('/api/roles', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { msg.innerHTML = `<div class="form-message error">${result.error || 'Fout bij opslaan'}</div>`; return; }
+    addRoleToGraph(result);
+    msg.innerHTML = '<div class="form-message success">Rol toegevoegd!</div>';
+    setTimeout(() => {
+      closeAddModal();
+      const n = currentNodes && currentNodes.find(x => x.id === result.id);
+      if (n && state.model === 'theory') selectNode(n);
+    }, 600);
+  } catch (e) { msg.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`; }
+}
+
+async function submitMechanism() {
+  const msg = document.getElementById('mech-msg');
+  const name = document.getElementById('mech-name').value.trim();
+  const description = document.getElementById('mech-desc').value.trim();
+  const effect = document.getElementById('mech-effect').value.trim();
+  const source_role_id = parseInt(document.getElementById('mech-source').value, 10) || null;
+  const target_role_id = parseInt(document.getElementById('mech-target').value, 10) || null;
+  if (!name) { msg.innerHTML = '<div class="form-message error">Naam is verplicht</div>'; return; }
+  if (!source_role_id || !target_role_id) { msg.innerHTML = '<div class="form-message error">Kies een bron- en doel-rol</div>'; return; }
+  if (source_role_id === target_role_id) { msg.innerHTML = '<div class="form-message error">Bron- en doel-rol mogen niet hetzelfde zijn</div>'; return; }
+  if (!description) { msg.innerHTML = '<div class="form-message error">Beschrijving is verplicht</div>'; return; }
+  if (!effect) { msg.innerHTML = '<div class="form-message error">Effect is verplicht</div>'; return; }
+  const body = {
+    name, filter: document.getElementById('mech-filter').value,
+    mechanism_type: document.getElementById('mech-type').value || null,
+    description, effect, source_role_id, target_role_id,
+    contributed_by: document.getElementById('mech-by').value.trim() || 'anoniem',
+  };
+  try {
+    const resp = await fetch('/api/mechanisms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { msg.innerHTML = `<div class="form-message error">${result.error || 'Fout bij opslaan'}</div>`; return; }
+    addMechanismToGraph(result);
+    msg.innerHTML = '<div class="form-message success">Mechanisme toegevoegd!</div>';
+    setTimeout(() => { closeAddModal(); }, 600);
+  } catch (e) { msg.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`; }
+}
+
+// ── Theorie: verwijderen ─────────────────────────────────────
+async function deleteRole(id) {
+  const role = roleMap.get(id) || DATA.roles.find(r => r.id === id);
+  const name = role ? role.name : `#${id}`;
+  const entCount = DATA.entities.filter(e => e.role_name === name).length;
+  const mechCount = DATA.mechanisms.filter(m => m.source_role_id === id || m.target_role_id === id).length;
+  let warn = '';
+  if (entCount || mechCount) {
+    const parts = [];
+    if (entCount) parts.push(`${entCount} entiteit(en)`);
+    if (mechCount) parts.push(`${mechCount} mechanisme(n)`);
+    warn = `\n\nDe rol wordt losgemaakt van ${parts.join(' en ')} (die blijven zelf bestaan).`;
+  }
+  if (!confirm(`Rol "${name}" definitief uit de database verwijderen?${warn}`)) return;
+  try {
+    const resp = await fetch(`/api/roles/${id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changed_by: 'admin' }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    removeRoleFromGraph(id);
+    deselectNode();
+  } catch (e) { alert('Netwerkfout: ' + e.message); }
+}
+
+async function deleteMechanism(id) {
+  const mech = DATA.mechanisms.find(m => m.id === id);
+  const name = mech ? mech.name : `#${id}`;
+  const relCount = DATA.relations.filter(r => r.mechanism_id === id).length;
+  const warn = relCount ? `\n\n${relCount} praktijk-relatie(s) verliezen de koppeling met dit mechanisme (de relaties blijven bestaan).` : '';
+  if (!confirm(`Mechanisme "${name}" definitief uit de database verwijderen?${warn}`)) return;
+  try {
+    const resp = await fetch(`/api/mechanisms/${id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changed_by: 'admin' }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    removeMechanismFromGraph(id);
+    deselectNode();
+  } catch (e) { alert('Netwerkfout: ' + e.message); }
 }
 
 async function submitEntity() {
@@ -2071,13 +2685,13 @@ async function submitRelation() {
   } catch (e) { msg.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`; }
 }
 
-document.getElementById('addBtn').addEventListener('click', () => openAddModal('entity'));
+document.getElementById('addBtn').addEventListener('click', () => openAddModal());
+document.getElementById('adminToggle').addEventListener('click', () => setAdminMode(!state.adminMode));
+try { setAdminMode(localStorage.getItem('pm-admin') === '1'); } catch (e) {}
 document.getElementById('addModalClose').addEventListener('click', closeAddModal);
 document.getElementById('addModal').addEventListener('click', (e) => {
   if (e.target.id === 'addModal') closeAddModal();
 });
-document.querySelectorAll('.modal-tabs button').forEach(b =>
-  b.addEventListener('click', () => openAddModal(b.dataset.addtab)));
 
 // ============================================================
 // INIT

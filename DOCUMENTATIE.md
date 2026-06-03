@@ -99,18 +99,22 @@ Structurele spelers die in meerdere filters tegelijk opereren en daarom een eige
 ```
 THEORETISCH MODEL          INSTANTIEMODEL              BEWIJS
 ┌──────────┐               ┌──────────┐                ┌──────────┐
-│  roles   │◄──────────────│ entities │                │ sources  │
-└──────────┘   primary_     ├──────────┤                ├──────────┤
-               role_id      │entity_   │                │source_   │
-┌──────────┐               │roles     │                │locations │
-│mechanisms│◄──────────────┤          │                └────┬─────┘
-└──────────┘   mechanism_   └────┬─────┘                     │
-               id                │                           │
-                           ┌─────┴─────┐               ┌────┴─────┐
-                           │ relations │──────────────►│arguments │
-                           └───────────┘               ├──────────┤
-                             certainty                 │citations │
-                             influence                 └──────────┘
+│  roles   │◄─────────────►│ entities │                │ sources  │
+└────┬─────┘  instantiations├──────────┤                ├──────────┤
+     │        (+exemplariteit│entity_   │                │source_   │
+┌────┴─────┐               │roles     │                │locations │
+│mechanisms│◄─────────────►┤          │                └────┬─────┘
+└────┬─────┘  instantiations└────┬─────┘                     │
+     │        (+exemplariteit)    │                           │
+     │  ▲ literatuur-      ┌─────┴─────┐               ┌────┴─────┐
+     │  │ argumenten       │ relations │──────────────►│arguments │
+     └──┴──────────────────┴───────────┘               ├──────────┤
+        arguments.role_id/   certainty                 │citations │
+        mechanism_id         influence                 └──────────┘
+
+De afgeleide scores stromen omhoog: discussieboom → praktijkscore per relatie/entiteit
+→ aggregatie (via instantiations) + literatuuronderbouwing → theoriescore per rol/mechanisme.
+Zie "Scores: van discussieboom naar theorie".
 ```
 
 ### Theoretisch model
@@ -127,6 +131,7 @@ THEORETISCH MODEL          INSTANTIEMODEL              BEWIJS
 | `entities` | Concrete actoren (personen, organisaties, partijen) | name, type, primary_role_id, description, metadata (JSON), active_from/active_until/active (temporeel) |
 | `entity_roles` | Koppeltabel: entiteit kan meerdere rollen vervullen | entity_id, role_id, notes |
 | `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, description, certainty, influence, bidirectional, active_from/active_until/active (temporeel) |
+| `instantiations` | Expliciete klasse↔instantie-koppeling: rol↔entiteit of mechanisme↔relatie, met **exemplariteit** (hoe prototypisch is dit voorbeeld). Basis voor de bottom-up aggregatie. | role_id/mechanism_id (de klasse), entity_id/relation_id (de instantie), exemplarity (0–1), notes |
 | `source_mentions` | Welke entiteiten worden in welke bronnen genoemd | source_id, entity_id, context |
 
 ### Bronnen (academisch)
@@ -140,7 +145,7 @@ THEORETISCH MODEL          INSTANTIEMODEL              BEWIJS
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `arguments` | Discussieboom: argumenten op relaties of entiteiten, met nesting | relation_id (optioneel), entity_id (optioneel), parent_argument_id (NULL=root), property/property_value (optioneel: argument over een specifieke eigenschap), stance, claim, reasoning, weight, status (`ongecontroleerd` default), contributed_by |
+| `arguments` | Discussieboom: argumenten op een praktijk-target (relatie/entiteit) óf een theorie-target (rol/mechanisme = literatuuronderbouwing), met nesting | relation_id / entity_id / role_id / mechanism_id (minstens één), parent_argument_id (NULL=root), property/property_value (optioneel), stance, claim, reasoning, weight, status (`ongecontroleerd` default), contributed_by |
 | `citations` | Bronvermeldingen per argument | argument_id, source_id, quote, page, section, context |
 | `edit_log` | Auditlog van wijzigingen (aanmaak, statuswijziging) | table_name, record_id, action (`created`/`updated`/`deleted`/`verified`/`disputed`), changed_by, old_value, new_value, reason |
 
@@ -176,6 +181,40 @@ Elke relatie heeft twee onafhankelijke scores:
 | < 0.3 | Marginaal | BlackRock→Shell (passief bezit) |
 
 Een relatie kan zeker bestaan maar weinig impact hebben (Vanguard→Shell: feit, maar passief). Of onzeker zijn maar potentieel groot effect hebben (zelfcensuur op redacties: moeilijk te bewijzen, maar systemisch).
+
+De handmatige `certainty` blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). `influence` blijft handmatig.
+
+---
+
+## Scores: van discussieboom naar theorie
+
+Een theoretisch element (rol/mechanisme) is een **klasse**; de concrete entiteiten/relaties zijn
+**instanties** ervan (gekoppeld via `instantiations`). De geloofwaardigheid en sterkte van de klasse
+zijn *emergent*: ze bouwen op uit de bewijslast eronder. De berekening (in `scoring.py`, gedeeld door
+`generate_viz.py` en het `/api/scores`-endpoint) kent drie lagen.
+
+**Laag A — bewijskracht per argument:** `weight × statusfactor × bronfactor`. De statusfactor schaalt
+op verificatiestatus (geverifieerd 1,0 → betwist 0,25); de bronfactor op de betrouwbaarste citatie.
+Brongewichten: `academisch 1,0 · primair 0,95 · institutioneel 0,85 · kwaliteitsjournalistiek 0,70 ·
+regulier 0,50 · opinie 0,35 · grijs 0,20 · onbeoordeeld 0,15`.
+
+**Laag B — afgeleide praktijkscore per relatie/entiteit:** `steun / (steun + tegen + k)`, waar steun en
+tegen de optelsom van de bewijskracht van de supporting- resp. contradicting-argumenten zijn. Zonder
+argumenten valt het terug op de handmatige `certainty` (prior). Een entiteit zonder eigen argumenten
+erft het gemiddelde van haar relaties.
+
+**Laag C — theoriescore per rol/mechanisme**, uit twee onafhankelijke bewijslijnen:
+- **Praktijk (bottom-up):** geloofwaardigheid-gewogen aggregatie over de gekoppelde instanties, met
+  volume-verzadiging `gem_cert × n/(n+k)` — veel goed-onderbouwde voorbeelden tillen de klasse op.
+  De **sterkte** is de geloofwaardigheid-gewogen gemiddelde invloed van die instanties.
+- **Literatuur (top-down):** argumenten/citaties die *direct* op de rol/het mechanisme hangen
+  (`arguments.role_id`/`mechanism_id`). Zo onderbouwt bijvoorbeeld Luyendijk's *Je hebt het niet van
+  mij* een mechanisme als bronafhankelijkheid; het gewicht volgt uit de `reliability` van die bron.
+
+De twee lijnen worden gecombineerd met een **noisy-OR**: `geloofwaardigheid = 1 − (1−literatuur)(1−praktijk)`
+— sterke literatuur óf veel geloofwaardige praktijkvoorbeelden maken de theorie geloofwaardiger, samen
+nog meer. In het theoriemodel codeert de node-grootte/lijndikte de **sterkte**; het detailpaneel toont
+beide scores met de opsplitsing literatuur ⊕ praktijk. Alle constanten staan boven in `scoring.py`.
 
 ---
 
@@ -221,19 +260,30 @@ Entiteit: DPG Media
 
 ## Entiteittypes
 
-De volledige toegestane lijst staat in de `CHECK`-constraint van `entities` in `schema.sql`. De belangrijkste:
+> **Soort entiteit (`type`) vs. functie in model (rol).** Dit zijn twee verschillende
+> assen die niet door elkaar mogen lopen:
+> - **`type` = de structurele VORM** — *wat is het?* Voor organisaties varieert die echt
+>   (bedrijf, partij, stichting, omroep…); voor mensen bestaat er maar **één** soort:
+>   `persoon`. Een "politicus" of "journalist" is geen ander *soort mens* maar een *functie*.
+> - **Rol (`primary_role_id` / `entity_roles`) = de FUNCTIE in het model** — *wat doet het
+>   binnen de vijf filters?* (bv. `mediaeigenaar`, `adverteerder`, `gezagsexpert`, `politicus`).
+>
+> Concreet: Shell is `type=bedrijf` met rol `adverteerder`; John de Mol is `type=persoon`
+> met rol `mediaeigenaar`. Functie/positie hoort dus altijd in de rol, nooit in `type`.
 
-**Personen:** `politicus`, `journalist`, `columnist`, `voorlichter`, `lobbyist`, `academicus`, `mediaeigenaar`, `toezichthouder_persoon`, `advocaat`, `klokkenluider`, `persoon`
+De volledige toegestane lijst staat in de `CHECK`-constraint van `entities` in `schema.sql`.
 
-**Organisaties:**
+**Personen:** `persoon` — één structurele soort; de functie (politicus, journalist, lobbyist, columnist, klokkenluider, mediaeigenaar…) staat in de rol.
+
+**Organisaties (structurele vormen):**
 
 | Type | Beschrijving | Voorbeelden |
 |---|---|---|
 | `mediaorganisatie` | Nieuwsproducent of -distributeur (pers/online) | DPG Media, de Volkskrant, De Telegraaf, NRC |
 | `omroep` | Publieke of commerciële omroep | NOS, RTL Nederland |
 | `persbureau` | Persbureau / nieuwsgroothandel | ANP |
-| `bedrijf` | Commercieel bedrijf | Shell, Albert Heijn, McKinsey |
-| `adverteerder` | Bedrijf in adverteerdersrol | (grote landelijke adverteerders) |
+| `bedrijf` | Commercieel bedrijf (ook in de rol van adverteerder, holding, belegger) | Shell, Albert Heijn, Unilever, BlackRock |
+| `stichting` | Stichting, administratiekantoor (STAK), borgingsstichting | Stichting Democratie en Media |
 | `vermogensbeheerder` | Institutionele belegger | BlackRock, Vanguard |
 | `elite_netwerk` | Besloten elite-/coördinatieforum | Bilderberg Groep, World Economic Forum |
 | `denktank` | Onderzoeks-/beleidsinstituut | Clingendael, HCSS |
@@ -243,6 +293,13 @@ De volledige toegestane lijst staat in de `CHECK`-constraint van `entities` in `
 | `platform` | Digitaal platform | Google, Meta, TikTok |
 | `pr_bureau` | Communicatie-/PR-bureau | — |
 | `ngo`, `vakbond`, `onderwijsinstelling`, `burgerinitiatief`, `rechterlijke_macht`, `lobbygroep` | Maatschappelijke en tegenmacht-actoren | NVJ, vakbonden, universiteiten |
+
+> **Legacy.** Rol-achtige type-waarden (`politicus`, `journalist`, `voorlichter`, `lobbyist`,
+> `columnist`, `academicus`, `mediaeigenaar`, `toezichthouder_persoon`, `advocaat`,
+> `klokkenluider`, `adverteerder`) blijven in de `CHECK` toegestaan zodat seed-/enrich-scripts
+> hun ruwe extractie kunnen invoeren, maar worden in de live DB samengevouwen tot hun
+> structurele vorm door `scripts/migrate_clean_entity_types.py`. Gebruik voor nieuwe data
+> alleen de structurele types hierboven.
 
 ## Relatietypes
 
@@ -281,6 +338,7 @@ propaganda-model/
 │   ├── init_db.py                      # Database aanmaken vanuit schema.sql
 │   ├── seed_theoretical_model.py       # Basis: rollen + mechanismen (laag 1)
 │   ├── seed_from_ai_source.py          # Basis: entiteiten + relaties (laag 2)
+│   ├── seed_instantiations.py          # Vult instantiations uit de impliciete koppelingen (laag 1↔2)
 │   ├── seed_draaideur_relaties.py      # Extra draaideur-relaties
 │   ├── enrich_*.py                     # Verrijken van een bestaande DB (theorie + instanties)
 │   ├── migrate_*.py                    # Schema-/datamigraties (backup-then-migrate)
@@ -315,7 +373,13 @@ python3 scripts/seed_theoretical_model.py
 
 # Entiteiten en relaties laden uit bronanalyse
 python3 scripts/seed_from_ai_source.py
+
+# Klasse↔instantie-koppelingen vullen uit de impliciete koppelingen (voor de scoringsketen)
+python3 scripts/seed_instantiations.py
 ```
+
+> Bestaande database (met data) upgraden naar de scoringslaag: `python3 scripts/migrate_add_scoring_layer.py`
+> (maakt eerst een backup, voegt `instantiations` toe en geeft `arguments` theorie-doelen).
 
 ### Bronnen registreren
 

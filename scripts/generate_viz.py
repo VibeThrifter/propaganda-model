@@ -5,7 +5,11 @@ met een D3.js force-directed graph.
 """
 import json
 import sqlite3
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+import scoring  # noqa: E402  (repo-root module met de scoringsketen)
 
 DB_PATH = Path(__file__).parent.parent / "data" / "propaganda_model.db"
 OUT_PATH = Path(__file__).parent.parent / "web" / "index.html"
@@ -52,7 +56,7 @@ def export_data():
 
     # Arguments: volledige discussiebomen
     cur.execute("""
-        SELECT a.id, a.relation_id, a.entity_id, a.parent_argument_id,
+        SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.parent_argument_id,
                a.property, a.property_value,
                a.stance, a.claim, a.reasoning, a.weight, a.status
         FROM arguments a
@@ -68,6 +72,13 @@ def export_data():
         JOIN sources s ON c.source_id = s.id
     """)
     citations = [dict(row) for row in cur.fetchall()]
+
+    # Instantiations: expliciete klasse<->instantie-koppeling + exemplariteit
+    cur.execute("SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity FROM instantiations")
+    instantiations = [dict(r) for r in cur.fetchall()]
+
+    # Volledige scoringsketen (gedeeld met /api/scores), zolang de connectie nog open is
+    scores = scoring.compute_all_scores(conn)
 
     # Argument counts per relation (voor edge labels)
     arg_counts = {}
@@ -95,6 +106,16 @@ def export_data():
         ac = arg_counts.get(r['id'])
         r['argument_count'] = ac['arg_count'] if ac else 0
 
+    # ── Afgeleide scores injecteren (uit scoring.compute_all_scores) ──
+    for r in relations:
+        r['derived_certainty'] = scores['relations'].get(r['id'], r.get('certainty') or 0.0)
+    for e in entities:
+        e['derived_certainty'] = scores['entities'].get(e['id'], 0.0)
+    for role in roles:
+        role.update(scores['roles'].get(role['id'], {}))
+    for m in mechanisms:
+        m.update(scores['mechanisms'].get(m['id'], {}))
+
     return {
         'entities': entities,
         'relations': relations,
@@ -102,6 +123,7 @@ def export_data():
         'mechanisms': mechanisms,
         'arguments': arguments,
         'citations': citations,
+        'instantiations': instantiations,
     }
 
 
