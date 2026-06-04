@@ -52,15 +52,17 @@ MULTI_FILTER = {
     "belang_elite_netwerk":               ["sourcing", "ideologie"],
     "politicus_elite_netwerk":            ["ideologie", "sourcing"],
     "stakeholder_capitalism_frame":       ["ideologie"],  # gecorrigeerd: ideologisch frame, geen advertentie
-    # Geldstromen
-    "partijfinanciering":                 ["eigendom", "sourcing"],
-    "externe_mediafinanciering":          ["eigendom", "ideologie"],
-    "publieke_groeifinanciering":         ["eigendom", "advertentie", "ideologie"],
-    "platform_journalistiekfinanciering": ["advertentie", "ideologie"],
-    # Platform/digitaal
+    # Geldstromen — zuiver economische kanalen; het (ideologische) motief van de
+    # geldstroom is geen filter, maar het belang van de actor.
+    "partijfinanciering":                 ["eigendom"],
+    "externe_mediafinanciering":          ["eigendom"],
+    "publieke_groeifinanciering":         ["eigendom", "advertentie"],
+    "platform_journalistiekfinanciering": ["advertentie"],
+    # Platform/digitaal — attentie-/engagement-economie; polarisatie is een effect,
+    # geen ideologisch kanaal.
     "platform_advertentie_concentratie":  ["advertentie"],
     "platform_verdienmodel_druk":         ["advertentie"],
-    "algoritmische_filtering":            ["advertentie", "ideologie"],
+    "algoritmische_filtering":            ["advertentie"],
     "algoritmische_socialisatie":         ["ideologie"],
     # Systemisch
     "eigendomsconcentratie":              ["eigendom"],
