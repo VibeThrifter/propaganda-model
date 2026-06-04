@@ -1424,11 +1424,15 @@ function buildGraph() {
 // HELPERS
 // ============================================================
 function getRadius(d) {
-  // Theoretisch model: grootte ∝ sterkte (geloofwaardigheid-gewogen invloed van de instanties);
-  // valt terug op graad zolang er nog geen sterkte is berekend.
+  // Theoretisch model: grootte ∝ transitieve invloed-centraliteit van de rol (mechanismegraaf);
+  // valt terug op sterkte en dan graad.
   if (state.model === 'theory') {
+    if (d.influence_norm != null) return 10 + Math.sqrt(d.influence_norm) * 22;
     return (d.sterkte != null) ? 10 + d.sterkte * 22 : 12 + Math.sqrt(d.degree || 1) * 5;
   }
+  // Instantiemodel: grootte ∝ transitieve invloed-centraliteit (gedempte invloed op het netwerk).
+  // sqrt spreidt de kleine waarden; floor houdt 'sink'-nodes nog klikbaar. Valt terug op graad.
+  if (d.influence_norm != null) return 6 + Math.sqrt(d.influence_norm) * 20;
   return 5 + Math.sqrt(d.degree || 1) * 3;
 }
 
@@ -1625,6 +1629,63 @@ function showMechanismDetail(m, content) {
 // ============================================================
 // SELECTION
 // ============================================================
+// ── Invloed-cascade: richtingsregels parallel aan influence.py ──
+const INFLUENCE_EXCLUDED = new Set(['oppositie']);   // tegenmacht: geen invloedskanaal
+const INFLUENCE_SYMMETRIC = new Set(['alliantie']);  // wederzijds
+// Theorie-laag: gewicht = THEORY_BASE + THEORY_SPAN*sterkte (spiegelt influence.py).
+const THEORY_BASE = 0.4, THEORY_SPAN = 0.4;
+
+// Invloed-bijdrage van één link, model-bewust. Geeft {w, excluded, symmetric}.
+function edgeInfluence(l, isTheory) {
+  if (isTheory) {
+    return { w: THEORY_BASE + THEORY_SPAN * (l.sterkte || 0),
+             excluded: l.filter === 'tegenmacht', symmetric: false };
+  }
+  return { w: (l.influence != null) ? l.influence : 0,
+           excluded: INFLUENCE_EXCLUDED.has(l.relation_type),
+           symmetric: INFLUENCE_SYMMETRIC.has(l.relation_type) };
+}
+
+// Downstream-invloedcascade vanaf startId, alleen over zichtbare links (multi-hop, gedempt).
+// Geeft {nodes: Map(id->sterkte), linkStrength: Map(linkIndex->sterkte)}.
+function computeDownstream(startId, visibleLinkSet, isTheory) {
+  const MAX_HOPS = 6, PRUNE = 0.01;
+  const adj = new Map();
+  currentLinks.forEach((l, i) => {
+    if (!visibleLinkSet.has(i)) return;
+    const { w, excluded, symmetric } = edgeInfluence(l, isTheory);
+    if (excluded || !(w > 0)) return;
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (!adj.has(sid)) adj.set(sid, []);
+    adj.get(sid).push({ to: tid, w, li: i });
+    if (symmetric) {
+      if (!adj.has(tid)) adj.set(tid, []);
+      adj.get(tid).push({ to: sid, w, li: i });
+    }
+  });
+  const best = new Map([[startId, 1]]);
+  const linkStrength = new Map();
+  let frontier = [[startId, 1]];
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const nxt = new Map();
+    for (const [node, acc] of frontier) {
+      for (const { to, w, li } of (adj.get(node) || [])) {
+        const v = acc * w;
+        if (v > PRUNE && v > (linkStrength.get(li) || 0)) linkStrength.set(li, v);
+        if (v > (best.get(to) || 0) && v > PRUNE) {
+          best.set(to, v);
+          if (v > (nxt.get(to) || 0)) nxt.set(to, v);
+        }
+      }
+    }
+    if (nxt.size === 0) break;
+    frontier = [...nxt.entries()];
+  }
+  best.delete(startId);
+  return { nodes: best, linkStrength };
+}
+
 function selectNode(d) {
   state.selectedNode = d;
   state.selectedRelation = null;
@@ -1632,6 +1693,39 @@ function selectNode(d) {
 
   // Only links that pass the current filters/timeline can be highlighted/hovered
   const { visibleLinkSet } = computeVisibleLinks();
+
+  // Licht de DOWNSTREAM-invloedcascade op (multi-hop) i.p.v. alleen directe buren.
+  // Instantiemodel: relatie-influence. Theoretisch model: mechanisme-sterkte.
+  {
+    const cascade = computeDownstream(d.id, visibleLinkSet, isTheory);
+    if (cascade.nodes.size > 0) {
+      const reached = cascade.nodes, linkStrength = cascade.linkStrength;
+      const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
+      const nodeOn = id => id === d.id || reached.has(id);
+      nodeElements.select('circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
+      nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
+      linkElements.each(function(l, i) {
+        const s = linkStrength.get(i);
+        const el = d3.select(this);
+        if (s != null) {
+          el.attr('stroke-opacity', 0.35 + 0.6 * Math.min(1, s));  // sterker pad = feller
+          if (!el.attr('data-marker')) {
+            const color = getLinkColor(l, isTheory);
+            el.attr('data-marker', `url(#${prefix}${color.replace('#','')})`);
+          }
+          el.attr('marker-end', el.attr('data-marker'));
+        } else {
+          el.attr('stroke-opacity', 0.03);
+          el.attr('marker-end', 'none');
+        }
+      });
+      if (linkHitElements) linkHitElements.style('pointer-events', (l, i) => linkStrength.has(i) ? 'auto' : 'none');
+      if (edgeLabelElements) edgeLabelElements.attr('opacity', (l, i) => linkStrength.has(i) ? 1 : 0.1);
+      showDetail(d);
+      return;
+    }
+    // Geen downstream-cascade (pure 'sink'): val terug op het buren-highlight hieronder.
+  }
 
   // A link counts as "connected" only when it touches d AND is currently visible
   const isConnected = (l, i) => visibleLinkSet.has(i) &&
@@ -1728,6 +1822,25 @@ function renderLiteratureSection(field, id, roots) {
     ">+ Bron/argument toevoegen ▸</button>
     <div id="${slot}"></div></div>`;
   return html;
+}
+
+// Structurele invloed-centraliteit van een entiteit (topologie, los van de bewijslast).
+function renderInfluenceSection(d) {
+  if (d.influence_rank == null) return '';
+  const total = (state.model === 'theory' ? DATA.roles.length : DATA.entities.length);
+  const pct = Math.round((d.influence_norm || 0) * 100);
+  return `<div class="detail-section">
+    <h4>Invloedspositie (structureel)</h4>
+    <div style="display:flex;gap:16px;margin-bottom:6px;flex-wrap:wrap">
+      <span class="score-bar">transitief <span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:var(--accent)"></span></span> ${pct}%</span>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);line-height:1.7">
+      rang <b style="color:var(--text-dim)">#${d.influence_rank}</b> van ${total} ·
+      bereikt <b style="color:var(--text-dim)">${d.influence_reach}</b> nodes (gedempt, multi-hop) ·
+      directe duwkracht ${(d.influence_direct || 0).toFixed(1)}
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Klik op de node in de graaf om de downstream-invloedpaden op te lichten.</div>
+  </div>`;
 }
 
 function entityById(id) { return entityMap.get(id) || DATA.entities.find(e => e.id === id); }
@@ -1848,6 +1961,7 @@ function showTheoryDetail(d, content, color) {
   `;
 
   html += renderTheoryScores(d);
+  html += renderInfluenceSection(d);
 
   if (d.examples) {
     html += `<div class="detail-section">
@@ -1926,6 +2040,7 @@ function showInstanceDetail(d, content, color) {
     html += `<div class="detail-section"><h4>Rol</h4>
       <div style="font-size:12px;color:var(--text-dim)">${d.role_name}</div></div>`;
   }
+  html += renderInfluenceSection(d);
   html += renderTimespanSection(d, 'entity_id', d.id);
   if (outgoing.length) {
     html += `<div class="detail-section"><h4>Uitgaande relaties (${outgoing.length})</h4>`;

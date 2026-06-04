@@ -16,8 +16,14 @@ onderbouwde concrete voorbeelden onder liggen. Geen enkele losse aanname is een 
 het geheel telt op.
 
 Alle constanten staan hieronder en zijn bedoeld om bij te stellen.
+
+Naast de bewijslast levert ``compute_all_scores`` ook de *structurele* invloed-centraliteit
+per entiteit (uit ``influence.py``) onder de sleutel ``entity_influence`` — geloofwaardigheid
+(bewijs) en invloedspositie (topologie) zijn twee losse assen.
 """
 from __future__ import annotations
+
+import influence as influence_graph  # repo-root module: invloedsgraaf (topologie naast bewijslast)
 
 # ── Instelbare constanten ────────────────────────────────────
 
@@ -238,9 +244,25 @@ def compute_all_scores(conn) -> dict:
     mechs = {mech_id: theory_scores(by_mech.get(mech_id, []), mech_instances.get(mech_id, []))
              for (mech_id,) in conn.execute("SELECT id FROM mechanisms")}
 
+    # Structurele invloed-centraliteit (topologie, los van de bewijslast):
+    #   - entiteiten: relatiegraaf, gewicht = influence.
+    #   - rollen: mechanismegraaf, gewicht = sterkte van het mechanisme (theorie-laag).
+    entity_influence = influence_graph.compute_influence(conn)
+
+    role_ids = [r[0] for r in conn.execute("SELECT id FROM roles")]
+    mech_edges = []
+    for mid, src_role, tgt_role, flt in conn.execute(
+            "SELECT id, source_role_id, target_role_id, filter FROM mechanisms"):
+        if flt == "tegenmacht":     # tegenkracht: geen pro-elite invloedskanaal
+            continue
+        mech_edges.append((src_role, tgt_role, mechs.get(mid, {}).get("sterkte", 0.0)))
+    role_influence = influence_graph.compute_role_influence(role_ids, mech_edges)
+
     return {
         "relations": {rid: round(c, 4) for rid, c in rel_certainty.items()},
         "entities": {eid: round(c, 4) for eid, c in entity_cred.items()},
+        "entity_influence": entity_influence,
+        "role_influence": role_influence,
         "roles": roles,
         "mechanisms": mechs,
     }

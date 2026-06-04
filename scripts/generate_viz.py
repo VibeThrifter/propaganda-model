@@ -133,6 +133,19 @@ def export_data():
     for m in mechanisms:
         m.update(scores['mechanisms'].get(m['id'], {}))
 
+    # ── Structurele invloed-centraliteit (topologie) ──
+    def _attach_influence(items, score_map):
+        for it in items:
+            inf = score_map.get(it['id'], {})
+            it['influence_direct'] = inf.get('direct', 0.0)
+            it['influence_transitive'] = inf.get('transitive', 0.0)
+            it['influence_reach'] = inf.get('reach', 0)
+            it['influence_norm'] = inf.get('transitive_norm', 0.0)
+            it['influence_rank'] = inf.get('rank')
+
+    _attach_influence(entities, scores.get('entity_influence', {}))  # instantiemodel
+    _attach_influence(roles, scores.get('role_influence', {}))       # theoretisch model
+
     return {
         'entities': entities,
         'relations': relations,
