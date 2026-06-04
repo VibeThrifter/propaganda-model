@@ -579,8 +579,8 @@ const DATA = {
       "active": 1,
       "role_name": "mediaeigenaar",
       "filter_category": "eigendom",
-      "degree": 41,
-      "derived_certainty": 0.1041
+      "degree": 43,
+      "derived_certainty": 0.115
     },
     {
       "id": 2,
@@ -1086,8 +1086,8 @@ const DATA = {
       "active": 1,
       "role_name": "techplatform",
       "filter_category": "systeemactor",
-      "degree": 8,
-      "derived_certainty": 0.1049
+      "degree": 9,
+      "derived_certainty": 0.1222
     },
     {
       "id": 41,
@@ -2466,6 +2466,19 @@ const DATA = {
       "filter_category": "systeemactor",
       "degree": 1,
       "derived_certainty": 0.05
+    },
+    {
+      "id": 154,
+      "name": "EIB (Europese Investeringsbank)",
+      "type": "overheidsinstelling",
+      "description": "Supranationale publieke bank van de EU; verstrekt groeileningen gekoppeld aan EU-beleid, o.a. aan media-uitgevers.",
+      "active_from": null,
+      "active_until": null,
+      "active": 1,
+      "role_name": "belanghebbende",
+      "filter_category": "systeemactor",
+      "degree": 1,
+      "derived_certainty": 0.4172
     }
   ],
   "relations": [
@@ -9346,6 +9359,44 @@ const DATA = {
       "mechanism_filter": "cross_filter",
       "argument_count": 1,
       "derived_certainty": 0.0826
+    },
+    {
+      "id": 395,
+      "source_id": 154,
+      "target_id": 1,
+      "relation_type": "financiering",
+      "certainty": 0.97,
+      "influence": 0.5,
+      "bidirectional": 0,
+      "description": "De EIB verstrekte DPG Media in twee tranches ~€220 mln (€100 mln 2022 + €120 mln dec 2024) voor digitalisering en het 'Trusted Web'-advertentieplatform, gekoppeld aan EU-beleid.",
+      "active_from": null,
+      "active_until": null,
+      "active": 1,
+      "source_name": "EIB (Europese Investeringsbank)",
+      "target_name": "DPG Media",
+      "mechanism_name": "publieke_groeifinanciering",
+      "mechanism_filter": "cross_filter",
+      "argument_count": 1,
+      "derived_certainty": 0.4172
+    },
+    {
+      "id": 396,
+      "source_id": 40,
+      "target_id": 1,
+      "relation_type": "financiering",
+      "certainty": 0.9,
+      "influence": 0.35,
+      "bidirectional": 0,
+      "description": "Google betaalt DPG Media via de News Showcase-licentiedeal (gesloten met elf NL-uitgevers/omroepen via Stichting OPR) — Big Tech dat de pers deels terugfinanciert die het eigen advertentiemodel ondermijnde.",
+      "active_from": null,
+      "active_until": null,
+      "active": 1,
+      "source_name": "Google",
+      "target_name": "DPG Media",
+      "mechanism_name": "platform_journalistiekfinanciering",
+      "mechanism_filter": "cross_filter",
+      "argument_count": 1,
+      "derived_certainty": 0.2604
     }
   ],
   "roles": [
@@ -9354,10 +9405,10 @@ const DATA = {
       "name": "mediaeigenaar",
       "category": "eigendom",
       "description": "De uiteindelijke eigenaar/UBO (vaak een familie) die via een keten van vehikels eigendom over mediaorganisaties uitoefent en daarmee de redactionele lijn kan beinvloeden.",
-      "geloofwaardigheid": 0.0809,
-      "sterkte": 0.5442,
+      "geloofwaardigheid": 0.0815,
+      "sterkte": 0.5438,
       "literatuur_geloofw": 0.0,
-      "praktijk_geloofw": 0.0809,
+      "praktijk_geloofw": 0.0815,
       "n_instanties": 15,
       "n_bronnen": 0
     },
@@ -9438,10 +9489,10 @@ const DATA = {
       "name": "techplatform",
       "category": "systeemactor",
       "description": "Digitaal platform dat als nieuwe poortwachter fungeert met algoritmische filtering. Verdienmodel gebaseerd op engagement, niet journalistieke waarden",
-      "geloofwaardigheid": 0.0368,
-      "sterkte": 0.6034,
+      "geloofwaardigheid": 0.039,
+      "sterkte": 0.5927,
       "literatuur_geloofw": 0.0,
-      "praktijk_geloofw": 0.0368,
+      "praktijk_geloofw": 0.039,
       "n_instanties": 3,
       "n_bronnen": 0
     },
@@ -11196,11 +11247,11 @@ const DATA = {
       "effect": "Drievoudig structureel effect, zonder dat de geldschieter voorschrijft wát er geschreven wordt: (F1) de overheid/EU subsidieert de facto de consolidatie — kleine, lokale of onafhankelijke media kunnen niet aankloppen voor honderden miljoenen, zodat alternatieve stemmen verder marginaliseren; (F2) de aflossingsdruk duwt de uitgever dieper in datagedreven tracking-advertising (FTM/Bits of Freedom: profilering zonder 'informed consent'); (F5) zakelijke en ideologische verwevenheid — de grootste uitgever is voor zijn technologische toekomst afhankelijk van de instituties waarover hij geacht wordt kritisch te berichten.",
       "source_role_id": 39,
       "target_role_id": 2,
-      "geloofwaardigheid": 0.0,
-      "sterkte": 0.0,
+      "geloofwaardigheid": 0.0695,
+      "sterkte": 0.5,
       "literatuur_geloofw": 0.0,
-      "praktijk_geloofw": 0.0,
-      "n_instanties": 0,
+      "praktijk_geloofw": 0.0695,
+      "n_instanties": 1,
       "n_bronnen": 0
     },
     {
@@ -11211,6 +11262,22 @@ const DATA = {
       "description": "Big Tech financiert de journalistiek deels terug die het eigen advertentiemodel ondermijnde: via fondsen (Google News Initiative ~$300 mln; Meta Journalism Project ~$600 mln sinds 2018; de Europese Digital News Initiative €150 mln) en via (deels afgedwongen) vergoedingen voor nieuwsgebruik (Australische News Media Bargaining Code, Canadese Online News Act). Ook Nederlandse innovaties zijn zo gefinancierd.",
       "effect": "Afhankelijkheid en co-optatie: uitgevers worden milder over de platforms, richten innovatie en productkeuzes naar platformprioriteiten, en de pers raakt structureel afhankelijk van de partij die haar verdienmodel uitholde. Versterkt `platform_advertentie_concentratie` en `platform_verdienmodel_druk`.",
       "source_role_id": 18,
+      "target_role_id": 2,
+      "geloofwaardigheid": 0.0397,
+      "sterkte": 0.35,
+      "literatuur_geloofw": 0.0,
+      "praktijk_geloofw": 0.0397,
+      "n_instanties": 1,
+      "n_bronnen": 0
+    },
+    {
+      "id": 117,
+      "name": "overheidsadvertenties",
+      "filter": "advertentie",
+      "mechanism_type": "economisch",
+      "description": "De overheid zet als adverteerder haar campagnebudget in: de Rijksoverheid is via de Dienst Publiek en Communicatie/Voorlichtingsraad (VoRa) een van de grootste enkele adverteerders (~€21-25 mln/jaar). Dezelfde 'adverteerder-hoed' als bij een commerciële belanghebbende, maar met de overheid als principaal.",
+      "effect": "Voor titels die sterk op overheidscampagnes leunen ontstaat zachte hefboom en goodwill: een prikkel om de overheid-als-adverteerder niet te antagoneren. In NL bescheiden vergeleken met landen waar staatsreclame een hard disciplineringsmiddel is, maar structureel aanwezig.",
+      "source_role_id": 39,
       "target_role_id": 2,
       "geloofwaardigheid": 0.0,
       "sterkte": 0.0,
@@ -15810,6 +15877,36 @@ const DATA = {
       "reasoning": null,
       "weight": 0.6,
       "status": "ongecontroleerd"
+    },
+    {
+      "id": 338,
+      "relation_id": 395,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": null,
+      "parent_argument_id": null,
+      "property": "existence",
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "De EIB financierde DPG Media met ~€220 mln aan groeileningen voor o.a. Trusted Web.",
+      "reasoning": "Twee EIB-tranches (2022: €100 mln; dec 2024: €120 mln), gekoppeld aan EU-digitaliseringsbeleid; FTM/Bits of Freedom bekritiseren de datagedreven tracking-infrastructuur die ermee wordt opgebouwd. Prototypisch voorbeeld van publieke/supranationale groeifinanciering.",
+      "weight": 0.8,
+      "status": "geverifieerd"
+    },
+    {
+      "id": 339,
+      "relation_id": 396,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": null,
+      "parent_argument_id": null,
+      "property": "existence",
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "Google betaalt DPG (via News Showcase/OPR-licentiedeal) voor nieuwsgebruik.",
+      "reasoning": "Google sloot een News Showcase-licentieovereenkomst met elf grote NL-nieuwsorganisaties via Stichting OPR, waaronder DPG Media. Voorbeeld van platform-journalistiekfinanciering (co-optatie/afhankelijkheid).",
+      "weight": 0.8,
+      "status": "geverifieerd"
     }
   ],
   "citations": [
@@ -15842,6 +15939,36 @@ const DATA = {
       "context": "Herman & Chomsky over het eerste filter: eigendom en winstoriëntatie",
       "source_title": "Manufacturing Consent: The Political Economy of the Mass Media",
       "source_author": "Herman, E.S. & Chomsky, N."
+    },
+    {
+      "id": 338,
+      "argument_id": 338,
+      "quote": "EUR 100m for the further digitalisation of media platforms in Belgium and the Netherlands",
+      "page": null,
+      "section": "EIB-persbericht 2022-021",
+      "context": null,
+      "source_title": "EIB and DPG Media Group: EUR 100m for the further digitalisation of media platforms",
+      "source_author": "Europese Investeringsbank"
+    },
+    {
+      "id": 339,
+      "argument_id": 338,
+      "quote": "DPG ontving van de EIB in twee tranches honderden miljoenen; privacy-experts spreken van profilering zonder informed consent.",
+      "page": null,
+      "section": "FTM-onderzoek",
+      "context": null,
+      "source_title": "In de strijd tegen Big Tech misbruikt uitgever DPG Europese miljoenen, zeggen privacy-experts",
+      "source_author": "Follow the Money"
+    },
+    {
+      "id": 340,
+      "argument_id": 339,
+      "quote": "Google sluit licentieovereenkomst met elf grote nieuwsorganisaties in Nederland",
+      "page": null,
+      "section": "Google-aankondiging News Showcase",
+      "context": null,
+      "source_title": "Google sluit licentieovereenkomst met elf grote nieuwsorganisaties in Nederland",
+      "source_author": "Google"
     }
   ],
   "instantiations": [
@@ -19028,6 +19155,22 @@ const DATA = {
       "entity_id": 72,
       "relation_id": null,
       "exemplarity": 0.5
+    },
+    {
+      "id": 514,
+      "role_id": null,
+      "mechanism_id": 115,
+      "entity_id": null,
+      "relation_id": 395,
+      "exemplarity": 1.0
+    },
+    {
+      "id": 515,
+      "role_id": null,
+      "mechanism_id": 116,
+      "entity_id": null,
+      "relation_id": 396,
+      "exemplarity": 0.9
     }
   ]
 };

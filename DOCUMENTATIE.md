@@ -56,7 +56,7 @@ Achter béíde structuren ligt een derde, diffuse laag: het systemische aandeelh
 Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeur creëert voor content die het consumentistische wereldbeeld bevestigt. De `adverteerder` is geen losse actor maar de **advertentie-hoed van een `belanghebbende`**: dezelfde corporate of sector die elders lobbyt of procedeert, zet hier het advertentiebudget in als drukmiddel (`adverteren_als_belang`). Zie *Systeemactoren* voor de principaal-superklasse die door alle filters heen werkt.
 
 **Rollen:** `adverteerder` (instrument-rol van `belanghebbende`)
-**Mechanismen:** `adverteren_als_belang`, `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `stakeholder_capitalism_frame`, `staatsreclame_exploitatie`
+**Mechanismen:** `adverteren_als_belang`, `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `stakeholder_capitalism_frame`, `staatsreclame_exploitatie`, `overheidsadvertenties`
 
 ### Filter 3: Sourcing
 Economische druk dwingt redacties tot afhankelijkheid van een beperkt aantal routineuze bronnen: het ANP, de overheid, en door de elite gefinancierde denktanks. Toegang (*access*) is hierbij zelf een schaarse hulpbron: wie aan tafel mag krijgt een podium, wie fundamenteel afwijkt verliest die toegang geruisloos (`toegangsdisciplinering`).
@@ -472,13 +472,13 @@ ORDER BY s.author;
 | Onderdeel | Aantal |
 |---|---|
 | Rollen (theoretisch) | 33 |
-| Mechanismen (theoretisch) | 92 |
-| Entiteiten (concreet) | 146 |
-| Relaties (concreet) | 362 |
-| Argumenten | 306 |
-| Citaties | 3 |
-| Bronnen | 5 |
-| Bronlocaties | 3 |
+| Mechanismen (theoretisch) | 93 |
+| Entiteiten (concreet) | 147 |
+| Relaties (concreet) | 364 |
+| Argumenten | 308 |
+| Citaties | 6 |
+| Bronnen | 8 |
+| Bronlocaties | 6 |
 
 > Let op: de meeste argumenten zijn automatisch gegenereerde `supporting`-onderbouwingen met status `ongecontroleerd` en nog grotendeels zonder citatie. Het aanvullen van citaties en het controleren van argumentstatus is openstaand werk.
 
