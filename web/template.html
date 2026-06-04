@@ -131,6 +131,15 @@ body {
 }
 .filter-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color, var(--text-muted)); flex-shrink: 0; }
 
+/* Filter-/thema-tags in detailpanelen */
+.tag-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.tag-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+  color: var(--c, var(--text-dim));
+  background: color-mix(in srgb, var(--c, var(--text-muted)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c, var(--text-muted)) 40%, transparent);
+}
+
 .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; margin: 0 -6px; border-radius: 4px; font-size: 11px; color: var(--text-dim); cursor: pointer; user-select: none; transition: background 0.12s, color 0.12s; }
 .legend-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .legend-item.inactive .swatch { opacity: 0.4; }
@@ -513,6 +522,11 @@ body {
     <h3>Filters (Chomsky/Herman)</h3>
     <div class="filter-group" id="filterChips"></div>
   </div>
+  <div class="panel-section">
+    <h3>Thema's (dwarsverbanden)</h3>
+    <div style="font-size:10px;color:var(--text-muted);margin:-2px 0 7px">Klik om in te zoomen op een dwarsverband (binnen de actieve filters)</div>
+    <div class="filter-group" id="themeChips"></div>
+  </div>
   <div class="panel-section" id="timelineSection">
     <h3>Tijdlijn</h3>
     <div class="slider-row">
@@ -620,6 +634,18 @@ const FILTER_LABELS = {
   flak: '4. Flak', ideologie: '5. Ideologie',
   systeemactor: 'Systeemactor', tegenmacht: 'Tegenmacht', cross_filter: 'Cross-filter',
   overig: 'Overig',
+};
+
+// Thema's = dwarsliggende verbanden die meerdere filters overspannen (eigen selectie-as).
+const THEME_LABELS = {
+  draaideur: 'Draaideur', elite_netwerk: 'Elite-netwerk', geldstromen: 'Geldstromen',
+  platform: 'Platform/digitaal', systemisch: 'Systemisch',
+  omroepbestel: 'Publiek omroepbestel', kennis_expertise: 'Kennis & expertise',
+};
+const THEME_COLORS = {
+  draaideur: '#c56cf0', elite_netwerk: '#7d5fff', geldstromen: '#ffd32a',
+  platform: '#34e7e4', systemisch: '#ff5e57',
+  omroepbestel: '#0be881', kennis_expertise: '#ffa801',
 };
 
 // ============================================================
@@ -1031,7 +1057,8 @@ const mechLinks = DATA.mechanisms.map(m => {
 let state = {
   model: 'instance',     // 'instance' | 'theory'
   colorMode: 'type',
-  activeFilters: new Set(Object.keys(FILTER_LABELS)),  // categorieën van de EDGES (pijltjes)
+  activeFilters: new Set(Object.keys(FILTER_LABELS)),  // filter-as: categorieën van de EDGES
+  activeThemes: new Set(Object.keys(THEME_LABELS)),    // thema-as: dwarsverbanden van de EDGES
   certMin: 0, inflMin: 0,
   selectedNode: null,
   selectedRelation: null,
@@ -1500,6 +1527,7 @@ function selectRelation(r) {
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${RELATION_LABELS[r.relation_type] || r.relation_type}${r.mechanism_name ? ' · ' + r.mechanism_name : ''}</div>
       <h2>${srcName} → ${tgtName}</h2>
+      ${r.mechanism_name ? renderTagBadges(r.mechanism_filters, r.mechanism_themes) : ''}
     </div>
     ${r.description ? `<div class="detail-description">${r.description}</div>` : ''}
     <div class="detail-section">
@@ -1556,6 +1584,15 @@ function selectRelation(r) {
   panel.classList.add('open');
 }
 
+// Badges voor de twee assen: alle filters (primair eerst) + thema's van een edge.
+function renderTagBadges(filters, themes) {
+  const f = (filters || []).map(k =>
+    `<span class="tag-badge" style="--c:${FILTER_COLORS[k] || '#888'}">${FILTER_LABELS[k] || k}</span>`).join('');
+  const t = (themes || []).map(k =>
+    `<span class="tag-badge" style="--c:${THEME_COLORS[k] || '#888'}">${THEME_LABELS[k] || k}</span>`).join('');
+  return (f || t) ? `<div class="tag-badges">${f}${t}</div>` : '';
+}
+
 // Detailpaneel voor een mechanisme (theoretische relatie/klasse).
 function showMechanismDetail(m, content) {
   const src = roleMap.get(typeof m.source === 'object' ? m.source.id : m.source);
@@ -1565,6 +1602,7 @@ function showMechanismDetail(m, content) {
     <div class="entity-type" style="color:${color}">${FILTER_LABELS[m.filter] || m.filter}${m.mechanism_type ? ' · ' + m.mechanism_type : ''}</div>
     <h2>${m.name}</h2>
     <div style="font-size:11px;color:var(--text-dim);margin-top:4px">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
+    ${renderTagBadges(m.filters, m.themes)}
   </div>`;
   if (m.description) html += `<div class="detail-description">${m.description}</div>`;
   if (m.effect) {
@@ -1971,25 +2009,51 @@ function relationCard(otherName, r, direction) {
 // ============================================================
 // FILTERING
 // ============================================================
-// Categorie (filter) van een EDGE. Mechanismen dragen 'filter'; relaties erven die
-// van hun gekoppelde mechanisme (mechanism_filter). Zonder koppeling: 'overig'.
-function edgeCatOf(link, isTheory) {
-  return (isTheory ? link.filter : link.mechanism_filter) || 'overig';
+// Tags van een EDGE op de twee assen. Mechanismen (theorie) dragen filters[]/themes[];
+// relaties (instance) erven mechanism_filters[]/mechanism_themes[]. Een relatie zonder
+// gekoppeld mechanisme valt op de filter-as onder 'overig' en heeft geen thema's.
+function edgeFiltersOf(link, isTheory) {
+  if (isTheory) return (link.filters && link.filters.length) ? link.filters
+                       : (link.filter ? [link.filter] : ['overig']);
+  return (link.mechanism_filters && link.mechanism_filters.length) ? link.mechanism_filters
+         : (link.mechanism_filter ? [link.mechanism_filter] : ['overig']);
+}
+function edgeThemesOf(link, isTheory) {
+  return (isTheory ? link.themes : link.mechanism_themes) || [];
 }
 
-// Compute which nodes/links pass the current category + search + timeline + threshold filters.
+// Twee assen met verschillende rol (zie AXIS_DEFS):
+//  - filter-as (mode 'toggle'): elke edge heeft een filter; toon edges met minstens één
+//    aangevinkt filter. Zet je alle filters uit, dan zie je niets.
+//  - thema-as (mode 'spotlight'): niets geselecteerd = geen effect (toon alles); zodra je
+//    een thema kiest, zoom je in op alléén dat dwarsverband (edges zonder thema vallen weg).
+// Tussen de assen geldt EN, maar omdat de thema-as in rust géén beperking oplegt, is het
+// gedrag "filters bepalen de kanalen, thema's zoomen daarbinnen in" — geen kale OR/AND.
+function axisPass(axisKey, edge, isTheory) {
+  const a = AXIS_DEFS[axisKey];
+  if (!a.cats.length) return true;                       // geen chips voor deze as → geen beperking
+  const active = a.get();
+  const tags = axisKey === 'filter' ? edgeFiltersOf(edge, isTheory) : edgeThemesOf(edge, isTheory);
+  if (a.mode === 'spotlight') {
+    if (!active.size) return true;                       // niets geselecteerd → geen beperking
+    return tags.some(t => active.has(t));                // alleen edges van de gekozen thema's
+  }
+  if (!tags.length) return true;                         // edge zonder waarde op deze as → niet gefilterd
+  return tags.some(t => active.has(t));
+}
+
+// Compute which nodes/links pass the current axes + search + timeline + threshold filters.
 // Returns { nodePassesFilter: Map<id,bool>, visibleLinkSet: Set<index> }.
 // Shared by applyFilters and selectNode so selection respects the same visibility rules.
 //
-// De categorie-chips filteren op EDGES (niet op nodes): een edge is alleen zichtbaar als
-// zijn eigen categorie aanstaat. Een node valt daardoor vanzelf weg zodra hij geen enkele
-// zichtbare edge meer heeft (zie applyFilters stap 3). De node-toets hieronder bevat dus
-// alleen legenda/zoek/tijd — bewust géén categorie.
+// De chips filteren op EDGES (niet op nodes): een edge is zichtbaar als hij beide assen
+// passeert (filter EN thema). Een node valt daardoor vanzelf weg zodra hij geen enkele
+// zichtbare edge meer heeft (zie applyFilters stap 3). De node-toets bevat dus alleen
+// legenda/zoek/tijd — bewust géén categorie.
 function computeVisibleLinks() {
   const isTheory = state.model === 'theory';
   const cf = state.certMin;
   const inf = state.inflMin;
-  const filters = state.activeFilters;
   const search = state.searchTerm.toLowerCase();
   const year = state.timelineYear;
 
@@ -2008,7 +2072,8 @@ function computeVisibleLinks() {
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
-    if (!filters.has(edgeCatOf(l, isTheory))) return;  // categorie zit op de edge
+    if (!axisPass('filter', l, isTheory)) return;   // filter-as (kan meerdere filters dragen)
+    if (!axisPass('theme', l, isTheory)) return;    // thema-as (dwarsverbanden)
     if (!isTheory) {
       if ((l.certainty||0) < cf || (l.influence||0) < inf) return;
       if (!isActiveAt(l, year)) return;
@@ -2119,54 +2184,92 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
     document.getElementById('timelineSection').style.display = isTheory ? 'none' : '';
 
+    rebuildChips();   // edge-categorieën verschillen per model
     buildGraph();
   });
 });
 
-// Filter chips
-const chipContainer = document.getElementById('filterChips');
-// Chips = edge-categorieën. Alleen categorieën tonen die daadwerkelijk als edge
-// voorkomen (mechanisme-filter of relatie's mechanism_filter); zuivere node-categorieën
-// zoals 'systeemactor' krijgen geen chip omdat er geen edges van die soort zijn.
-const edgeCatsPresent = new Set();
-DATA.mechanisms.forEach(m => edgeCatsPresent.add(m.filter || 'overig'));
-DATA.relations.forEach(r => edgeCatsPresent.add(r.mechanism_filter || 'overig'));
-const chipCats = Object.keys(FILTER_LABELS).filter(k => edgeCatsPresent.has(k));
-const chipEls = new Map();  // categorie -> chip-element
+// Chips voor TWEE assen: Chomsky-filters en dwarsliggende thema's. Beide werken
+// identiek (isoleer-klik) en worden per model herbouwd, want welke filters/thema's
+// als edge voorkomen verschilt per model. Een edge kan op de filter-as meerdere
+// waarden dragen (multi-filter); op de thema-as nul of meer.
+const AXIS_DEFS = {
+  // Filter-as: aan/uit-toggles. Elke edge heeft een filter; standaard alles aan
+  // (behalve tegenmacht). Klikken zet een kanaal weg.
+  filter: {
+    labels: FILTER_LABELS, colors: FILTER_COLORS,
+    container: document.getElementById('filterChips'),
+    get: () => state.activeFilters, set: s => { state.activeFilters = s; },
+    cats: [], els: new Map(), mode: 'toggle',
+    optOut: new Set(['tegenmacht']),  // standaard UIT tot je hem selecteert
+    defaultActive: new Set(),
+  },
+  // Thema-as: inzoomen (spotlight). Standaard NIETS geselecteerd = geen effect.
+  // Klik een thema → toon alléén dat dwarsverband (binnen de actieve filters).
+  theme: {
+    labels: THEME_LABELS, colors: THEME_COLORS,
+    container: document.getElementById('themeChips'),
+    get: () => state.activeThemes, set: s => { state.activeThemes = s; },
+    cats: [], els: new Map(), mode: 'spotlight',
+    optOut: new Set(),
+    defaultActive: new Set(),
+  },
+};
 
-// Houd de 'active'-markering van alle chips gelijk aan state.activeFilters
-function syncChips() {
-  chipEls.forEach((el, k) => el.classList.toggle('active', state.activeFilters.has(k)));
+// Welke categorieën van een as daadwerkelijk als edge voorkomen in het actieve model.
+function axisCatsForModel(axisKey) {
+  const cats = new Set();
+  const isTheory = state.model === 'theory';
+  const edges = isTheory
+    ? DATA.mechanisms.filter(m => m.source_role_id && m.target_role_id)
+    : DATA.relations;
+  edges.forEach(e => (axisKey === 'filter' ? edgeFiltersOf(e, isTheory) : edgeThemesOf(e, isTheory))
+    .forEach(c => cats.add(c)));
+  return cats;
 }
 
-// Klik = "isoleer deze categorie". Vanuit de alles-aan stand toont één klik alleen
-// die categorie; volgende kliks bouwen de selectie op/af; alles uitzetten reset
-// naar alles-aan. Zo betekent "ideologie aanklikken" → alleen ideologie-pijltjes.
-function onChipClick(key) {
-  const f = state.activeFilters;
-  const allOn = chipCats.every(c => f.has(c));
-  if (allOn) {
-    state.activeFilters = new Set([key]);              // isoleer
-  } else if (f.has(key)) {
-    f.delete(key);                                     // uit selectie halen
-    if (!chipCats.some(c => f.has(c))) state.activeFilters = new Set(chipCats);  // leeg → reset
-  } else {
-    f.add(key);                                        // toevoegen aan selectie
-  }
-  syncChips();
+// Houd de 'active'-markering van de chips van een as gelijk aan de state.
+function syncAxis(axisKey) {
+  const a = AXIS_DEFS[axisKey];
+  a.els.forEach((el, k) => el.classList.toggle('active', a.get().has(k)));
+}
+
+// Klik = simpele aan/uit-toggle per knop. Standaard staat alles aan (behalve opt-out
+// zoals tegenmacht); je klikt categorieën weg die je niet wilt zien, en weer aan.
+function onAxisChipClick(axisKey, key) {
+  const f = AXIS_DEFS[axisKey].get();
+  if (f.has(key)) f.delete(key); else f.add(key);
+  syncAxis(axisKey);
   applyFilters();
 }
 
-chipCats.forEach(key => {
-  const chip = document.createElement('div');
-  chip.className = 'filter-chip active';
-  chip.style.setProperty('--chip-color', FILTER_COLORS[key]);
-  chip.innerHTML = `<span class="dot"></span>${FILTER_LABELS[key]}`;
-  chip.addEventListener('click', () => onChipClick(key));
-  chipContainer.appendChild(chip);
-  chipEls.set(key, chip);
-});
-syncChips();
+// (Her)bouw de chips van één as voor het actieve model; zet de as terug op zijn
+// default-selectie (alles aan, behalve opt-out-categorieën zoals tegenmacht).
+function rebuildAxis(axisKey) {
+  const a = AXIS_DEFS[axisKey];
+  const present = axisCatsForModel(axisKey);
+  a.cats = Object.keys(a.labels).filter(k => present.has(k));
+  // spotlight (thema's) start leeg = neutraal; toggle (filters) start alles-aan behalve opt-out
+  a.defaultActive = a.mode === 'spotlight'
+    ? new Set()
+    : new Set(a.cats.filter(c => !a.optOut.has(c)));
+  a.set(new Set(a.defaultActive));
+  a.container.innerHTML = '';
+  a.els.clear();
+  a.cats.forEach(key => {
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip' + (a.defaultActive.has(key) ? ' active' : '');
+    chip.style.setProperty('--chip-color', a.colors[key]);
+    chip.innerHTML = `<span class="dot"></span>${a.labels[key]}`;
+    chip.addEventListener('click', () => onAxisChipClick(axisKey, key));
+    a.container.appendChild(chip);
+    a.els.set(key, chip);
+  });
+  syncAxis(axisKey);   // markeer chips exact volgens de actieve selectie
+}
+
+function rebuildChips() { rebuildAxis('filter'); rebuildAxis('theme'); }
+rebuildChips();
 
 // Legenda-key van een node, afhankelijk van model + kleurmodus
 function legendKeyOf(node) {

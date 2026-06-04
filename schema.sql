@@ -50,6 +50,26 @@ CREATE TABLE mechanisms (
     target_role_id INTEGER REFERENCES roles(id)   -- welke rol ondergaat dit
 );
 
+-- Twee-assen-categorisatie van mechanismen (zie enrich_filters_themas.py).
+-- mechanisms.filter blijft het PRIMAIRE filter (lead-kleur); hieronder alle filter-tags.
+CREATE TABLE mechanism_filters (
+    mechanism_id INTEGER NOT NULL REFERENCES mechanisms(id) ON DELETE CASCADE,
+    filter TEXT NOT NULL CHECK(filter IN (
+        'eigendom', 'advertentie', 'sourcing', 'flak', 'ideologie', 'tegenmacht', 'overig'
+    )),
+    PRIMARY KEY (mechanism_id, filter)
+);
+
+-- Dwarsliggende thema's (families die meerdere filters overspannen), many-to-many.
+CREATE TABLE mechanism_themes (
+    mechanism_id INTEGER NOT NULL REFERENCES mechanisms(id) ON DELETE CASCADE,
+    theme TEXT NOT NULL CHECK(theme IN (
+        'draaideur', 'elite_netwerk', 'geldstromen', 'platform',
+        'systemisch', 'omroepbestel', 'kennis_expertise'
+    )),
+    PRIMARY KEY (mechanism_id, theme)
+);
+
 --------------------------------------------------------------
 -- LAAG 2: INSTANTIEMODEL (concreet, met namen)
 -- De echte entiteiten en relaties in Nederland
@@ -377,6 +397,8 @@ CREATE INDEX idx_arguments_stance ON arguments(stance);
 CREATE INDEX idx_citations_argument ON citations(argument_id);
 CREATE INDEX idx_citations_source ON citations(source_id);
 CREATE INDEX idx_mechanisms_filter ON mechanisms(filter);
+CREATE INDEX idx_mechfilters_filter ON mechanism_filters(filter);
+CREATE INDEX idx_mechthemes_theme ON mechanism_themes(theme);
 CREATE INDEX idx_edit_log_table ON edit_log(table_name, record_id);
 CREATE INDEX idx_edit_log_changed_by ON edit_log(changed_by);
 CREATE INDEX idx_arguments_status ON arguments(status);

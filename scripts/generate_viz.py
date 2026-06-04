@@ -35,7 +35,7 @@ def export_data():
     cur.execute("""
         SELECT r.id, r.source_id, r.target_id, r.relation_type,
                r.certainty, r.influence, r.bidirectional,
-               r.description,
+               r.description, r.mechanism_id,
                r.active_from, r.active_until, r.active,
                e1.name as source_name, e2.name as target_name,
                m.name as mechanism_name, m.filter as mechanism_filter
@@ -53,6 +53,19 @@ def export_data():
     # Mechanisms
     cur.execute("SELECT id, name, filter, mechanism_type, description, effect, source_role_id, target_role_id FROM mechanisms")
     mechanisms = [dict(row) for row in cur.fetchall()]
+
+    # Twee-assen-tags: alle filters (multi) + thema's (dwarsverbanden) per mechanisme.
+    # Primair filter (kleur/lead) staat altijd vooraan in 'filters'.
+    mech_filters, mech_themes = {}, {}
+    for mid, flt in cur.execute("SELECT mechanism_id, filter FROM mechanism_filters"):
+        mech_filters.setdefault(mid, []).append(flt)
+    for mid, thm in cur.execute("SELECT mechanism_id, theme FROM mechanism_themes"):
+        mech_themes.setdefault(mid, []).append(thm)
+    for m in mechanisms:
+        fs = mech_filters.get(m['id'], [m['filter']])
+        # primair filter vooraan
+        m['filters'] = [m['filter']] + [f for f in fs if f != m['filter']]
+        m['themes'] = sorted(mech_themes.get(m['id'], []))
 
     # Arguments: volledige discussiebomen
     cur.execute("""
@@ -105,6 +118,10 @@ def export_data():
     for r in relations:
         ac = arg_counts.get(r['id'])
         r['argument_count'] = ac['arg_count'] if ac else 0
+        # Relatie erft de twee-assen-tags van haar mechanisme (primair filter blijft mechanism_filter)
+        mid = r.get('mechanism_id')
+        r['mechanism_filters'] = mech_filters.get(mid, [r['mechanism_filter']] if r.get('mechanism_filter') else [])
+        r['mechanism_themes'] = sorted(mech_themes.get(mid, []))
 
     # ── Afgeleide scores injecteren (uit scoring.compute_all_scores) ──
     for r in relations:
