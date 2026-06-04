@@ -19499,6 +19499,7 @@ const FILTER_COLORS = {
   eigendom: '#e74c3c', advertentie: '#f0a030', sourcing: '#3498db',
   flak: '#9b59b6', ideologie: '#2ecc71',
   systeemactor: '#e8c547', cross_filter: '#fd79a8',
+  tegenmacht: '#1abc9c',
   overig: '#7f8c9a',
 };
 // Kleuren per STRUCTURELE entiteitsvorm (kleurmodus "type"). Personen vormen één
@@ -19956,7 +19957,7 @@ const mechLinks = DATA.mechanisms.map(m => {
 let state = {
   model: 'instance',     // 'instance' | 'theory'
   colorMode: 'type',
-  activeFilters: new Set(Object.keys(FILTER_COLORS)),
+  activeFilters: new Set(Object.keys(FILTER_LABELS)),  // categorieën van de EDGES (pijltjes)
   certMin: 0, inflMin: 0,
   selectedNode: null,
   selectedRelation: null,
@@ -20896,9 +20897,20 @@ function relationCard(otherName, r, direction) {
 // ============================================================
 // FILTERING
 // ============================================================
+// Categorie (filter) van een EDGE. Mechanismen dragen 'filter'; relaties erven die
+// van hun gekoppelde mechanisme (mechanism_filter). Zonder koppeling: 'overig'.
+function edgeCatOf(link, isTheory) {
+  return (isTheory ? link.filter : link.mechanism_filter) || 'overig';
+}
+
 // Compute which nodes/links pass the current category + search + timeline + threshold filters.
 // Returns { nodePassesFilter: Map<id,bool>, visibleLinkSet: Set<index> }.
 // Shared by applyFilters and selectNode so selection respects the same visibility rules.
+//
+// De categorie-chips filteren op EDGES (niet op nodes): een edge is alleen zichtbaar als
+// zijn eigen categorie aanstaat. Een node valt daardoor vanzelf weg zodra hij geen enkele
+// zichtbare edge meer heeft (zie applyFilters stap 3). De node-toets hieronder bevat dus
+// alleen legenda/zoek/tijd — bewust géén categorie.
 function computeVisibleLinks() {
   const isTheory = state.model === 'theory';
   const cf = state.certMin;
@@ -20910,13 +20922,11 @@ function computeVisibleLinks() {
   const legendSel = state.legendSelection;
   const nodePassesFilter = new Map();
   currentNodes.forEach(n => {
-    const cat = isTheory ? n.category : n.filterCat;
-    const matchFilter = filters.has(cat);
     const matchLegend = !legendSel.size || legendSel.has(legendKeyOf(n));
     const matchSearch = !search || n.name.toLowerCase().includes(search)
       || (n.description && n.description.toLowerCase().includes(search));
     const matchTime = isTheory || isActiveAt(n, year);
-    nodePassesFilter.set(n.id, matchFilter && matchLegend && matchSearch && matchTime);
+    nodePassesFilter.set(n.id, matchLegend && matchSearch && matchTime);
   });
 
   const visibleLinkSet = new Set();
@@ -20924,6 +20934,7 @@ function computeVisibleLinks() {
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
+    if (!filters.has(edgeCatOf(l, isTheory))) return;  // categorie zit op de edge
     if (!isTheory) {
       if ((l.certainty||0) < cf || (l.influence||0) < inf) return;
       if (!isActiveAt(l, year)) return;
@@ -21040,18 +21051,48 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
 
 // Filter chips
 const chipContainer = document.getElementById('filterChips');
-Object.entries(FILTER_LABELS).forEach(([key, label]) => {
+// Chips = edge-categorieën. Alleen categorieën tonen die daadwerkelijk als edge
+// voorkomen (mechanisme-filter of relatie's mechanism_filter); zuivere node-categorieën
+// zoals 'systeemactor' krijgen geen chip omdat er geen edges van die soort zijn.
+const edgeCatsPresent = new Set();
+DATA.mechanisms.forEach(m => edgeCatsPresent.add(m.filter || 'overig'));
+DATA.relations.forEach(r => edgeCatsPresent.add(r.mechanism_filter || 'overig'));
+const chipCats = Object.keys(FILTER_LABELS).filter(k => edgeCatsPresent.has(k));
+const chipEls = new Map();  // categorie -> chip-element
+
+// Houd de 'active'-markering van alle chips gelijk aan state.activeFilters
+function syncChips() {
+  chipEls.forEach((el, k) => el.classList.toggle('active', state.activeFilters.has(k)));
+}
+
+// Klik = "isoleer deze categorie". Vanuit de alles-aan stand toont één klik alleen
+// die categorie; volgende kliks bouwen de selectie op/af; alles uitzetten reset
+// naar alles-aan. Zo betekent "ideologie aanklikken" → alleen ideologie-pijltjes.
+function onChipClick(key) {
+  const f = state.activeFilters;
+  const allOn = chipCats.every(c => f.has(c));
+  if (allOn) {
+    state.activeFilters = new Set([key]);              // isoleer
+  } else if (f.has(key)) {
+    f.delete(key);                                     // uit selectie halen
+    if (!chipCats.some(c => f.has(c))) state.activeFilters = new Set(chipCats);  // leeg → reset
+  } else {
+    f.add(key);                                        // toevoegen aan selectie
+  }
+  syncChips();
+  applyFilters();
+}
+
+chipCats.forEach(key => {
   const chip = document.createElement('div');
   chip.className = 'filter-chip active';
   chip.style.setProperty('--chip-color', FILTER_COLORS[key]);
-  chip.innerHTML = `<span class="dot"></span>${label}`;
-  chip.addEventListener('click', () => {
-    if (state.activeFilters.has(key)) { state.activeFilters.delete(key); chip.classList.remove('active'); }
-    else { state.activeFilters.add(key); chip.classList.add('active'); }
-    applyFilters();
-  });
+  chip.innerHTML = `<span class="dot"></span>${FILTER_LABELS[key]}`;
+  chip.addEventListener('click', () => onChipClick(key));
   chipContainer.appendChild(chip);
+  chipEls.set(key, chip);
 });
+syncChips();
 
 // Legenda-key van een node, afhankelijk van model + kleurmodus
 function legendKeyOf(node) {
