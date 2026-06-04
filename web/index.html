@@ -8766,7 +8766,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "EO",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8785,7 +8785,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "BNNVARA",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8804,7 +8804,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "KRO-NCRV",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8823,7 +8823,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "AVROTROS",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8842,7 +8842,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "VPRO",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8861,7 +8861,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "Omroep MAX",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8880,7 +8880,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "WNL",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -8899,7 +8899,7 @@ const DATA = {
       "active": 1,
       "source_name": "NPO",
       "target_name": "PowNed",
-      "mechanism_name": "bestelsturing",
+      "mechanism_name": "intekensturing",
       "mechanism_filter": "eigendom",
       "argument_count": 0,
       "derived_certainty": 0.05
@@ -10991,11 +10991,11 @@ const DATA = {
       "effect": "Omroepen zijn voor geld, plek en bereik afhankelijk van de koepel; de koepel kan de programmering sturen via de geldkraan en zendtijdverdeling in plaats van directe inhoudelijke bemoeienis.",
       "source_role_id": 46,
       "target_role_id": 2,
-      "geloofwaardigheid": 0.0333,
-      "sterkte": 0.51,
+      "geloofwaardigheid": 0.0143,
+      "sterkte": 0.55,
       "literatuur_geloofw": 0.0,
-      "praktijk_geloofw": 0.0333,
-      "n_instanties": 10,
+      "praktijk_geloofw": 0.0143,
+      "n_instanties": 2,
       "n_bronnen": 0
     },
     {
@@ -11019,16 +11019,16 @@ const DATA = {
       "name": "omroepverzuiling",
       "filter": "ideologie",
       "mechanism_type": "structureel",
-      "description": "Een ledenomroep is statutair gebonden aan een levensbeschouwelijke of politieke stroming (christelijk, socialistisch, rechts-populistisch, ...). Die identiteit bepaalt onderwerpkeuze, gasten en toon.",
-      "effect": "Nieuwsselectie en agenda worden vooraf gekleurd door de zuil; het pluralisme zit tussen omroepen, niet binnen een redactie, en blijft binnen de grenzen van het bestel.",
+      "description": "Het bestel is 'extern pluriform': elke ledenomroep representeert statutair een eigen godsdienstige, maatschappelijke of geestelijke stroming en brengt vanuit dat perspectief programma's, gecoordineerd door de NPO voor heel Nederland.",
+      "effect": "Het pluralisme zit TUSSEN omroepen, niet BINNEN een redactie, en blijft binnen de grenzen van het bestel: het publiek krijgt een verzameling vooraf gekleurde, elkaar begrenzende perspectieven aangeboden. De 'stroming'-eis is vaag gedefinieerd en stamt uit de 20e-eeuwse verzuiling (WRR 2024).",
       "source_role_id": 47,
       "target_role_id": 35,
-      "geloofwaardigheid": 0.0188,
+      "geloofwaardigheid": 0.4427,
       "sterkte": 0.45,
-      "literatuur_geloofw": 0.0,
+      "literatuur_geloofw": 0.4321,
       "praktijk_geloofw": 0.0188,
       "n_instanties": 3,
-      "n_bronnen": 0
+      "n_bronnen": 1
     },
     {
       "id": 101,
@@ -11327,6 +11327,134 @@ const DATA = {
       "effect": "Via `pakketjournalistiek` plant de denktank-framing zich vrijwel gelijktijdig door alle titels voort; de belangengebonden oorsprong blijft onzichtbaar achter het neutrale persbureau-stempel. Sluit aan op `persbureau_brongebondenheid`.",
       "source_role_id": 28,
       "target_role_id": 8,
+      "geloofwaardigheid": 0.0,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.0,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 0
+    },
+    {
+      "id": 121,
+      "name": "ledeneis",
+      "filter": "eigendom",
+      "mechanism_type": "structureel",
+      "description": "Een omroepvereniging krijgt en behoudt haar erkenning alleen met genoeg betalende leden: de Mediawet eist minimaal 100.000 leden voor een erkende omroep en 50.000 voor een aspirant-omroep. Het ledental geldt als bewijs van 'maatschappelijke binding' en bepaalt mede de zendtijd en het budgetaandeel.",
+      "effect": "De omroep richt programmering, marketing en ledenwerving op het binden van (vooral de bestaande) leden; goed bestuur en kwaliteit raken ondergeschikt aan ledentallen (WRR 2024). Het publiek-als-ledenmarkt wordt zo een structurele filter op wat er gemaakt wordt, en jongere/diffuse geluiden die geen massalidmaatschap binden vallen weg.",
+      "source_role_id": 35,
+      "target_role_id": 47,
+      "geloofwaardigheid": 0.4461,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.4461,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 1
+    },
+    {
+      "id": 122,
+      "name": "intekensturing",
+      "filter": "eigendom",
+      "mechanism_type": "economisch",
+      "description": "De NPO kent elke omroep een vast garantiebudget toe (~50% voor ledenomroepen, 70% voor taakomroepen; art. 2.149/2.150 Mediawet) en verdeelt het resterende programmageld competitief via 'intekening': omroepen pitchen programmavoorstellen die de NPO goedkeurt, weigert of op een zender plaatst. De stuurruimte van de koepel is wettelijk verruimd van 30% naar 50% van het budget van de erkende omroepen.",
+      "effect": "Ledenomroepen schikken hun aanbod naar het genre-, doelgroep- en plaatsingsbeleid van de koepel om geld en zendtijd te krijgen; de regie verschuift van de verzuilde omroep naar de centrale sturingsorganisatie ('geen thuisnet': de NPO bepaalt per programma de zender).",
+      "source_role_id": 46,
+      "target_role_id": 47,
+      "geloofwaardigheid": 0.4675,
+      "sterkte": 0.5,
+      "literatuur_geloofw": 0.4506,
+      "praktijk_geloofw": 0.0308,
+      "n_instanties": 8,
+      "n_bronnen": 1
+    },
+    {
+      "id": 123,
+      "name": "erkenningverlening",
+      "filter": "eigendom",
+      "mechanism_type": "juridisch",
+      "description": "De minister van OCW beslist per concessieperiode -- op advies van de NPO, de Raad voor Cultuur en het Commissariaat voor de Media -- of een omroep een erkenning krijgt: de toegang tot het bestel, het publieke geld en een landelijk podium. De minister kan die erkenning ook onthouden of intrekken.",
+      "effect": "Een politiek-bestuurlijke poort bepaalt welke 'stromingen' een landelijk podium krijgen. Nieuwe of onwelgevallige geluiden staan of vallen bij de erkenning (bv. de aanvaring rond Ongehoord Nederland), wat een disciplinerend signaal afgeeft aan het hele bestel.",
+      "source_role_id": 41,
+      "target_role_id": 47,
+      "geloofwaardigheid": 0.4461,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.4461,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 1
+    },
+    {
+      "id": 124,
+      "name": "omroepsignatuur",
+      "filter": "ideologie",
+      "mechanism_type": "structureel",
+      "description": "De statutaire godsdienstige, maatschappelijke of geestelijke stroming van een ledenomroep (christelijk, sociaaldemocratisch, rechts-populistisch, ...) stuurt intern de onderwerp- en gastenkeuze, toon en bronselectie van de eigen redactie.",
+      "effect": "Nieuwsselectie en framing zijn binnen een omroep vooraf gekleurd door de zuil; afwijken van de eigen signatuur is intern onwaarschijnlijk. Dit is de productie-zijde van de verzuiling (intern), waarvan `omroepverzuiling` het publiekgerichte resultaat is.",
+      "source_role_id": 47,
+      "target_role_id": 34,
+      "geloofwaardigheid": 0.3852,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.3852,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 1
+    },
+    {
+      "id": 125,
+      "name": "academische_socialisatie_politiek",
+      "filter": "ideologie",
+      "mechanism_type": "structureel",
+      "description": "De politieke klasse is overwegend academisch gevormd: parlement, kabinet en adviesraden worden gedomineerd door hoogopgeleiden (Bovens & Wille, 'diplomademocratie'). Politici delen daardoor de premissen en het wereldbeeld van de academische hegemonie.",
+      "effect": "Beleid en debat vertrekken vanuit het hoogopgeleide referentiekader (internationalisering, milieu, migratie) dat afwijkt van de praktisch geschoolden; voedt `politicus_als_ideoloog` en vergroot de kloof tussen burger en politiek.",
+      "source_role_id": 43,
+      "target_role_id": 33,
+      "geloofwaardigheid": 0.0,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.0,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 0
+    },
+    {
+      "id": 126,
+      "name": "academische_orthodoxie_denktank",
+      "filter": "ideologie",
+      "mechanism_type": "structureel",
+      "description": "Denktank-onderzoekers zijn academisch gevormd (PhD's, oud-academici); hun analyses blijven binnen de heersende academische paradigma's. Dit is de IDEOLOGISCHE achtergrond, te onderscheiden van de FINANCIËLE sturing (`denktank_financiering_bias`).",
+      "effect": "De 'schijnbaar objectieve' denktank-output deelt de premissen van de academische consensus; heterodoxe paradigma's komen er nauwelijks in. Versterkt het aureool van neutraliteit van `expert_framing`/`denktank_levert_expert`.",
+      "source_role_id": 43,
+      "target_role_id": 28,
+      "geloofwaardigheid": 0.0,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.0,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 0
+    },
+    {
+      "id": 127,
+      "name": "academische_orthodoxie_instituut",
+      "filter": "ideologie",
+      "mechanism_type": "structureel",
+      "description": "De 'primaire definieerders' (CPB, DNB, ministeries, planbureaus) worden bemenst door academisch gevormde economen en deskundigen die de heersende paradigma's hanteren (bv. neoklassieke economie). Hun 'neutrale' modellen en doorrekeningen dragen die orthodoxie.",
+      "effect": "De aannames achter een CPB-doorrekening of DNB-prognose gelden als objectief feit terwijl ze een academisch paradigma weerspiegelen; alternatieve probleemdefinities moeten 'tegen de cijfers in' bewijzen. Voedt `institutioneel_gezag`.",
+      "source_role_id": 43,
+      "target_role_id": 41,
+      "geloofwaardigheid": 0.0,
+      "sterkte": 0.0,
+      "literatuur_geloofw": 0.0,
+      "praktijk_geloofw": 0.0,
+      "n_instanties": 0,
+      "n_bronnen": 0
+    },
+    {
+      "id": 128,
+      "name": "academische_vorming_opinie",
+      "filter": "ideologie",
+      "mechanism_type": "discursief",
+      "description": "Columnisten en opiniemakers — de 'organische intellectuelen' — zijn academisch gevormd en reproduceren het dominante denkkader als vanzelfsprekend.",
+      "effect": "Het hoogopgeleide, progressief-neoliberale frame wordt als 'gezond verstand' herhaald; voedt `columnist_als_hegemon` en helpt de grenzen van het redelijke debat bewaken.",
+      "source_role_id": 43,
+      "target_role_id": 32,
       "geloofwaardigheid": 0.0,
       "sterkte": 0.0,
       "literatuur_geloofw": 0.0,
@@ -15955,6 +16083,96 @@ const DATA = {
       "reasoning": "Google sloot een News Showcase-licentieovereenkomst met elf grote NL-nieuwsorganisaties via Stichting OPR, waaronder DPG Media. Voorbeeld van platform-journalistiekfinanciering (co-optatie/afhankelijkheid).",
       "weight": 0.8,
       "status": "geverifieerd"
+    },
+    {
+      "id": 340,
+      "relation_id": null,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": 121,
+      "parent_argument_id": null,
+      "property": null,
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "De Mediawet bindt de erkenning van een omroep rechtstreeks aan het ledental.",
+      "reasoning": "Een erkende omroep moet minimaal 100.000 betalende leden hebben, een aspirant-omroep 50.000. Het ledental functioneert daarmee als toegangsdrempel en als verdeelsleutel voor zendtijd en budget.",
+      "weight": 0.9,
+      "status": "geverifieerd"
+    },
+    {
+      "id": 341,
+      "relation_id": null,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": 121,
+      "parent_argument_id": null,
+      "property": null,
+      "property_value": null,
+      "stance": "contextual",
+      "claim": "De WRR signaleert dat goed bestuur en kwaliteit ondergeschikt raken aan ledentallen.",
+      "reasoning": "Pluriformiteit wordt afgemeten aan het halen van de ledendrempel; omroepen ervaren stress door de marketing die nodig is om die drempel te halen, terwijl vooral jongeren steeds minder lid worden.",
+      "weight": 0.7,
+      "status": "geverifieerd"
+    },
+    {
+      "id": 342,
+      "relation_id": null,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": 122,
+      "parent_argument_id": null,
+      "property": null,
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "Het budget is deels een vast garantiebudget en deels competitief verdeeld programmageld.",
+      "reasoning": "Art. 2.149/2.150 Mediawet legt een garantiebudget vast (~50% voor ledenomroepen, 70% voor taakomroepen); de rest verdeelt de NPO via intekening op programmavoorstellen, waarbij de stuurruimte is verruimd van 30% naar 50%.",
+      "weight": 0.85,
+      "status": "geverifieerd"
+    },
+    {
+      "id": 343,
+      "relation_id": null,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": 123,
+      "parent_argument_id": null,
+      "property": null,
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "De minister van OCW beslist of een omroep een erkenning krijgt.",
+      "reasoning": "De erkenning verschaft toegang tot het bestel, publiek geld en een landelijk podium; het besluit ligt bij de bewindspersoon (op advies van NPO, Raad voor Cultuur en Commissariaat voor de Media).",
+      "weight": 0.9,
+      "status": "geverifieerd"
+    },
+    {
+      "id": 344,
+      "relation_id": null,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": 100,
+      "parent_argument_id": null,
+      "property": null,
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "De Mediawet eist dat een omroep een godsdienstige, maatschappelijke of geestelijke stroming vertegenwoordigt.",
+      "reasoning": "Die eis institutionaliseert de externe pluriformiteit: diversiteit tussen omroepen in plaats van binnen een redactie. Het begrip 'stroming' is vaag en stamt uit de verzuiling.",
+      "weight": 0.85,
+      "status": "geverifieerd"
+    },
+    {
+      "id": 345,
+      "relation_id": null,
+      "entity_id": null,
+      "role_id": null,
+      "mechanism_id": 124,
+      "parent_argument_id": null,
+      "property": null,
+      "property_value": null,
+      "stance": "supporting",
+      "claim": "De wettelijke 'stroming'-eis bindt niet alleen het profiel maar ook de programma-inhoud van de omroep.",
+      "reasoning": "Omroepverenigingen moeten een godsdienstige, maatschappelijke of geestelijke stroming vertegenwoordigen en maken hun programma's vanuit dat perspectief; de signatuur stuurt zo intern de onderwerp-, gasten- en bronselectie van de eigen redactie.",
+      "weight": 0.7,
+      "status": "geverifieerd"
     }
   ],
   "citations": [
@@ -16017,6 +16235,76 @@ const DATA = {
       "context": null,
       "source_title": "Google sluit licentieovereenkomst met elf grote nieuwsorganisaties in Nederland",
       "source_author": "Google"
+    },
+    {
+      "id": 341,
+      "argument_id": 340,
+      "quote": "minimaal 100.000 betalende leden hebben",
+      "page": null,
+      "section": "Erkende omroep",
+      "context": null,
+      "source_title": "Aan welke eisen moet een omroepvereniging voldoen?",
+      "source_author": "Rijksoverheid"
+    },
+    {
+      "id": 342,
+      "argument_id": 340,
+      "quote": "minimaal 50.000 betalende leden hebben",
+      "page": null,
+      "section": "Aspirant-omroep",
+      "context": null,
+      "source_title": "Aan welke eisen moet een omroepvereniging voldoen?",
+      "source_author": "Rijksoverheid"
+    },
+    {
+      "id": 343,
+      "argument_id": 341,
+      "quote": "pluriformiteit wordt beoordeeld op het behalen van het ledental, terwijl goed bestuur en kwaliteit ondergeschikt zijn aan ledentallen",
+      "page": null,
+      "section": "Publieke omroep",
+      "context": null,
+      "source_title": "Aandacht voor media",
+      "source_author": "Wetenschappelijke Raad voor het Regeringsbeleid"
+    },
+    {
+      "id": 344,
+      "argument_id": 342,
+      "quote": "garantiebudget",
+      "page": null,
+      "section": "art. 2.149/2.150",
+      "context": null,
+      "source_title": "Mediawet 2008",
+      "source_author": "Staten-Generaal"
+    },
+    {
+      "id": 345,
+      "argument_id": 343,
+      "quote": "De minister van Onderwijs, Cultuur en Wetenschap beslist of een omroep een erkenning krijgt.",
+      "page": null,
+      "section": "Erkenning",
+      "context": null,
+      "source_title": "Aan welke eisen moet een omroepvereniging voldoen?",
+      "source_author": "Rijksoverheid"
+    },
+    {
+      "id": 346,
+      "argument_id": 344,
+      "quote": "een godsdienstige, maatschappelijke of geestelijke stroming vertegenwoordigen",
+      "page": null,
+      "section": "Stroming",
+      "context": null,
+      "source_title": "Aan welke eisen moet een omroepvereniging voldoen?",
+      "source_author": "Rijksoverheid"
+    },
+    {
+      "id": 347,
+      "argument_id": 345,
+      "quote": "een godsdienstige, maatschappelijke of geestelijke stroming vertegenwoordigen",
+      "page": null,
+      "section": "Stroming",
+      "context": null,
+      "source_title": "Aan welke eisen moet een omroepvereniging voldoen?",
+      "source_author": "Rijksoverheid"
     }
   ],
   "instantiations": [
@@ -18983,7 +19271,7 @@ const DATA = {
     {
       "id": 486,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 363,
       "exemplarity": 1.0
@@ -18991,7 +19279,7 @@ const DATA = {
     {
       "id": 487,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 364,
       "exemplarity": 1.0
@@ -18999,7 +19287,7 @@ const DATA = {
     {
       "id": 488,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 365,
       "exemplarity": 1.0
@@ -19007,7 +19295,7 @@ const DATA = {
     {
       "id": 489,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 366,
       "exemplarity": 1.0
@@ -19015,7 +19303,7 @@ const DATA = {
     {
       "id": 490,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 367,
       "exemplarity": 1.0
@@ -19023,7 +19311,7 @@ const DATA = {
     {
       "id": 491,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 368,
       "exemplarity": 1.0
@@ -19031,7 +19319,7 @@ const DATA = {
     {
       "id": 492,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 369,
       "exemplarity": 1.0
@@ -19039,7 +19327,7 @@ const DATA = {
     {
       "id": 493,
       "role_id": null,
-      "mechanism_id": 98,
+      "mechanism_id": 122,
       "entity_id": null,
       "relation_id": 370,
       "exemplarity": 1.0
