@@ -247,22 +247,44 @@ def compute_all_scores(conn) -> dict:
     # Structurele invloed-centraliteit (topologie, los van de bewijslast):
     #   - entiteiten: relatiegraaf, gewicht = influence.
     #   - rollen: mechanismegraaf, gewicht = sterkte van het mechanisme (theorie-laag).
-    entity_influence = influence_graph.compute_influence(conn)
+    # Twee varianten: 'clean' (exclude) = schone dyadische graaf (default-view in de viz, toggle
+    # uit); 'collapse' = eerlijk met veld-effecten, fan-out gedempt (toggle aan, en de API-default).
+    entity_influence = influence_graph.compute_influence(conn, field_mode="collapse")
+    entity_influence_clean = influence_graph.compute_influence(conn, field_mode="exclude")
 
     role_ids = [r[0] for r in conn.execute("SELECT id FROM roles")]
     mech_edges = []
-    for mid, src_role, tgt_role, flt in conn.execute(
-            "SELECT id, source_role_id, target_role_id, filter FROM mechanisms"):
+    for mid, src_role, tgt_role, flt, aard in conn.execute(
+            "SELECT id, source_role_id, target_role_id, filter, aard FROM mechanisms"):
         if flt == "tegenmacht":     # tegenkracht: geen pro-elite invloedskanaal
             continue
-        mech_edges.append((src_role, tgt_role, mechs.get(mid, {}).get("sterkte", 0.0)))
-    role_influence = influence_graph.compute_role_influence(role_ids, mech_edges)
+        mech_edges.append((src_role, tgt_role,
+                           mechs.get(mid, {}).get("sterkte", 0.0), aard or "direct"))
+    def _role_ids(*role_names):
+        ids = set()
+        for rn in role_names:
+            row = conn.execute("SELECT id FROM roles WHERE name = ?", (rn,)).fetchone()
+            if row:
+                ids.add(row[0])
+        return ids
+
+    target_role_sets = {}
+    if (pub := _role_ids("publiek")):
+        target_role_sets["public"] = pub
+    if (pol := _role_ids("politicus", "partij")):
+        target_role_sets["politiek"] = pol
+    role_influence = influence_graph.compute_role_influence(
+        role_ids, mech_edges, target_role_sets=target_role_sets, field_mode="collapse")
+    role_influence_clean = influence_graph.compute_role_influence(
+        role_ids, mech_edges, target_role_sets=target_role_sets, field_mode="exclude")
 
     return {
         "relations": {rid: round(c, 4) for rid, c in rel_certainty.items()},
         "entities": {eid: round(c, 4) for eid, c in entity_cred.items()},
         "entity_influence": entity_influence,
+        "entity_influence_clean": entity_influence_clean,
         "role_influence": role_influence,
+        "role_influence_clean": role_influence_clean,
         "roles": roles,
         "mechanisms": mechs,
     }

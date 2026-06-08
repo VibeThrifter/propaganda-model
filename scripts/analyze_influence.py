@@ -47,7 +47,20 @@ def resolve(conn, names, term):
 
 
 def print_rankings(conn, names, types, top):
-    inf = influence.compute_influence(conn)
+    # Standaard 'collapse': emergente veld-effecten (mechanisms.aard != direct) tellen gedempt mee —
+    # een diffuse fan-out (bv. hegemonische naturalisatie) als één bijdrage i.p.v. N losse duwen,
+    # en een veld-eigenschap (zelfcensuur) niet als uitgaande invloed. Zo geen kunstmatige inflatie.
+    inf = influence.compute_influence(conn, field_mode="collapse")
+    print("\n(invloed-wiskunde: veld-effecten gedempt — zie mechanisms.aard / migrate_add_mechanism_aard.py)")
+
+    print(f"\n== TOP {top} — INVLOED OP HET PUBLIEK (eindstation: kranten/omroepen/platforms) ==")
+    print("   De kernvraag: wiens invloed komt uiteindelijk bij de nieuwsconsument terecht?")
+    print("   Som van het beste-pad naar elke publieksgerichte uitlaat (uitlaten tellen +1 voor")
+    print("   hun eigen directe levering).\n")
+    for eid in sorted(inf, key=lambda e: -inf[e].get("public", 0.0))[:top]:
+        v = inf[eid]
+        print(f"   #{v['public_rank']:<2} {v['public']:6.2f}              "
+              f"{names[eid]}  [{types[eid]}]")
 
     print(f"\n== TOP {top} — TRANSITIEVE invloed (gedempte invloed op heel het netwerk, multi-hop) ==")
     print("   De maat die 'macht via het netwerk' vangt: niet wie zelf het hardst duwt,")

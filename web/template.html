@@ -551,6 +551,24 @@ body {
       <span class="val" id="inflVal">0</span>
     </div>
   </div>
+  <div class="panel-section" id="sizeSection">
+    <h3>Node-grootte</h3>
+    <select id="sizeMetric" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);font-size:12px"></select>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
+  </div>
+  <div class="panel-section" id="fieldSection">
+    <h3>Veld-effecten</h3>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+      <input type="checkbox" id="fieldToggle">
+      <span>Toon emergente veld-effecten</span>
+    </label>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">
+      Diffuse systeemkrachten, géén gericht kanaal: <span style="color:#9b8cc4">gestippelde waaiers</span>
+      (veld-instantiatie — bv. hegemonische naturalisatie) en <span style="color:#9b8cc4">halo's</span>
+      (veld-eigenschap — bv. zelfcensuur). Uit = schone dyadische graaf; de node-grootte telt ze dan
+      niet mee (fan-out-inflatie weg).
+    </div>
+  </div>
   <div class="panel-section" id="legendSection">
     <h3>Legenda</h3>
     <div id="legend"></div>
@@ -1066,6 +1084,10 @@ let state = {
   searchTerm: '',
   timelineYear: null,    // null = show all, number = filter to year
   legendSelection: new Set(),  // leeg = alles tonen; anders alleen geselecteerde legenda-keys
+  sizeMetric: 'influence_direct',  // welke maat de node-grootte bepaalt (zie SIZE_METRICS)
+  receivedMap: null,           // entity/rol-id -> som inkomende invloed (per buildGraph)
+  showFieldEffects: false,     // emergente veld-effecten (aard != direct) tonen? Default schoon.
+  fieldPropertyMap: null,      // node-id -> max inkomende veld-eigenschap-influence (halo-intensiteit)
 };
 
 // ============================================================
@@ -1275,6 +1297,9 @@ function buildGraph() {
 
   currentNodes = nodes;
   currentLinks = links;
+  state.receivedMap = computeReceivedMap();        // voor de 'ontvangen invloed'-maat
+  state.fieldPropertyMap = computeFieldPropertyMap(); // voor de veld-eigenschap-halo's
+  invalidateSizeCache();                     // node-grootte herschalen op de nieuwe nodes
 
   // Meerdere relaties tussen hetzelfde knooppunt-paar uit elkaar buigen,
   // zodat ze niet op elkaar vallen en elk afzonderlijk hoverbaar zijn.
@@ -1297,14 +1322,12 @@ function buildGraph() {
   const linkGroup = g.append('g').attr('class', 'links');
   linkElements = linkGroup.selectAll('path').data(links).join('path')
     .attr('fill', 'none')
-    .attr('stroke', d => getLinkColor(d, isTheory))
-    .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
+    .attr('stroke', d => isFieldInstantiation(d) ? FIELD_COLOR : getLinkColor(d, isTheory))
+    // Veld-instantiatie = diffuse waaier: gestippeld, dunner, geen pijlpunt (geen gericht kanaal).
+    .attr('stroke-dasharray', d => isFieldInstantiation(d) ? '3,4' : null)
+    .attr('stroke-width', d => isFieldInstantiation(d) ? 1.2 : (isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5))
     .attr('stroke-opacity', d => isTheory ? 0.5 : 0.15 + (d.certainty || 0.5) * 0.45)
-    .attr('marker-end', d => {
-      const color = getLinkColor(d, isTheory);
-      const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
-      return `url(#${prefix}${color.replace('#','')})`;
-    });
+    .attr('marker-end', d => markerFor(d, isTheory));
 
   // Invisible wider hit-area for clicking on edges
   const linkHitGroup = g.append('g').attr('class', 'link-hits');
@@ -1355,7 +1378,19 @@ function buildGraph() {
       .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
       .on('end', (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
+  // Halo voor veld-eigenschap (niveau 2) — vóór de hoofdcircle zodat hij erachter ligt.
   nodeElements.append('circle')
+    .attr('class', 'field-halo')
+    .attr('fill', 'none')
+    .attr('stroke', FIELD_COLOR)
+    .attr('stroke-width', 3)
+    .attr('stroke-dasharray', '2,3')
+    .style('pointer-events', 'none')
+    .attr('r', d => fieldHaloRadius(d))
+    .attr('opacity', d => fieldHaloOpacity(d));
+
+  nodeElements.append('circle')
+    .attr('class', 'node-circle')
     .attr('r', d => getRadius(d))
     .attr('fill', d => getNodeColor(d))
     .attr('stroke', d => d3.color(getNodeColor(d)).brighter(0.6))
@@ -1423,17 +1458,150 @@ function buildGraph() {
 // ============================================================
 // HELPERS
 // ============================================================
+// ── Emergente veld-effecten (mechanisms.aard) ──
+// Sommige edges zijn geen dyadisch kanaal maar een eigenschap van het hele systeem:
+//   veld_instantiatie (niveau 1) — diffuse waaier (WEF/NAVO → uitlaten); gestippeld, geen pijl.
+//   veld_eigenschap   (niveau 2) — geen echte bron (zelfcensuur); getekend als halo om de node.
+// De toggle state.showFieldEffects bepaalt of ze meedoen (default uit = schone dyadische graaf).
+const FIELD_COLOR = '#9b8cc4';  // gedempt violet: "diffuus/systemisch", los van de filter-kleuren
+function isFieldLink(l) { return l.aard && l.aard !== 'direct'; }
+function isFieldInstantiation(l) { return l.aard === 'veld_instantiatie'; }
+function isFieldProperty(l) { return l.aard === 'veld_eigenschap'; }
+// Node-grootte leest de schone (basis) waarde, of de _veld-variant als de toggle aan staat.
+function infVal(d, key) { return (state.showFieldEffects ? d[key + '_veld'] : d[key]) || 0; }
+
+// ── Node-grootte: instelbaar register van maten ──
+// Elke maat geeft een ruwe waarde per node; getRadius normaliseert op het maximum van de
+// huidige nodes. 'models' bepaalt in welk model de maat in de selector verschijnt.
+const SIZE_METRICS = {
+  influence_direct: { label: 'Invloed — direct (duwkracht)', models: ['instance', 'theory'],
+                      val: d => infVal(d, 'influence_direct') },
+  public:           { label: 'Invloed op het publiek', models: ['instance', 'theory'],
+                      val: d => infVal(d, 'influence_public') },
+  politiek:         { label: 'Invloed op de politiek (partijen/politici)', models: ['instance', 'theory'],
+                      val: d => infVal(d, 'influence_politiek') },
+  influence:        { label: 'Invloed op het hele netwerk (transitief)', models: ['instance', 'theory'],
+                      val: d => infVal(d, 'influence_transitive') },
+  reach:            { label: 'Bereik (aantal nodes)', models: ['instance', 'theory'],
+                      val: d => infVal(d, 'influence_reach') },
+  received:         { label: 'Ontvangen invloed (beïnvloed dóór anderen)', models: ['instance', 'theory'],
+                      val: d => (state.receivedMap && state.receivedMap.get(d.id)) || 0 },
+  degree:           { label: 'Verbondenheid (aantal relaties)', models: ['instance', 'theory'],
+                      val: d => d.degree || 0 },
+  credibility:      { label: 'Geloofwaardigheid (bewijslast)', models: ['instance', 'theory'],
+                      val: d => (state.model === 'theory' ? d.geloofwaardigheid : d.derived_certainty) || 0 },
+  sterkte:          { label: 'Sterkte (theorie-score)', models: ['theory'],
+                      val: d => d.sterkte || 0 },
+  instanties:       { label: 'Praktijkvoorbeelden (aantal)', models: ['theory'],
+                      val: d => d.n_instanties || 0 },
+  uniform:          { label: 'Gelijk (uit)', models: ['instance', 'theory'], val: () => 1 },
+};
+
+let _sizeMaxCache = null;
+function invalidateSizeCache() { _sizeMaxCache = null; }
+function currentSizeMax() {
+  if (_sizeMaxCache != null) return _sizeMaxCache;
+  const m = SIZE_METRICS[state.sizeMetric] || SIZE_METRICS.influence;
+  let mx = 0;
+  (currentNodes || []).forEach(d => { const v = m.val(d) || 0; if (v > mx) mx = v; });
+  return (_sizeMaxCache = mx || 1);
+}
+
+// Som van de inkomende invloed per node (model-bewust; zelfde richtingsregels als de cascade).
+function computeReceivedMap() {
+  const map = new Map();
+  const isTheory = state.model === 'theory';
+  (currentLinks || []).forEach(l => {
+    if (isFieldProperty(l)) return;                       // node-eigenschap, geen kanaal
+    if (isFieldInstantiation(l) && !state.showFieldEffects) return;
+    const { w, excluded, symmetric } = edgeInfluence(l, isTheory);
+    if (excluded || !(w > 0)) return;
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    map.set(tid, (map.get(tid) || 0) + w);
+    if (symmetric) map.set(sid, (map.get(sid) || 0) + w);
+  });
+  return map;
+}
+
+// Inkomende veld-eigenschap (niveau 2) per node — bepaalt de halo-intensiteit (max influence).
+function computeFieldPropertyMap() {
+  const map = new Map();
+  (currentLinks || []).forEach(l => {
+    if (!isFieldProperty(l)) return;
+    const w = (l.influence != null) ? l.influence : (THEORY_BASE + THEORY_SPAN * (l.sterkte || 0));
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (w > (map.get(tid) || 0)) map.set(tid, w);
+  });
+  return map;
+}
+
+// Marker (pijlpunt) voor een link: veld-effecten krijgen GEEN pijl (diffuus, geen gericht kanaal).
+function markerFor(l, isTheory) {
+  if (isFieldLink(l)) return 'none';
+  const color = getLinkColor(l, isTheory);
+  const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
+  return `url(#${prefix}${color.replace('#', '')})`;
+}
+
+// Halo om een node die een veld-eigenschap (niveau 2) ondergaat — alleen als de toggle aan staat.
+function fieldHaloRadius(d) { return getRadius(d) + 5; }
+function fieldHaloOpacity(d) {
+  if (!state.showFieldEffects || !state.fieldPropertyMap) return 0;
+  const v = state.fieldPropertyMap.get(d.id) || 0;
+  return v > 0 ? 0.25 + 0.5 * Math.min(1, v) : 0;
+}
+// Alleen de straal bijwerken na een resize; de halo-OPACITY wordt beheerd door applyFilters
+// (zichtbaarheid) en selectNode (cascade), zodat verborgen/gedimde nodes geen losse halo houden.
+function refreshFieldHalos() {
+  if (!nodeElements) return;
+  nodeElements.select('.field-halo').attr('r', d => fieldHaloRadius(d));
+}
+
 function getRadius(d) {
-  // Theoretisch model: grootte ∝ transitieve invloed-centraliteit van de rol (mechanismegraaf);
-  // valt terug op sterkte en dan graad.
-  if (state.model === 'theory') {
-    if (d.influence_norm != null) return 10 + Math.sqrt(d.influence_norm) * 22;
-    return (d.sterkte != null) ? 10 + d.sterkte * 22 : 12 + Math.sqrt(d.degree || 1) * 5;
+  const key = state.sizeMetric || 'influence';
+  const isTheory = state.model === 'theory';
+  if (key === 'uniform') return isTheory ? 15 : 9;
+  const m = SIZE_METRICS[key] || SIZE_METRICS.influence;
+  const norm = (m.val(d) || 0) / currentSizeMax();
+  // sqrt spreidt kleine waarden; floor (base) houdt 'sink'-nodes klikbaar.
+  const base = isTheory ? 9 : 5;
+  const span = isTheory ? 24 : 22;
+  return base + Math.sqrt(Math.max(0, norm)) * span;
+}
+
+// (Her)vul de selector met de maten die in het huidige model gelden.
+function populateSizeMetricOptions() {
+  const sel = document.getElementById('sizeMetric');
+  if (!sel) return;
+  const model = state.model;
+  if (!SIZE_METRICS[state.sizeMetric] || !SIZE_METRICS[state.sizeMetric].models.includes(model)) {
+    state.sizeMetric = 'influence';
   }
-  // Instantiemodel: grootte ∝ transitieve invloed-centraliteit (gedempte invloed op het netwerk).
-  // sqrt spreidt de kleine waarden; floor houdt 'sink'-nodes nog klikbaar. Valt terug op graad.
-  if (d.influence_norm != null) return 6 + Math.sqrt(d.influence_norm) * 20;
-  return 5 + Math.sqrt(d.degree || 1) * 3;
+  sel.innerHTML = '';
+  Object.entries(SIZE_METRICS).forEach(([key, m]) => {
+    if (!m.models.includes(model)) return;
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = m.label;
+    if (key === state.sizeMetric) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// Herteken alleen de node-groottes (zonder volledige rebuild) na een maatwissel.
+function applySizeMetric() {
+  invalidateSizeCache();
+  const isTheory = state.model === 'theory';
+  if (nodeElements) {
+    nodeElements.select('circle:not(.field-halo)').attr('r', d => getRadius(d));
+    nodeElements.select('text').attr('dy', d => getRadius(d) + (isTheory ? 16 : 12));
+    refreshFieldHalos();
+  }
+  if (simulation) {
+    simulation.force('collision', d3.forceCollide().radius(d => getRadius(d) + (isTheory ? 12 : 4)));
+    simulation.alpha(0.3).restart();
+  }
+  if (state.selectedNode) selectNode(state.selectedNode);  // herstel cascade-highlight
 }
 
 function getNodeColor(d) {
@@ -1702,17 +1870,15 @@ function selectNode(d) {
       const reached = cascade.nodes, linkStrength = cascade.linkStrength;
       const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
       const nodeOn = id => id === d.id || reached.has(id);
-      nodeElements.select('circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
+      nodeElements.select('.node-circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
       nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
+      nodeElements.select('.field-halo').attr('opacity', n => nodeOn(n.id) ? fieldHaloOpacity(n) : 0.02);
       linkElements.each(function(l, i) {
         const s = linkStrength.get(i);
         const el = d3.select(this);
         if (s != null) {
           el.attr('stroke-opacity', 0.35 + 0.6 * Math.min(1, s));  // sterker pad = feller
-          if (!el.attr('data-marker')) {
-            const color = getLinkColor(l, isTheory);
-            el.attr('data-marker', `url(#${prefix}${color.replace('#','')})`);
-          }
+          if (!el.attr('data-marker')) el.attr('data-marker', markerFor(l, isTheory));
           el.attr('marker-end', el.attr('data-marker'));
         } else {
           el.attr('stroke-opacity', 0.03);
@@ -1741,19 +1907,16 @@ function selectNode(d) {
     connectedIds.add(tid);
   });
 
-  nodeElements.select('circle').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.08);
+  nodeElements.select('.node-circle').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.08);
   nodeElements.select('text').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.06);
+  nodeElements.select('.field-halo').attr('opacity', n => connectedIds.has(n.id) ? fieldHaloOpacity(n) : 0.02);
   linkElements.each(function(l, i) {
     const connected = isConnected(l, i);
     const el = d3.select(this);
     el.attr('stroke-opacity', connected ? 0.8 : 0.03);
     el.attr('marker-end', connected ? el.attr('marker-end') || 'none' : 'none');
     // Store original marker so we can restore it
-    if (connected && !el.attr('data-marker')) {
-      const color = getLinkColor(l, isTheory);
-      const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
-      el.attr('data-marker', `url(#${prefix}${color.replace('#','')})`);
-    }
+    if (connected && !el.attr('data-marker')) el.attr('data-marker', markerFor(l, isTheory));
     if (connected) el.attr('marker-end', el.attr('data-marker'));
   });
   // Only connected + visible relations stay hoverable (tooltips live on the hit-lines)
@@ -1826,19 +1989,39 @@ function renderLiteratureSection(field, id, roots) {
 
 // Structurele invloed-centraliteit van een entiteit (topologie, los van de bewijslast).
 function renderInfluenceSection(d) {
-  if (d.influence_rank == null) return '';
+  // Volgt de veld-effecten-toggle: schone (dyadische) waarden, of de _veld-variant (gedempt).
+  const fe = state.showFieldEffects;
+  const pick = k => (fe ? d[k + '_veld'] : d[k]);
+  if (pick('influence_rank') == null) return '';
   const total = (state.model === 'theory' ? DATA.roles.length : DATA.entities.length);
-  const pct = Math.round((d.influence_norm || 0) * 100);
+  const pubNorm = pick('influence_public_norm'), netNorm = pick('influence_norm');
+  const pubRank = pick('influence_public_rank'), polRank = pick('influence_politiek_rank');
+  const pubPct = Math.round((pubNorm != null ? pubNorm : 0) * 100);
+  const netPct = Math.round((netNorm || 0) * 100);
+  const pubBar = pick('influence_public') != null
+    ? `<span class="score-bar">op publiek <span class="bar-track"><span class="bar-fill" style="width:${pubPct}%;background:var(--accent)"></span></span> rang #${pubRank}</span>`
+    : '';
+  const modeNote = fe
+    ? 'incl. emergente veld-effecten (fan-out gedempt)'
+    : 'schone dyadische graaf — veld-effecten niet meegeteld';
+  // Ondergaat deze node zelf een veld-eigenschap (bv. zelfcensuur)? Toon dat als de toggle aan staat.
+  const fieldProp = (fe && state.fieldPropertyMap && state.fieldPropertyMap.get(d.id) > 0)
+    ? `<div style="font-size:10px;color:${FIELD_COLOR};margin-top:4px">◌ Ondergaat een veld-eigenschap (diffuse systeemdruk, bv. zelfcensuur) — getekend als halo.</div>`
+    : '';
   return `<div class="detail-section">
     <h4>Invloedspositie (structureel)</h4>
     <div style="display:flex;gap:16px;margin-bottom:6px;flex-wrap:wrap">
-      <span class="score-bar">transitief <span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:var(--accent)"></span></span> ${pct}%</span>
+      ${pubBar}
+      <span class="score-bar">heel netwerk <span class="bar-track"><span class="bar-fill" style="width:${netPct}%;background:var(--text-muted)"></span></span> rang #${pick('influence_rank')}</span>
     </div>
     <div style="font-size:10px;color:var(--text-muted);line-height:1.7">
-      rang <b style="color:var(--text-dim)">#${d.influence_rank}</b> van ${total} ·
-      bereikt <b style="color:var(--text-dim)">${d.influence_reach}</b> nodes (gedempt, multi-hop) ·
-      directe duwkracht ${(d.influence_direct || 0).toFixed(1)}
+      <b style="color:var(--text-dim)">Invloed op het publiek</b>: rang #${pubRank != null ? pubRank : '—'} van ${total} ·
+      <b style="color:var(--text-dim)">op de politiek</b>: rang #${polRank != null ? polRank : '—'} ·
+      netwerk-bereik <b style="color:var(--text-dim)">${pick('influence_reach')}</b> nodes ·
+      directe duwkracht ${(pick('influence_direct') || 0).toFixed(1)}
     </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-style:italic">${modeNote}</div>
+    ${fieldProp}
     <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Klik op de node in de graaf om de downstream-invloedpaden op te lichten.</div>
   </div>`;
 }
@@ -2184,6 +2367,10 @@ function computeVisibleLinks() {
 
   const visibleLinkSet = new Set();
   currentLinks.forEach((l, i) => {
+    // Veld-eigenschap (niveau 2) is een node-eigenschap (halo), nooit een zichtbare edge.
+    // Veld-instantiatie (niveau 1, diffuse waaier) alleen tonen als de toggle aan staat.
+    if (isFieldProperty(l)) return;
+    if (isFieldInstantiation(l) && !state.showFieldEffects) return;
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
@@ -2241,8 +2428,9 @@ function applyFilters() {
   }
 
   // Step 4: Apply visibility to nodes
-  nodeElements.select('circle').attr('opacity', d => visibleNodes.has(d.id) ? 1 : 0);
+  nodeElements.select('.node-circle').attr('opacity', d => visibleNodes.has(d.id) ? 1 : 0);
   nodeElements.select('text').attr('opacity', d => visibleNodes.has(d.id) ? 1 : 0);
+  nodeElements.select('.field-halo').attr('opacity', d => visibleNodes.has(d.id) ? fieldHaloOpacity(d) : 0);
   nodeElements.style('pointer-events', d => visibleNodes.has(d.id) ? 'all' : 'none');
 
   // Step 5: Apply visibility to links — including marker-end
@@ -2252,12 +2440,7 @@ function applyFilters() {
       if (isTheory) return 0.5;
       return 0.15 + (l.certainty||0.5) * 0.45;
     })
-    .attr('marker-end', (l, i) => {
-      if (!visibleLinkSet.has(i)) return 'none';
-      const color = getLinkColor(l, isTheory);
-      const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
-      return `url(#${prefix}${color.replace('#','')})`;
-    });
+    .attr('marker-end', (l, i) => visibleLinkSet.has(i) ? markerFor(l, isTheory) : 'none');
 
   // Verborgen links niet hoverbaar: tooltip-handlers zitten op de hit-lijnen,
   // dus pointer-events daar uitschakelen voor uitgefilterde/verleden relaties
@@ -2299,9 +2482,30 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
     document.getElementById('timelineSection').style.display = isTheory ? 'none' : '';
 
-    rebuildChips();   // edge-categorieën verschillen per model
+    rebuildChips();                 // edge-categorieën verschillen per model
+    populateSizeMetricOptions();    // sommige maten zijn model-specifiek
     buildGraph();
   });
+});
+
+// Node-grootte-selector
+document.getElementById('sizeMetric').addEventListener('change', e => {
+  state.sizeMetric = e.target.value;
+  applySizeMetric();
+});
+
+// Veld-effecten-toggle: schakelt de diffuse waaiers + halo's aan/uit en wisselt de node-grootte
+// tussen de schone (dyadische) en de met-veld variant.
+function applyFieldEffects() {
+  invalidateSizeCache();
+  state.receivedMap = computeReceivedMap();
+  applyFilters();        // link-zichtbaarheid (waaier) + node/halo-zichtbaarheid + stats
+  applySizeMetric();     // node-grootte schoon<->veld, halo-stralen, eventueel cascade herstellen
+  if (state.selectedNode) showDetail(state.selectedNode);  // detailpaneel met de juiste variant
+}
+document.getElementById('fieldToggle').addEventListener('change', e => {
+  state.showFieldEffects = e.target.checked;
+  applyFieldEffects();
 });
 
 // Chips voor TWEE assen: Chomsky-filters en dwarsliggende thema's. Beide werken
@@ -2433,7 +2637,7 @@ document.querySelectorAll('#viewToggle button').forEach(btn => {
     applyFilters();
     // Recolor existing nodes
     if (nodeElements) {
-      nodeElements.select('circle')
+      nodeElements.select('.node-circle')
         .attr('fill', d => getNodeColor(d))
         .attr('stroke', d => d3.color(getNodeColor(d)).brighter(0.6));
     }
@@ -3023,6 +3227,7 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 // INIT
 // ============================================================
 initTimeline();
+populateSizeMetricOptions();
 buildGraph();
 renderLegend();
 

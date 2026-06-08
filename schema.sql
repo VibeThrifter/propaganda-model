@@ -47,7 +47,15 @@ CREATE TABLE mechanisms (
     description TEXT NOT NULL,            -- hoe werkt dit mechanisme
     effect TEXT NOT NULL,                 -- wat is het effect op de berichtgeving
     source_role_id INTEGER REFERENCES roles(id),  -- welke rol oefent dit uit
-    target_role_id INTEGER REFERENCES roles(id)   -- welke rol ondergaat dit
+    target_role_id INTEGER REFERENCES roles(id),  -- welke rol ondergaat dit
+    -- Aard van het mechanisme: is een instantie ervan een echt dyadisch invloedskanaal,
+    -- of een emergente eigenschap van het systeem? Bepaalt viz én invloed-wiskunde
+    -- (zie migrate_add_mechanism_aard.py en influence.py).
+    aard TEXT NOT NULL DEFAULT 'direct' CHECK(aard IN (
+        'direct',             -- lokaal feit; oorzaak = de twee eindpunten (eigendom, draaideur, ...)
+        'veld_instantiatie',  -- dyade = steekproef uit een veld-regelmaat; eindpunten substitueerbaar
+        'veld_eigenschap'     -- geen zinnige externe bron; eigenschap ván de getroffen node
+    ))
 );
 
 -- Twee-assen-categorisatie van mechanismen (zie enrich_filters_themas.py).

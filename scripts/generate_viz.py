@@ -38,7 +38,8 @@ def export_data():
                r.description, r.mechanism_id,
                r.active_from, r.active_until, r.active,
                e1.name as source_name, e2.name as target_name,
-               m.name as mechanism_name, m.filter as mechanism_filter
+               m.name as mechanism_name, m.filter as mechanism_filter,
+               COALESCE(m.aard, 'direct') as aard
         FROM relations r
         JOIN entities e1 ON r.source_id = e1.id
         JOIN entities e2 ON r.target_id = e2.id
@@ -50,8 +51,8 @@ def export_data():
     cur.execute("SELECT id, name, category, description FROM roles")
     roles = [dict(row) for row in cur.fetchall()]
 
-    # Mechanisms
-    cur.execute("SELECT id, name, filter, mechanism_type, description, effect, source_role_id, target_role_id FROM mechanisms")
+    # Mechanisms (incl. `aard`: direct / veld_instantiatie / veld_eigenschap)
+    cur.execute("SELECT id, name, filter, mechanism_type, aard, description, effect, source_role_id, target_role_id FROM mechanisms")
     mechanisms = [dict(row) for row in cur.fetchall()]
 
     # Twee-assen-tags: alle filters (multi) + thema's (dwarsverbanden) per mechanisme.
@@ -134,17 +135,31 @@ def export_data():
         m.update(scores['mechanisms'].get(m['id'], {}))
 
     # ── Structurele invloed-centraliteit (topologie) ──
-    def _attach_influence(items, score_map):
+    # Twee varianten per node: de basisvelden (influence_*) komen uit de SCHONE dyadische graaf
+    # (veld-effecten weg) — dat is de default-view. De *_veld-velden komen uit de variant MÉT
+    # veld-effecten (fan-out gedempt); de viz-toggle "toon veld-effecten" schakelt ernaartoe.
+    def _attach_influence(items, clean_map, field_map):
+        keys = [('direct', 'influence_direct'), ('transitive', 'influence_transitive'),
+                ('reach', 'influence_reach'), ('transitive_norm', 'influence_norm'),
+                ('rank', 'influence_rank'), ('public', 'influence_public'),
+                ('public_norm', 'influence_public_norm'), ('public_rank', 'influence_public_rank'),
+                ('politiek', 'influence_politiek'), ('politiek_norm', 'influence_politiek_norm'),
+                ('politiek_rank', 'influence_politiek_rank')]
+        defaults = {'reach': 0, 'rank': None, 'public_rank': None, 'politiek_rank': None}
         for it in items:
-            inf = score_map.get(it['id'], {})
-            it['influence_direct'] = inf.get('direct', 0.0)
-            it['influence_transitive'] = inf.get('transitive', 0.0)
-            it['influence_reach'] = inf.get('reach', 0)
-            it['influence_norm'] = inf.get('transitive_norm', 0.0)
-            it['influence_rank'] = inf.get('rank')
+            clean = clean_map.get(it['id'], {})
+            field = field_map.get(it['id'], {})
+            for src_key, dst_key in keys:
+                d = defaults.get(src_key, 0.0)
+                it[dst_key] = clean.get(src_key, d)
+                it[dst_key + '_veld'] = field.get(src_key, d)
 
-    _attach_influence(entities, scores.get('entity_influence', {}))  # instantiemodel
-    _attach_influence(roles, scores.get('role_influence', {}))       # theoretisch model
+    _attach_influence(entities,
+                      scores.get('entity_influence_clean', {}),
+                      scores.get('entity_influence', {}))   # instantiemodel
+    _attach_influence(roles,
+                      scores.get('role_influence_clean', {}),
+                      scores.get('role_influence', {}))      # theoretisch model
 
     return {
         'entities': entities,
