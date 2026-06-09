@@ -48,16 +48,16 @@ CREATE TABLE mechanisms (
     effect TEXT NOT NULL,                 -- wat is het effect op de berichtgeving
     source_role_id INTEGER REFERENCES roles(id),  -- welke rol oefent dit uit
     target_role_id INTEGER REFERENCES roles(id),  -- welke rol ondergaat dit
-    -- Aard van het mechanisme: is een instantie ervan een echt dyadisch invloedskanaal,
-    -- een gemedieerd (indirect) kanaal, of een emergente/systemische eigenschap? Bepaalt viz
-    -- én invloed-wiskunde (zie migrate_add_mechanism_aard.py, migrate_add_indirect_aard.py en
-    -- influence.py). Visuele grammatica: pijlpunt = gericht; doorgetrokken = onmiddellijk,
-    -- gestippeld = gemedieerd/diffuus.
+    -- Aard van het mechanisme: is een instantie ervan een echt dyadisch invloedskanaal
+    -- of een emergente/systemische eigenschap (halo)? Bepaalt viz én invloed-wiskunde.
+    -- Leidend principe: een edge tussen twee nodes is 'direct'. Volledige uitleg + beslisgids:
+    -- DOCUMENTATIE.md § "Aard: direct & systemisch" en CLAUDE.md. Visuele grammatica:
+    -- pijlpunt = gericht; doorgetrokken = onmiddellijk.
     aard TEXT NOT NULL DEFAULT 'direct' CHECK(aard IN (
-        'direct',             -- lokaal feit; oorzaak = de twee eindpunten — doorgetrokken pijl (eigendom, draaideur, ...)
-        'indirect',           -- gericht maar GEMEDIEERD (A→B via tussen-nodes) — gestippelde pijl mét punt, filterkleur, achtergrondlaag
-        'veld_instantiatie',  -- dyade = steekproef uit een veld-regelmaat; eindpunten substitueerbaar — gestippelde waaier zónder punt
-        'veld_eigenschap'     -- geen zinnige externe bron; eigenschap ván de getroffen node — halo
+        'direct',             -- lokaal feit; oorzaak = de twee eindpunten — doorgetrokken pijl mét punt (LEVEND)
+        'veld_eigenschap',    -- geen zinnige externe bron; eigenschap ván de getroffen node — halo (LEVEND)
+        'indirect',           -- DEPRECATED/leeg: "een edge tussen twee nodes is direct"; teken de keten i.p.v. een stippelpijl. Tekent als directe edge.
+        'veld_instantiatie'   -- DEPRECATED/leeg: was diffuse waaier; echte dyade → direct, systeemeigenschap → veld_eigenschap, anders verwijderen. Behouden voor migratie-replay.
     ))
 );
 

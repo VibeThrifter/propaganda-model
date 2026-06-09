@@ -92,7 +92,7 @@ Niet álle flak is echter diffuus: een hedendaagse, *wél* doelgerichte en gedoc
 Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid: ze socialiseren de journalisten (`academische_socialisatie`) én leveren de `gezagsexpert`s (`academische_autoriteit`). Doordat journalist én "onafhankelijke" bron uit dezelfde instituten komen, ontstaat **ideologische homofilie** — empirisch zichtbaar in de sterk afwijkende stemvoorkeur van NL-journalisten (D66/GroenLinks fors oververtegenwoordigd t.o.v. de bevolking). De hegemonie-*reproductie* reikt verder dan de media: het `kennisinstituut` vormt de hele hoogopgeleide elite die álle instituties bevolkt (Bovens & Wille, *diplomademocratie*) — politici (`academische_socialisatie_politiek`), denktanks (`academische_orthodoxie_denktank`), de "primaire definieerders" als CPB/DNB (`academische_orthodoxie_instituut`) en opiniemakers (`academische_vorming_opinie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
 
 **Rollen:** `elite_forum`, `columnist_opiniemaker`, `kennisinstituut`
-**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `hegemonische_naturalisatie`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`
+**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `transnationale_frame_export`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`
 
 <a id="themas-dwarsverbanden"></a>
 ### Thema's: dwarsverbanden
@@ -106,7 +106,7 @@ De zeven thema's:
 - **Elite-netwerk** — synchronisatie van wereldbeeld in elite-fora (Bilderberg/WEF/ERT); combinatie van lobby (Sourcing) en Ideologie.
 - **Geldstromen** — agenda-gebonden geld dat buiten eigendom én advertentie om naar partij of titel stroomt (partij-/mediafinanciering, groeileningen, platformfinanciering), plus de neutrale tegenpool `projectfinanciering_journalistiek`.
 - **Platform/digitaal** — techplatforms en algoritmes (filtering, socialisatie, verdienmodeldruk, advertentieconcentratie).
-- **Systemisch** — emergente, zelfversterkende systeemkenmerken (eigendomsconcentratie, economische terugkoppeling, emergente bias, homeostase, hegemonische naturalisatie).
+- **Systemisch** — emergente, zelfversterkende systeemkenmerken (eigendomsconcentratie, economische terugkoppeling, emergente bias, homeostase).
 - **Publiek omroepbestel** — de bestel-specifieke krachten (ledeneis, intekensturing, erkenningverlening, omroepsignatuur/-verzuiling, Ster); spant Eigendom + Ideologie + Advertentie.
 - **Kennis & expertise** — het expert-/autoriteitscomplex (academische vorming/orthodoxie, denktanks, expert-framing/-legitimatie); spant Sourcing + Ideologie.
 
@@ -169,7 +169,7 @@ Zie "Scores: van discussieboom naar theorie".
 | Tabel | Beschrijving | Velden |
 |---|---|---|
 | `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples |
-| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`indirect`/`veld_instantiatie`/`veld_eigenschap` — zie [Aard: direct, indirect & emergent](#aard-direct-indirect--emergent)), description, effect, source_role_id, target_role_id |
+| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
 | `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`systemisch`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`) |
 | `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl) | name, label, category, description, effect |
@@ -235,46 +235,50 @@ Een relatie kan zeker bestaan maar weinig impact hebben (Vanguard→Shell: feit,
 
 De handmatige `certainty` blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). `influence` blijft handmatig.
 
-### Aard: direct, indirect & emergent
+### Aard: direct & systemisch
 
-Niet elke relatie is een onmiddellijk dyadisch kanaal tussen twee actoren. Sommige zijn *gemedieerd*
-(de invloed loopt via tussen-nodes), andere een *emergente eigenschap van het hele systeem* die
-noodgedwongen als pijl tussen twee nodes is getekend. De kolom `mechanisms.aard` legt dat onderscheid
+Niet elke relatie is een onmiddellijk dyadisch kanaal tussen twee actoren; sommige zijn een *emergente
+eigenschap van het systeem* zonder gericht bron→doel-kanaal. De kolom `mechanisms.aard` legt dat onderscheid
 vast (relaties erven het van hun mechanisme); het stuurt zowel de visualisatie als de invloed-wiskunde
-(`influence.py`). Vier niveaus — de visuele grammatica sluit erop: **pijlpunt = gericht; doorgetrokken =
-onmiddellijk, gestippeld = gemedieerd/diffuus.**
+(`influence.py`).
+
+**Leidend principe: een edge tussen twee nodes is `direct`.** "Indirectheid" is een eigenschap van een
+*pad* (≥2 edges via tussen-nodes), niet van één edge. Een gemedieerde invloed teken je dus als de *keten*
+van directe edges (de demping volgt vanzelf uit `influence.py`, zie onder); de twijfel of een verband wel
+een hard kanaal is, zit in de `certainty`-score — niet in een stippellijn. Daarom zijn er nog maar twee
+levende aarden, met de visuele grammatica **pijlpunt = gericht, doorgetrokken = onmiddellijk**:
 
 | aard | betekenis | toets | render | voorbeeld |
 |---|---|---|---|---|
-| `direct` | lokaal feit; de oorzaak ís de twee eindpunten | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt | DPG → Het Parool (eigendom), een draaideur-overstap, één adverteerder |
-| `indirect` | gericht maar **gemedieerd**: A beïnvloedt echt B, maar via tussen-nodes — geen brute dyade én geen diffuus veld | haal een tussenschakel weg → het effect verdwijnt/verzwakt | gestippelde pijl **mét** punt, filterkleur, achtergrondlaag | `stak_stemzeggenschap` (STAK ⇢ RvC), `preselectie_hoofdredacteur` (org ⇢ hoofdredacteur), `academische_socialisatie_hoofdredacteur` |
-| `veld_instantiatie` | de dyade is een willekeurige steekproef uit een veld-regelmaat; eindpunten substitueerbaar, geen centrale zender | je kunt de bron/het doel vervangen zonder de claim te raken | gestippelde waaier **zónder** punt | WEF/NAVO → uitlaten (`hegemonische_naturalisatie`), elites die onderling synchroniseren (`ideologische_synchronisatie`) |
-| `veld_eigenschap` | er ís geen zinnige externe bron; hoort een eigenschap ván de getroffen node te zijn | wie is de bron? niemand specifieks | halo om de node (geen edge) | `zelfcensuur` (de redactie censureert zichzelf), `geweld_intimidatie` (bron bewust diffuus) |
-
-> De `indirect`-aard is de wiskundig "kleine systemische" route: de eigenaar raakt de redactie nooit
-> rechtstreeks, zijn voorkeur stroomt gemedieerd door de keten (`mediaeigenaar → STAK → RvC → directie →
-> hoofdredacteur`). Elke gestippelde schakel vermenigvuldigt een influence < 1, dus het effect aan het eind
-> is klein — geen bevel, wel een blijvende eigenaarssignatuur op het toegestane frame.
+| `direct` | lokaal feit; de oorzaak ís de twee eindpunten — óók als de invloed gemedieerd of onzeker is (mediatie → de keten; twijfel → de `certainty`-score) | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt, filterkleur | DPG → Het Parool (eigendom); WEF → NOS (`transnationale_frame_export`, cert ≈ 0,05) |
+| `veld_eigenschap` | er ís geen zinnige externe bron; een eigenschap *ván* de getroffen node (die de node *ondergaat*) | wie is de bron? niemand specifieks | **halo** om de node (geen edge); bron-rol mag `NULL` zijn | `zelfcensuur`, `sociologische_homogeniteit` (homogene redactie → blinde vlekken), `geweld_intimidatie` |
 
 > Let op: dat een mechanisme thema `systemisch` draagt zegt niets over zijn `aard`. `eigendomsconcentratie`
 > is thematisch systemisch, maar elke afzonderlijke edge (DPG → Het Parool) is een lokaal eigendomsfeit —
 > dus `direct`. Het emergente zit daar in de *optelsom* (de concentratie), niet in de losse edge.
 
-**Effect op de wiskunde** (`influence.py`, parameter `field_mode`): bij `collapse` (de eerlijke default)
-telt een veld-instantiatie als **één gedempte bijdrage per bron** — het gewicht wordt door de fan-out `k`
-gedeeld i.p.v. N losse duwen op te tellen — en telt een veld-eigenschap **niet** mee als uitgaande
-invloed (het is een node-eigenschap). Bij `exclude` (de schone dyadische graaf) vallen niveau 1 én 2
-helemaal weg. Zonder deze correctie inflateren de fan-out-edges de centraliteit van elite-knooppunten
-kunstmatig (zo wás 64% van NAVO's uitgaande invloed louter `hegemonische_naturalisatie`-waaier). Een
-`indirect`-edge telt gewoon als **gerichte edge** (geen aparte behandeling) — de demping zit al in de
-lagere influence-waarde van de relatie; `aard` is orthogonaal aan het filter, dus de kleur blijft.
+**Afgeschaft.** Twee oudere aarden zijn leeg en hun viz-rendering is verwijderd:
+- `indirect` (gericht-maar-gemedieerd; was een gestippelde pijl mét punt) — vervangen door het principe
+  hierboven. De gemedieerde eigenaarsgreep (`mediaeigenaar → STAK → RvC → directie → hoofdredacteur`) is nu
+  gewoon díé keten van directe edges; elke schakel vermenigvuldigt een influence < 1, dus het netto-effect
+  aan het eind blijft klein — geen bevel, wel een eigenaarssignatuur.
+- `veld_instantiatie` (diffuse waaier; was gestippeld zónder punt) — elke waaier bleek óf een echte gerichte
+  dyade (→ `direct` gemaakt: `transnationale_frame_export`, `ideologische_synchronisatie`, `schijndebat`,
+  `omroepverzuiling`) óf redundant (→ verwijderd: `stakeholder_capitalism_frame`).
 
-**In de viz** (alleen in het **theoriemodel** — in het praktijkmodel is WEF → NOS gewoon een concrete
-relatie en tekent álles als normale edge): de toggle *Indirecte & systemische effecten* schakelt alles
-wat niet `direct` is aan/uit (default uit = schone graaf; de node-grootte telt deze effecten dan niet
-mee). Een `indirect`-effect is een **gestippelde pijl mét pijlpunt** in de filterkleur, getekend in een
-achtergrondlaag **áchter** de emergente velden; een veld-instantiatie een **gestippelde waaier zonder
-pijlpunt** (geen gericht kanaal); een veld-eigenschap een **halo** om de getroffen node (geen edge).
+Beide blijven geldig in de `CHECK` (voor migratie-replay) maar tekenen, indien gezet, gewoon als directe edge.
+
+**Effect op de wiskunde** (`influence.py`, parameter `field_mode`): een `veld_eigenschap` telt **niet** mee
+als uitgaande invloed (het is een node-eigenschap, geen kanaal); bij `exclude` (de schone dyadische graaf)
+valt ze helemaal weg. De `collapse`-correctie voor veld-instantiatie-waaiers (één gedempte bijdrage per bron,
+gewicht gedeeld door de fan-out `k`) bestaat nog in de code maar staat inactief — er zijn geen waaiers meer;
+ze voorkwam dat fan-out-edges de centraliteit van elite-knooppunten kunstmatig inflateerden. `aard` is
+orthogonaal aan het filter, dus de kleur (het filter) blijft.
+
+**In de viz** (alleen in het **theoriemodel** — in het praktijkmodel is WEF → NOS gewoon een concrete relatie
+en tekent álles als normale edge): de toggle *Systemische effecten* schakelt alles wat niet `direct` is
+aan/uit (default uit = schone graaf; de node-grootte telt deze effecten dan niet mee). Wat er nog onder valt:
+de **veld-eigenschap-halo's** (een ring om de getroffen node) en het emergente effect hieronder.
 
 Naast deze edge-aarden kent het theoriemodel het **emergente effect als hyperedge**: een systeem-
 eigenschap die uit het samenspel van een hele *groep* rollen voortkomt en niet in één bron→doel-relatie
