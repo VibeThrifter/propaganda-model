@@ -169,9 +169,11 @@ Zie "Scores: van discussieboom naar theorie".
 | Tabel | Beschrijving | Velden |
 |---|---|---|
 | `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples |
-| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_instantiatie`/`veld_eigenschap` — zie [Aard: direct vs. emergent](#aard-direct-vs-emergent)), description, effect, source_role_id, target_role_id |
+| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`indirect`/`veld_instantiatie`/`veld_eigenschap` — zie [Aard: direct, indirect & emergent](#aard-direct-indirect--emergent)), description, effect, source_role_id, target_role_id |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
-| `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`systemisch`/`omroepbestel`/`kennis_expertise`) |
+| `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`systemisch`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`) |
+| `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl) | name, label, category, description, effect |
+| `emergent_effect_members` | Koppeltabel: welke rollen dragen samen een emergent effect | emergent_effect_id, role_id |
 
 ### Instantiemodel
 
@@ -233,18 +235,26 @@ Een relatie kan zeker bestaan maar weinig impact hebben (Vanguard→Shell: feit,
 
 De handmatige `certainty` blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). `influence` blijft handmatig.
 
-### Aard: direct vs. emergent
+### Aard: direct, indirect & emergent
 
-Niet elke relatie is een dyadisch kanaal tussen twee actoren. Sommige zijn een *emergente eigenschap
-van het hele systeem* die noodgedwongen als pijl tussen twee nodes is getekend. De kolom
-`mechanisms.aard` legt dat onderscheid vast (relaties erven het van hun mechanisme); het stuurt zowel
-de visualisatie als de invloed-wiskunde (`influence.py`). Drie niveaus:
+Niet elke relatie is een onmiddellijk dyadisch kanaal tussen twee actoren. Sommige zijn *gemedieerd*
+(de invloed loopt via tussen-nodes), andere een *emergente eigenschap van het hele systeem* die
+noodgedwongen als pijl tussen twee nodes is getekend. De kolom `mechanisms.aard` legt dat onderscheid
+vast (relaties erven het van hun mechanisme); het stuurt zowel de visualisatie als de invloed-wiskunde
+(`influence.py`). Vier niveaus — de visuele grammatica sluit erop: **pijlpunt = gericht; doorgetrokken =
+onmiddellijk, gestippeld = gemedieerd/diffuus.**
 
-| aard | betekenis | toets | voorbeeld |
-|---|---|---|---|
-| `direct` | lokaal feit; de oorzaak ís de twee eindpunten | verander de bron/het doel → de claim wordt onwaar | DPG → Het Parool (eigendom), een draaideur-overstap, één adverteerder |
-| `veld_instantiatie` | de dyade is een willekeurige steekproef uit een veld-regelmaat; eindpunten substitueerbaar, geen centrale zender | je kunt de bron/het doel vervangen zonder de claim te raken | WEF/NAVO → uitlaten (`hegemonische_naturalisatie`), elites die onderling synchroniseren (`ideologische_synchronisatie`) |
-| `veld_eigenschap` | er ís geen zinnige externe bron; hoort een eigenschap ván de getroffen node te zijn | wie is de bron? niemand specifieks | `zelfcensuur` (de redactie censureert zichzelf), `geweld_intimidatie` (bron bewust diffuus) |
+| aard | betekenis | toets | render | voorbeeld |
+|---|---|---|---|---|
+| `direct` | lokaal feit; de oorzaak ís de twee eindpunten | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt | DPG → Het Parool (eigendom), een draaideur-overstap, één adverteerder |
+| `indirect` | gericht maar **gemedieerd**: A beïnvloedt echt B, maar via tussen-nodes — geen brute dyade én geen diffuus veld | haal een tussenschakel weg → het effect verdwijnt/verzwakt | gestippelde pijl **mét** punt, filterkleur, achtergrondlaag | `stak_stemzeggenschap` (STAK ⇢ RvC), `preselectie_hoofdredacteur` (org ⇢ hoofdredacteur), `academische_socialisatie_hoofdredacteur` |
+| `veld_instantiatie` | de dyade is een willekeurige steekproef uit een veld-regelmaat; eindpunten substitueerbaar, geen centrale zender | je kunt de bron/het doel vervangen zonder de claim te raken | gestippelde waaier **zónder** punt | WEF/NAVO → uitlaten (`hegemonische_naturalisatie`), elites die onderling synchroniseren (`ideologische_synchronisatie`) |
+| `veld_eigenschap` | er ís geen zinnige externe bron; hoort een eigenschap ván de getroffen node te zijn | wie is de bron? niemand specifieks | halo om de node (geen edge) | `zelfcensuur` (de redactie censureert zichzelf), `geweld_intimidatie` (bron bewust diffuus) |
+
+> De `indirect`-aard is de wiskundig "kleine systemische" route: de eigenaar raakt de redactie nooit
+> rechtstreeks, zijn voorkeur stroomt gemedieerd door de keten (`mediaeigenaar → STAK → RvC → directie →
+> hoofdredacteur`). Elke gestippelde schakel vermenigvuldigt een influence < 1, dus het effect aan het eind
+> is klein — geen bevel, wel een blijvende eigenaarssignatuur op het toegestane frame.
 
 > Let op: dat een mechanisme thema `systemisch` draagt zegt niets over zijn `aard`. `eigendomsconcentratie`
 > is thematisch systemisch, maar elke afzonderlijke edge (DPG → Het Parool) is een lokaal eigendomsfeit —
@@ -255,12 +265,22 @@ telt een veld-instantiatie als **één gedempte bijdrage per bron** — het gewi
 gedeeld i.p.v. N losse duwen op te tellen — en telt een veld-eigenschap **niet** mee als uitgaande
 invloed (het is een node-eigenschap). Bij `exclude` (de schone dyadische graaf) vallen niveau 1 én 2
 helemaal weg. Zonder deze correctie inflateren de fan-out-edges de centraliteit van elite-knooppunten
-kunstmatig (zo wás 64% van NAVO's uitgaande invloed louter `hegemonische_naturalisatie`-waaier).
+kunstmatig (zo wás 64% van NAVO's uitgaande invloed louter `hegemonische_naturalisatie`-waaier). Een
+`indirect`-edge telt gewoon als **gerichte edge** (geen aparte behandeling) — de demping zit al in de
+lagere influence-waarde van de relatie; `aard` is orthogonaal aan het filter, dus de kleur blijft.
 
-**In de viz**: de toggle *Veld-effecten* schakelt ze aan/uit (default uit = schone graaf). Een
-veld-instantiatie verschijnt als een **gestippelde waaier zonder pijlpunt** (geen gericht kanaal); een
-veld-eigenschap als een **halo** om de getroffen node (geen edge). De node-grootte leest dan de
-`*_veld`-variant van de invloed-scores; uitgezet de schone variant.
+**In de viz** (alleen in het **theoriemodel** — in het praktijkmodel is WEF → NOS gewoon een concrete
+relatie en tekent álles als normale edge): de toggle *Indirecte & systemische effecten* schakelt alles
+wat niet `direct` is aan/uit (default uit = schone graaf; de node-grootte telt deze effecten dan niet
+mee). Een `indirect`-effect is een **gestippelde pijl mét pijlpunt** in de filterkleur, getekend in een
+achtergrondlaag **áchter** de emergente velden; een veld-instantiatie een **gestippelde waaier zonder
+pijlpunt** (geen gericht kanaal); een veld-eigenschap een **halo** om de getroffen node (geen edge).
+
+Naast deze edge-aarden kent het theoriemodel het **emergente effect als hyperedge**: een systeem-
+eigenschap die uit het samenspel van een hele *groep* rollen voortkomt en niet in één bron→doel-relatie
+te vangen is (eigen tabellen `emergent_effects` + `emergent_effect_members`; bv. *fabricage van consensus*,
+*zelfversterkende homeostase*). Het verschijnt als een transparant **goud veld** rond de leden, met label,
+hoverbaar/klikbaar (het detailpaneel toont het samenspel). Het volgt dezelfde toggle.
 
 ---
 

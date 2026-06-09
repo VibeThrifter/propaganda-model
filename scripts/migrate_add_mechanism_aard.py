@@ -42,6 +42,7 @@ VELD_INSTANTIATIE = [
     "ideologische_synchronisatie",  # elites → willekeurige elite-nodes
     "schijndebat",                  # veld-eigenschap van het debat zelf
     "omroepverzuiling",             # structurele veld-regelmaat (twijfelgeval, bewust niveau 1)
+    "stakeholder_capitalism_frame", # elite-frame → publiek; diffuse normalisatie, geen dyade
 ]
 VELD_EIGENSCHAP = [
     "zelfcensuur",                  # geen externe zender; nu kunstmatig aan de eigenaar geknoopt

@@ -49,12 +49,15 @@ CREATE TABLE mechanisms (
     source_role_id INTEGER REFERENCES roles(id),  -- welke rol oefent dit uit
     target_role_id INTEGER REFERENCES roles(id),  -- welke rol ondergaat dit
     -- Aard van het mechanisme: is een instantie ervan een echt dyadisch invloedskanaal,
-    -- of een emergente eigenschap van het systeem? Bepaalt viz én invloed-wiskunde
-    -- (zie migrate_add_mechanism_aard.py en influence.py).
+    -- een gemedieerd (indirect) kanaal, of een emergente/systemische eigenschap? Bepaalt viz
+    -- én invloed-wiskunde (zie migrate_add_mechanism_aard.py, migrate_add_indirect_aard.py en
+    -- influence.py). Visuele grammatica: pijlpunt = gericht; doorgetrokken = onmiddellijk,
+    -- gestippeld = gemedieerd/diffuus.
     aard TEXT NOT NULL DEFAULT 'direct' CHECK(aard IN (
-        'direct',             -- lokaal feit; oorzaak = de twee eindpunten (eigendom, draaideur, ...)
-        'veld_instantiatie',  -- dyade = steekproef uit een veld-regelmaat; eindpunten substitueerbaar
-        'veld_eigenschap'     -- geen zinnige externe bron; eigenschap ván de getroffen node
+        'direct',             -- lokaal feit; oorzaak = de twee eindpunten — doorgetrokken pijl (eigendom, draaideur, ...)
+        'indirect',           -- gericht maar GEMEDIEERD (A→B via tussen-nodes) — gestippelde pijl mét punt, filterkleur, achtergrondlaag
+        'veld_instantiatie',  -- dyade = steekproef uit een veld-regelmaat; eindpunten substitueerbaar — gestippelde waaier zónder punt
+        'veld_eigenschap'     -- geen zinnige externe bron; eigenschap ván de getroffen node — halo
     ))
 );
 
@@ -73,7 +76,7 @@ CREATE TABLE mechanism_themes (
     mechanism_id INTEGER NOT NULL REFERENCES mechanisms(id) ON DELETE CASCADE,
     theme TEXT NOT NULL CHECK(theme IN (
         'draaideur', 'elite_netwerk', 'geldstromen', 'platform',
-        'systemisch', 'omroepbestel', 'kennis_expertise'
+        'systemisch', 'omroepbestel', 'kennis_expertise', 'benoemingsketen'
     )),
     PRIMARY KEY (mechanism_id, theme)
 );

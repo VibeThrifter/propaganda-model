@@ -43,6 +43,11 @@ EXCLUDED_TYPES = frozenset({"oppositie"})  # tegenmacht: geen invloedskanaal
 # invloed-wiskunde telt. Zie migrate_add_mechanism_aard.py voor de driedeling.
 FIELD_INSTANTIATION = "veld_instantiatie"  # niveau 1: dyade = steekproef uit een veld-regelmaat
 FIELD_PROPERTY = "veld_eigenschap"         # niveau 2: geen echte bron; eigenschap ván de node
+# 'indirect' is GEEN veld-effect: het is een echt gericht, maar gemedieerd kanaal (A→B via
+# tussen-nodes). Het telt hier daarom als gewone gerichte edge — de demping zit al in de
+# (lagere) influence-waarde van de relatie. Geen aparte behandeling in build_adjacency nodig;
+# het valt vanzelf in de 'else' (niet FIELD_PROPERTY, niet FIELD_INSTANTIATION). Alleen de viz
+# tekent het anders (gestippelde achtergrondpijl mét punt). Zie migrate_add_indirect_aard.py.
 
 # Hoe veld-effecten meetellen in de centraliteit:
 #   'full'     — alles op volle sterkte (legacy/pad-tracering; negeert aard).
