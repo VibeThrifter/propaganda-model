@@ -557,21 +557,19 @@ body {
     <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
   </div>
   <div class="panel-section" id="fieldSection">
-    <h3>Indirecte &amp; systemische effecten</h3>
+    <h3>Systemische effecten</h3>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
       <input type="checkbox" id="fieldToggle">
-      <span>Toon indirecte &amp; systemische effecten</span>
+      <span>Toon systemische effecten</span>
     </label>
     <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">
-      Alles wat géén direct dyadisch feit is. <b>Gericht maar gemedieerd</b> (via tussen-nodes):
-      een <span style="color:var(--text)">gestippelde pijl mét punt</span> in de filterkleur, als
-      achtergrondlaag (indirect — bv. STAK ⇢ Raad van Commissarissen). <b>Diffuus, géén gericht
-      kanaal</b>: <span style="color:#9b8cc4">gestippelde waaiers</span> (veld-instantiatie — bv.
-      hegemonische naturalisatie) en <span style="color:#9b8cc4">halo's</span> (veld-eigenschap — bv.
-      zelfcensuur). En de <span style="color:#e3b341">emergente velden</span> — een transparant veld
-      rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van
-      consensus); klik erop voor het samenspel. Uit = schone dyadische graaf; de node-grootte telt
-      deze effecten dan niet mee.
+      Alles wat géén direct dyadisch feit is. <b>Diffuus, géén gericht kanaal</b>:
+      <span style="color:#9b8cc4">halo's</span> rond een node die een systeemeigenschap ondergáát
+      (veld-eigenschap — bv. zelfcensuur, emergente bias). En de
+      <span style="color:#e3b341">emergente velden</span> — een transparant veld rond een gróép
+      rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus);
+      klik erop voor het samenspel. Uit = schone dyadische graaf; de node-grootte telt deze
+      effecten dan niet mee.
     </div>
   </div>
   <div class="panel-section" id="legendSection">
@@ -1327,13 +1325,8 @@ function buildGraph() {
     .force('y', d3.forceY(height / 2).strength(0.04))
     .alphaDecay(isTheory ? 0.015 : 0.02);
 
-  // Indirecte (gemedieerde) pijlen — ACHTERGRONDLAAG, aangemaakt vóór de gouden velden zodat ze
-  // erachter liggen. De paths zelf blijven in de hoofd-linkselectie (data-indices intact voor
-  // applyFilters); we VERHUIZEN ze straks alleen naar deze groep (alleen de DOM-ouder verschuift).
-  const indirectBackGroup = g.append('g').attr('class', 'indirect-links');
-
-  // Emergente-effect-velden — achtergrondveld onder de directe edges/nodes (maar boven de
-  // indirecte achtergrondlaag). Hyperedge over een groep rollen; geen pijl. Theorie + toggle aan.
+  // Emergente-effect-velden — achtergrondveld onder de directe edges/nodes.
+  // Hyperedge over een groep rollen; geen pijl. Theorie + toggle aan.
   const emergentGroup = g.append('g').attr('class', 'emergent-fields');
   const effects = (state.model === 'theory') ? (DATA.emergent_effects || []) : [];
   emergentHullElements = emergentGroup.selectAll('path.emergent-hull').data(effects).join('path')
@@ -1376,18 +1369,10 @@ function buildGraph() {
   const linkGroup = g.append('g').attr('class', 'links');
   linkElements = linkGroup.selectAll('path').data(links).join('path')
     .attr('fill', 'none')
-    .attr('stroke', d => isFieldInstantiation(d) ? FIELD_FAN_COLOR : getLinkColor(d, isTheory))
-    // Veld-instantiatie = diffuse waaier: gestippeld + geen pijlpunt (geen gericht kanaal), maar
-    // wél fel/dik genoeg om in de drukke graaf op te vallen.
-    .attr('stroke-dasharray', d => isFieldInstantiation(d) ? '5,4' : (isIndirect(d) ? '4,3' : null))
-    .attr('stroke-width', d => isFieldInstantiation(d) ? 2.4 : (isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5))
+    .attr('stroke', d => getLinkColor(d, isTheory))
+    .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
     .attr('stroke-opacity', d => linkBaseOpacity(d, isTheory))
     .attr('marker-end', d => markerFor(d, isTheory));
-
-  // Verhuis de indirecte pijlen naar de achtergrondgroep (áchter de gouden velden). 'linkElements'
-  // en haar data-indices blijven ongewijzigd — applyFilters (op positie-index) en de tick blijven
-  // dus correct; alleen de DOM-ouder verschuift. In de praktijk (isIndirect=false) gebeurt niets.
-  linkElements.filter(d => isIndirect(d)).each(function () { indirectBackGroup.node().appendChild(this); });
 
   // Invisible wider hit-area for clicking on edges
   const linkHitGroup = g.append('g').attr('class', 'link-hits');
@@ -1554,15 +1539,11 @@ function buildGraph() {
 // ============================================================
 // HELPERS
 // ============================================================
-// ── Indirecte & systemische effecten (mechanisms.aard) ──
-// Niet elke edge is een direct dyadisch kanaal. Drie niet-directe aarden, samen onder de toggle
-// state.showFieldEffects (default uit = schone dyadische graaf):
-//   indirect          — gericht maar gemedieerd (STAK ⇢ RvC); gestippelde pijl MÉT punt, in de
-//                        filterkleur, getekend in de achtergrondgroep áchter de gouden velden.
-//   veld_instantiatie — diffuse waaier (WEF/NAVO → uitlaten); gestippeld, GEEN pijl.
+// ── Systemische effecten (mechanisms.aard) ──
+// Niet elke edge is een direct dyadisch kanaal. Naast 'direct' is er nog één niet-directe aard,
+// samen met de emergente velden onder de toggle state.showFieldEffects (default uit = schone graaf):
 //   veld_eigenschap   — geen echte bron (zelfcensuur); getekend als halo om de node.
 const FIELD_COLOR = '#9b8cc4';  // gedempt violet: "diffuus/systemisch", los van de filter-kleuren (halo's)
-const FIELD_FAN_COLOR = '#c4b6ff';  // feller violet voor de dunne gestippelde waaier-lijnen, anders gaan ze verloren
 
 // ── Emergente effecten (hyperedge over een GROEP rollen) ──
 // Een systeemeigenschap die uit het samenspel van meerdere rollen voortkomt en niet in een
@@ -1643,14 +1624,8 @@ function selectEmergent(eff) {
 // Veld-effecten (waaiers/halo's) gelden ALLEEN in het theoriemodel. In het praktijkmodel is
 // WEF → NOS gewoon een concrete relatie, geen emergent veld: daar tellen alle relaties als
 // normale edges (solide, met pijl, filterkleur). Emergentie woont in het theoriemodel (gouden velden).
-function isFieldLink(l) { return state.model === 'theory' && l.aard && l.aard !== 'direct' && l.aard !== 'indirect'; }
-function isFieldInstantiation(l) { return state.model === 'theory' && l.aard === 'veld_instantiatie'; }
+function isFieldLink(l) { return state.model === 'theory' && l.aard && l.aard !== 'direct'; }
 function isFieldProperty(l) { return state.model === 'theory' && l.aard === 'veld_eigenschap'; }
-// 'indirect' = gericht maar gemedieerd (A→B via tussen-nodes): gestippelde pijl MÉT punt, in de
-// filterkleur, als achtergrondlaag áchter de gouden velden. Hoort bij de indirecte & systemische
-// laag (zelfde toggle), maar is GEEN field-link → houdt dus zijn pijlpunt. Alleen in het
-// theoriemodel; in de praktijk een gewone edge (daar is aard niet-bepalend).
-function isIndirect(l) { return state.model === 'theory' && l.aard === 'indirect'; }
 // Node-grootte leest de schone (basis) waarde, of de _veld-variant als de toggle aan staat.
 function infVal(d, key) { return (state.showFieldEffects ? d[key + '_veld'] : d[key]) || 0; }
 
@@ -1697,8 +1672,6 @@ function computeReceivedMap() {
   const isTheory = state.model === 'theory';
   (currentLinks || []).forEach(l => {
     if (isFieldProperty(l)) return;                       // node-eigenschap, geen kanaal
-    if (isFieldInstantiation(l) && !state.showFieldEffects) return;
-    if (isIndirect(l) && !state.showFieldEffects) return; // indirect telt mee zodra de laag aan staat
     const { w, excluded, symmetric } = edgeInfluence(l, isTheory);
     if (excluded || !(w > 0)) return;
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
@@ -1729,12 +1702,8 @@ function markerFor(l, isTheory) {
   return `url(#${prefix}${color.replace('#', '')})`;
 }
 
-// Basis-opacity van een link. Veld-instantiaties (diffuse waaiers) hebben bewust een
-// minieme certainty (~0.05) — die mag hun zichtbaarheid niet bepalen, anders zijn de
-// waaiers vrijwel onzichtbaar. Vaste, gedempt-maar-leesbare waarde, los van de bewijslast.
+// Basis-opacity van een link.
 function linkBaseOpacity(l, isTheory) {
-  if (isFieldInstantiation(l)) return 0.85;
-  if (isIndirect(l)) return 0.42;   // achtergrondlaag: subtieler dan de directe structuur
   if (isTheory) return 0.5;
   return 0.15 + (l.certainty || 0.5) * 0.45;
 }
@@ -2602,10 +2571,7 @@ function computeVisibleLinks() {
   const visibleLinkSet = new Set();
   currentLinks.forEach((l, i) => {
     // Veld-eigenschap (niveau 2) is een node-eigenschap (halo), nooit een zichtbare edge.
-    // Veld-instantiatie (niveau 1, diffuse waaier) alleen tonen als de toggle aan staat.
     if (isFieldProperty(l)) return;
-    if (isFieldInstantiation(l) && !state.showFieldEffects) return;
-    if (isIndirect(l) && !state.showFieldEffects) return;   // indirecte pijlen vallen onder de toggle
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
