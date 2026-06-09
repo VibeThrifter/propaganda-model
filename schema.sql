@@ -78,6 +78,26 @@ CREATE TABLE mechanism_themes (
     PRIMARY KEY (mechanism_id, theme)
 );
 
+-- Emergente effecten als HYPEREDGE: een systeemeigenschap die uit het samenspel van
+-- MEERDERE rollen voortkomt en niet in een 1-op-1 relatie te vangen is (bv. 'fabricage
+-- van consensus'). Geen bron→doel-pijl; het effect hoort bij de hele ledengroep.
+-- Zie migrate_add_emergent_effects.py. In de viz: transparant veld rond de leden (theorie).
+CREATE TABLE emergent_effects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,            -- machine-naam, bv. 'fabricage_van_consensus'
+    label TEXT NOT NULL,                  -- weergavenaam, bv. 'Fabricage van consensus'
+    category TEXT NOT NULL DEFAULT 'systeemactor' CHECK(category IN (
+        'eigendom','advertentie','sourcing','flak','ideologie','systeemactor','overig'
+    )),
+    description TEXT NOT NULL,            -- wat is het emergente effect (uit welk samenspel)
+    effect TEXT NOT NULL                 -- gevolg voor de berichtgeving
+);
+CREATE TABLE emergent_effect_members (
+    emergent_effect_id INTEGER NOT NULL REFERENCES emergent_effects(id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES roles(id),
+    PRIMARY KEY (emergent_effect_id, role_id)
+);
+
 --------------------------------------------------------------
 -- LAAG 2: INSTANTIEMODEL (concreet, met namen)
 -- De echte entiteiten en relaties in Nederland

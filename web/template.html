@@ -541,12 +541,12 @@ body {
   <div class="panel-section" id="sliderSection">
     <h3>Drempelwaarden</h3>
     <div class="slider-row">
-      <label>Zekerheid</label>
+      <label id="certLabel">Zekerheid</label>
       <input type="range" id="certSlider" min="0" max="1" step="0.05" value="0">
       <span class="val" id="certVal">0</span>
     </div>
     <div class="slider-row">
-      <label>Invloed</label>
+      <label id="inflLabel">Invloed</label>
       <input type="range" id="inflSlider" min="0" max="1" step="0.05" value="0">
       <span class="val" id="inflVal">0</span>
     </div>
@@ -565,8 +565,10 @@ body {
     <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">
       Diffuse systeemkrachten, géén gericht kanaal: <span style="color:#9b8cc4">gestippelde waaiers</span>
       (veld-instantiatie — bv. hegemonische naturalisatie) en <span style="color:#9b8cc4">halo's</span>
-      (veld-eigenschap — bv. zelfcensuur). Uit = schone dyadische graaf; de node-grootte telt ze dan
-      niet mee (fan-out-inflatie weg).
+      (veld-eigenschap — bv. zelfcensuur). In het theoriemodel ook
+      <span style="color:#e3b341">emergente velden</span> — een transparant veld rond een gróép rollen
+      waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus); klik erop voor
+      het samenspel. Uit = schone dyadische graaf; de node-grootte telt de veld-effecten dan niet mee.
     </div>
   </div>
   <div class="panel-section" id="legendSection">
@@ -1212,6 +1214,9 @@ let linkElements = null;
 let linkHitElements = null;
 let nodeElements = null;
 let edgeLabelElements = null;
+let emergentHullElements = null;   // transparante velden rond emergente-effect-groepen (theorie)
+let emergentLabelElements = null;
+let nodeByIdGlobal = null;         // id -> node-object van de huidige graaf (voor hull-geometrie)
 
 // Hoeveel pixels de parallelle relaties tussen twee knooppunten uit elkaar buigen.
 const PARALLEL_EDGE_SPREAD = 22;
@@ -1294,6 +1299,7 @@ function buildGraph() {
 
   const nodeById = new Map();
   nodes.forEach(n => nodeById.set(n.id, n));
+  nodeByIdGlobal = nodeById;          // voor de emergente-veld-hulls (id -> node-object)
 
   currentNodes = nodes;
   currentLinks = links;
@@ -1318,15 +1324,56 @@ function buildGraph() {
     .force('y', d3.forceY(height / 2).strength(0.04))
     .alphaDecay(isTheory ? 0.015 : 0.02);
 
+  // Emergente-effect-velden — als ACHTERSTE laag (achtergrondveld onder edges/nodes).
+  // Hyperedge over een groep rollen; geen pijl. Alleen zichtbaar in theorie + toggle aan.
+  const emergentGroup = g.append('g').attr('class', 'emergent-fields');
+  const effects = (state.model === 'theory') ? (DATA.emergent_effects || []) : [];
+  emergentHullElements = emergentGroup.selectAll('path.emergent-hull').data(effects).join('path')
+    .attr('class', 'emergent-hull')
+    .attr('fill', EMERGENCE_COLOR)
+    .attr('fill-opacity', 0.10)
+    .attr('stroke', EMERGENCE_COLOR)
+    .attr('stroke-opacity', 0.55)
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '7,5')
+    .style('cursor', 'pointer')
+    .attr('opacity', 0)
+    .on('click', (event, d) => { event.stopPropagation(); selectEmergent(d); })
+    .on('mouseover', (event, d) => {
+      const tt = document.getElementById('tooltip');
+      tt.innerHTML = `<div class="tt-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
+        <div class="tt-name">${d.label}</div>
+        ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
+        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor het samenspel</div>`;
+      tt.classList.add('visible');
+    })
+    .on('mousemove', (event) => {
+      const tt = document.getElementById('tooltip');
+      tt.style.left = (event.clientX + 16) + 'px'; tt.style.top = (event.clientY - 8) + 'px';
+    })
+    .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
+  emergentLabelElements = emergentGroup.selectAll('text.emergent-label').data(effects).join('text')
+    .attr('class', 'emergent-label')
+    .attr('text-anchor', 'middle')
+    .attr('fill', EMERGENCE_COLOR)
+    .attr('font-size', '13px')
+    .attr('font-weight', '600')
+    .style('pointer-events', 'none')
+    .style('letter-spacing', '0.4px')
+    .style('text-shadow', '0 1px 6px rgba(0,0,0,0.95)')
+    .attr('opacity', 0)
+    .text(d => d.label);
+
   // Draw links (no dashed lines — timeline slider handles temporal visibility)
   const linkGroup = g.append('g').attr('class', 'links');
   linkElements = linkGroup.selectAll('path').data(links).join('path')
     .attr('fill', 'none')
-    .attr('stroke', d => isFieldInstantiation(d) ? FIELD_COLOR : getLinkColor(d, isTheory))
-    // Veld-instantiatie = diffuse waaier: gestippeld, dunner, geen pijlpunt (geen gericht kanaal).
-    .attr('stroke-dasharray', d => isFieldInstantiation(d) ? '3,4' : null)
-    .attr('stroke-width', d => isFieldInstantiation(d) ? 1.2 : (isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5))
-    .attr('stroke-opacity', d => isTheory ? 0.5 : 0.15 + (d.certainty || 0.5) * 0.45)
+    .attr('stroke', d => isFieldInstantiation(d) ? FIELD_FAN_COLOR : getLinkColor(d, isTheory))
+    // Veld-instantiatie = diffuse waaier: gestippeld + geen pijlpunt (geen gericht kanaal), maar
+    // wél fel/dik genoeg om in de drukke graaf op te vallen.
+    .attr('stroke-dasharray', d => isFieldInstantiation(d) ? '5,4' : null)
+    .attr('stroke-width', d => isFieldInstantiation(d) ? 2.4 : (isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5))
+    .attr('stroke-opacity', d => linkBaseOpacity(d, isTheory))
     .attr('marker-end', d => markerFor(d, isTheory));
 
   // Invisible wider hit-area for clicking on edges
@@ -1385,9 +1432,43 @@ function buildGraph() {
     .attr('stroke', FIELD_COLOR)
     .attr('stroke-width', 3)
     .attr('stroke-dasharray', '2,3')
-    .style('pointer-events', 'none')
+    // Klikbaar: een klik op de halo bubbelt naar de node-handler (selectNode), die in het
+    // detailpaneel toont wélke veld-eigenschap (bv. zelfcensuur) deze node ondergaat.
+    .style('pointer-events', 'all')
+    .style('cursor', 'pointer')
     .attr('r', d => fieldHaloRadius(d))
-    .attr('opacity', d => fieldHaloOpacity(d));
+    .attr('opacity', d => fieldHaloOpacity(d))
+    // Eigen, gerichte tooltip op de halo zelf: hover op de ring toont alléén het/de
+    // systeemeffect(en) (mét effecttekst), apart van de node-tooltip. Geen systeemeffect →
+    // niets doen en laten doorbubbelen naar de node-tooltip.
+    .on('mouseover', (event, d) => {
+      if (!state.showFieldEffects) return;
+      const props = nodeFieldProperties(d);
+      if (!props.length) return;
+      event.stopPropagation();
+      const tt = document.getElementById('tooltip');
+      const rows = props.map(l => {
+        const mech = l.mechanism_name || l.name || 'veld-eigenschap';
+        const detail = l.effect || l.description || '';
+        return `<div style="margin-top:3px"><span style="color:${FIELD_COLOR}">◌ ${mech}</span>${detail ? `<div class="tt-desc">${detail}</div>` : ''}</div>`;
+      }).join('');
+      tt.innerHTML = `<div class="tt-type" style="color:${FIELD_COLOR}">Emergent systeemeffect · halo</div>
+        <div class="tt-name">${d.name} ondergaat</div>
+        ${rows}
+        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor de onderbouwing</div>`;
+      tt.classList.add('visible');
+    })
+    .on('mousemove', (event, d) => {
+      if (!state.showFieldEffects || !nodeFieldProperties(d).length) return;
+      event.stopPropagation();
+      const tt = document.getElementById('tooltip');
+      tt.style.left = (event.clientX + 16) + 'px';
+      tt.style.top = (event.clientY - 8) + 'px';
+    })
+    .on('mouseout', (event, d) => {
+      if (!state.showFieldEffects || !nodeFieldProperties(d).length) return;
+      document.getElementById('tooltip').classList.remove('visible');
+    });
 
   nodeElements.append('circle')
     .attr('class', 'node-circle')
@@ -1419,6 +1500,7 @@ function buildGraph() {
         .attr('y', d => linkLabelPos(d).y - 6);
     }
     nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
+    updateEmergentFields();   // emergente velden volgen de bewegende leden
   });
 
   // Events
@@ -1434,6 +1516,7 @@ function buildGraph() {
         ${period ? `<div class="tt-desc" style="margin-bottom:4px">${period}</div>` : ''}
         ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
         ${d.examples ? `<div class="tt-desc" style="margin-top:4px"><b>Voorbeelden:</b> ${d.examples}</div>` : ''}
+        ${fieldPropertyTooltipBlock(d)}
       `;
       tooltip.classList.add('visible');
     })
@@ -1463,10 +1546,91 @@ function buildGraph() {
 //   veld_instantiatie (niveau 1) — diffuse waaier (WEF/NAVO → uitlaten); gestippeld, geen pijl.
 //   veld_eigenschap   (niveau 2) — geen echte bron (zelfcensuur); getekend als halo om de node.
 // De toggle state.showFieldEffects bepaalt of ze meedoen (default uit = schone dyadische graaf).
-const FIELD_COLOR = '#9b8cc4';  // gedempt violet: "diffuus/systemisch", los van de filter-kleuren
-function isFieldLink(l) { return l.aard && l.aard !== 'direct'; }
-function isFieldInstantiation(l) { return l.aard === 'veld_instantiatie'; }
-function isFieldProperty(l) { return l.aard === 'veld_eigenschap'; }
+const FIELD_COLOR = '#9b8cc4';  // gedempt violet: "diffuus/systemisch", los van de filter-kleuren (halo's)
+const FIELD_FAN_COLOR = '#c4b6ff';  // feller violet voor de dunne gestippelde waaier-lijnen, anders gaan ze verloren
+
+// ── Emergente effecten (hyperedge over een GROEP rollen) ──
+// Een systeemeigenschap die uit het samenspel van meerdere rollen voortkomt en niet in een
+// 1-op-1 relatie te vangen is (bv. 'fabricage van consensus'). Géén bron→doel-pijl: het effect
+// hoort bij de hele ledengroep. Alleen in het theoriemodel; getekend als transparant veld
+// (convex hull) rond de leden, met label. Volgt de veld-effecten-toggle.
+const EMERGENCE_COLOR = '#e3b341';  // warm goud: "systeem-/groepsniveau", los van filter- en veld-kleuren
+function emergentVisible() { return state.model === 'theory' && state.showFieldEffects; }
+function emergentMemberNodes(eff) {
+  if (!nodeByIdGlobal) return [];
+  return (eff.member_role_ids || []).map(id => nodeByIdGlobal.get(id)).filter(Boolean);
+}
+// Gladde, gepadde convex hull rond de leden. Elk lid wordt verbreed tot een cirkel-puntenwolk
+// zodat ook 1- en 2-lid-groepen een nette omhulling krijgen; d3.polygonHull + curve sluit het.
+function emergentHullPath(eff) {
+  const nodes = emergentMemberNodes(eff);
+  if (!nodes.length) return '';
+  const cloud = [];
+  nodes.forEach(n => {
+    const r = getRadius(n) + 30;
+    for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; cloud.push([n.x + r * Math.cos(a), n.y + r * Math.sin(a)]); }
+  });
+  const hull = d3.polygonHull(cloud);
+  if (!hull) return '';
+  return d3.line().curve(d3.curveCatmullRomClosed.alpha(0.6))(hull);
+}
+function emergentLabelPos(eff) {
+  const nodes = emergentMemberNodes(eff);
+  if (!nodes.length) return { x: 0, y: 0 };
+  return { x: d3.mean(nodes, n => n.x), y: d3.min(nodes, n => n.y - getRadius(n)) - 40 };
+}
+// Geometrie + zichtbaarheid van de emergente velden bijwerken (vanuit tick én applyFilters).
+function updateEmergentFields() {
+  if (!emergentHullElements) return;
+  const show = emergentVisible();
+  const on = d => (show && emergentMemberNodes(d).length) ? 1 : 0;
+  emergentHullElements
+    .attr('d', d => emergentHullPath(d))
+    .attr('opacity', on)
+    .style('pointer-events', d => on(d) ? 'auto' : 'none');
+  emergentLabelElements
+    .attr('x', d => emergentLabelPos(d).x)
+    .attr('y', d => emergentLabelPos(d).y)
+    .attr('opacity', d => on(d) ? 0.92 : 0);
+}
+// Detailpaneel voor een emergent effect: het samenspel, niet een edge.
+function selectEmergent(eff) {
+  state.selectedNode = null;
+  state.selectedRelation = null;
+  const content = document.getElementById('detailContent');
+  const members = (eff.member_role_ids || []).map(id => (currentNodes || []).find(n => n.id === id)).filter(Boolean);
+  let html = `
+    <div class="detail-header">
+      <div class="entity-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
+      <h2>${eff.label}</h2>
+    </div>
+    <div class="detail-description">${eff.description || ''}</div>
+    <div class="detail-section">
+      <h4>Effect op de berichtgeving</h4>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.6">${eff.effect || ''}</div>
+    </div>
+    <div class="detail-section">
+      <h4>Ontstaat uit het samenspel van (${members.length})</h4>`;
+  members.forEach(m => {
+    html += `<div class="relation-card" style="cursor:pointer" onclick="selectNode(currentNodes.find(n=>n.id===${m.id}))">
+      <div class="rel-name">${m.name}</div>
+      <div style="font-size:10px;color:var(--text-muted)">${FILTER_LABELS[m.category] || m.category}</div>
+    </div>`;
+  });
+  html += `</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:8px;font-style:italic">
+      Géén bron→doel-pijl: dit effect is een eigenschap van de hele groep, niet van een losse relatie.
+    </div>`;
+  content.innerHTML = html;
+  document.getElementById('detail').classList.add('open');
+}
+
+// Veld-effecten (waaiers/halo's) gelden ALLEEN in het theoriemodel. In het praktijkmodel is
+// WEF → NOS gewoon een concrete relatie, geen emergent veld: daar tellen alle relaties als
+// normale edges (solide, met pijl, filterkleur). Emergentie woont in het theoriemodel (gouden velden).
+function isFieldLink(l) { return state.model === 'theory' && l.aard && l.aard !== 'direct'; }
+function isFieldInstantiation(l) { return state.model === 'theory' && l.aard === 'veld_instantiatie'; }
+function isFieldProperty(l) { return state.model === 'theory' && l.aard === 'veld_eigenschap'; }
 // Node-grootte leest de schone (basis) waarde, of de _veld-variant als de toggle aan staat.
 function infVal(d, key) { return (state.showFieldEffects ? d[key + '_veld'] : d[key]) || 0; }
 
@@ -1542,6 +1706,15 @@ function markerFor(l, isTheory) {
   const color = getLinkColor(l, isTheory);
   const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
   return `url(#${prefix}${color.replace('#', '')})`;
+}
+
+// Basis-opacity van een link. Veld-instantiaties (diffuse waaiers) hebben bewust een
+// minieme certainty (~0.05) — die mag hun zichtbaarheid niet bepalen, anders zijn de
+// waaiers vrijwel onzichtbaar. Vaste, gedempt-maar-leesbare waarde, los van de bewijslast.
+function linkBaseOpacity(l, isTheory) {
+  if (isFieldInstantiation(l)) return 0.85;
+  if (isTheory) return 0.5;
+  return 0.15 + (l.certainty || 0.5) * 0.45;
 }
 
 // Halo om een node die een veld-eigenschap (niveau 2) ondergaat — alleen als de toggle aan staat.
@@ -2004,10 +2177,6 @@ function renderInfluenceSection(d) {
   const modeNote = fe
     ? 'incl. emergente veld-effecten (fan-out gedempt)'
     : 'schone dyadische graaf — veld-effecten niet meegeteld';
-  // Ondergaat deze node zelf een veld-eigenschap (bv. zelfcensuur)? Toon dat als de toggle aan staat.
-  const fieldProp = (fe && state.fieldPropertyMap && state.fieldPropertyMap.get(d.id) > 0)
-    ? `<div style="font-size:10px;color:${FIELD_COLOR};margin-top:4px">◌ Ondergaat een veld-eigenschap (diffuse systeemdruk, bv. zelfcensuur) — getekend als halo.</div>`
-    : '';
   return `<div class="detail-section">
     <h4>Invloedspositie (structureel)</h4>
     <div style="display:flex;gap:16px;margin-bottom:6px;flex-wrap:wrap">
@@ -2021,8 +2190,50 @@ function renderInfluenceSection(d) {
       directe duwkracht ${(pick('influence_direct') || 0).toFixed(1)}
     </div>
     <div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-style:italic">${modeNote}</div>
-    ${fieldProp}
     <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Klik op de node in de graaf om de downstream-invloedpaden op te lichten.</div>
+  </div>`;
+}
+
+// De veld-eigenschap(pen) die een node ondergaat (de inkomende halo-mechanismen).
+function nodeFieldProperties(d) {
+  return (currentLinks || []).filter(l => {
+    if (!isFieldProperty(l)) return false;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return tid === d.id;
+  });
+}
+// Compacte tooltip-toevoeging: zodra een node een halo heeft, het systeemeffect erbij tonen,
+// zodat hover (op de node óf de halo-ring) niet alleen de node-info laat zien.
+function fieldPropertyTooltipBlock(d) {
+  if (!state.showFieldEffects) return '';
+  const props = nodeFieldProperties(d);
+  if (!props.length) return '';
+  const rows = props.map(l => `<div style="margin-top:2px">◌ ${l.mechanism_name || l.name || 'veld-eigenschap'}</div>`).join('');
+  return `<div class="tt-desc" style="margin-top:5px;padding-top:4px;border-top:1px solid var(--border);color:${FIELD_COLOR}">Ondergaat systeemeffect (halo):${rows}</div>`;
+}
+
+// Eigen, prominente sectie voor de veld-eigenschap(pen) die een node ondergaat (de halo).
+// Bewust bovenaan het paneel — niet begraven onder de invloedscijfers — zodat ELKE halo
+// duidelijk naar zijn systeemeffect(en) wijst. Klikbaar naar de onderbouwing van het mechanisme.
+function renderFieldPropertySection(d) {
+  if (!state.showFieldEffects) return '';
+  const incoming = nodeFieldProperties(d);
+  if (!incoming.length) return '';
+  const items = incoming.map(l => {
+    const s = (typeof l.source === 'object') ? l.source
+            : (nodeByIdGlobal && nodeByIdGlobal.get(l.source)) || entityMap.get(l.source_id || l.source);
+    const srcName = s ? s.name : (l.source_name || '');
+    const mech = l.mechanism_name || l.name || 'veld-eigenschap';
+    const detail = l.effect || l.description || '';
+    return `<div class="relation-card" style="cursor:pointer;margin-top:4px" onclick="selectRelation(currentLinks.find(x=>x.id===${l.id}))">
+      <div class="rel-name" style="color:${FIELD_COLOR}">◌ ${mech}</div>
+      <div style="font-size:10px;color:var(--text-muted)">${srcName ? 'diffuse systeemdruk vanuit ' + srcName : 'diffuse systeemdruk (geen vaste bron)'}${detail ? ' — ' + detail : ''}</div>
+    </div>`;
+  }).join('');
+  return `<div class="detail-section" style="border-left:2px solid ${FIELD_COLOR};padding-left:10px">
+    <h4 style="color:${FIELD_COLOR}">◌ Emergent systeemeffect (veld-eigenschap)</h4>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Deze ${state.model === 'theory' ? 'rol' : 'node'} ondergáát diffuse systeemdruk (de halo) — geen gericht kanaal. Klik voor de onderbouwing:</div>
+    ${items}
   </div>`;
 }
 
@@ -2143,6 +2354,7 @@ function showTheoryDetail(d, content, color) {
     <div class="detail-description">${d.description || ''}</div>
   `;
 
+  html += renderFieldPropertySection(d);   // halo → systeemeffect, prominent bovenaan
   html += renderTheoryScores(d);
   html += renderInfluenceSection(d);
 
@@ -2376,7 +2588,12 @@ function computeVisibleLinks() {
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
     if (!axisPass('filter', l, isTheory)) return;   // filter-as (kan meerdere filters dragen)
     if (!axisPass('theme', l, isTheory)) return;    // thema-as (dwarsverbanden)
-    if (!isTheory) {
+    // Drempels werken in beide modellen, op model-eigen velden:
+    //   instantie: zekerheid (certainty) + invloed (influence) — plus tijdlijn.
+    //   theorie:   geloofwaardigheid (bewijslast) + sterkte (theorie-score).
+    if (isTheory) {
+      if ((l.geloofwaardigheid||0) < cf || (l.sterkte||0) < inf) return;
+    } else {
       if ((l.certainty||0) < cf || (l.influence||0) < inf) return;
       if (!isActiveAt(l, year)) return;
     }
@@ -2435,11 +2652,7 @@ function applyFilters() {
 
   // Step 5: Apply visibility to links — including marker-end
   linkElements
-    .attr('stroke-opacity', (l, i) => {
-      if (!visibleLinkSet.has(i)) return 0;
-      if (isTheory) return 0.5;
-      return 0.15 + (l.certainty||0.5) * 0.45;
-    })
+    .attr('stroke-opacity', (l, i) => visibleLinkSet.has(i) ? linkBaseOpacity(l, isTheory) : 0)
     .attr('marker-end', (l, i) => visibleLinkSet.has(i) ? markerFor(l, isTheory) : 'none');
 
   // Verborgen links niet hoverbaar: tooltip-handlers zitten op de hit-lijnen,
@@ -2453,6 +2666,8 @@ function applyFilters() {
       .attr('opacity', (l, i) => visibleLinkSet.has(i) ? 1 : 0)
       .style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
   }
+
+  updateEmergentFields();   // emergente velden tonen/verbergen (theorie + toggle)
 
   // Stats — count only visible
   const nodeLabel = isTheory ? 'rollen' : 'entiteiten';
@@ -2478,9 +2693,16 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
 
     // Show/hide instance-specific controls
     const isTheory = state.model === 'theory';
-    document.getElementById('sliderSection').style.display = isTheory ? 'none' : '';
+    configureSliders(isTheory);     // drempels werken in beide modellen, op model-eigen velden
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
     document.getElementById('timelineSection').style.display = isTheory ? 'none' : '';
+    // Veld-effecten bestaan alleen in het theoriemodel; in het praktijkmodel verbergen we de
+    // toggle en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
+    document.getElementById('fieldSection').style.display = isTheory ? '' : 'none';
+    if (!isTheory) {
+      state.showFieldEffects = false;
+      document.getElementById('fieldToggle').checked = false;
+    }
 
     rebuildChips();                 // edge-categorieën verschillen per model
     populateSizeMetricOptions();    // sommige maten zijn model-specifiek
@@ -2645,6 +2867,21 @@ document.querySelectorAll('#viewToggle button').forEach(btn => {
 });
 
 // Sliders
+// De drempel-sliders gelden in beide modellen, maar op model-eigen velden (zie computeVisibleLinks):
+//   instantie: Zekerheid (certainty) + Invloed (influence)
+//   theorie:   Geloofwaardigheid (bewijslast) + Sterkte (theorie-score)
+// Bij een modelwissel verschillen de velden én hun bereik, dus de drempels terug naar 0.
+function configureSliders(isTheory) {
+  document.getElementById('certLabel').textContent = isTheory ? 'Geloofwaardigheid' : 'Zekerheid';
+  document.getElementById('inflLabel').textContent = isTheory ? 'Sterkte' : 'Invloed';
+  state.certMin = 0;
+  state.inflMin = 0;
+  document.getElementById('certSlider').value = 0;
+  document.getElementById('inflSlider').value = 0;
+  document.getElementById('certVal').textContent = '0';
+  document.getElementById('inflVal').textContent = '0';
+}
+
 document.getElementById('certSlider').addEventListener('input', e => {
   state.certMin = parseFloat(e.target.value);
   document.getElementById('certVal').textContent = state.certMin.toFixed(2);
@@ -3228,6 +3465,8 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 // ============================================================
 initTimeline();
 populateSizeMetricOptions();
+// Veld-effecten-toggle alleen tonen in het theoriemodel (default-model = praktijk → verborgen).
+document.getElementById('fieldSection').style.display = (state.model === 'theory') ? '' : 'none';
 buildGraph();
 renderLegend();
 

@@ -68,6 +68,23 @@ def export_data():
         m['filters'] = [m['filter']] + [f for f in fs if f != m['filter']]
         m['themes'] = sorted(mech_themes.get(m['id'], []))
 
+    # Emergente effecten (hyperedge): een systeemeigenschap over MEERDERE rollen.
+    # Optioneel — oudere DB's zonder de tabel leveren simpelweg een lege lijst.
+    emergent_effects = []
+    have_emergent = cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='emergent_effects'"
+    ).fetchone()
+    if have_emergent:
+        cur.execute("SELECT id, name, label, category, description, effect FROM emergent_effects")
+        emergent_effects = [dict(row) for row in cur.fetchall()]
+        members = {}
+        for eid, rid in cur.execute(
+            "SELECT emergent_effect_id, role_id FROM emergent_effect_members"
+        ):
+            members.setdefault(eid, []).append(rid)
+        for e in emergent_effects:
+            e['member_role_ids'] = members.get(e['id'], [])
+
     # Arguments: volledige discussiebomen
     cur.execute("""
         SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.parent_argument_id,
@@ -166,6 +183,7 @@ def export_data():
         'relations': relations,
         'roles': roles,
         'mechanisms': mechanisms,
+        'emergent_effects': emergent_effects,
         'arguments': arguments,
         'citations': citations,
         'instantiations': instantiations,
