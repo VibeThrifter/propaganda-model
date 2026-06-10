@@ -31103,6 +31103,7 @@ let state = {
   showFieldEffects: false,     // emergente velden (goud, groeps-hyperedges) tonen? Default schoon.
   emergentSelection: new Set(),// geïsoleerde velden (chip-klik); leeg = alle velden als vage contour
   emergentHover: null,         // veld-id onder de cursor (chip of hull) — licht tijdelijk op
+  emergentActive: null,        // aangeklikt veld — blijft opgelicht zolang zijn detailpaneel open is
   showHalos: false,            // halo's (veld-eigenschappen, violet) tonen? Default schoon.
   showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
@@ -31638,7 +31639,8 @@ function updateEmergentFields() {
   // De toggle is leidend: staat hij uit, dan ook geen velden bij een actieve selectie.
   const show = emergentVisible();
   const on = d => (show && emergentMemberNodes(d).length) ? 1 : 0;
-  const lit = d => state.emergentSelection.has(d.id) || state.emergentHover === d.id;
+  const lit = d => state.emergentSelection.has(d.id) || state.emergentHover === d.id
+                || state.emergentActive === d.id;
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
     .attr('opacity', on)
@@ -31713,6 +31715,10 @@ function hoverEmergentAt(event, fallback) {
 function selectEmergent(eff) {
   state.selectedNode = null;
   state.selectedRelation = null;
+  // Houd het aangeklikte veld opgelicht terwijl het detailpaneel gelezen wordt,
+  // alsof de cursor er nog boven hangt; gaat pas uit bij een andere selectie/sluiten.
+  state.emergentActive = eff.id;
+  updateEmergentFields();
   const members = (eff.member_role_ids || []).map(id => (currentNodes || []).find(n => n.id === id)).filter(Boolean);
   let html = `
     <div class="detail-header">
@@ -31997,6 +32003,8 @@ function openTimespanForm(idField, id, property, slotId) {
 function selectRelation(r) {
   state.selectedRelation = r;
   state.selectedNode = null;
+  state.emergentActive = null;   // paneel toont nu iets anders dan het veld
+  updateEmergentFields();
   clearDerivedLinks();
   const panel = document.getElementById('detail');
   const content = document.getElementById('detailContent');
@@ -32391,6 +32399,8 @@ function hopInfo(l, isTheory) {
 function selectDerivedPath(dd) {
   if (!dd) return;
   state.activeDerivedPath = dd;
+  state.emergentActive = null;   // paneel toont nu iets anders dan het veld
+  updateEmergentFields();
   const isTheory = state.model === 'theory';
   const pct = v => Math.round((v || 0) * 100);
   updateDerivedLinks([dd]);   // toon alleen deze pijl zolang het pad open staat
@@ -32560,6 +32570,7 @@ function updateDerivedLinks(data) {
 function selectNode(d) {
   state.selectedNode = d;
   state.selectedRelation = null;
+  state.emergentActive = null;   // paneel toont nu een node, niet meer het veld
   const isTheory = state.model === 'theory';
   clearDerivedLinks();
 
@@ -32648,6 +32659,7 @@ function selectNode(d) {
 function deselectNode() {
   state.selectedNode = null;
   state.selectedRelation = null;
+  state.emergentActive = null;   // paneel dicht/weg = veld-oplichting weer uit
   // Re-apply filters so timeline visibility is respected
   applyFilters();
   document.getElementById('detail').classList.remove('open');
