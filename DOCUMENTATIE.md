@@ -78,7 +78,7 @@ Naast deze principalen gelden officiële instituties zelf als gezaghebbende rout
 Een grensgeval tussen Sourcing en Flak is `inlichtingen_cooptatie`: een inlichtingendienst (AIVD/MIVD) werft journalisten als bron of agent. Gedocumenteerd door NRC/de Volkskrant (2024) — van 32 benaderde redacteuren/correspondenten meldde ~de helft een verzoek; een intern AIVD-document noemde 8 journalisten onder 21 "bronnen en agenten". Het compromitteert de onafhankelijkheid van de bronvergaarder (Sourcing) en ondermijnt de geloofwaardigheid van het vak (Flak). Dit is geen emergent veld-effect maar een *bewezen, doelgerichte* ingreep — en hoort daarom expliciet in het model. (Op instantieniveau is bewust nog géén specifieke dienst→journalist-relatie opgenomen: *dát* een dienst journalisten werft is bewezen, *welke* dienst wie benaderde niet — het praktijkmodel wacht op een gedocumenteerd, specifiek geval. Zo kan het theoretische model wél een verband met geheime diensten dragen terwijl de praktijklaag leeg blijft tot het bewijs er is.)
 
 **Rollen:** `persbureau`, `journalist`, `voorlichter`, `lobbyist`, `denktank`, `belanghebbende`, `gezagsinstituut`, `gezagsexpert`
-**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `klantvraag_persbureau`, `verifieerbaarheidsroutine`, `expert_framing`, `pr_subsidie`, `haagse_stam`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_financiering_bias`, `denktank_levert_expert`, `denktank_naar_politiek`, `denktank_naar_persbureau`, `woo_obstructie`, `draaideur_politiek_institutie`, `inlichtingen_cooptatie`
+**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `klantvraag_persbureau`, `verifieerbaarheidsroutine`, `expert_framing`, `pr_subsidie`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_financiering_bias`, `denktank_levert_expert`, `denktank_naar_politiek`, `denktank_naar_persbureau`, `woo_obstructie`, `draaideur_politiek_institutie`, `inlichtingen_cooptatie`
 
 ### Filter 4: Flak
 Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur. De hedendaagse *cancelling* — een gast die iets onwelgevalligs zegt en niet meer wordt uitgenodigd — valt hier onder via `deplatforming`. Het uiterste van het flak-spectrum is fysiek én online `geweld_intimidatie` tegen journalisten; de bron daarvan is bewust diffuus gelaten (geen vaste principaal), passend bij het emergente — niet samenzweerderige — karakter van dát mechanisme. Externe flak en interne redactiecultuur versterken elkaar bovendien in een vicieuze cirkel — empirisch gedocumenteerd door PersVeilig/I&O (2021: 8 op de 10 journalisten ervaart agressie of bedreiging, 16% past de berichtgeving aan, ±15% publiceert soms niet) — gemodelleerd als emergent effect `verkillingsspiraal`: het collectieve chilling effect dat de individuele zelfcensuur-halo overstijgt.
@@ -92,7 +92,7 @@ Niet álle flak is echter diffuus: een hedendaagse, *wél* doelgerichte en gedoc
 Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid: ze socialiseren de journalisten (`academische_socialisatie`) én leveren de `gezagsexpert`s (`academische_autoriteit`). Doordat journalist én "onafhankelijke" bron uit dezelfde instituten komen, ontstaat **ideologische homofilie** — empirisch zichtbaar in de sterk afwijkende stemvoorkeur van NL-journalisten (D66/GroenLinks fors oververtegenwoordigd t.o.v. de bevolking; parlementair journalisten: D66 27% vs. 9% landelijk, 'Haagse waakhonden') — gemodelleerd als het gelijknamige emergente effect `ideologische_homofilie`. De hegemonie-*reproductie* reikt verder dan de media: het `kennisinstituut` vormt de hele hoogopgeleide elite die álle instituties bevolkt (Bovens & Wille, *diplomademocratie*) — politici (`academische_socialisatie_politiek`), denktanks (`academische_orthodoxie_denktank`), de "primaire definieerders" als CPB/DNB (`academische_orthodoxie_instituut`) en opiniemakers (`academische_vorming_opinie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
 
 **Rollen:** `elite_forum`, `columnist_opiniemaker`, `kennisinstituut`
-**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`, `publieksfragmentatie`
+**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`, `publieksfragmentatie`
 
 <a id="themas-dwarsverbanden"></a>
 ### Thema's: dwarsverbanden
@@ -251,7 +251,7 @@ levende aarden, met de visuele grammatica **pijlpunt = gericht, doorgetrokken = 
 | aard | betekenis | toets | render | voorbeeld |
 |---|---|---|---|---|
 | `direct` | lokaal feit; de oorzaak ís de twee eindpunten — óók als de invloed gemedieerd of onzeker is (mediatie → de keten; twijfel → de `certainty`-score) | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt, filterkleur | DPG → Het Parool (eigendom); Bilderberg → mediabestuurder (`ideologische_synchronisatie`, cert ≈ 0,05) |
-| `veld_eigenschap` | er ís geen zinnige externe bron; een eigenschap *ván* de getroffen node (die de node *ondergaat*) | wie is de bron? niemand specifieks | **halo** om de node (geen edge); bron-rol mag `NULL` zijn of de diffuse herkomst aanduiden | `zelfcensuur`, `sociologische_homogeniteit` (homogene redactie → blinde vlekken), `geweld_intimidatie`, `elite_referentiekader` (media opereren binnen het elite-frame; herkomst diffuus — er is geen handeling van forum naar redactie) |
+| `veld_eigenschap` | een staande *toestand* ván de getroffen node (die de node *ondergaat*); oorzaken bestaan wél, maar zijn diffuus/overgedetermineerd — er is geen toerekenbare levende zender, en de toestand blijft werken zonder levende input | wie is de zénder (niet: de oorzaak)? niemand specifieks — én: bevries alle andere nodes; werkt het effect morgen nog door? (zelfcensuur: ja; eigenaarsinvloed via de hoofdredacteur: nee, die heeft de levende keten nodig) | **halo** om de node (geen edge); bron-rol mag `NULL` zijn of de diffuse herkomst aanduiden | `zelfcensuur`, `sociologische_homogeniteit` (homogene redactie → blinde vlekken), `geweld_intimidatie`, `elite_referentiekader` (media opereren binnen het elite-frame; herkomst diffuus — er is geen handeling van forum naar redactie) |
 
 > Let op: dat een mechanisme thema `systemisch` draagt zegt niets over zijn `aard`. `eigendomsconcentratie`
 > is thematisch systemisch, maar elke afzonderlijke edge (DPG → Het Parool) is een lokaal eigendomsfeit —
@@ -271,24 +271,31 @@ levende aarden, met de visuele grammatica **pijlpunt = gericht, doorgetrokken = 
 Beide blijven geldig in de `CHECK` (voor migratie-replay) maar tekenen, indien gezet, gewoon als directe edge.
 
 **Effect op de wiskunde** (`influence.py`, parameter `field_mode`): een `veld_eigenschap` telt **niet** mee
-als uitgaande invloed (het is een node-eigenschap, geen kanaal); bij `exclude` (de schone dyadische graaf)
+als uitgaande invloed (het is een node-eigenschap, geen kanaal) — en hoort ook niet als inkomende edge
+gemodelleerd te worden: de oorzaken van de toestand (flak, eigendomsdruk, carrièreprikkels) hebben al hun
+eigen directe edges in de graaf, en hun invloed-scores worden geschat op een effect dat juist vía de
+internalisering loopt. De halo daarnaast als kanaal tellen zou dezelfde causale kracht dubbel tellen;
+de halo is de *neerslag en versterker* van edges die er al zijn, geen extra kanaal; bij `exclude` (de schone dyadische graaf)
 valt ze helemaal weg. De `collapse`-correctie voor veld-instantiatie-waaiers (één gedempte bijdrage per bron,
 gewicht gedeeld door de fan-out `k`) bestaat nog in de code maar staat inactief — er zijn geen waaiers meer;
 ze voorkwam dat fan-out-edges de centraliteit van elite-knooppunten kunstmatig inflateerden. `aard` is
 orthogonaal aan het filter, dus de kleur (het filter) blijft.
 
-**In de viz** (alleen in het **theoriemodel** — in het praktijkmodel is WEF → NOS gewoon een concrete relatie
-en tekent álles als normale edge): de toggle *Systemische effecten* schakelt alles wat niet `direct` is
-aan/uit (default uit = schone graaf; de node-grootte telt deze effecten dan niet mee). Wat er nog onder valt:
-de **veld-eigenschap-halo's** (een ring om de getroffen node) en het emergente effect hieronder.
+**In de viz**: het paneel *Systemische effecten* heeft aparte toggles per laag — **emergente velden**
+(goud) en **halo's** (ring om de getroffen node; schakelt ook de node-grootte naar de veld-variant) gelden
+alleen in het **theoriemodel** (in het praktijkmodel is WEF → NOS gewoon een concrete relatie en tekent
+álles als normale edge); **afgeleide pijlen** en **directe pijlen** werken in beide modellen. Default staat
+alleen *directe pijlen* aan (schone graaf).
 
 Naast deze edge-aarden kent het theoriemodel het **emergente effect als hyperedge**: een systeem-
 eigenschap die uit het samenspel van een hele *groep* rollen voortkomt en niet in één bron→doel-relatie
 te vangen is (eigen tabellen `emergent_effects` + `emergent_effect_members`; bv. *fabricage van consensus*,
-*zelfversterkende homeostase*). Het verschijnt als een transparant **goud veld** rond de leden, met label,
-hoverbaar/klikbaar (het detailpaneel toont het samenspel). Het volgt dezelfde toggle.
+*zelfversterkende homeostase*). Ook **terugkoppellussen tussen meerdere rollen** horen hier (medialogica,
+verkillingsspiraal, economische feedback-loop): een lus is geen toestand van één node en geen gerichte
+dyade — elke schakel is tegelijk oorzaak en gevolg. Het verschijnt als een transparant **goud veld** rond
+de leden, met label, hoverbaar/klikbaar (het detailpaneel toont het samenspel).
 
-De elf emergente effecten, met de literatuur die de compositie benoemt:
+De twaalf emergente effecten, met de literatuur die de compositie benoemt:
 
 | effect | kern | literatuur |
 |---|---|---|
@@ -303,6 +310,7 @@ De elf emergente effecten, met de literatuur die de compositie benoemt:
 | `medialogica` | wurggreep politiek↔media; incidenten verdringen inhoud (gevangenendilemma) | RMO (2003) |
 | `verkillingsspiraal` | extern flak ↔ intern conformisme; collectief chilling effect | PersVeilig/I&O (2021) |
 | `voorlichtingsovermacht` | ±150.000 communicatieprofessionals vs. ±15.000 journalisten | UvA/CBS (via Villamedia 2018) |
+| `economische_feedback_loop` | dalend vertrouwen → minder abonnees → bezuinigingen → slechtere journalistiek → nog minder vertrouwen | systeemtheorie-duiding (nieuwsmijding verhoogt de financiële druk) |
 
 ### Afgeleide (indirecte) pijlen & padclaims
 
@@ -592,14 +600,14 @@ ORDER BY s.author;
 | Onderdeel | Aantal |
 |---|---|
 | Rollen (theoretisch) | 35 |
-| Mechanismen (theoretisch) | 122 |
-| Emergente effecten (hyperedges) | 11 |
-| Entiteiten (concreet) | 154 |
-| Relaties (concreet) | 383 |
-| Argumenten | 392 |
-| Citaties | 108 |
-| Bronnen | 33 |
-| Bronlocaties | 25 |
+| Mechanismen (theoretisch) | 118 |
+| Emergente effecten (hyperedges) | 12 |
+| Entiteiten (concreet) | 158 |
+| Relaties (concreet) | 387 |
+| Argumenten | 402 |
+| Citaties | 129 |
+| Bronnen | 45 |
+| Bronlocaties | 37 |
 
 > Let op: de meeste argumenten zijn automatisch gegenereerde `supporting`-onderbouwingen met status `ongecontroleerd` en nog grotendeels zonder citatie. Het aanvullen van citaties en het controleren van argumentstatus is openstaand werk.
 
