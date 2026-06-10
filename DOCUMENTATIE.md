@@ -103,7 +103,7 @@ De **draaideur** illustreert het principe: personeel circuleert tussen politiek,
 De zeven thema's:
 
 - **Draaideur** — circulatie van personeel/macht (politicus → bedrijfsleven/lobby/toezicht/hoofdredactie, journalist ↔ politiek).
-- **Elite-netwerk** — synchronisatie van wereldbeeld in elite-fora (Bilderberg/WEF/ERT); combinatie van lobby (Sourcing) en Ideologie.
+- **Elite-netwerk** — synchronisatie van wereldbeeld in elite-fora (Bilderberg/WEF/ERT); combinatie van lobby (Sourcing) en Ideologie. Zeldzaam publiek spoor: de VN-herstelterm "build back better" (Sendai-raamwerk, 2015) werd na WEF- en OESO-publicaties van begin juni 2020 binnen maanden de herstelslogan van meerdere westerse regeringsleiders — gedocumenteerde vocabulaire-convergentie via gedeelde circuits, geen bewijs van regie (zie de argumenten bij `ideologische_synchronisatie`).
 - **Geldstromen** — agenda-gebonden geld dat buiten eigendom én advertentie om naar partij of titel stroomt (partij-/mediafinanciering, groeileningen, platformfinanciering), plus de neutrale tegenpool `projectfinanciering_journalistiek`.
 - **Platform/digitaal** — techplatforms en algoritmes (filtering, socialisatie, verdienmodeldruk, advertentieconcentratie).
 - **Systemisch** — emergente, zelfversterkende systeemkenmerken (eigendomsconcentratie, economische terugkoppeling, emergente bias, homeostase).
