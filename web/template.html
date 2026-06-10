@@ -294,6 +294,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
   fill: var(--text-muted);
   text-anchor: middle;
   pointer-events: none;
+  user-select: none;
   text-shadow: 0 0 6px var(--bg), 0 0 3px var(--bg);
 }
 
@@ -3258,10 +3259,10 @@ function applyFilters() {
     linkHitElements.style('pointer-events', (l, i) => drawL(i) ? 'auto' : 'none');
   }
 
+  // Labels blijven muis-transparant (CSS pointer-events: none): de tooltip
+  // hoort bij de hit-lijn erónder, ook als die onder een label doorloopt.
   if (edgeLabelElements) {
-    edgeLabelElements
-      .attr('opacity', (l, i) => drawL(i) ? 1 : 0)
-      .style('pointer-events', (l, i) => drawL(i) ? 'auto' : 'none');
+    edgeLabelElements.attr('opacity', (l, i) => drawL(i) ? 1 : 0);
   }
 
   updateEmergentFields();   // emergente velden tonen/verbergen (theorie + toggle)
