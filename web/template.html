@@ -1663,16 +1663,9 @@ function emergentLabelPos(eff) {
 // Geometrie + zichtbaarheid van de emergente velden bijwerken (vanuit tick én applyFilters).
 function updateEmergentFields() {
   if (!emergentHullElements) return;
+  // De toggle is leidend: staat hij uit, dan ook geen velden bij een actieve selectie.
   const show = emergentVisible();
-  // Bij een actieve selectie lichten ook zonder toggle de velden op waarvan de
-  // geselecteerde node lid is — zo is bv. de lobby-makelaardij-driehoek direct
-  // zichtbaar wanneer je de belanghebbende aanklikt.
-  const selId = (state.model === 'theory' && state.selectedNode) ? state.selectedNode.id : null;
-  const on = d => {
-    if (!emergentMemberNodes(d).length) return 0;
-    if (show) return 1;
-    return (selId != null && (d.member_role_ids || []).includes(selId)) ? 1 : 0;
-  };
+  const on = d => (show && emergentMemberNodes(d).length) ? 1 : 0;
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
     .attr('opacity', on)
