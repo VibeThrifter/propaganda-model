@@ -575,12 +575,20 @@ details.detail-section > .sec-body { margin-top: 8px; }
   </div>
   <div class="panel-section" id="fieldSection">
     <h3>Systemische effecten</h3>
-    <label id="fieldToggleRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
-           title="Alles wat géén direct dyadisch feit is. Diffuus, géén gericht kanaal: halo's rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias), en de emergente velden — een transparant veld rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus); klik erop voor het samenspel. Uit = schone dyadische graaf; de node-grootte telt deze effecten dan niet mee.">
-      <input type="checkbox" id="fieldToggle">
-      <span>Velden &amp; halo's</span>
-      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
-    </label>
+    <div id="fieldToggleRow">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
+             title="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel.">
+        <input type="checkbox" id="fieldToggle">
+        <span>Emergente velden</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
+             title="Violette ringen rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias). Diffuus, géén gericht kanaal. Aan = de node-grootte telt deze veld-effecten mee; uit = schone dyadische maat.">
+        <input type="checkbox" id="haloToggle">
+        <span>Halo's (veld-eigenschappen)</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+    </div>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
            title="Bij selectie berekende ≥2-hops-routes (violet, gestippeld): de sterkste onderbouwde keten van bron naar doel, getoetst aan de drie poorten (schakelscore, schakelargumenten, padclaim).">
       <input type="checkbox" id="derivedToggle" checked>
@@ -30786,7 +30794,8 @@ let state = {
   legendSelection: new Set(),  // leeg = alles tonen; anders alleen geselecteerde legenda-keys
   sizeMetric: 'influence_direct',  // welke maat de node-grootte bepaalt (zie SIZE_METRICS)
   receivedMap: null,           // entity/rol-id -> som inkomende invloed (per buildGraph)
-  showFieldEffects: false,     // emergente veld-effecten (aard != direct) tonen? Default schoon.
+  showFieldEffects: false,     // emergente velden (goud, groeps-hyperedges) tonen? Default schoon.
+  showHalos: false,            // halo's (veld-eigenschappen, violet) tonen? Default schoon.
   showDerived: true,           // afgeleide (indirecte) pijlen bij selectie tonen?
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
   fieldPropertyMap: null,      // node-id -> max inkomende veld-eigenschap-influence (halo-intensiteit)
@@ -31162,7 +31171,7 @@ function buildGraph() {
     // systeemeffect(en) (mét effecttekst), apart van de node-tooltip. Geen systeemeffect →
     // niets doen en laten doorbubbelen naar de node-tooltip.
     .on('mouseover', (event, d) => {
-      if (!state.showFieldEffects) return;
+      if (!state.showHalos) return;
       const props = nodeFieldProperties(d);
       if (!props.length) return;
       event.stopPropagation();
@@ -31179,14 +31188,14 @@ function buildGraph() {
       tt.classList.add('visible');
     })
     .on('mousemove', (event, d) => {
-      if (!state.showFieldEffects || !nodeFieldProperties(d).length) return;
+      if (!state.showHalos || !nodeFieldProperties(d).length) return;
       event.stopPropagation();
       const tt = document.getElementById('tooltip');
       tt.style.left = (event.clientX + 16) + 'px';
       tt.style.top = (event.clientY - 8) + 'px';
     })
     .on('mouseout', (event, d) => {
-      if (!state.showFieldEffects || !nodeFieldProperties(d).length) return;
+      if (!state.showHalos || !nodeFieldProperties(d).length) return;
       document.getElementById('tooltip').classList.remove('visible');
     });
 
@@ -31264,7 +31273,7 @@ function buildGraph() {
 // ============================================================
 // ── Systemische effecten (mechanisms.aard) ──
 // Niet elke edge is een direct dyadisch kanaal. Naast 'direct' is er nog één niet-directe aard,
-// samen met de emergente velden onder de toggle state.showFieldEffects (default uit = schone graaf):
+// met een eigen toggle (state.showHalos; de emergente velden hangen onder state.showFieldEffects):
 //   veld_eigenschap   — geen echte bron (zelfcensuur); getekend als halo om de node.
 const FIELD_COLOR = '#9b8cc4';  // gedempt violet: "diffuus/systemisch", los van de filter-kleuren (halo's)
 
@@ -31367,8 +31376,9 @@ function selectEmergent(eff) {
 // normale edges (solide, met pijl, filterkleur). Emergentie woont in het theoriemodel (gouden velden).
 function isFieldLink(l) { return state.model === 'theory' && l.aard && l.aard !== 'direct'; }
 function isFieldProperty(l) { return state.model === 'theory' && l.aard === 'veld_eigenschap'; }
-// Node-grootte leest de schone (basis) waarde, of de _veld-variant als de toggle aan staat.
-function infVal(d, key) { return (state.showFieldEffects ? d[key + '_veld'] : d[key]) || 0; }
+// Node-grootte leest de schone (basis) waarde, of de _veld-variant als de halo-toggle aan
+// staat (de _veld-cijfers tellen de veld-eigenschappen mee — dat zijn de halo's).
+function infVal(d, key) { return (state.showHalos ? d[key + '_veld'] : d[key]) || 0; }
 
 // ── Node-grootte: instelbaar register van maten ──
 // Elke maat geeft een ruwe waarde per node; getRadius normaliseert op het maximum van de
@@ -31452,7 +31462,7 @@ function linkBaseOpacity(l, isTheory) {
 // Halo om een node die een veld-eigenschap (niveau 2) ondergaat — alleen als de toggle aan staat.
 function fieldHaloRadius(d) { return getRadius(d) + 5; }
 function fieldHaloOpacity(d) {
-  if (!state.showFieldEffects || !state.fieldPropertyMap) return 0;
+  if (!state.showHalos || !state.fieldPropertyMap) return 0;
   const v = state.fieldPropertyMap.get(d.id) || 0;
   return v > 0 ? 0.25 + 0.5 * Math.min(1, v) : 0;
 }
@@ -32337,7 +32347,7 @@ function nodeFieldProperties(d) {
 // Compacte tooltip-toevoeging: zodra een node een halo heeft, het systeemeffect erbij tonen,
 // zodat hover (op de node óf de halo-ring) niet alleen de node-info laat zien.
 function fieldPropertyTooltipBlock(d) {
-  if (!state.showFieldEffects) return '';
+  if (!state.showHalos) return '';
   const props = nodeFieldProperties(d);
   if (!props.length) return '';
   const rows = props.map(l => `<div style="margin-top:2px">◌ ${l.mechanism_name || l.name || 'veld-eigenschap'}</div>`).join('');
@@ -32348,7 +32358,7 @@ function fieldPropertyTooltipBlock(d) {
 // Bewust bovenaan het paneel — niet begraven onder de invloedscijfers — zodat ELKE halo
 // duidelijk naar zijn systeemeffect(en) wijst. Klikbaar naar de onderbouwing van het mechanisme.
 function renderFieldPropertySection(d) {
-  if (!state.showFieldEffects) return '';
+  if (!state.showHalos) return '';
   const incoming = nodeFieldProperties(d);
   if (!incoming.length) return '';
   const items = incoming.map(l => {
@@ -32834,7 +32844,9 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     document.getElementById('fieldToggleRow').style.display = isTheory ? '' : 'none';
     if (!isTheory) {
       state.showFieldEffects = false;
+      state.showHalos = false;
       document.getElementById('fieldToggle').checked = false;
+      document.getElementById('haloToggle').checked = false;
     }
 
     rebuildChips();                 // edge-categorieën verschillen per model
@@ -32860,6 +32872,12 @@ function applyFieldEffects() {
 }
 document.getElementById('fieldToggle').addEventListener('change', e => {
   state.showFieldEffects = e.target.checked;
+  applyFieldEffects();
+});
+// Halo's (veld-eigenschappen) los van de emergente velden; beïnvloedt ook de node-grootte
+// (schoon <-> met veld-effecten), dus dezelfde volledige verversing.
+document.getElementById('haloToggle').addEventListener('change', e => {
+  state.showHalos = e.target.checked;
   applyFieldEffects();
 });
 // Indirecte (afgeleide) pijlen bestaan alleen bij een actieve selectie: herselecteren volstaat.
