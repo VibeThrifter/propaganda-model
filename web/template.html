@@ -611,21 +611,24 @@ details.detail-section > .sec-body { margin-top: 8px; }
   <div class="panel-section" id="fieldSection">
     <h3>Systemische effecten</h3>
     <div id="fieldToggleRow">
-      <!-- Toggle (alle velden als contour) met rechts een kaal pijltje dat de lijst
-           uitklapt om velden uit te lichten — lós van de toggle: hover = oplichten,
-           klik = vastzetten (meerdere kan), ook getekend als de toggle uit staat. -->
-      <div style="display:flex;align-items:center;gap:8px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;flex:1"
-               title="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel.">
-          <input type="checkbox" id="fieldToggle">
+      <!-- Alleen het vinkje bedient de contour-toggle; klik op de rest van de rij
+           (tekst of pijltje) klapt de lijst uit om velden uit te lichten — lós van de
+           toggle: hover = oplichten, klik = vastzetten (meerdere kan), ook getekend
+           als de toggle uit staat. -->
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <input type="checkbox" id="fieldToggle" style="cursor:pointer;flex-shrink:0"
+               title="Alle emergente velden als vage contour tonen/verbergen">
+        <div id="emergentDropdownRow" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer"
+             title="Klik om de lijst uit te klappen en velden uit te lichten — ook als de toggle uit staat.">
           <span>Emergente velden</span>
-          <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
-        </label>
-        <button type="button" class="dropdown-btn" id="emergentDropdownBtn"
-                title="Licht één of meer emergente velden uit in de graaf — ook als de toggle uit staat.">
-          <span class="count" id="emergentCount" style="display:none">0</span>
-          <span class="chev" aria-hidden="true">▼</span>
-        </button>
+          <span style="color:var(--text-muted);font-size:11px" aria-hidden="true"
+                title="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel.">ⓘ</span>
+          <button type="button" class="dropdown-btn" id="emergentDropdownBtn" style="margin-left:auto"
+                  title="Licht één of meer emergente velden uit in de graaf — ook als de toggle uit staat.">
+            <span class="count" id="emergentCount" style="display:none">0</span>
+            <span class="chev" aria-hidden="true">▼</span>
+          </button>
+        </div>
       </div>
       <div class="dropdown-list" id="emergentChips"></div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
@@ -3363,7 +3366,8 @@ function rebuildEmergentChips() {
   });
 }
 rebuildEmergentChips();
-document.getElementById('emergentDropdownBtn').addEventListener('click', () => {
+// De hele rij (tekst + pijltje) klapt de lijst uit; alleen het vinkje schakelt de contour.
+document.getElementById('emergentDropdownRow').addEventListener('click', () => {
   document.getElementById('emergentDropdownBtn').classList.toggle('open');
   document.getElementById('emergentChips').classList.toggle('open');
 });
