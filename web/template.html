@@ -2297,6 +2297,23 @@ function computeDerivedInfluence(startId, visibleLinkSet, isTheory) {
   return out.slice(0, DERIVED_CAP);
 }
 
+// Afgeleide pijlen zónder selectie: alle gekwalificeerde paden over de zichtbare graaf.
+// Alleen nodes die volgens een padclaim bron kunnen zijn hoeven doorgerekend — zonder
+// onderbouwde eindclaim bestaat er toch geen pijl (poort 3).
+function computeAllDerived(visibleLinkSet, isTheory) {
+  const srcRoleIds = new Set(Object.keys(pathClaims).map(k => +k.split('>')[0]));
+  if (!srcRoleIds.size) return [];
+  const out = [];
+  currentNodes.forEach(n => {
+    const isCandidate = isTheory ? srcRoleIds.has(n.id)
+                                 : (n.role_ids || []).some(r => srcRoleIds.has(r));
+    if (!isCandidate) return;
+    out.push(...computeDerivedInfluence(n.id, visibleLinkSet, isTheory));
+  });
+  out.sort((a, b) => b.strength - a.strength);
+  return out.slice(0, DERIVED_CAP);
+}
+
 function derivedArcPath(d) {
   const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
   const dx = x2 - x1, dy = y2 - y1;
@@ -3046,7 +3063,7 @@ function computeVisibleLinks() {
 
 function applyFilters() {
   if (!nodeElements || !linkElements) return;
-  clearDerivedLinks();   // afgeleide pijlen horen bij een actieve selectie, niet bij de basisview
+  clearDerivedLinks();   // schoon herbeginnen; verderop tekenen we ze opnieuw (globaal of per selectie)
   const isTheory = state.model === 'theory';
   const search = state.searchTerm.toLowerCase();
 
@@ -3114,6 +3131,15 @@ function applyFilters() {
 
   updateEmergentFields();   // emergente velden tonen/verbergen (theorie + toggle)
 
+  // Afgeleide pijlen ook in de basisview: zonder actieve selectie tonen we álle
+  // gekwalificeerde paden (bij selectie rekent selectNode ze voor die node uit).
+  if (state.showDerived && !state.selectedNode) {
+    const allDerived = computeAllDerived(visibleLinkSet, isTheory);
+    state.derivedAll = allDerived;
+    state.derivedShown = allDerived;
+    updateDerivedLinks(allDerived);
+  }
+
   // Stats — count only visible
   const nodeLabel = isTheory ? 'rollen' : 'entiteiten';
   const linkLabel = isTheory ? 'mechanismen' : 'relaties';
@@ -3179,6 +3205,7 @@ document.getElementById('fieldToggle').addEventListener('change', e => {
 document.getElementById('derivedToggle').addEventListener('change', e => {
   state.showDerived = e.target.checked;
   if (state.selectedNode) selectNode(state.selectedNode);
+  else applyFilters();   // basisview: globale afgeleide pijlen tonen/wissen
 });
 // Directe pijlen: alleen het tekenen; nodes, velden en afgeleide paden blijven staan.
 document.getElementById('directToggle').addEventListener('change', e => {
