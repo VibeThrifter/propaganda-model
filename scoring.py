@@ -191,15 +191,17 @@ def compute_all_scores(conn) -> dict:
 
     # Argumenten gegroepeerd per doel
     by_relation, by_entity, by_role, by_mech = {}, {}, {}, {}
-    for aid, rel_id, ent_id, role_id, mech_id, stance, weight, status in conn.execute(
-            "SELECT id, relation_id, entity_id, role_id, mechanism_id, stance, weight, status FROM arguments"):
+    for aid, rel_id, ent_id, role_id, mech_id, prop, stance, weight, status in conn.execute(
+            "SELECT id, relation_id, entity_id, role_id, mechanism_id, property, stance, weight, status FROM arguments"):
         payload = {"stance": stance, "weight": weight, "status": status,
                    "citation_reliabilities": rel_by_arg.get(aid, [])}
         if rel_id:
             by_relation.setdefault(rel_id, []).append(payload)
         if ent_id:
             by_entity.setdefault(ent_id, []).append(payload)
-        if role_id:
+        if role_id and prop != "indirecte_invloed_op":
+            # Padclaims (property 'indirecte_invloed_op') onderbouwen een afgeleide
+            # pijl rol ⇢ rol, niet de rol zelf — buiten de rolscore houden.
             by_role.setdefault(role_id, []).append(payload)
         if mech_id:
             by_mech.setdefault(mech_id, []).append(payload)

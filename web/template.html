@@ -193,6 +193,23 @@ body {
 .detail-section { margin-bottom: 16px; }
 .detail-section h4 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; }
 
+/* Inklapbare paneelsecties: dichtgeklapt is de kopregel een inhoudsopgave-item */
+details.detail-section { margin-bottom: 12px; }
+details.detail-section > summary {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; list-style: none; user-select: none;
+}
+details.detail-section > summary::-webkit-details-marker { display: none; }
+details.detail-section > summary h4 { margin-bottom: 0; }
+details.detail-section > summary:hover h4 { color: var(--text-dim); }
+details.detail-section > summary .chev { font-size: 8px; color: var(--text-muted); transition: transform 0.15s; flex: none; }
+details.detail-section[open] > summary .chev { transform: rotate(90deg); }
+details.detail-section > summary .sec-meta {
+  margin-left: auto; padding-left: 8px; font-size: 10px;
+  color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+details.detail-section > .sec-body { margin-top: 8px; }
+
 .relation-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
   padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s;
@@ -678,8 +695,12 @@ const argsByRelation = {};  // relation_id → [root arguments]
 const argsByEntity = {};    // entity_id → [root arguments]
 const argsByRole = {};      // role_id → [root arguments]  (literatuur over een rol)
 const argsByMechanism = {}; // mechanism_id → [root arguments] (literatuur over een mechanisme)
+const pathClaims = {};      // 'bronRolId>doelRolId' → [root arguments]: eindclaims die een
+                            // afgeleide pijl als geheel onderbouwen (property 'indirecte_invloed_op')
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
+const roleIdByName = {};
+(DATA.roles || []).forEach(r => { roleIdByName[r.name] = r.id; });
 
 // Index citations
 (DATA.citations || []).forEach(c => {
@@ -707,8 +728,18 @@ const citationsByArg = {};  // argument_id → [citations]
       argsByEntity[a.entity_id].push(a);
     }
     if (a.role_id) {
-      if (!argsByRole[a.role_id]) argsByRole[a.role_id] = [];
-      argsByRole[a.role_id].push(a);
+      if (a.property === 'indirecte_invloed_op') {
+        // Padclaim: hoort bij de afgeleide pijl rol ⇢ rol, niet bij de rol zelf.
+        const tgtRole = roleIdByName[a.property_value];
+        if (tgtRole != null) {
+          const key = a.role_id + '>' + tgtRole;
+          if (!pathClaims[key]) pathClaims[key] = [];
+          pathClaims[key].push(a);
+        }
+      } else {
+        if (!argsByRole[a.role_id]) argsByRole[a.role_id] = [];
+        argsByRole[a.role_id].push(a);
+      }
     }
     if (a.mechanism_id) {
       if (!argsByMechanism[a.mechanism_id]) argsByMechanism[a.mechanism_id] = [];
@@ -1199,6 +1230,15 @@ Object.values(FILTER_COLORS).forEach(color => {
     .append('path').attr('d', 'M0,-4L9,0L0,4').attr('fill', color).attr('opacity', 0.6);
 });
 
+// Afgeleide (indirecte) invloed — violet (= FIELD_COLOR), gestippelde pijl mét punt.
+// Indirectheid is een eigenschap van een PAD, geen edge-type: deze pijlen worden bij
+// node-selectie berekend uit de cascade (≥2 hops) en nooit in de data opgeslagen.
+defs.append('marker').attr('id', 'arrow-derived')
+  .attr('viewBox', '0 -5 10 10').attr('refX', 9).attr('refY', 0)
+  .attr('markerUnits', 'userSpaceOnUse')
+  .attr('markerWidth', 13).attr('markerHeight', 13).attr('orient', 'auto')
+  .append('path').attr('d', 'M0,-4L9,0L0,4').attr('fill', '#9b8cc4').attr('opacity', 0.8);
+
 const g = svgEl.append('g');
 
 const zoom = d3.zoom().scaleExtent([0.1, 6])
@@ -1218,6 +1258,8 @@ let edgeLabelElements = null;
 let emergentHullElements = null;   // transparante velden rond emergente-effect-groepen (theorie)
 let emergentLabelElements = null;
 let nodeByIdGlobal = null;         // id -> node-object van de huidige graaf (voor hull-geometrie)
+let derivedLinkGroup = null;       // laag voor afgeleide (indirecte) invloed-pijlen bij selectie
+let derivedLinkData = [];          // actieve afgeleide pijlen: {source, target, strength, chain}
 
 // Hoeveel pixels de parallelle relaties tussen twee knooppunten uit elkaar buigen.
 const PARALLEL_EDGE_SPREAD = 22;
@@ -1339,12 +1381,15 @@ function buildGraph() {
     .attr('stroke-dasharray', '7,5')
     .style('cursor', 'pointer')
     .attr('opacity', 0)
-    .on('click', (event, d) => { event.stopPropagation(); selectEmergent(d); })
+    // De velden overlappen elkaar sterk; een kale klik raakt de bovenste in DOM-volgorde.
+    // pickEmergentAt kiest daarom het KLEINSTE veld onder de cursor (meest specifiek).
+    .on('click', (event, d) => { event.stopPropagation(); selectEmergent(pickEmergentAt(event) || d); })
     .on('mouseover', (event, d) => {
+      const eff = pickEmergentAt(event) || d;
       const tt = document.getElementById('tooltip');
       tt.innerHTML = `<div class="tt-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
-        <div class="tt-name">${d.label}</div>
-        ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
+        <div class="tt-name">${eff.label}</div>
+        ${eff.description ? `<div class="tt-desc">${eff.description}</div>` : ''}
         <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor het samenspel</div>`;
       tt.classList.add('visible');
     })
@@ -1359,7 +1404,11 @@ function buildGraph() {
     .attr('fill', EMERGENCE_COLOR)
     .attr('font-size', '13px')
     .attr('font-weight', '600')
-    .style('pointer-events', 'none')
+    // Het label hoort ondubbelzinnig bij zíjn veld: klik selecteert direct dit effect
+    // (voorheen pointer-events:none, waardoor de klik doorviel naar een overlappend veld).
+    .style('pointer-events', 'auto')
+    .style('cursor', 'pointer')
+    .on('click', (event, d) => { event.stopPropagation(); selectEmergent(d); })
     .style('letter-spacing', '0.4px')
     .style('text-shadow', '0 1px 6px rgba(0,0,0,0.95)')
     .attr('opacity', 0)
@@ -1373,6 +1422,11 @@ function buildGraph() {
     .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
     .attr('stroke-opacity', d => linkBaseOpacity(d, isTheory))
     .attr('marker-end', d => markerFor(d, isTheory));
+
+  // Afgeleide (indirecte) invloed — gestippelde violette pijlen, alleen gevuld bij
+  // node-selectie (cascade ≥2 hops). Boven de gewone links, onder de nodes.
+  derivedLinkGroup = g.append('g').attr('class', 'derived-links');
+  derivedLinkData = [];
 
   // Invisible wider hit-area for clicking on edges
   const linkHitGroup = g.append('g').attr('class', 'link-hits');
@@ -1499,6 +1553,7 @@ function buildGraph() {
     }
     nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
     updateEmergentFields();   // emergente velden volgen de bewegende leden
+    if (derivedLinkData.length) positionDerivedLinks();
   });
 
   // Events
@@ -1579,7 +1634,15 @@ function emergentLabelPos(eff) {
 function updateEmergentFields() {
   if (!emergentHullElements) return;
   const show = emergentVisible();
-  const on = d => (show && emergentMemberNodes(d).length) ? 1 : 0;
+  // Bij een actieve selectie lichten ook zonder toggle de velden op waarvan de
+  // geselecteerde node lid is — zo is bv. de lobby-makelaardij-driehoek direct
+  // zichtbaar wanneer je de belanghebbende aanklikt.
+  const selId = (state.model === 'theory' && state.selectedNode) ? state.selectedNode.id : null;
+  const on = d => {
+    if (!emergentMemberNodes(d).length) return 0;
+    if (show) return 1;
+    return (selId != null && (d.member_role_ids || []).includes(selId)) ? 1 : 0;
+  };
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
     .attr('opacity', on)
@@ -1589,11 +1652,25 @@ function updateEmergentFields() {
     .attr('y', d => emergentLabelPos(d).y)
     .attr('opacity', d => on(d) ? 0.92 : 0);
 }
+// Welk emergent veld "bedoelt" een klik/hover? De hulls overlappen elkaar sterk en het
+// event komt altijd bij de bovenste in DOM-volgorde terecht. Kies daarom uit álle zichtbare
+// hulls onder de cursor het kleinste (meest specifieke) veld.
+function pickEmergentAt(event) {
+  const hulls = document.elementsFromPoint(event.clientX, event.clientY)
+    .filter(el => el.classList && el.classList.contains('emergent-hull') && +el.getAttribute('opacity') > 0);
+  let best = null, bestArea = Infinity;
+  hulls.forEach(el => {
+    const bb = el.getBBox();
+    const area = bb.width * bb.height;
+    if (area < bestArea) { bestArea = area; best = d3.select(el).datum(); }
+  });
+  return best;
+}
+
 // Detailpaneel voor een emergent effect: het samenspel, niet een edge.
 function selectEmergent(eff) {
   state.selectedNode = null;
   state.selectedRelation = null;
-  const content = document.getElementById('detailContent');
   const members = (eff.member_role_ids || []).map(id => (currentNodes || []).find(n => n.id === id)).filter(Boolean);
   let html = `
     <div class="detail-header">
@@ -1601,23 +1678,19 @@ function selectEmergent(eff) {
       <h2>${eff.label}</h2>
     </div>
     <div class="detail-description">${eff.description || ''}</div>
-    <div class="detail-section">
-      <h4>Effect op de berichtgeving</h4>
-      <div style="font-size:12px;color:var(--text-dim);line-height:1.6">${eff.effect || ''}</div>
-    </div>
-    <div class="detail-section">
-      <h4>Ontstaat uit het samenspel van (${members.length})</h4>`;
-  members.forEach(m => {
-    html += `<div class="relation-card" style="cursor:pointer" onclick="selectNode(currentNodes.find(n=>n.id===${m.id}))">
-      <div class="rel-name">${m.name}</div>
-      <div style="font-size:10px;color:var(--text-muted)">${FILTER_LABELS[m.category] || m.category}</div>
-    </div>`;
-  });
-  html += `</div>
+    ${collapsibleSection('Effect op de berichtgeving',
+      `<div style="font-size:12px;color:var(--text-dim);line-height:1.6">${eff.effect || ''}</div>`,
+      { open: true })}
+    ${collapsibleSection('Ontstaat uit het samenspel van',
+      `<div class="tag-badges">` +
+      members.map(m =>
+        `<span class="tag-badge" style="--c:${FILTER_COLORS[m.category] || '#888'};cursor:pointer"
+          onclick="selectNode(currentNodes.find(n=>n.id===${m.id}))">${m.name}</span>`).join('') +
+      `</div>`, { open: true, meta: `${members.length} rollen` })}
     <div style="font-size:10px;color:var(--text-muted);margin-top:8px;font-style:italic">
       Géén bron→doel-pijl: dit effect is een eigenschap van de hele groep, niet van een losse relatie.
     </div>`;
-  content.innerHTML = html;
+  setPanelContent(`eff-${eff.label}`, html);
   document.getElementById('detail').classList.add('open');
 }
 
@@ -1793,6 +1866,45 @@ function formatPeriod(d) {
   return `${from} – ${until} ${badge}`;
 }
 
+// ── Inklapbare paneelsecties ──
+// Native <details>: dichtgeklapt toont alleen de kopregel, met rechts een korte
+// samenvatting (opts.meta: aantal, rang, periode …). opts.open voor kerninfo die
+// meteen zichtbaar moet zijn; opts.color/opts.border voor accent (bv. veld-violet).
+function collapsibleSection(title, body, opts = {}) {
+  if (!body) return '';
+  const style = opts.border ? ` style="border-left:2px solid ${opts.border};padding-left:10px"` : '';
+  return `<details class="detail-section"${opts.open ? ' open' : ''}${style}>
+    <summary><span class="chev">▶</span><h4${opts.color ? ` style="color:${opts.color}"` : ''}>${title}</h4>${opts.meta != null ? `<span class="sec-meta">${opts.meta}</span>` : ''}</summary>
+    <div class="sec-body">${body}</div>
+  </details>`;
+}
+
+let _panelKey = null;
+// Paneel-HTML zetten mét behoud van de open/dicht-status van secties zolang
+// hetzelfde item getoond blijft (re-render na score-refresh of formulier-submit);
+// een nieuwe selectie begint weer met de standaardstanden. Match op sectietitel.
+function setPanelContent(key, html) {
+  const content = document.getElementById('detailContent');
+  if (key && key === _panelKey) {
+    const wasOpen = new Set(), wasClosed = new Set();
+    content.querySelectorAll('details.detail-section').forEach(det => {
+      const h = det.querySelector('summary h4');
+      if (h) (det.open ? wasOpen : wasClosed).add(h.textContent.trim());
+    });
+    content.innerHTML = html;
+    content.querySelectorAll('details.detail-section').forEach(det => {
+      const h = det.querySelector('summary h4');
+      if (!h) return;
+      const t = h.textContent.trim();
+      if (wasOpen.has(t)) det.setAttribute('open', '');
+      else if (wasClosed.has(t)) det.removeAttribute('open');
+    });
+  } else {
+    content.innerHTML = html;
+  }
+  _panelKey = key;
+}
+
 // Prominente, bespreekbare looptijd-sectie voor relatie- of entiteit-detail.
 // idField = 'relation_id' of 'entity_id'. Toont begin/einde en knoppen die het
 // argumentformulier openen met de juiste eigenschap (active_from/active_until)
@@ -1806,9 +1918,9 @@ function renderTimespanSection(d, idField, id) {
                 : '<span class="temporal-badge inactive">inactief</span>')
     : '';
   const slotId = `ts-slot-${idField}-${id}`;
-  return `
-    <div class="detail-section">
-      <h4>Looptijd</h4>
+  const meta = (d.active_from || d.active_until)
+    ? `${from} – ${until}${isActive ? '' : ' · inactief'}` : 'onbekend';
+  return collapsibleSection('Looptijd', `
       <div class="timespan-row">
         <div class="timespan-cell">
           <span class="ts-label">Begin</span>
@@ -1821,8 +1933,7 @@ function renderTimespanSection(d, idField, id) {
           <button class="ts-discuss" onclick="openTimespanForm('${idField}',${id},'active_until','${slotId}')">bespreek einddatum</button>
         </div>
       </div>
-      <div id="${slotId}"></div>
-    </div>`;
+      <div id="${slotId}"></div>`, { meta });
 }
 
 // Open (of sluit) het argumentformulier voor een datum-eigenschap, met de
@@ -1843,6 +1954,7 @@ function openTimespanForm(idField, id, property, slotId) {
 function selectRelation(r) {
   state.selectedRelation = r;
   state.selectedNode = null;
+  clearDerivedLinks();
   const panel = document.getElementById('detail');
   const content = document.getElementById('detailContent');
   // In het theoretische model is "r" een mechanisme (klasse), geen praktijk-relatie.
@@ -1866,27 +1978,21 @@ function selectRelation(r) {
       ${r.mechanism_name ? renderTagBadges(r.mechanism_filters, r.mechanism_themes) : ''}
     </div>
     ${r.description ? `<div class="detail-description">${r.description}</div>` : ''}
-    <div class="detail-section">
-      <h4>Scores</h4>
-      <div style="display:flex;gap:16px;margin-bottom:12px">
+    ${collapsibleSection('Scores', `
+      <div style="display:flex;gap:16px">
         <span class="score-bar">zekerheid <span class="bar-track"><span class="bar-fill" style="width:${certPct}%;background:var(--accent)"></span></span> ${certPct}%</span>
         <span class="score-bar">invloed <span class="bar-track"><span class="bar-fill" style="width:${inflPct}%;background:var(--c-advertentie)"></span></span> ${inflPct}%</span>
-      </div>
-    </div>
+      </div>`, { open: true, meta: `${certPct}% · ${inflPct}%` })}
     ${renderTimespanSection(r, 'relation_id', r.id)}
   `;
 
-  // Discussieboom
+  // Discussieboom — de kern van een relatie-selectie, dus standaard open.
   const relArgs = argsByRelation[r.id];
-  if (relArgs && relArgs.length) {
-    html += `<div class="detail-section"><h4>Discussie</h4>`;
-    html += renderArgTree(relArgs);
-    html += `</div>`;
-  } else {
-    html += `<div class="detail-section"><h4>Discussie</h4>
-      <div style="font-size:11px;color:var(--text-muted);padding:8px 0">Nog geen argumenten voor deze relatie.</div>
-    </div>`;
-  }
+  const nRelArgs = relArgs && relArgs.length ? countStances(relArgs).total : 0;
+  html += collapsibleSection('Discussie',
+    nRelArgs ? renderArgTree(relArgs)
+             : `<div style="font-size:11px;color:var(--text-muted);padding:2px 0">Nog geen argumenten voor deze relatie.</div>`,
+    { open: true, meta: nRelArgs ? `${nRelArgs} arg.` : 'geen' });
 
   // Formulier voor nieuw root-argument
   html += `<div class="detail-section">
@@ -1916,7 +2022,7 @@ function selectRelation(r) {
     </div>`;
   }
 
-  content.innerHTML = html;
+  setPanelContent(`rel-${r.id}`, html);
   panel.classList.add('open');
 }
 
@@ -1942,8 +2048,9 @@ function showMechanismDetail(m, content) {
   </div>`;
   if (m.description) html += `<div class="detail-description">${m.description}</div>`;
   if (m.effect) {
-    html += `<div class="detail-section"><h4>Effect</h4>
-      <div style="font-size:12px;color:var(--c-advertentie);line-height:1.6">${m.effect}</div></div>`;
+    html += collapsibleSection('Effect',
+      `<div style="font-size:12px;color:var(--c-advertentie);line-height:1.6">${m.effect}</div>`,
+      { open: true });
   }
   html += renderTheoryScores(m);
   html += renderInstanceList('mechanism_id', m.id);
@@ -1955,7 +2062,7 @@ function showMechanismDetail(m, content) {
       <div class="admin-hint">${relCount ? `${relCount} praktijk-relatie(s) verliezen de koppeling, maar blijven bestaan.` : 'Geen praktijk-relaties gekoppeld.'}</div>
     </div>`;
   }
-  content.innerHTML = html;
+  setPanelContent(`mech-${m.id}`, html);
 }
 
 // ============================================================
@@ -1998,6 +2105,7 @@ function computeDownstream(startId, visibleLinkSet, isTheory) {
   });
   const best = new Map([[startId, 1]]);
   const linkStrength = new Map();
+  const meta = new Map();   // node -> {prev, hops} van het sterkste pad (voor reconstructie)
   let frontier = [[startId, 1]];
   for (let hop = 0; hop < MAX_HOPS; hop++) {
     const nxt = new Map();
@@ -2007,6 +2115,7 @@ function computeDownstream(startId, visibleLinkSet, isTheory) {
         if (v > PRUNE && v > (linkStrength.get(li) || 0)) linkStrength.set(li, v);
         if (v > (best.get(to) || 0) && v > PRUNE) {
           best.set(to, v);
+          meta.set(to, { prev: node, hops: hop + 1 });
           if (v > (nxt.get(to) || 0)) nxt.set(to, v);
         }
       }
@@ -2015,13 +2124,384 @@ function computeDownstream(startId, visibleLinkSet, isTheory) {
     frontier = [...nxt.entries()];
   }
   best.delete(startId);
-  return { nodes: best, linkStrength };
+  return { nodes: best, linkStrength, meta };
+}
+
+// Sterkste pad teruglopen van eindpunt naar start (via meta.prev) — voor de
+// tooltip van de afgeleide invloed-pijlen ("A → tussenstap → B").
+function reconstructPath(meta, startId, endId) {
+  const chain = [endId];
+  let cur = endId, guard = 0;
+  while (cur !== startId && guard++ < 20) {
+    const m = meta.get(cur);
+    if (!m) break;
+    cur = m.prev;
+    chain.push(cur);
+  }
+  return chain.reverse();
+}
+
+// ── Afgeleide (indirecte) invloed: gestippelde pijlen uit de cascade ──
+// "Indirect" is geen edge-type (zie CLAUDE.md/aard) maar een PAD-eigenschap. Bij selectie
+// tekenen we voor elke node die alléén via tussenstappen wordt bereikt een gestippelde
+// violette pijl met de max-product-sterkte; de tooltip toont de keten. Nooit opgeslagen.
+// Geen willekeurige top-N: een pad kwalificeert alleen als élke schakel zelf
+// onderbouwd is — dezelfde eis die directe pijlen hebben, hier per schakel getoetst.
+// De drempels volgen de twee drempel-sliders (state.certMin / state.inflMin), net als
+// de gewone edges: de zekerheid/geloofwaardigheid-slider toetst élke schakel, de
+// invloed/sterkte-slider de gedempte padsterkte (max-product) van de hele pijl.
+const DERIVED_MIN = 0.05;              // ondergrens padsterkte bij slider op 0 (anders ruis)
+const DERIVED_CAP = 20;                // veiligheidslimiet op het aantal pijlen
+
+// Onderbouwing van één schakel: theorie = geloofwaardigheid van het mechanisme
+// (literatuur + praktijk), praktijk = (afgeleide) zekerheid van de relatie.
+function hopSupport(l, isTheory) {
+  if (isTheory) return l.geloofwaardigheid || 0;
+  return (l.derived_certainty != null ? l.derived_certainty : l.certainty) || 0;
+}
+
+// Een schakel telt alleen mee als er echte argumenten op staan — een score
+// zonder discussieboom is geen onderbouwing.
+function hopHasArgs(l, isTheory) {
+  return isTheory ? (argsByMechanism[l.id] || []).length > 0
+                  : (argsByRelation[l.id] || []).length > 0;
+}
+
+// Eindclaim voor een afgeleide pijl bron ⇢ doel: per-schakel-steun bewijst de
+// compositie niet (A→B en B→C maakt nog geen A⇢C); de pijl bestaat alleen als
+// die samengestelde claim zélf in de discussieboom onderbouwd is.
+function pathClaimFor(srcNode, tgtNode, isTheory) {
+  if (!srcNode || !tgtNode) return null;
+  if (isTheory) return pathClaims[srcNode.id + '>' + tgtNode.id] || null;
+  for (const s of (srcNode.role_ids || [])) {
+    for (const t of (tgtNode.role_ids || [])) {
+      const c = pathClaims[s + '>' + t];
+      if (c) return c;
+    }
+  }
+  return null;
+}
+
+// Afgeleide (indirecte) invloed mét onderbouwingstoets. Eerst wordt de deelgraaf
+// beperkt tot schakels die zelf onderbouwd zijn; daarbinnen geldt max-product op
+// sterkte. Ook naar directe buren wordt het beste ≥2-hops-pad gezocht: een
+// indirect kanaal (bv. via de lobbyist) is informatief náást een directe edge.
+// Geeft per doel het sterkste pad, met zwakste schakel als verantwoording.
+function computeDerivedInfluence(startId, visibleLinkSet, isTheory) {
+  const MAX_HOPS = 6;
+  const minSup = state.certMin;
+  const minVal = Math.max(DERIVED_MIN, state.inflMin);
+
+  // Deelgraaf: alleen zichtbare, niet-uitgesloten schakels met voldoende onderbouwing.
+  const adj = new Map();
+  const addEdge = (from, to, w, sup, li) => {
+    if (!adj.has(from)) adj.set(from, []);
+    adj.get(from).push({ to, w, sup, li });
+  };
+  currentLinks.forEach((l, i) => {
+    if (!visibleLinkSet.has(i)) return;
+    const { w, excluded, symmetric } = edgeInfluence(l, isTheory);
+    if (excluded || !(w > 0)) return;
+    const sup = hopSupport(l, isTheory);
+    if (sup < minSup) return;
+    if (!hopHasArgs(l, isTheory)) return;
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    addEdge(sid, tid, w, sup, i);
+    if (symmetric) addEdge(tid, sid, w, sup, i);
+  });
+
+  // Sterkste-pad-cascade (max-product) over de onderbouwde deelgraaf.
+  const best = new Map([[startId, 1]]);
+  const supMin = new Map([[startId, 1]]);
+  const meta = new Map();                 // node -> {prev, li} van het sterkste pad
+  let frontier = [[startId, 1]];
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const nxt = new Map();
+    for (const [node, acc] of frontier) {
+      for (const { to, w, sup, li } of (adj.get(node) || [])) {
+        const v = acc * w;
+        if (v > (best.get(to) || 0) && v > minVal) {
+          best.set(to, v);
+          supMin.set(to, Math.min(supMin.get(node) || 1, sup));
+          meta.set(to, { prev: node, li });
+          if (v > (nxt.get(to) || 0)) nxt.set(to, v);
+        }
+      }
+    }
+    if (nxt.size === 0) break;
+    frontier = [...nxt.entries()];
+  }
+
+  // Beste ≥2-hops-pad per doel: laatste schakel u→T geplakt op het sterkste
+  // prefix-pad start→…→u (u ≠ start, dus minimaal twee hops in totaal).
+  const candidates = new Map();           // targetId -> [{val, sup, prev, li}]
+  adj.forEach((edges, u) => {
+    if (u === startId || !best.has(u)) return;
+    for (const { to, w, sup, li } of edges) {
+      if (to === startId) continue;
+      const val = best.get(u) * w;
+      if (val < minVal) continue;
+      if (!candidates.has(to)) candidates.set(to, []);
+      candidates.get(to).push({ val, sup: Math.min(supMin.get(u) || 1, sup), prev: u, li });
+    }
+  });
+
+  const out = [];
+  const startNode = nodeByIdGlobal.get(startId);
+  candidates.forEach((cands, tid) => {
+    const target = nodeByIdGlobal.get(tid);
+    if (!target) return;
+    // Compositie-toets: zonder onderbouwde eindclaim bron ⇢ doel geen pijl,
+    // hoe goed de losse schakels ook scoren.
+    const claimRoots = pathClaimFor(startNode, target, isTheory);
+    if (!claimRoots) return;
+    cands.sort((a, b) => b.val - a.val);
+    for (const c of cands) {
+      const prefixIds = reconstructPath(meta, startId, c.prev);
+      // Prefix moet echt bij start beginnen en T niet al bevatten (geen cykel).
+      if (prefixIds[0] !== startId || prefixIds.includes(tid)) continue;
+      const chain = prefixIds.concat(tid).map(id => nodeByIdGlobal.get(id)).filter(Boolean);
+      // Schakels van het pad verzamelen voor de zwakste-schakel-verantwoording.
+      const linkIdx = [];
+      for (let k = prefixIds.length - 1; k > 0; k--) {
+        const m = meta.get(prefixIds[k]);
+        if (m) linkIdx.unshift(m.li);
+      }
+      linkIdx.push(c.li);
+      let weakest = null;
+      linkIdx.forEach(li => {
+        const l = currentLinks[li];
+        if (!l) return;
+        const s = hopSupport(l, isTheory);
+        if (!weakest || s < weakest.sup) {
+          weakest = { sup: s, name: isTheory ? (l.name || 'mechanisme')
+                                             : (RELATION_LABELS[l.relation_type] || l.relation_type) };
+        }
+      });
+      out.push({ source: startNode, target,
+                 strength: c.val, support: c.sup, weakest, chain,
+                 claimRoots,
+                 links: linkIdx.map(li => currentLinks[li]).filter(Boolean) });
+      break;
+    }
+  });
+  out.sort((a, b) => b.strength - a.strength);
+  return out.slice(0, DERIVED_CAP);
+}
+
+function derivedArcPath(d) {
+  const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+  const dx = x2 - x1, dy = y2 - y1;
+  // Vaste lichte welving (loodrecht), zodat de stippellijn niet over de directe edges valt.
+  const cx = (x1 + x2) / 2 - dy * 0.15, cy = (y1 + y2) / 2 + dx * 0.15;
+  const tx = x2 - cx, ty = y2 - cy, tl = Math.hypot(tx, ty) || 1;
+  const trim = getRadius(d.target) + 4;
+  const k = Math.hypot(dx, dy) > trim + 4 ? trim : 0;
+  return `M${x1},${y1}Q${cx},${cy} ${x2 - (tx / tl) * k},${y2 - (ty / tl) * k}`;
+}
+
+function clearDerivedLinks() {
+  derivedLinkData = [];
+  state.derivedAll = [];
+  state.derivedShown = [];
+  if (derivedLinkGroup) derivedLinkGroup.selectAll('*').remove();
+}
+
+// Hover op een rij in het detailpaneel: toon alléén dat pad; bij verlaten de top weer.
+function previewDerived(i) {
+  const d = (state.derivedAll || [])[i];
+  if (d) updateDerivedLinks([d]);
+}
+function previewDerivedEnd() {
+  updateDerivedLinks(state.derivedShown || []);
+}
+
+// Samenvatting van één schakel: naam, onderbouwingsscore en de échte argumenten.
+function hopInfo(l, isTheory) {
+  const name = isTheory ? (l.name || 'mechanisme')
+                        : (RELATION_LABELS[l.relation_type] || l.relation_type);
+  const sup = hopSupport(l, isTheory);
+  const roots = isTheory ? (argsByMechanism[l.id] || []) : (argsByRelation[l.id] || []);
+  return { name, sup, roots, nArgs: countStances(roots).total };
+}
+
+// Detailpaneel voor een afgeleid pad: de volledige onderbouwing per schakel —
+// dezelfde discussieboom (argumenten + citaties) die directe pijlen hebben.
+function selectDerivedPath(dd) {
+  if (!dd) return;
+  state.activeDerivedPath = dd;
+  const isTheory = state.model === 'theory';
+  const pct = v => Math.round((v || 0) * 100);
+  updateDerivedLinks([dd]);   // toon alleen deze pijl zolang het pad open staat
+  let html = `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px"
+      onclick="selectNode(currentNodes.find(n=>n.id===${dd.source.id}))">← terug naar ${dd.source.name}</div>
+  <div class="detail-header">
+    <div class="entity-type" style="color:${FIELD_COLOR}">Afgeleid pad · indirecte invloed</div>
+    <h2>${dd.source.name} ⇢ ${dd.target.name}</h2>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:4px">${dd.chain.map(n => n.name).join(' → ')}</div>
+  </div>
+  <div class="detail-description">Deze indirecte invloed is zelf als claim onderbouwd (zie eindclaim)
+    en loopt via onderstaande schakels · sterkte <b>${pct(dd.strength)}%</b>.</div>`;
+  const claimRoots = dd.claimRoots || [];
+  html += collapsibleSection('Eindclaim · waarom deze pijl bestaat',
+    `<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">
+       ${dd.source.name} ⇢ ${dd.target.name}: de samengestelde claim, met eigen argumenten en bronnen —
+       los van de schakels eronder.</div>` + renderArgTree(claimRoots),
+    { border: FIELD_COLOR, open: true, meta: `${countStances(claimRoots).total} arg.` });
+  (dd.links || []).forEach((l, k) => {
+    const src = typeof l.source === 'object' ? l.source : nodeByIdGlobal.get(l.source);
+    const tgt = typeof l.target === 'object' ? l.target : nodeByIdGlobal.get(l.target);
+    const h = hopInfo(l, isTheory);
+    const score = isTheory
+      ? `${pct(h.sup)}% geloofwaardig · sterkte ${pct(l.sterkte)}%`
+      : `${pct(h.sup)}% zeker · invloed ${pct(l.influence)}%`;
+    let body = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'} · ${score}</div>`;
+    body += h.roots.length
+      ? renderArgTree(h.roots)
+      : `<div style="font-size:11px;color:var(--text-muted);padding:4px 0">Nog geen argumenten
+           direct op deze schakel; de score komt uit ${isTheory ? 'praktijkvoorbeelden (instanties)' : 'de ingeschatte zekerheid'}.</div>`;
+    body += `<div style="font-size:10px;color:var(--accent);cursor:pointer;margin-top:6px"
+       onclick="openDerivedSchakel(${k})">→ volledige discussie van deze schakel</div>`;
+    html += collapsibleSection(`Schakel ${k + 1} · ${h.name}`, body,
+      { border: getLinkColor(l, isTheory), open: k === 0, meta: `${pct(h.sup)}%` });
+  });
+  setPanelContent(`dpath-${dd.source.id}-${dd.target.id}`, html);
+  document.getElementById('detail').classList.add('open');
+}
+
+function openDerivedSchakel(k) {
+  const p = state.activeDerivedPath;
+  if (!p || !p.links || !p.links[k]) return;
+  selectRelation(p.links[k]);
+  // Terugknop bovenaan de schakel-discussie: terug naar het pad-overzicht.
+  document.getElementById('detailContent').insertAdjacentHTML('afterbegin',
+    `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px"
+        onclick="selectDerivedPath(state.activeDerivedPath)">← terug naar het pad</div>`);
+}
+
+// Ranglijst van afgeleide (indirecte) invloed voor het detailpaneel van de geselecteerde node.
+function renderDerivedSection() {
+  const list = state.derivedAll || [];
+  if (!list.length) return '';
+  const isTheory = state.model === 'theory';
+  const supPct = Math.round(state.certMin * 100);
+  const valPct = Math.round(Math.max(DERIVED_MIN, state.inflMin) * 100);
+  const supLabel = isTheory ? 'geloofwaardigheid per mechanisme' : 'zekerheid per relatie';
+  let body = `<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">
+      Alleen pijlen waarvan de eindclaim zélf onderbouwd is, met élke schakel ≥ ${supPct}%
+      ${supLabel} én eigen argumenten (drempel-sliders); padsterkte ≥ ${valPct}%.
+      Klik voor de onderbouwing.
+    </div>`;
+  list.forEach((dd, i) => {
+    const via = dd.chain.slice(1, -1).map(n => n.name).join(' → ');
+    // Kort: doel + sterkte + route; de onderbouwing per schakel zit achter de klik.
+    body += `<div class="relation-card" style="cursor:pointer"
+        onmouseenter="previewDerived(${i})" onmouseleave="previewDerivedEnd()"
+        onclick="selectDerivedPath(state.derivedAll[${i}])">
+      <div class="rel-name" style="color:${FIELD_COLOR}">⇢ ${dd.target.name}
+        <span style="float:right;color:var(--text-dim)">${Math.round(dd.strength * 100)}%</span></div>
+      <div style="font-size:10px;color:var(--text-muted)">via ${via} · ${Math.round(dd.support * 100)}% onderbouwd</div>
+    </div>`;
+  });
+  return collapsibleSection('⇢ Indirecte invloed (afgeleid)', body,
+    { color: FIELD_COLOR, border: FIELD_COLOR, meta: `${list.length} ${list.length === 1 ? 'pad' : 'paden'}` });
+}
+
+// Apex van de afgeleide boog (zelfde kwadratische curve als derivedArcPath) — daar
+// komt het "via …"-label dat de tussenschakel(s) zonder hover leesbaar maakt.
+function derivedLabelPos(d) {
+  const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+  const dx = x2 - x1, dy = y2 - y1;
+  const cx = (x1 + x2) / 2 - dy * 0.15, cy = (y1 + y2) / 2 + dx * 0.15;
+  return { x: (x1 + 2 * cx + x2) / 4, y: (y1 + 2 * cy + y2) / 4 };
+}
+
+function derivedLabelText(d) {
+  const via = d.chain.slice(1, -1).map(n => n.name);
+  if (!via.length) return '';
+  if (via.length > 2) return `via ${via[0]} → ${via[1]} …`;
+  return `via ${via.join(' → ')}`;
+}
+
+function positionDerivedLinks() {
+  if (!derivedLinkGroup) return;
+  derivedLinkGroup.selectAll('path').attr('d', derivedArcPath);
+  derivedLinkGroup.selectAll('text.derived-label')
+    .attr('x', d => derivedLabelPos(d).x)
+    .attr('y', d => derivedLabelPos(d).y - 5);
+}
+
+function updateDerivedLinks(data) {
+  if (!derivedLinkGroup) return;
+  derivedLinkData = data;
+  derivedLinkGroup.selectAll('*').remove();
+  if (!data.length) return;
+  derivedLinkGroup.selectAll('path.derived-link').data(data).join('path')
+    .attr('class', 'derived-link')
+    .attr('fill', 'none')
+    .attr('stroke', FIELD_COLOR)
+    .attr('stroke-width', 2)
+    .attr('stroke-dasharray', '6,5')
+    .attr('stroke-opacity', d => 0.25 + 0.55 * Math.min(1, d.strength))
+    .attr('marker-end', 'url(#arrow-derived)')
+    .style('pointer-events', 'none')
+    .attr('d', derivedArcPath);
+  // Bredere onzichtbare hit-lijnen: tooltip met onderbouwing per schakel; klik
+  // opent het pad-detail met de volledige argumenten en citaties.
+  derivedLinkGroup.selectAll('path.derived-hit').data(data).join('path')
+    .attr('class', 'derived-hit')
+    .attr('fill', 'none')
+    .attr('stroke', 'transparent')
+    .attr('stroke-width', 12)
+    .style('cursor', 'pointer')
+    .attr('d', derivedArcPath)
+    .on('click', (event, dd) => { event.stopPropagation(); selectDerivedPath(dd); })
+    .on('mouseover', (event, dd) => {
+      const tt = document.getElementById('tooltip');
+      const isTheory = state.model === 'theory';
+      const route = dd.chain.map(n => n.name).join(' → ');
+      const hops = (dd.links || []).map(l => {
+        const h = hopInfo(l, isTheory);
+        const extra = isTheory ? `${h.nArgs} arg., ${l.n_instanties || 0} praktijk`
+                               : `${h.nArgs} argumenten`;
+        return `<div class="tt-desc">◦ ${h.name} — ${Math.round(h.sup * 100)}% onderbouwd (${extra})</div>`;
+      }).join('');
+      const nClaim = countStances(dd.claimRoots || []).total;
+      tt.innerHTML = `<div class="tt-type" style="color:${FIELD_COLOR}">Afgeleide (indirecte) invloed · pad</div>
+        <div class="tt-name">${dd.source.name} ⇢ ${dd.target.name}</div>
+        <div class="tt-desc">Sterkste route: ${route} · gedempte sterkte ${Math.round(dd.strength * 100)}%</div>
+        <div class="tt-desc">Eindclaim onderbouwd met ${nClaim} argument${nClaim === 1 ? '' : 'en'}</div>
+        <div class="tt-desc" style="margin-top:4px"><b>Onderbouwing per schakel:</b></div>
+        ${hops}
+        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor de argumenten en bronnen</div>`;
+      tt.classList.add('visible');
+    })
+    .on('mousemove', (event) => {
+      const tt = document.getElementById('tooltip');
+      tt.style.left = (event.clientX + 16) + 'px';
+      tt.style.top = (event.clientY - 8) + 'px';
+    })
+    .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
+  // "via …"-labels: de tussenschakel(s) van het sterkste pad, leesbaar zonder hover.
+  derivedLinkGroup.selectAll('text.derived-label').data(data).join('text')
+    .attr('class', 'derived-label')
+    .attr('text-anchor', 'middle')
+    .attr('fill', FIELD_COLOR)
+    .attr('font-size', '10px')
+    .attr('font-style', 'italic')
+    .attr('opacity', d => 0.5 + 0.45 * Math.min(1, d.strength))
+    .style('pointer-events', 'none')
+    .style('text-shadow', '0 1px 5px rgba(0,0,0,0.95)')
+    .text(derivedLabelText);
+  positionDerivedLinks();
 }
 
 function selectNode(d) {
   state.selectedNode = d;
   state.selectedRelation = null;
   const isTheory = state.model === 'theory';
+  clearDerivedLinks();
 
   // Only links that pass the current filters/timeline can be highlighted/hovered
   const { visibleLinkSet } = computeVisibleLinks();
@@ -2051,6 +2531,16 @@ function selectNode(d) {
       });
       if (linkHitElements) linkHitElements.style('pointer-events', (l, i) => linkStrength.has(i) ? 'auto' : 'none');
       if (edgeLabelElements) edgeLabelElements.attr('opacity', (l, i) => linkStrength.has(i) ? 1 : 0.1);
+
+      // Afgeleide (indirecte) invloed: alleen paden waarvan élke schakel onderbouwd
+      // is krijgen een pijl — geen willekeurige top-N. Ook naar directe buren als
+      // er daarnaast een onderbouwd indirect kanaal bestaat (ander pad, ander verhaal).
+      const derived = computeDerivedInfluence(d.id, visibleLinkSet, isTheory);
+      state.derivedAll = derived;
+      state.derivedShown = derived;
+      updateDerivedLinks(derived);
+
+      updateEmergentFields();   // velden van de geselecteerde node oplichten
       showDetail(d);
       return;
     }
@@ -2091,6 +2581,7 @@ function selectNode(d) {
     edgeLabelElements.attr('opacity', (l, i) => isConnected(l, i) ? 1 : 0.1);
   }
 
+  updateEmergentFields();   // velden van de geselecteerde node oplichten
   showDetail(d);
 }
 
@@ -2113,14 +2604,15 @@ function showDetail(d) {
   } else {
     showInstanceDetail(d, content, color);
   }
+  // Ranglijst van afgeleide (indirecte) invloed — alleen gevuld direct na selectNode.
+  content.insertAdjacentHTML('beforeend', renderDerivedSection());
   panel.classList.add('open');
 }
 
 // Twee scorebalken + opsplitsing literatuur/praktijk voor een theorie-element.
 function renderTheoryScores(d) {
   const pct = v => Math.round((v || 0) * 100);
-  return `<div class="detail-section">
-    <h4>Geloofwaardigheid &amp; sterkte</h4>
+  return collapsibleSection('Geloofwaardigheid &amp; sterkte', `
     <div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">
       <span class="score-bar">geloofwaardig <span class="bar-track"><span class="bar-fill" style="width:${pct(d.geloofwaardigheid)}%;background:var(--accent)"></span></span> ${pct(d.geloofwaardigheid)}%</span>
       <span class="score-bar">sterkte <span class="bar-track"><span class="bar-fill" style="width:${pct(d.sterkte)}%;background:var(--c-advertentie)"></span></span> ${pct(d.sterkte)}%</span>
@@ -2128,61 +2620,25 @@ function renderTheoryScores(d) {
     <div style="font-size:10px;color:var(--text-muted);line-height:1.7">
       opgebouwd uit <b style="color:var(--text-dim)">literatuur</b> (${d.n_bronnen || 0} bron-arg., ${pct(d.literatuur_geloofw)}%)
       &oplus; <b style="color:var(--text-dim)">praktijk</b> (${d.n_instanties || 0} voorbeeld(en), ${pct(d.praktijk_geloofw)}%)
-    </div>
-  </div>`;
+    </div>`, { open: true, meta: `${pct(d.geloofwaardigheid)}% · ${pct(d.sterkte)}%` });
 }
 
 // Literatuur-discussie (argumenten/citaties direct op de theorie) + invoerformulier.
 function renderLiteratureSection(field, id, roots) {
-  let html = `<div class="detail-section"><h4>Literatuuronderbouwing</h4>`;
-  if (roots && roots.length) {
-    html += renderArgTree(roots);
-  } else {
-    html += `<div style="font-size:11px;color:var(--text-muted);padding:6px 0">Nog geen bronnen/argumenten. Voeg een bron toe (bijv. een boek of rapport) met een citaat — de betrouwbaarheid van die bron bepaalt het gewicht.</div>`;
-  }
+  const nArgs = roots && roots.length ? countStances(roots).total : 0;
+  let body = nArgs
+    ? renderArgTree(roots)
+    : `<div style="font-size:11px;color:var(--text-muted);padding:6px 0">Nog geen bronnen/argumenten. Voeg een bron toe (bijv. een boek of rapport) met een citaat — de betrouwbaarheid van die bron bepaalt het gewicht.</div>`;
   const slot = `lit-slot-${field}-${id}`, toggle = `lit-toggle-${field}-${id}`;
   const opts = field === 'role_id' ? `{role_id:${id}}` : `{mechanism_id:${id}}`;
-  html += `<button class="arg-toggle" id="${toggle}" onclick="
+  body += `<button class="arg-toggle" id="${toggle}" onclick="
       let s=document.getElementById('${slot}');
       if(s.children.length===0){ s.innerHTML=renderArgForm(${opts}); this.textContent='Verberg formulier ▾'; }
       else { s.innerHTML=''; this.textContent='+ Bron/argument toevoegen ▸'; }
     ">+ Bron/argument toevoegen ▸</button>
-    <div id="${slot}"></div></div>`;
-  return html;
-}
-
-// Structurele invloed-centraliteit van een entiteit (topologie, los van de bewijslast).
-function renderInfluenceSection(d) {
-  // Volgt de veld-effecten-toggle: schone (dyadische) waarden, of de _veld-variant (gedempt).
-  const fe = state.showFieldEffects;
-  const pick = k => (fe ? d[k + '_veld'] : d[k]);
-  if (pick('influence_rank') == null) return '';
-  const total = (state.model === 'theory' ? DATA.roles.length : DATA.entities.length);
-  const pubNorm = pick('influence_public_norm'), netNorm = pick('influence_norm');
-  const pubRank = pick('influence_public_rank'), polRank = pick('influence_politiek_rank');
-  const pubPct = Math.round((pubNorm != null ? pubNorm : 0) * 100);
-  const netPct = Math.round((netNorm || 0) * 100);
-  const pubBar = pick('influence_public') != null
-    ? `<span class="score-bar">op publiek <span class="bar-track"><span class="bar-fill" style="width:${pubPct}%;background:var(--accent)"></span></span> rang #${pubRank}</span>`
-    : '';
-  const modeNote = fe
-    ? 'incl. emergente veld-effecten (fan-out gedempt)'
-    : 'schone dyadische graaf — veld-effecten niet meegeteld';
-  return `<div class="detail-section">
-    <h4>Invloedspositie (structureel)</h4>
-    <div style="display:flex;gap:16px;margin-bottom:6px;flex-wrap:wrap">
-      ${pubBar}
-      <span class="score-bar">heel netwerk <span class="bar-track"><span class="bar-fill" style="width:${netPct}%;background:var(--text-muted)"></span></span> rang #${pick('influence_rank')}</span>
-    </div>
-    <div style="font-size:10px;color:var(--text-muted);line-height:1.7">
-      <b style="color:var(--text-dim)">Invloed op het publiek</b>: rang #${pubRank != null ? pubRank : '—'} van ${total} ·
-      <b style="color:var(--text-dim)">op de politiek</b>: rang #${polRank != null ? polRank : '—'} ·
-      netwerk-bereik <b style="color:var(--text-dim)">${pick('influence_reach')}</b> nodes ·
-      directe duwkracht ${(pick('influence_direct') || 0).toFixed(1)}
-    </div>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-style:italic">${modeNote}</div>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Klik op de node in de graaf om de downstream-invloedpaden op te lichten.</div>
-  </div>`;
+    <div id="${slot}"></div>`;
+  return collapsibleSection('Literatuuronderbouwing', body,
+    { meta: nArgs ? `${nArgs} arg.` : 'geen' });
 }
 
 // De veld-eigenschap(pen) die een node ondergaat (de inkomende halo-mechanismen).
@@ -2218,14 +2674,13 @@ function renderFieldPropertySection(d) {
     const detail = l.effect || l.description || '';
     return `<div class="relation-card" style="cursor:pointer;margin-top:4px" onclick="selectRelation(currentLinks.find(x=>x.id===${l.id}))">
       <div class="rel-name" style="color:${FIELD_COLOR}">◌ ${mech}</div>
-      <div style="font-size:10px;color:var(--text-muted)">${srcName ? 'diffuse systeemdruk vanuit ' + srcName : 'diffuse systeemdruk (geen vaste bron)'}${detail ? ' — ' + detail : ''}</div>
+      <div style="font-size:10px;color:var(--text-muted)">${srcName ? 'diffuse systeemdruk vanuit ' + srcName : 'diffuse systeemdruk (geen vaste bron)'}${detail ? ' — ' + truncate(detail, 140) : ''}</div>
     </div>`;
   }).join('');
-  return `<div class="detail-section" style="border-left:2px solid ${FIELD_COLOR};padding-left:10px">
-    <h4 style="color:${FIELD_COLOR}">◌ Emergent systeemeffect (veld-eigenschap)</h4>
+  return collapsibleSection('◌ Systeemeffect (halo)', `
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Deze ${state.model === 'theory' ? 'rol' : 'node'} ondergáát diffuse systeemdruk (de halo) — geen gericht kanaal. Klik voor de onderbouwing:</div>
-    ${items}
-  </div>`;
+    ${items}`,
+    { open: true, color: FIELD_COLOR, border: FIELD_COLOR, meta: incoming.length > 1 ? incoming.length : null });
 }
 
 function entityById(id) { return entityMap.get(id) || DATA.entities.find(e => e.id === id); }
@@ -2235,7 +2690,7 @@ function relationById(id) { return DATA.relations.find(r => r.id === id); }
 function renderInstanceList(field, id) {
   const isRole = field === 'role_id';
   const insts = (DATA.instantiations || []).filter(it => it[field] === id);
-  let html = `<div class="detail-section"><h4>Praktijkvoorbeelden (${insts.length})</h4>`;
+  let html = '';
   if (!insts.length) {
     html += `<div style="font-size:11px;color:var(--text-muted);padding:4px 0">Nog geen gekoppelde ${isRole ? 'entiteiten' : 'relaties'}.</div>`;
   }
@@ -2260,7 +2715,8 @@ function renderInstanceList(field, id) {
         else { s.innerHTML=''; this.textContent='+ Voorbeeld koppelen ▸'; }
       ">+ Voorbeeld koppelen ▸</button><div id="${slot}"></div>`;
   }
-  return html + `</div>`;
+  return collapsibleSection('Praktijkvoorbeelden', html,
+    { meta: insts.length || 'geen' });
 }
 
 function renderInstanceAddForm(field, id) {
@@ -2347,34 +2803,30 @@ function showTheoryDetail(d, content, color) {
 
   html += renderFieldPropertySection(d);   // halo → systeemeffect, prominent bovenaan
   html += renderTheoryScores(d);
-  html += renderInfluenceSection(d);
 
   if (d.examples) {
-    html += `<div class="detail-section">
-      <h4>Voorbeelden</h4>
-      <div style="font-size:12px;color:var(--text-dim);line-height:1.6">${d.examples}</div>
-    </div>`;
+    html += collapsibleSection('Voorbeelden',
+      `<div style="font-size:12px;color:var(--text-dim);line-height:1.6">${d.examples}</div>`);
   }
 
+  // Geen literatuuronderbouwing op rollen: een rol is definitievocabulaire, geen claim.
+  // De bewijslast woont op de mechanismen (showMechanismDetail) en in de praktijklaag.
   html += renderInstanceList('role_id', d.id);
-  html += renderLiteratureSection('role_id', d.id, argsByRole[d.id]);
 
   if (outMechs.length) {
-    html += `<div class="detail-section"><h4>Uitgaande mechanismen (${outMechs.length})</h4>`;
-    outMechs.forEach(m => {
-      const tgt = typeof m.target === 'object' ? m.target : roleMap.get(m.target);
-      html += mechCard(m, tgt ? tgt.name : '?', 'naar');
-    });
-    html += `</div>`;
+    html += collapsibleSection('Uitgaande mechanismen',
+      outMechs.map(m => {
+        const tgt = typeof m.target === 'object' ? m.target : roleMap.get(m.target);
+        return mechCard(m, tgt ? tgt.name : '?', 'naar');
+      }).join(''), { meta: outMechs.length });
   }
 
   if (inMechs.length) {
-    html += `<div class="detail-section"><h4>Inkomende mechanismen (${inMechs.length})</h4>`;
-    inMechs.forEach(m => {
-      const src = typeof m.source === 'object' ? m.source : roleMap.get(m.source);
-      html += mechCard(m, src ? src.name : '?', 'van');
-    });
-    html += `</div>`;
+    html += collapsibleSection('Inkomende mechanismen',
+      inMechs.map(m => {
+        const src = typeof m.source === 'object' ? m.source : roleMap.get(m.source);
+        return mechCard(m, src ? src.name : '?', 'van');
+      }).join(''), { meta: inMechs.length });
   }
 
   // Adminmodus: rol verwijderen
@@ -2392,16 +2844,16 @@ function showTheoryDetail(d, content, color) {
     </div>`;
   }
 
-  content.innerHTML = html;
+  setPanelContent(`role-${d.id}`, html);
 }
 
+// Compacte mechanisme-kaart: naam + richting; beschrijving en effect staan in het
+// mechanisme-detail dat de klik opent (anders herhaalt elke lijst alle lopende tekst).
 function mechCard(m, otherName, direction) {
   return `
-    <div class="relation-card">
+    <div class="relation-card" style="cursor:pointer" onclick="selectRelation(currentLinks.find(l=>l.id===${m.id}))">
       <div class="rel-name" style="color:${FILTER_COLORS[m.filter] || 'var(--text)'}">${m.name}</div>
-      <div style="font-size:11px;color:var(--text-dim);margin:3px 0">${direction} ${otherName}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${m.description || ''}</div>
-      ${m.effect ? `<div style="font-size:11px;color:var(--c-advertentie);margin-top:4px"><b>Effect:</b> ${m.effect}</div>` : ''}
+      <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${direction} ${otherName}</div>
     </div>`;
 }
 
@@ -2419,38 +2871,31 @@ function showInstanceDetail(d, content, color) {
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${d.type} · ${d.filterCat}</div>
       <h2>${d.name}</h2>
+      ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
     </div>
   `;
   if (d.description) html += `<div class="detail-description">${d.description}</div>`;
-  if (d.role_name) {
-    html += `<div class="detail-section"><h4>Rol</h4>
-      <div style="font-size:12px;color:var(--text-dim)">${d.role_name}</div></div>`;
-  }
-  html += renderInfluenceSection(d);
   html += renderTimespanSection(d, 'entity_id', d.id);
   if (outgoing.length) {
-    html += `<div class="detail-section"><h4>Uitgaande relaties (${outgoing.length})</h4>`;
-    outgoing.forEach(r => {
-      const tgt = typeof r.target === 'object' ? r.target : entityMap.get(r.target);
-      html += relationCard(tgt ? tgt.name : '?', r, 'naar');
-    });
-    html += `</div>`;
+    html += collapsibleSection('Uitgaande relaties',
+      outgoing.map(r => {
+        const tgt = typeof r.target === 'object' ? r.target : entityMap.get(r.target);
+        return relationCard(tgt ? tgt.name : '?', r, 'naar');
+      }).join(''), { meta: outgoing.length });
   }
   if (incoming.length) {
-    html += `<div class="detail-section"><h4>Inkomende relaties (${incoming.length})</h4>`;
-    incoming.forEach(r => {
-      const src = typeof r.source === 'object' ? r.source : entityMap.get(r.source);
-      html += relationCard(src ? src.name : '?', r, 'van');
-    });
-    html += `</div>`;
+    html += collapsibleSection('Inkomende relaties',
+      incoming.map(r => {
+        const src = typeof r.source === 'object' ? r.source : entityMap.get(r.source);
+        return relationCard(src ? src.name : '?', r, 'van');
+      }).join(''), { meta: incoming.length });
   }
 
   // Discussieboom voor deze entiteit
   const entityArgs = argsByEntity[d.id];
   if (entityArgs && entityArgs.length) {
-    html += `<div class="detail-section"><h4>Discussie over ${d.name}</h4>`;
-    html += renderArgTree(entityArgs);
-    html += `</div>`;
+    html += collapsibleSection('Discussie', renderArgTree(entityArgs),
+      { meta: `${countStances(entityArgs).total} arg.` });
   }
 
   // Formulier voor nieuw argument over deze entiteit
@@ -2477,7 +2922,7 @@ function showInstanceDetail(d, content, color) {
     </div>`;
   }
 
-  content.innerHTML = html;
+  setPanelContent(`ent-${d.id}`, html);
 }
 
 function relationCard(otherName, r, direction) {
@@ -2594,6 +3039,7 @@ function computeVisibleLinks() {
 
 function applyFilters() {
   if (!nodeElements || !linkElements) return;
+  clearDerivedLinks();   // afgeleide pijlen horen bij een actieve selectie, niet bij de basisview
   const isTheory = state.model === 'theory';
   const search = state.searchTerm.toLowerCase();
 
@@ -2875,11 +3321,13 @@ document.getElementById('certSlider').addEventListener('input', e => {
   state.certMin = parseFloat(e.target.value);
   document.getElementById('certVal').textContent = state.certMin.toFixed(2);
   applyFilters();
+  if (state.selectedNode) selectNode(state.selectedNode);  // afgeleide pijlen volgen de sliders live
 });
 document.getElementById('inflSlider').addEventListener('input', e => {
   state.inflMin = parseFloat(e.target.value);
   document.getElementById('inflVal').textContent = state.inflMin.toFixed(2);
   applyFilters();
+  if (state.selectedNode) selectNode(state.selectedNode);  // afgeleide pijlen volgen de sliders live
 });
 
 // Search

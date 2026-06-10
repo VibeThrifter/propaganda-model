@@ -31,6 +31,20 @@ def export_data():
     """)
     entities = [dict(row) for row in cur.fetchall()]
 
+    # Alle rollen per entiteit (hoofdrol + entity_roles) — nodig om padclaims
+    # (rol ⇢ rol) op praktijk-paren te kunnen toetsen.
+    entity_role_ids = {}
+    for eid, rid in cur.execute(
+        "SELECT entity_id, role_id FROM entity_roles WHERE role_id IS NOT NULL"
+    ):
+        entity_role_ids.setdefault(eid, set()).add(rid)
+    for eid, rid in cur.execute(
+        "SELECT id, primary_role_id FROM entities WHERE primary_role_id IS NOT NULL"
+    ):
+        entity_role_ids.setdefault(eid, set()).add(rid)
+    for e in entities:
+        e['role_ids'] = sorted(entity_role_ids.get(e['id'], []))
+
     # Relations with entity names, mechanism + temporal data
     cur.execute("""
         SELECT r.id, r.source_id, r.target_id, r.relation_type,

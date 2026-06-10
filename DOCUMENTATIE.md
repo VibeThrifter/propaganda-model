@@ -92,7 +92,7 @@ Niet álle flak is echter diffuus: een hedendaagse, *wél* doelgerichte en gedoc
 Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid: ze socialiseren de journalisten (`academische_socialisatie`) én leveren de `gezagsexpert`s (`academische_autoriteit`). Doordat journalist én "onafhankelijke" bron uit dezelfde instituten komen, ontstaat **ideologische homofilie** — empirisch zichtbaar in de sterk afwijkende stemvoorkeur van NL-journalisten (D66/GroenLinks fors oververtegenwoordigd t.o.v. de bevolking). De hegemonie-*reproductie* reikt verder dan de media: het `kennisinstituut` vormt de hele hoogopgeleide elite die álle instituties bevolkt (Bovens & Wille, *diplomademocratie*) — politici (`academische_socialisatie_politiek`), denktanks (`academische_orthodoxie_denktank`), de "primaire definieerders" als CPB/DNB (`academische_orthodoxie_instituut`) en opiniemakers (`academische_vorming_opinie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
 
 **Rollen:** `elite_forum`, `columnist_opiniemaker`, `kennisinstituut`
-**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `transnationale_frame_export`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`
+**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`
 
 <a id="themas-dwarsverbanden"></a>
 ### Thema's: dwarsverbanden
@@ -250,8 +250,8 @@ levende aarden, met de visuele grammatica **pijlpunt = gericht, doorgetrokken = 
 
 | aard | betekenis | toets | render | voorbeeld |
 |---|---|---|---|---|
-| `direct` | lokaal feit; de oorzaak ís de twee eindpunten — óók als de invloed gemedieerd of onzeker is (mediatie → de keten; twijfel → de `certainty`-score) | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt, filterkleur | DPG → Het Parool (eigendom); WEF → NOS (`transnationale_frame_export`, cert ≈ 0,05) |
-| `veld_eigenschap` | er ís geen zinnige externe bron; een eigenschap *ván* de getroffen node (die de node *ondergaat*) | wie is de bron? niemand specifieks | **halo** om de node (geen edge); bron-rol mag `NULL` zijn | `zelfcensuur`, `sociologische_homogeniteit` (homogene redactie → blinde vlekken), `geweld_intimidatie` |
+| `direct` | lokaal feit; de oorzaak ís de twee eindpunten — óók als de invloed gemedieerd of onzeker is (mediatie → de keten; twijfel → de `certainty`-score) | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt, filterkleur | DPG → Het Parool (eigendom); Bilderberg → mediabestuurder (`ideologische_synchronisatie`, cert ≈ 0,05) |
+| `veld_eigenschap` | er ís geen zinnige externe bron; een eigenschap *ván* de getroffen node (die de node *ondergaat*) | wie is de bron? niemand specifieks | **halo** om de node (geen edge); bron-rol mag `NULL` zijn of de diffuse herkomst aanduiden | `zelfcensuur`, `sociologische_homogeniteit` (homogene redactie → blinde vlekken), `geweld_intimidatie`, `elite_referentiekader` (media opereren binnen het elite-frame; herkomst diffuus — er is geen handeling van forum naar redactie) |
 
 > Let op: dat een mechanisme thema `systemisch` draagt zegt niets over zijn `aard`. `eigendomsconcentratie`
 > is thematisch systemisch, maar elke afzonderlijke edge (DPG → Het Parool) is een lokaal eigendomsfeit —
@@ -263,8 +263,10 @@ levende aarden, met de visuele grammatica **pijlpunt = gericht, doorgetrokken = 
   gewoon díé keten van directe edges; elke schakel vermenigvuldigt een influence < 1, dus het netto-effect
   aan het eind blijft klein — geen bevel, wel een eigenaarssignatuur.
 - `veld_instantiatie` (diffuse waaier; was gestippeld zónder punt) — elke waaier bleek óf een echte gerichte
-  dyade (→ `direct` gemaakt: `transnationale_frame_export`, `ideologische_synchronisatie`, `schijndebat`,
-  `omroepverzuiling`) óf redundant (→ verwijderd: `stakeholder_capitalism_frame`).
+  dyade (→ `direct` gemaakt: `ideologische_synchronisatie`, `schijndebat`, `omroepverzuiling`), óf redundant
+  (→ verwijderd: `stakeholder_capitalism_frame`), óf bij nader inzien een node-eigenschap
+  (`transnationale_frame_export` werd eerst `direct`, maar er is geen handeling van forum naar redactie en
+  de cert=0,05-edges bliezen de forum-centraliteit op — herclassificeerd tot halo `elite_referentiekader`).
 
 Beide blijven geldig in de `CHECK` (voor migratie-replay) maar tekenen, indien gezet, gewoon als directe edge.
 
@@ -285,6 +287,30 @@ eigenschap die uit het samenspel van een hele *groep* rollen voortkomt en niet i
 te vangen is (eigen tabellen `emergent_effects` + `emergent_effect_members`; bv. *fabricage van consensus*,
 *zelfversterkende homeostase*). Het verschijnt als een transparant **goud veld** rond de leden, met label,
 hoverbaar/klikbaar (het detailpaneel toont het samenspel). Het volgt dezelfde toggle.
+
+### Afgeleide (indirecte) pijlen & padclaims
+
+Indirecte invloed wordt **niet opgeslagen** maar bij selectie van een node ter plekke afgeleid: de
+sterkste ≥2-hops-route (max-product over de zichtbare graaf) tekent als violette stippelpijl met
+"via …"-label. Drie poorten bepalen of zo'n pijl mag bestaan — alle drie verplicht:
+
+1. **Schakelscore** — de drempel-sliders gelden ook hier, net als voor gewone edges: de
+   zekerheid/geloofwaardigheid-slider toetst élke schakel afzonderlijk, de invloed/sterkte-slider
+   de gedempte padsterkte (max-product) van de hele pijl, met een vaste ondergrens van 5%
+   padsterkte tegen ruis.
+2. **Schakelargumenten** — elke schakel heeft eigen argumenten in de discussieboom; een score zonder
+   discussieboom telt niet als onderbouwing.
+3. **Eindclaim (padclaim)** — de *compositie* zelf is onderbouwd. Dat A→B en B→C elk kloppen, bewijst
+   nog niet A ⇢ C: invloed is niet automatisch transitief (wat A bij B verandert hoeft niet het kanaal
+   te zijn waarlangs B C beïnvloedt). Een padclaim is een gewoon argument in `arguments` met
+   `role_id` = bronrol, `property = 'indirecte_invloed_op'`, `property_value` = naam van de doelrol,
+   plus citaties — dezelfde bewijsstandaard als een directe pijl. `scoring.py` sluit padclaims uit van
+   de rolscore (ze gaan over het pad, niet over de rol); de viz toetst er elke kandidaat-pijl aan, in
+   het praktijkmodel via de rollen van de twee entiteiten. Vuistregel: claim alleen een paar als de
+   literatuur de compositie zelf benoemt (bv. Bergman over eigenaarsinvloed op hoofdredacteurs-
+   benoemingen; Luyendijk over de lobby-driehoek), en alleen als er ook een route bestaat die het
+   verhaal van de claim volgt — een claim wiens enige doorlatende route iets ánders vertelt, hoort er
+   niet in.
 
 ---
 
