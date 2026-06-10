@@ -2614,20 +2614,13 @@ function updateDerivedLinks(data) {
     .on('mouseover', (event, dd) => {
       const tt = document.getElementById('tooltip');
       const isTheory = state.model === 'theory';
-      const route = dd.chain.map(n => n.name).join(' → ');
-      const hops = (dd.links || []).map(l => {
-        const h = hopInfo(l, isTheory);
-        const extra = isTheory ? `${h.nArgs} arg., ${l.n_instanties || 0} praktijk`
-                               : `${h.nArgs} argumenten`;
-        return `<div class="tt-desc">◦ ${h.name} — ${Math.round(h.sup * 100)}% onderbouwd (${extra})</div>`;
-      }).join('');
-      const nClaim = countStances(dd.claimRoots || []).total;
+      // Alleen de eindclaim: dáár draait de pijl om. Route staat al op het
+      // "via …"-label; schakel-onderbouwing en bronnen zitten in het pad-detail (klik).
+      const claimTexts = (dd.claimRoots || []).slice(0, 2).map(a =>
+        `<div class="tt-desc" style="font-style:italic;color:var(--text)">“${truncate(a.claim, 260)}”</div>`).join('');
       tt.innerHTML = `<div class="tt-type" style="color:${FIELD_COLOR}">Afgeleide (indirecte) invloed · pad</div>
         <div class="tt-name">${dd.source.name} ⇢ ${dd.target.name}</div>
-        <div class="tt-desc">Sterkste route: ${route} · gedempte sterkte ${Math.round(dd.strength * 100)}%</div>
-        <div class="tt-desc">Eindclaim onderbouwd met ${nClaim} argument${nClaim === 1 ? '' : 'en'}</div>
-        <div class="tt-desc" style="margin-top:4px"><b>Onderbouwing per schakel:</b></div>
-        ${hops}
+        ${claimTexts}
         <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor de argumenten en bronnen</div>`;
       tt.classList.add('visible');
     })

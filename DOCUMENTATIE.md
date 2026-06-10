@@ -600,14 +600,14 @@ ORDER BY s.author;
 | Onderdeel | Aantal |
 |---|---|
 | Rollen (theoretisch) | 35 |
-| Mechanismen (theoretisch) | 119 |
+| Mechanismen (theoretisch) | 122 |
 | Emergente effecten (hyperedges) | 12 |
 | Entiteiten (concreet) | 162 |
 | Relaties (concreet) | 392 |
-| Argumenten | 413 |
-| Citaties | 144 |
-| Bronnen | 51 |
-| Bronlocaties | 43 |
+| Argumenten | 422 |
+| Citaties | 157 |
+| Bronnen | 62 |
+| Bronlocaties | 51 |
 
 > Let op: de meeste argumenten zijn automatisch gegenereerde `supporting`-onderbouwingen met status `ongecontroleerd` en nog grotendeels zonder citatie. Het aanvullen van citaties en het controleren van argumentstatus is openstaand werk.
 
