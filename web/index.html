@@ -504,8 +504,8 @@ details.detail-section > .sec-body { margin-top: 8px; }
   <h1>Propagandamodel</h1>
   <span class="subtitle">NL Politiek &amp; Media</span>
   <div class="model-toggle" id="modelToggle">
-    <button class="active" data-model="instance">Praktijk Model</button>
-    <button data-model="theory">Theoretisch Model</button>
+    <button data-model="instance">Praktijk Model</button>
+    <button class="active" data-model="theory">Theoretisch Model</button>
   </div>
   <div class="search-box">
     <span class="search-icon">&#x1F50D;</span>
@@ -30781,7 +30781,7 @@ const mechLinks = DATA.mechanisms.map(m => {
 // STATE
 // ============================================================
 let state = {
-  model: 'instance',     // 'instance' | 'theory'
+  model: 'theory',       // 'instance' | 'theory' — theoretisch model als startpunt
   colorMode: 'type',
   activeFilters: new Set(Object.keys(FILTER_LABELS)),  // filter-as: categorieën van de EDGES
   activeThemes: new Set(Object.keys(THEME_LABELS)),    // thema-as: dwarsverbanden van de EDGES
@@ -33651,8 +33651,12 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 // ============================================================
 initTimeline();
 populateSizeMetricOptions();
-// Veld-effecten-toggle alleen tonen in het theoriemodel (default-model = praktijk → verborgen).
-document.getElementById('fieldToggleRow').style.display = (state.model === 'theory') ? '' : 'none';
+// Model-afhankelijke UI op de startstand zetten (zelfde regels als de modelwissel-handler).
+const initTheory = state.model === 'theory';
+configureSliders(initTheory);
+document.getElementById('colorModeSection').style.display = initTheory ? 'none' : '';
+document.getElementById('timelineSection').style.display = initTheory ? 'none' : '';
+document.getElementById('fieldToggleRow').style.display = initTheory ? '' : 'none';
 buildGraph();
 renderLegend();
 
