@@ -183,7 +183,7 @@ body {
 .legend-item .count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 10px; }
 
 .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.slider-row label { font-size: 11px; color: var(--text-dim); min-width: 70px; }
+.slider-row label { font-size: 11px; color: var(--text-dim); width: 102px; flex-shrink: 0; }
 .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); height: 4px; }
 .slider-row .val { font-size: 10px; color: var(--text-muted); min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -582,7 +582,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
   <div class="panel-section" id="timelineSection">
     <h3>Tijdlijn</h3>
     <div class="slider-row">
-      <label id="timeLabel" style="min-width:90px">Alle jaren</label>
+      <label id="timeLabel">Alle jaren</label>
       <input type="range" id="timeSlider" min="0" max="1" step="1" value="0">
     </div>
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:-2px">
