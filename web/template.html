@@ -575,10 +575,22 @@ details.detail-section > .sec-body { margin-top: 8px; }
   </div>
   <div class="panel-section" id="fieldSection">
     <h3>Systemische effecten</h3>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
+    <label id="fieldToggleRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
            title="Alles wat géén direct dyadisch feit is. Diffuus, géén gericht kanaal: halo's rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias), en de emergente velden — een transparant veld rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus); klik erop voor het samenspel. Uit = schone dyadische graaf; de node-grootte telt deze effecten dan niet mee.">
       <input type="checkbox" id="fieldToggle">
-      <span>Toon systemische effecten</span>
+      <span>Velden &amp; halo's</span>
+      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
+           title="Bij selectie berekende ≥2-hops-routes (violet, gestippeld): de sterkste onderbouwde keten van bron naar doel, getoetst aan de drie poorten (schakelscore, schakelargumenten, padclaim).">
+      <input type="checkbox" id="derivedToggle" checked>
+      <span>Indirecte (afgeleide) pijlen</span>
+      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
+           title="De gewone dyadische edges. Uit = alleen nodes (plus eventuele velden/indirecte pijlen), handig om de niet-directe lagen los te bekijken.">
+      <input type="checkbox" id="directToggle" checked>
+      <span>Directe pijlen</span>
       <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
     </label>
   </div>
@@ -1114,6 +1126,8 @@ let state = {
   sizeMetric: 'influence_direct',  // welke maat de node-grootte bepaalt (zie SIZE_METRICS)
   receivedMap: null,           // entity/rol-id -> som inkomende invloed (per buildGraph)
   showFieldEffects: false,     // emergente veld-effecten (aard != direct) tonen? Default schoon.
+  showDerived: true,           // afgeleide (indirecte) pijlen bij selectie tonen?
+  showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
   fieldPropertyMap: null,      // node-id -> max inkomende veld-eigenschap-influence (halo-intensiteit)
 };
 
@@ -2511,24 +2525,24 @@ function selectNode(d) {
       nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
       nodeElements.select('.field-halo').attr('opacity', n => nodeOn(n.id) ? fieldHaloOpacity(n) : 0.02);
       linkElements.each(function(l, i) {
-        const s = linkStrength.get(i);
+        const s = state.showDirect ? linkStrength.get(i) : null;
         const el = d3.select(this);
         if (s != null) {
           el.attr('stroke-opacity', 0.35 + 0.6 * Math.min(1, s));  // sterker pad = feller
           if (!el.attr('data-marker')) el.attr('data-marker', markerFor(l, isTheory));
           el.attr('marker-end', el.attr('data-marker'));
         } else {
-          el.attr('stroke-opacity', 0.03);
+          el.attr('stroke-opacity', state.showDirect ? 0.03 : 0);
           el.attr('marker-end', 'none');
         }
       });
-      if (linkHitElements) linkHitElements.style('pointer-events', (l, i) => linkStrength.has(i) ? 'auto' : 'none');
-      if (edgeLabelElements) edgeLabelElements.attr('opacity', (l, i) => linkStrength.has(i) ? 1 : 0.1);
+      if (linkHitElements) linkHitElements.style('pointer-events', (l, i) => (state.showDirect && linkStrength.has(i)) ? 'auto' : 'none');
+      if (edgeLabelElements) edgeLabelElements.attr('opacity', (l, i) => (state.showDirect && linkStrength.has(i)) ? 1 : 0.1);
 
       // Afgeleide (indirecte) invloed: alleen paden waarvan élke schakel onderbouwd
       // is krijgen een pijl — geen willekeurige top-N. Ook naar directe buren als
       // er daarnaast een onderbouwd indirect kanaal bestaat (ander pad, ander verhaal).
-      const derived = computeDerivedInfluence(d.id, visibleLinkSet, isTheory);
+      const derived = state.showDerived ? computeDerivedInfluence(d.id, visibleLinkSet, isTheory) : [];
       state.derivedAll = derived;
       state.derivedShown = derived;
       updateDerivedLinks(derived);
@@ -2558,9 +2572,9 @@ function selectNode(d) {
   nodeElements.select('text').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.06);
   nodeElements.select('.field-halo').attr('opacity', n => connectedIds.has(n.id) ? fieldHaloOpacity(n) : 0.02);
   linkElements.each(function(l, i) {
-    const connected = isConnected(l, i);
+    const connected = state.showDirect && isConnected(l, i);
     const el = d3.select(this);
-    el.attr('stroke-opacity', connected ? 0.8 : 0.03);
+    el.attr('stroke-opacity', connected ? 0.8 : (state.showDirect ? 0.03 : 0));
     el.attr('marker-end', connected ? el.attr('marker-end') || 'none' : 'none');
     // Store original marker so we can restore it
     if (connected && !el.attr('data-marker')) el.attr('data-marker', markerFor(l, isTheory));
@@ -2568,10 +2582,10 @@ function selectNode(d) {
   });
   // Only connected + visible relations stay hoverable (tooltips live on the hit-lines)
   if (linkHitElements) {
-    linkHitElements.style('pointer-events', (l, i) => isConnected(l, i) ? 'auto' : 'none');
+    linkHitElements.style('pointer-events', (l, i) => (state.showDirect && isConnected(l, i)) ? 'auto' : 'none');
   }
   if (edgeLabelElements) {
-    edgeLabelElements.attr('opacity', (l, i) => isConnected(l, i) ? 1 : 0.1);
+    edgeLabelElements.attr('opacity', (l, i) => (state.showDirect && isConnected(l, i)) ? 1 : 0.1);
   }
 
   updateEmergentFields();   // velden van de geselecteerde node oplichten
@@ -3079,20 +3093,23 @@ function applyFilters() {
   nodeElements.style('pointer-events', d => visibleNodes.has(d.id) ? 'all' : 'none');
 
   // Step 5: Apply visibility to links — including marker-end
+  // Directe pijlen-toggle: alleen het TEKENEN van de edges; de zichtbaarheidsset
+  // (node-zichtbaarheid, afgeleide paden, stats) blijft op de echte filters lopen.
+  const drawL = i => visibleLinkSet.has(i) && state.showDirect;
   linkElements
-    .attr('stroke-opacity', (l, i) => visibleLinkSet.has(i) ? linkBaseOpacity(l, isTheory) : 0)
-    .attr('marker-end', (l, i) => visibleLinkSet.has(i) ? markerFor(l, isTheory) : 'none');
+    .attr('stroke-opacity', (l, i) => drawL(i) ? linkBaseOpacity(l, isTheory) : 0)
+    .attr('marker-end', (l, i) => drawL(i) ? markerFor(l, isTheory) : 'none');
 
   // Verborgen links niet hoverbaar: tooltip-handlers zitten op de hit-lijnen,
   // dus pointer-events daar uitschakelen voor uitgefilterde/verleden relaties
   if (linkHitElements) {
-    linkHitElements.style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
+    linkHitElements.style('pointer-events', (l, i) => drawL(i) ? 'auto' : 'none');
   }
 
   if (edgeLabelElements) {
     edgeLabelElements
-      .attr('opacity', (l, i) => visibleLinkSet.has(i) ? 1 : 0)
-      .style('pointer-events', (l, i) => visibleLinkSet.has(i) ? 'auto' : 'none');
+      .attr('opacity', (l, i) => drawL(i) ? 1 : 0)
+      .style('pointer-events', (l, i) => drawL(i) ? 'auto' : 'none');
   }
 
   updateEmergentFields();   // emergente velden tonen/verbergen (theorie + toggle)
@@ -3124,9 +3141,10 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     configureSliders(isTheory);     // drempels werken in beide modellen, op model-eigen velden
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
     document.getElementById('timelineSection').style.display = isTheory ? 'none' : '';
-    // Veld-effecten bestaan alleen in het theoriemodel; in het praktijkmodel verbergen we de
-    // toggle en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
-    document.getElementById('fieldSection').style.display = isTheory ? '' : 'none';
+    // Veld-effecten bestaan alleen in het theoriemodel; in het praktijkmodel verbergen we die
+    // rij en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
+    // De toggles voor directe/indirecte pijlen gelden in beide modellen.
+    document.getElementById('fieldToggleRow').style.display = isTheory ? '' : 'none';
     if (!isTheory) {
       state.showFieldEffects = false;
       document.getElementById('fieldToggle').checked = false;
@@ -3156,6 +3174,17 @@ function applyFieldEffects() {
 document.getElementById('fieldToggle').addEventListener('change', e => {
   state.showFieldEffects = e.target.checked;
   applyFieldEffects();
+});
+// Indirecte (afgeleide) pijlen bestaan alleen bij een actieve selectie: herselecteren volstaat.
+document.getElementById('derivedToggle').addEventListener('change', e => {
+  state.showDerived = e.target.checked;
+  if (state.selectedNode) selectNode(state.selectedNode);
+});
+// Directe pijlen: alleen het tekenen; nodes, velden en afgeleide paden blijven staan.
+document.getElementById('directToggle').addEventListener('change', e => {
+  state.showDirect = e.target.checked;
+  applyFilters();
+  if (state.selectedNode) selectNode(state.selectedNode);
 });
 
 // Chips voor TWEE assen: Chomsky-filters en dwarsliggende thema's. Beide werken
@@ -3896,7 +3925,7 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 initTimeline();
 populateSizeMetricOptions();
 // Veld-effecten-toggle alleen tonen in het theoriemodel (default-model = praktijk → verborgen).
-document.getElementById('fieldSection').style.display = (state.model === 'theory') ? '' : 'none';
+document.getElementById('fieldToggleRow').style.display = (state.model === 'theory') ? '' : 'none';
 buildGraph();
 renderLegend();
 
