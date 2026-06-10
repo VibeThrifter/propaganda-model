@@ -131,19 +131,20 @@ body {
 }
 .filter-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color, var(--text-muted)); flex-shrink: 0; }
 
-/* Dropdown voor de emergente velden (uitlichten/isoleren, los van de contour-toggle) */
+/* Dropdown voor de emergente velden (uitlichten/isoleren, los van de contour-toggle).
+   De knop is een kaal pijltje rechts van de toggle — geen tekst. */
 .dropdown-btn {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  width: 100%; padding: 7px 10px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
-  font-size: 12px; font-family: inherit; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  min-width: 22px; height: 22px; padding: 0 5px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted);
+  font-family: inherit; cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.dropdown-btn:hover { background: var(--bg-hover); border-color: color-mix(in srgb, #e3b341 55%, var(--border)); }
-.dropdown-btn .chev { color: var(--text-muted); font-size: 10px; transition: transform 0.18s; }
+.dropdown-btn:hover { background: var(--bg-hover); color: var(--text); border-color: color-mix(in srgb, #e3b341 55%, var(--border)); }
+.dropdown-btn .chev { font-size: 9px; transition: transform 0.18s; }
 .dropdown-btn.open .chev { transform: rotate(180deg); }
 .dropdown-btn .count {
-  margin-left: auto; font-size: 10px; padding: 1px 7px; border-radius: 9px;
+  font-size: 9px; padding: 0 5px; border-radius: 8px;
   background: color-mix(in srgb, #e3b341 18%, transparent); color: #e3b341;
   font-variant-numeric: tabular-nums;
 }
@@ -610,23 +611,23 @@ details.detail-section > .sec-body { margin-top: 8px; }
   <div class="panel-section" id="fieldSection">
     <h3>Systemische effecten</h3>
     <div id="fieldToggleRow">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
-             title="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel.">
-        <input type="checkbox" id="fieldToggle">
-        <span>Emergente velden</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
-      </label>
-      <!-- Velden uitlichten, lós van de contour-toggle: hover = oplichten, klik = vastzetten
-           (meerdere kan). Een uitgelicht veld wordt ook getekend als de toggle uit staat. -->
-      <div style="margin-top:8px">
+      <!-- Toggle (alle velden als contour) met rechts een kaal pijltje dat de lijst
+           uitklapt om velden uit te lichten — lós van de toggle: hover = oplichten,
+           klik = vastzetten (meerdere kan), ook getekend als de toggle uit staat. -->
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;flex:1"
+               title="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van consensus). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel.">
+          <input type="checkbox" id="fieldToggle">
+          <span>Emergente velden</span>
+          <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        </label>
         <button type="button" class="dropdown-btn" id="emergentDropdownBtn"
-                title="Licht één of meer emergente velden uit in de graaf — ook als de contour-toggle hierboven uit staat.">
-          <span>Velden uitlichten</span>
+                title="Licht één of meer emergente velden uit in de graaf — ook als de toggle uit staat.">
           <span class="count" id="emergentCount" style="display:none">0</span>
           <span class="chev" aria-hidden="true">▼</span>
         </button>
-        <div class="dropdown-list" id="emergentChips"></div>
       </div>
+      <div class="dropdown-list" id="emergentChips"></div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
              title="Violette ringen rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias). Diffuus, géén gericht kanaal. Aan = de node-grootte telt deze veld-effecten mee; uit = schone dyadische maat.">
         <input type="checkbox" id="haloToggle">
