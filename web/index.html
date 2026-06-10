@@ -336,7 +336,9 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .arg-node.depth-0 { border-left: none; margin-left: 0; }
 
 .arg-node .arg-header {
-  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  /* flex-start + wrap: een lang property-chipje duwt de claim naar een eigen
+     volle regel in plaats van haar als smalle kolom ernaast te persen. */
+  display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;
 }
 .arg-stance {
   display: inline-flex; align-items: center; justify-content: center;
@@ -349,6 +351,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
 
 .arg-claim {
   font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4;
+  flex: 1 1 220px;   /* wikkelt naar een nieuwe regel als er < 220px naast de badges over is */
 }
 .arg-reasoning {
   font-size: 11px; color: var(--text-dim); line-height: 1.5; margin-top: 4px;
@@ -32258,7 +32261,8 @@ const STANCE_SYMBOLS = { supporting: '+', contradicting: '−', contextual: '~' 
 const PROPERTY_LABELS = {
   existence: 'Bestaan', active_from: 'Startdatum', active_until: 'Einddatum',
   certainty: 'Zekerheid', influence: 'Invloed', relation_type: 'Relatietype',
-  description: 'Beschrijving', type: 'Entiteittype', role: 'Rol'
+  description: 'Beschrijving', type: 'Entiteittype', role: 'Rol',
+  indirecte_invloed_op: 'Indirecte invloed op'
 };
 const STATUS_LABELS = {
   ongecontroleerd: '?', bronvermelding_nodig: '!', betwist: '⚡',
@@ -32305,7 +32309,7 @@ function renderArgNode(arg, depth) {
   const depthClass = depth === 0 ? 'root' : '';
 
   const propLabel = arg.property ? PROPERTY_LABELS[arg.property] || arg.property : null;
-  const propBadge = propLabel ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(108,138,255,0.12);color:var(--accent);margin-right:2px">${propLabel}${arg.property_value ? ': '+arg.property_value : ''}</span>` : '';
+  const propBadge = propLabel ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(108,138,255,0.12);color:var(--accent);margin-right:2px;white-space:nowrap">${propLabel}${arg.property_value ? ': '+arg.property_value : ''}</span>` : '';
   const statusSym = arg.status ? STATUS_LABELS[arg.status] || '' : '';
   const statusCol = arg.status ? STATUS_COLORS[arg.status] || 'var(--text-muted)' : '';
   const statusBadge = statusSym ? `<span style="font-size:10px;color:${statusCol}" title="${arg.status}">${statusSym}</span>` : '';
@@ -33936,23 +33940,17 @@ function selectDerivedPath(dd) {
   <div class="detail-header">
     <div class="entity-type" style="color:${FIELD_COLOR}">Afgeleid pad · indirecte invloed</div>
     <h2>${dd.source.name} ⇢ ${dd.target.name}</h2>
-    <div style="font-size:11px;color:var(--text-dim);margin-top:4px">${dd.chain.map(n => n.name).join(' → ')}</div>
-  </div>
-  <div class="detail-description">Deze indirecte invloed is zelf als claim onderbouwd (zie eindclaim)
-    en loopt via onderstaande schakels · sterkte <b>${pct(dd.strength)}%</b>.</div>`;
+    <div style="font-size:11px;color:var(--text-dim);margin-top:4px">${dd.chain.map(n => n.name).join(' → ')}
+      &nbsp;·&nbsp; sterkte <b style="color:var(--text)">${pct(dd.strength)}%</b></div>
+  </div>`;
   const claimRoots = dd.claimRoots || [];
-  html += collapsibleSection('Eindclaim · waarom deze pijl bestaat',
-    `<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">
-       ${dd.source.name} ⇢ ${dd.target.name}: de samengestelde claim, met eigen argumenten en bronnen —
-       los van de schakels eronder.</div>` + renderArgTree(claimRoots),
+  html += collapsibleSection('Eindclaim', renderArgTree(claimRoots),
     { border: FIELD_COLOR, open: true, meta: `${countStances(claimRoots).total} arg.` });
   (dd.links || []).forEach((l, k) => {
     const src = typeof l.source === 'object' ? l.source : nodeByIdGlobal.get(l.source);
     const tgt = typeof l.target === 'object' ? l.target : nodeByIdGlobal.get(l.target);
     const h = hopInfo(l, isTheory);
-    const score = isTheory
-      ? `${pct(h.sup)}% geloofwaardig · sterkte ${pct(l.sterkte)}%`
-      : `${pct(h.sup)}% zeker · invloed ${pct(l.influence)}%`;
+    const score = isTheory ? `sterkte ${pct(l.sterkte)}%` : `invloed ${pct(l.influence)}%`;
     let body = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'} · ${score}</div>`;
     body += h.roots.length
       ? renderArgTree(h.roots)
@@ -33961,7 +33959,8 @@ function selectDerivedPath(dd) {
     body += `<div style="font-size:10px;color:var(--accent);cursor:pointer;margin-top:6px"
        onclick="openDerivedSchakel(${k})">→ volledige discussie van deze schakel</div>`;
     html += collapsibleSection(`Schakel ${k + 1} · ${h.name}`, body,
-      { border: getLinkColor(l, isTheory), open: k === 0, meta: `${pct(h.sup)}%` });
+      { border: getLinkColor(l, isTheory), open: false,
+        meta: `${pct(h.sup)}% ${isTheory ? 'geloofwaardig' : 'zeker'}` });
   });
   setPanelContent(`dpath-${dd.source.id}-${dd.target.id}`, html);
   document.getElementById('detail').classList.add('open');
