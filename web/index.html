@@ -131,6 +131,40 @@ body {
 }
 .filter-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color, var(--text-muted)); flex-shrink: 0; }
 
+/* Dropdown voor de emergente velden (uitlichten/isoleren, los van de contour-toggle) */
+.dropdown-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
+  font-size: 12px; font-family: inherit; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dropdown-btn:hover { background: var(--bg-hover); border-color: color-mix(in srgb, #e3b341 55%, var(--border)); }
+.dropdown-btn .chev { color: var(--text-muted); font-size: 10px; transition: transform 0.18s; }
+.dropdown-btn.open .chev { transform: rotate(180deg); }
+.dropdown-btn .count {
+  margin-left: auto; font-size: 10px; padding: 1px 7px; border-radius: 9px;
+  background: color-mix(in srgb, #e3b341 18%, transparent); color: #e3b341;
+  font-variant-numeric: tabular-nums;
+}
+.dropdown-list {
+  display: none; margin-top: 6px; padding: 4px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card);
+  max-height: 230px; overflow-y: auto;
+}
+.dropdown-list.open { display: block; }
+.dropdown-item {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  border-radius: 6px; font-size: 11px; color: var(--text-dim); cursor: pointer;
+  user-select: none; transition: background 0.12s, color 0.12s;
+}
+.dropdown-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.dropdown-item.active {
+  background: color-mix(in srgb, #e3b341 15%, transparent); color: var(--text);
+}
+.dropdown-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #e3b341; flex-shrink: 0; opacity: 0.45; }
+.dropdown-item.active .dot { opacity: 1; }
+
 /* Filter-/thema-tags in detailpanelen */
 .tag-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .tag-badge {
@@ -582,9 +616,17 @@ details.detail-section > .sec-body { margin-top: 8px; }
         <span>Emergente velden</span>
         <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
       </label>
-      <!-- Eén chip per veld: hover = oplichten, klik = isoleren (meerdere kan). Zonder
-           selectie tekent de graaf alle velden als vage contour, zonder label-wolk. -->
-      <div class="filter-group" id="emergentChips" style="display:none;margin-top:6px"></div>
+      <!-- Velden uitlichten, lós van de contour-toggle: hover = oplichten, klik = vastzetten
+           (meerdere kan). Een uitgelicht veld wordt ook getekend als de toggle uit staat. -->
+      <div style="margin-top:8px">
+        <button type="button" class="dropdown-btn" id="emergentDropdownBtn"
+                title="Licht één of meer emergente velden uit in de graaf — ook als de contour-toggle hierboven uit staat.">
+          <span>Velden uitlichten</span>
+          <span class="count" id="emergentCount" style="display:none">0</span>
+          <span class="chev" aria-hidden="true">▼</span>
+        </button>
+        <div class="dropdown-list" id="emergentChips"></div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
              title="Violette ringen rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias). Diffuus, géén gericht kanaal. Aan = de node-grootte telt deze veld-effecten mee; uit = schone dyadische maat.">
         <input type="checkbox" id="haloToggle">
@@ -31636,11 +31678,12 @@ function emergentLabelPos(eff) {
 //   opgelicht  — chip geselecteerd of gehoverd (chip óf hull): vulling + label.
 function updateEmergentFields() {
   if (!emergentHullElements) return;
-  // De toggle is leidend: staat hij uit, dan ook geen velden bij een actieve selectie.
+  // De contour-toggle bepaalt of álle velden (vaag) getekend worden; een uitgelicht
+  // veld (dropdown-selectie, hover of aangeklikt) wordt áltijd getekend.
   const show = emergentVisible();
-  const on = d => (show && emergentMemberNodes(d).length) ? 1 : 0;
   const lit = d => state.emergentSelection.has(d.id) || state.emergentHover === d.id
                 || state.emergentActive === d.id;
+  const on = d => (state.model === 'theory' && (show || lit(d)) && emergentMemberNodes(d).length) ? 1 : 0;
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
     .attr('opacity', on)
@@ -33228,7 +33271,6 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
       state.showHalos = false;
       document.getElementById('fieldToggle').checked = false;
       document.getElementById('haloToggle').checked = false;
-      syncEmergentChipsVisibility();
     }
 
     rebuildChips();                 // edge-categorieën verschillen per model
@@ -33252,40 +33294,45 @@ function applyFieldEffects() {
   applySizeMetric();     // node-grootte schoon<->veld, halo-stralen, eventueel cascade herstellen
   if (state.selectedNode) showDetail(state.selectedNode);  // detailpaneel met de juiste variant
 }
-// Chips voor de emergente velden: hover = veld oplichten, klik = isoleren (meerdere kan).
-// Zonder selectie tekent de graaf alle velden als vage contour zonder labels.
+// Dropdown voor de emergente velden: hover = veld oplichten, klik = vastzetten (meerdere
+// kan). Werkt lós van de contour-toggle — een uitgelicht veld wordt altijd getekend.
 const emergentChipEls = new Map();
+function syncEmergentCount() {
+  const n = state.emergentSelection.size;
+  const badge = document.getElementById('emergentCount');
+  badge.textContent = n;
+  badge.style.display = n ? '' : 'none';
+}
 function rebuildEmergentChips() {
   const container = document.getElementById('emergentChips');
   container.innerHTML = '';
   emergentChipEls.clear();
   (DATA.emergent_effects || []).forEach(eff => {
-    const chip = document.createElement('div');
-    chip.className = 'filter-chip';
-    chip.style.setProperty('--chip-color', EMERGENCE_COLOR);
-    chip.innerHTML = `<span class="dot"></span>${eff.label}`;
-    if (eff.description) chip.title = eff.description;
-    chip.addEventListener('click', () => {
+    const item = document.createElement('div');
+    item.className = 'dropdown-item';
+    item.innerHTML = `<span class="dot"></span>${eff.label}`;
+    if (eff.description) item.title = eff.description;
+    item.addEventListener('click', () => {
       const sel = state.emergentSelection;
       if (sel.has(eff.id)) sel.delete(eff.id); else sel.add(eff.id);
-      chip.classList.toggle('active', sel.has(eff.id));
+      item.classList.toggle('active', sel.has(eff.id));
+      syncEmergentCount();
       updateEmergentFields();
     });
-    chip.addEventListener('mouseenter', () => { state.emergentHover = eff.id; updateEmergentFields(); });
-    chip.addEventListener('mouseleave', () => { state.emergentHover = null; updateEmergentFields(); });
-    container.appendChild(chip);
-    emergentChipEls.set(eff.id, chip);
+    item.addEventListener('mouseenter', () => { state.emergentHover = eff.id; updateEmergentFields(); });
+    item.addEventListener('mouseleave', () => { state.emergentHover = null; updateEmergentFields(); });
+    container.appendChild(item);
+    emergentChipEls.set(eff.id, item);
   });
 }
-function syncEmergentChipsVisibility() {
-  document.getElementById('emergentChips').style.display = state.showFieldEffects ? '' : 'none';
-}
 rebuildEmergentChips();
-syncEmergentChipsVisibility();
+document.getElementById('emergentDropdownBtn').addEventListener('click', () => {
+  document.getElementById('emergentDropdownBtn').classList.toggle('open');
+  document.getElementById('emergentChips').classList.toggle('open');
+});
 
 document.getElementById('fieldToggle').addEventListener('change', e => {
   state.showFieldEffects = e.target.checked;
-  syncEmergentChipsVisibility();
   applyFieldEffects();
 });
 // Halo's (veld-eigenschappen) los van de emergente velden; beïnvloedt ook de node-grootte
