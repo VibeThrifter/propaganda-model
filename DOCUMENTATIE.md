@@ -69,7 +69,7 @@ Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeu
 ### Filter 3: Sourcing
 Economische druk dwingt redacties tot afhankelijkheid van een beperkt aantal routineuze bronnen: het ANP, de overheid, en door de elite gefinancierde denktanks. Toegang (*access*) is hierbij zelf een schaarse hulpbron: wie aan tafel mag krijgt een podium, wie fundamenteel afwijkt verliest die toegang geruisloos (`toegangsdisciplinering`).
 
-Het **persbureau** (ANP) is binnen dit filter de *industriële versterker*: objectief in HÓE het schrijft (zonder oordeel), maar door tijd, geld, klantvraag en routines structureel selectief in WÁT het schrijft — en het propagandamodel gaat juist over dat WÁT. Drie routines drijven die selectie: leunen op de agenda's van officiële instanties — rechtbank, Kamer, politie, persconferenties (`persbureau_brongebondenheid`); de gebundelde vraag van betalende klant-redacties die de "waan van de dag" opschaalt ten koste van structureel ondervraagde thema's (`klantvraag_persbureau`); en de snelheids-/verifieerbaarheidseis die het officieel-controleerbare bevoordeelt boven trage onderzoeksjournalistiek (`verifieerbaarheidsroutine`). Via `pakketjournalistiek` wordt die selectie vervolgens landelijk uniform doorgegeven.
+Het **persbureau** (ANP) is binnen dit filter de *industriële versterker*: objectief in HÓE het schrijft (zonder oordeel), maar door tijd, geld, klantvraag en routines structureel selectief in WÁT het schrijft — en het propagandamodel gaat juist over dat WÁT. Drie routines drijven die selectie: leunen op de agenda's van officiële instanties — rechtbank, Kamer, politie, persconferenties (`persbureau_brongebondenheid`); de gebundelde vraag van betalende klant-redacties die de "waan van de dag" opschaalt ten koste van structureel ondervraagde thema's (`klantvraag_persbureau`); en de snelheids-/verifieerbaarheidseis die het officieel-controleerbare bevoordeelt boven trage onderzoeksjournalistiek (`verifieerbaarheidsroutine`). Via `pakketjournalistiek` wordt die selectie vervolgens landelijk uniform doorgegeven. De landschapsbrede uitkomst — veel merknamen, één nieuwsstroom, terwijl het publiek meerstemmigheid ervaart — is gemodelleerd als emergent effect `schijnpluriformiteit` (Boumans, UvA 2016: ca. tweederde van het online nieuws in 2014 ANP-gebaseerd, veelal vrijwel integraal overgenomen). De structurele scheefgroei tussen de zendende en de checkende kant (±150.000 communicatieprofessionals tegenover ±15.000 journalisten; UvA/CBS) is het emergente effect `voorlichtingsovermacht`.
 
 Achter de bronnen zitten **principalen** die de sourcing-stroom voeden via instrumenten — dezelfde logica, twee gedaanten. Corporate: een `belanghebbende` (bedrijf/sector/branche) zet zijn belang om in mediabeeld via lobbyisten, brancheorganisaties en denktanks (`belangenbehartiging`); de soorten lobby verschillen (corporate-sectoraal, branche/koepel, ideologisch/NGO) en goed georganiseerde belangen zijn structureel oververtegenwoordigd. Politiek: de voorlichter heeft altijd een principaal — een **politieke `partij`** (die via `gecoordineerde_voorlichting` één afgestemde boodschap langs de partijlijn levert en via `partijlijn` haar politici aanstuurt) **óf een instituut/ministerie** (`gezagsinstituut`, Rijksvoorlichtingsdienst, departementale woordvoerders, via `institutionele_voorlichting`). De voorlichter en de politicus zijn bewust *aparte* rollen — de toegangs-poortwachter versus de bron — en het smeermiddel is *access*: de off-the-record Nieuwspoort-code "je hebt het niet van mij, maar..." (Luyendijk), die zelfcensuur wekt omdat niemand hem durft te breken.
 
@@ -81,7 +81,7 @@ Een grensgeval tussen Sourcing en Flak is `inlichtingen_cooptatie`: een inlichti
 **Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `klantvraag_persbureau`, `verifieerbaarheidsroutine`, `expert_framing`, `pr_subsidie`, `haagse_stam`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_financiering_bias`, `denktank_levert_expert`, `denktank_naar_politiek`, `denktank_naar_persbureau`, `woo_obstructie`, `draaideur_politiek_institutie`, `inlichtingen_cooptatie`
 
 ### Filter 4: Flak
-Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur. De hedendaagse *cancelling* — een gast die iets onwelgevalligs zegt en niet meer wordt uitgenodigd — valt hier onder via `deplatforming`. Het uiterste van het flak-spectrum is fysiek én online `geweld_intimidatie` tegen journalisten; de bron daarvan is bewust diffuus gelaten (geen vaste principaal), passend bij het emergente — niet samenzweerderige — karakter van dát mechanisme.
+Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur. De hedendaagse *cancelling* — een gast die iets onwelgevalligs zegt en niet meer wordt uitgenodigd — valt hier onder via `deplatforming`. Het uiterste van het flak-spectrum is fysiek én online `geweld_intimidatie` tegen journalisten; de bron daarvan is bewust diffuus gelaten (geen vaste principaal), passend bij het emergente — niet samenzweerderige — karakter van dát mechanisme. Externe flak en interne redactiecultuur versterken elkaar bovendien in een vicieuze cirkel — empirisch gedocumenteerd door PersVeilig/I&O (2021: 8 op de 10 journalisten ervaart agressie of bedreiging, 16% past de berichtgeving aan, ±15% publiceert soms niet) — gemodelleerd als emergent effect `verkillingsspiraal`: het collectieve chilling effect dat de individuele zelfcensuur-halo overstijgt.
 
 Niet álle flak is echter diffuus: een hedendaagse, *wél* doelgerichte en gedocumenteerde variant is `statelijke_inhoudsmoderatie` — een overheid (bv. het ministerie van BZK met trusted-flagger-status bij vijf platforms) of de Europese Commissie (Code of Practice, EU Internet Forum 'borderline content'-handboek dat o.a. anti-elite en meme-content benoemt) zet techplatforms onder druk om legale maar ongewenste uitingen te modereren of demoten. Anders dan `deplatforming` (één mediagast) werkt dit digitaal en publieksbreed, op platformniveau, en raakt het ook Ideologie (spectrumbewaking). Het is het schoolvoorbeeld van bewezen sturing binnen een verder emergent systeem.
 
@@ -89,10 +89,10 @@ Niet álle flak is echter diffuus: een hedendaagse, *wél* doelgerichte en gedoc
 **Mechanismen:** `juridische_dreiging`, `publieke_aanval`, `deplatforming`, `etikettering`, `zelfcensuur`, `geweld_intimidatie`, `statelijke_inhoudsmoderatie`
 
 ### Filter 5: Ideologie
-Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid: ze socialiseren de journalisten (`academische_socialisatie`) én leveren de `gezagsexpert`s (`academische_autoriteit`). Doordat journalist én "onafhankelijke" bron uit dezelfde instituten komen, ontstaat **ideologische homofilie** — empirisch zichtbaar in de sterk afwijkende stemvoorkeur van NL-journalisten (D66/GroenLinks fors oververtegenwoordigd t.o.v. de bevolking). De hegemonie-*reproductie* reikt verder dan de media: het `kennisinstituut` vormt de hele hoogopgeleide elite die álle instituties bevolkt (Bovens & Wille, *diplomademocratie*) — politici (`academische_socialisatie_politiek`), denktanks (`academische_orthodoxie_denktank`), de "primaire definieerders" als CPB/DNB (`academische_orthodoxie_instituut`) en opiniemakers (`academische_vorming_opinie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
+Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid: ze socialiseren de journalisten (`academische_socialisatie`) én leveren de `gezagsexpert`s (`academische_autoriteit`). Doordat journalist én "onafhankelijke" bron uit dezelfde instituten komen, ontstaat **ideologische homofilie** — empirisch zichtbaar in de sterk afwijkende stemvoorkeur van NL-journalisten (D66/GroenLinks fors oververtegenwoordigd t.o.v. de bevolking; parlementair journalisten: D66 27% vs. 9% landelijk, 'Haagse waakhonden') — gemodelleerd als het gelijknamige emergente effect `ideologische_homofilie`. De hegemonie-*reproductie* reikt verder dan de media: het `kennisinstituut` vormt de hele hoogopgeleide elite die álle instituties bevolkt (Bovens & Wille, *diplomademocratie*) — politici (`academische_socialisatie_politiek`), denktanks (`academische_orthodoxie_denktank`), de "primaire definieerders" als CPB/DNB (`academische_orthodoxie_instituut`) en opiniemakers (`academische_vorming_opinie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
 
 **Rollen:** `elite_forum`, `columnist_opiniemaker`, `kennisinstituut`
-**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`
+**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `emergente_bias`, `systemische_homeostase`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`, `publieksfragmentatie`
 
 <a id="themas-dwarsverbanden"></a>
 ### Thema's: dwarsverbanden
@@ -287,6 +287,22 @@ eigenschap die uit het samenspel van een hele *groep* rollen voortkomt en niet i
 te vangen is (eigen tabellen `emergent_effects` + `emergent_effect_members`; bv. *fabricage van consensus*,
 *zelfversterkende homeostase*). Het verschijnt als een transparant **goud veld** rond de leden, met label,
 hoverbaar/klikbaar (het detailpaneel toont het samenspel). Het volgt dezelfde toggle.
+
+De elf emergente effecten, met de literatuur die de compositie benoemt:
+
+| effect | kern | literatuur |
+|---|---|---|
+| `fabricage_van_consensus` | pro-elite bias uit het samenspel van de vijf filters | Herman & Chomsky |
+| `zelfversterkende_homeostase` | afwijkingen worden gedempt, status quo reproduceert zichzelf | Bergman; systeemtheorie-duiding |
+| `haagse_stam` | politici, voorlichters, lobbyisten en journalisten als één stam | Luyendijk |
+| `toeschouwersdemocratie` | het publiek ziet de frontstage-opvoering, de afweging is backstage | Luyendijk |
+| `lobbymakelaardij` | de lobbyist regisseert journalist én politicus namens een onzichtbare opdrachtgever | Luyendijk |
+| `schijnpluriformiteit` | veel merknamen, één ANP-nieuwsstroom; pluriformiteit als façade | Boumans (2016): ±66% online nieuws ANP-gebaseerd |
+| `ideologische_homofilie` | journalist, expert en politicus uit dezelfde academische kring; bevestiging oogt als verificatie | Bovens & Wille (2011); 'Haagse waakhonden' |
+| `mediahype` | zelfversterkende nieuwsgolf, pack journalism; positieve feedback | Vasterman (2004) |
+| `medialogica` | wurggreep politiek↔media; incidenten verdringen inhoud (gevangenendilemma) | RMO (2003) |
+| `verkillingsspiraal` | extern flak ↔ intern conformisme; collectief chilling effect | PersVeilig/I&O (2021) |
+| `voorlichtingsovermacht` | ±150.000 communicatieprofessionals vs. ±15.000 journalisten | UvA/CBS (via Villamedia 2018) |
 
 ### Afgeleide (indirecte) pijlen & padclaims
 
@@ -575,14 +591,15 @@ ORDER BY s.author;
 
 | Onderdeel | Aantal |
 |---|---|
-| Rollen (theoretisch) | 33 |
-| Mechanismen (theoretisch) | 108 |
-| Entiteiten (concreet) | 153 |
-| Relaties (concreet) | 378 |
-| Argumenten | 333 |
-| Citaties | 34 |
-| Bronnen | 22 |
-| Bronlocaties | 20 |
+| Rollen (theoretisch) | 35 |
+| Mechanismen (theoretisch) | 122 |
+| Emergente effecten (hyperedges) | 11 |
+| Entiteiten (concreet) | 154 |
+| Relaties (concreet) | 383 |
+| Argumenten | 392 |
+| Citaties | 108 |
+| Bronnen | 33 |
+| Bronlocaties | 25 |
 
 > Let op: de meeste argumenten zijn automatisch gegenereerde `supporting`-onderbouwingen met status `ongecontroleerd` en nog grotendeels zonder citatie. Het aanvullen van citaties en het controleren van argumentstatus is openstaand werk.
 
@@ -681,3 +698,9 @@ HAVING n_contra > 0;
 | *The Making of an Atlantic Ruling Class* (1984) | Kees van der Pijl | Transnational Capitalist Class theorie |
 | *Quaderni del Carcere* (1935) | Antonio Gramsci | Culturele hegemonie (Filter 5) |
 | *Aandacht voor media* (2024) | WRR | Institutionele erkenning van de crisis |
+| *Medialogica* (2003) | RMO | Wurggreep politiek↔media (emergent effect `medialogica`) |
+| *Mediahype* (2004) | Peter Vasterman | Zelfversterkende nieuwsgolven (emergent effect `mediahype`) |
+| *Diplomademocratie* (2011) | Bovens & Wille | Dominantie van hoogopgeleiden in alle instituties (emergent effect `ideologische_homofilie`) |
+| *Outsourcing the news?* (2016) | Jelle Boumans | Kwantificering ANP-afhankelijkheid (emergent effect `schijnpluriformiteit`) |
+| *Agressie en bedreiging richting journalisten* (2021) | PersVeilig / I&O Research | Collectief chilling effect (emergent effect `verkillingsspiraal`) |
+| *Digital News Report Nederland* (2024/2025) | Commissariaat voor de Media | Fragmentatie en nieuwsmijding (halo `publieksfragmentatie`) |
