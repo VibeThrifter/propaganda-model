@@ -582,6 +582,9 @@ details.detail-section > .sec-body { margin-top: 8px; }
         <span>Emergente velden</span>
         <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
       </label>
+      <!-- Eén chip per veld: hover = oplichten, klik = isoleren (meerdere kan). Zonder
+           selectie tekent de graaf alle velden als vage contour, zonder label-wolk. -->
+      <div class="filter-group" id="emergentChips" style="display:none;margin-top:6px"></div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
              title="Violette ringen rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias). Diffuus, géén gericht kanaal. Aan = de node-grootte telt deze veld-effecten mee; uit = schone dyadische maat.">
         <input type="checkbox" id="haloToggle">
@@ -1134,6 +1137,8 @@ let state = {
   sizeMetric: 'influence_direct',  // welke maat de node-grootte bepaalt (zie SIZE_METRICS)
   receivedMap: null,           // entity/rol-id -> som inkomende invloed (per buildGraph)
   showFieldEffects: false,     // emergente velden (goud, groeps-hyperedges) tonen? Default schoon.
+  emergentSelection: new Set(),// geïsoleerde velden (chip-klik); leeg = alle velden als vage contour
+  emergentHover: null,         // veld-id onder de cursor (chip of hull) — licht tijdelijk op
   showHalos: false,            // halo's (veld-eigenschappen, violet) tonen? Default schoon.
   showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
@@ -1421,20 +1426,16 @@ function buildGraph() {
     // De velden overlappen elkaar sterk; een kale klik raakt de bovenste in DOM-volgorde.
     // pickEmergentAt kiest daarom het KLEINSTE veld onder de cursor (meest specifiek).
     .on('click', (event, d) => { event.stopPropagation(); selectEmergent(pickEmergentAt(event) || d); })
-    .on('mouseover', (event, d) => {
-      const eff = pickEmergentAt(event) || d;
-      const tt = document.getElementById('tooltip');
-      tt.innerHTML = `<div class="tt-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
-        <div class="tt-name">${eff.label}</div>
-        ${eff.description ? `<div class="tt-desc">${eff.description}</div>` : ''}
-        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor het samenspel</div>`;
-      tt.classList.add('visible');
+    .on('mouseover', (event, d) => hoverEmergent(pickEmergentAt(event) || d, event))
+    .on('mousemove', (event, d) => {
+      // De hulls overlappen; volg tijdens het bewegen welk (kleinste) veld bedoeld is.
+      hoverEmergent(pickEmergentAt(event) || d, event);
     })
-    .on('mousemove', (event) => {
-      const tt = document.getElementById('tooltip');
-      tt.style.left = (event.clientX + 16) + 'px'; tt.style.top = (event.clientY - 8) + 'px';
-    })
-    .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
+    .on('mouseout', () => {
+      state.emergentHover = null;
+      updateEmergentFields();
+      document.getElementById('tooltip').classList.remove('visible');
+    });
   emergentLabelElements = emergentGroup.selectAll('text.emergent-label').data(effects).join('text')
     .attr('class', 'emergent-label')
     .attr('text-anchor', 'middle')
@@ -1661,19 +1662,26 @@ function emergentLabelPos(eff) {
   return { x: d3.mean(nodes, n => n.x), y: d3.min(nodes, n => n.y - getRadius(n)) - 40 };
 }
 // Geometrie + zichtbaarheid van de emergente velden bijwerken (vanuit tick én applyFilters).
+// Met 11 sterk overlappende velden is alles-vol-tekenen één gouden blob; daarom twee standen:
+//   contour    — geen chip geselecteerd: alleen een vage rand, geen vulling/label;
+//   opgelicht  — chip geselecteerd of gehoverd (chip óf hull): vulling + label.
 function updateEmergentFields() {
   if (!emergentHullElements) return;
   // De toggle is leidend: staat hij uit, dan ook geen velden bij een actieve selectie.
   const show = emergentVisible();
   const on = d => (show && emergentMemberNodes(d).length) ? 1 : 0;
+  const lit = d => state.emergentSelection.has(d.id) || state.emergentHover === d.id;
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
     .attr('opacity', on)
+    .attr('fill-opacity', d => lit(d) ? 0.14 : 0.03)
+    .attr('stroke-opacity', d => lit(d) ? 0.85 : 0.28)
+    .attr('stroke-width', d => lit(d) ? 2 : 1.2)
     .style('pointer-events', d => on(d) ? 'auto' : 'none');
   emergentLabelElements
     .attr('x', d => emergentLabelPos(d).x)
     .attr('y', d => emergentLabelPos(d).y)
-    .attr('opacity', d => on(d) ? 0.92 : 0);
+    .attr('opacity', d => (on(d) && lit(d)) ? 0.95 : 0);
 }
 // Welk emergent veld "bedoelt" een klik/hover? De hulls overlappen elkaar sterk en het
 // event komt altijd bij de bovenste in DOM-volgorde terecht. Kies daarom uit álle zichtbare
@@ -1688,6 +1696,23 @@ function pickEmergentAt(event) {
     if (area < bestArea) { bestArea = area; best = d3.select(el).datum(); }
   });
   return best;
+}
+
+// Hover op een veld (hull in de graaf): oplichten (incl. label) + tooltip laten volgen.
+function hoverEmergent(eff, event) {
+  if (state.emergentHover !== eff.id) {
+    state.emergentHover = eff.id;
+    updateEmergentFields();
+    const tt = document.getElementById('tooltip');
+    tt.innerHTML = `<div class="tt-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
+      <div class="tt-name">${eff.label}</div>
+      ${eff.description ? `<div class="tt-desc">${eff.description}</div>` : ''}
+      <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor het samenspel</div>`;
+    tt.classList.add('visible');
+  }
+  const tt = document.getElementById('tooltip');
+  tt.style.left = (event.clientX + 16) + 'px';
+  tt.style.top = (event.clientY - 8) + 'px';
 }
 
 // Detailpaneel voor een emergent effect: het samenspel, niet een edge.
@@ -3197,6 +3222,7 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
       state.showHalos = false;
       document.getElementById('fieldToggle').checked = false;
       document.getElementById('haloToggle').checked = false;
+      syncEmergentChipsVisibility();
     }
 
     rebuildChips();                 // edge-categorieën verschillen per model
@@ -3220,8 +3246,40 @@ function applyFieldEffects() {
   applySizeMetric();     // node-grootte schoon<->veld, halo-stralen, eventueel cascade herstellen
   if (state.selectedNode) showDetail(state.selectedNode);  // detailpaneel met de juiste variant
 }
+// Chips voor de emergente velden: hover = veld oplichten, klik = isoleren (meerdere kan).
+// Zonder selectie tekent de graaf alle velden als vage contour zonder labels.
+const emergentChipEls = new Map();
+function rebuildEmergentChips() {
+  const container = document.getElementById('emergentChips');
+  container.innerHTML = '';
+  emergentChipEls.clear();
+  (DATA.emergent_effects || []).forEach(eff => {
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.style.setProperty('--chip-color', EMERGENCE_COLOR);
+    chip.innerHTML = `<span class="dot"></span>${eff.label}`;
+    if (eff.description) chip.title = eff.description;
+    chip.addEventListener('click', () => {
+      const sel = state.emergentSelection;
+      if (sel.has(eff.id)) sel.delete(eff.id); else sel.add(eff.id);
+      chip.classList.toggle('active', sel.has(eff.id));
+      updateEmergentFields();
+    });
+    chip.addEventListener('mouseenter', () => { state.emergentHover = eff.id; updateEmergentFields(); });
+    chip.addEventListener('mouseleave', () => { state.emergentHover = null; updateEmergentFields(); });
+    container.appendChild(chip);
+    emergentChipEls.set(eff.id, chip);
+  });
+}
+function syncEmergentChipsVisibility() {
+  document.getElementById('emergentChips').style.display = state.showFieldEffects ? '' : 'none';
+}
+rebuildEmergentChips();
+syncEmergentChipsVisibility();
+
 document.getElementById('fieldToggle').addEventListener('change', e => {
   state.showFieldEffects = e.target.checked;
+  syncEmergentChipsVisibility();
   applyFieldEffects();
 });
 // Halo's (veld-eigenschappen) los van de emergente velden; beïnvloedt ook de node-grootte
