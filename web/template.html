@@ -1424,13 +1424,17 @@ function buildGraph() {
     .style('cursor', 'pointer')
     .attr('opacity', 0)
     // De velden overlappen elkaar sterk; een kale klik raakt de bovenste in DOM-volgorde.
-    // pickEmergentAt kiest daarom het KLEINSTE veld onder de cursor (meest specifiek).
-    .on('click', (event, d) => { event.stopPropagation(); selectEmergent(pickEmergentAt(event) || d); })
-    .on('mouseover', (event, d) => hoverEmergent(pickEmergentAt(event) || d, event))
-    .on('mousemove', (event, d) => {
-      // De hulls overlappen; volg tijdens het bewegen welk (kleinste) veld bedoeld is.
-      hoverEmergent(pickEmergentAt(event) || d, event);
+    // emergentAtCursor kiest het veld dat in de klik-cyclus aan de beurt is (start: kleinste);
+    // een volgende klik op dezelfde plek schuift één veld dieper de stapel in.
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      const { eff, stack } = emergentAtCursor(event, d);
+      selectEmergent(eff);
+      if (stack.length > 1) emergentCycle.idx = (emergentCycle.idx + 1) % stack.length;
+      hoverEmergentAt(event, d);   // oplichting + tooltip op het veld dat nú aan de beurt is
     })
+    .on('mouseover', (event, d) => hoverEmergentAt(event, d))
+    .on('mousemove', (event, d) => hoverEmergentAt(event, d))
     .on('mouseout', () => {
       state.emergentHover = null;
       updateEmergentFields();
@@ -1683,36 +1687,62 @@ function updateEmergentFields() {
     .attr('y', d => emergentLabelPos(d).y)
     .attr('opacity', d => (on(d) && lit(d)) ? 0.95 : 0);
 }
-// Welk emergent veld "bedoelt" een klik/hover? De hulls overlappen elkaar sterk en het
-// event komt altijd bij de bovenste in DOM-volgorde terecht. Kies daarom uit álle zichtbare
-// hulls onder de cursor het kleinste (meest specifieke) veld.
-function pickEmergentAt(event) {
+// Welke emergente velden liggen er onder de cursor? De hulls overlappen elkaar sterk en
+// het event komt altijd bij de bovenste in DOM-volgorde terecht. Geef daarom de hele
+// stapel terug, gesorteerd van klein (meest specifiek) naar groot.
+function pickEmergentStack(event) {
   const hulls = document.elementsFromPoint(event.clientX, event.clientY)
     .filter(el => el.classList && el.classList.contains('emergent-hull') && +el.getAttribute('opacity') > 0);
-  let best = null, bestArea = Infinity;
-  hulls.forEach(el => {
+  const items = hulls.map(el => {
     const bb = el.getBBox();
-    const area = bb.width * bb.height;
-    if (area < bestArea) { bestArea = area; best = d3.select(el).datum(); }
+    return { eff: d3.select(el).datum(), area: bb.width * bb.height };
   });
-  return best;
+  items.sort((a, b) => a.area - b.area);
+  return items.map(i => i.eff);
+}
+
+// Klik-cyclus door de stapel: zonder dit zijn velden die geheel onder een kleiner veld
+// liggen onbereikbaar. Zolang de stapel onder de cursor dezelfde is, schuift elke klik
+// één veld dieper (en daarna weer rond); hover toont steeds het veld dat aan de beurt is.
+let emergentCycle = { key: '', idx: 0 };
+function emergentAtCursor(event, fallback) {
+  const stack = pickEmergentStack(event);
+  if (!stack.length) return { eff: fallback, stack };
+  const key = stack.map(e => e.id).join('|');
+  if (emergentCycle.key !== key) emergentCycle = { key, idx: 0 };
+  return { eff: stack[Math.min(emergentCycle.idx, stack.length - 1)], stack };
 }
 
 // Hover op een veld (hull in de graaf): oplichten (incl. label) + tooltip laten volgen.
-function hoverEmergent(eff, event) {
+// Bij een stapel overlappende velden licht steeds het veld op dat de eerstvolgende klik
+// zou selecteren; de hint legt uit dat herhaald klikken de stapel afloopt.
+function hoverEmergent(eff, event, stack) {
+  if (!eff) return;
   if (state.emergentHover !== eff.id) {
     state.emergentHover = eff.id;
     updateEmergentFields();
+    const n = (stack || []).length;
+    const pos = n > 1 ? (stack.findIndex(e => e.id === eff.id) + 1) : 1;
+    const stackHint = n > 1
+      ? `<div class="tt-desc" style="margin-top:4px;color:var(--text-muted)">Veld ${pos} van ${n} hier — klik herhaald om de stapel af te lopen</div>`
+      : '';
     const tt = document.getElementById('tooltip');
     tt.innerHTML = `<div class="tt-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
       <div class="tt-name">${eff.label}</div>
       ${eff.description ? `<div class="tt-desc">${eff.description}</div>` : ''}
+      ${stackHint}
       <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor het samenspel</div>`;
     tt.classList.add('visible');
   }
   const tt = document.getElementById('tooltip');
   tt.style.left = (event.clientX + 16) + 'px';
   tt.style.top = (event.clientY - 8) + 'px';
+}
+
+// Hover/klik-hulp: bepaal het veld dat in de cyclus aan de beurt is en toon het.
+function hoverEmergentAt(event, fallback) {
+  const { eff, stack } = emergentAtCursor(event, fallback);
+  hoverEmergent(eff, event, stack);
 }
 
 // Detailpaneel voor een emergent effect: het samenspel, niet een edge.
