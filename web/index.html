@@ -591,7 +591,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
     </div>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
            title="Bij selectie berekende ≥2-hops-routes (violet, gestippeld): de sterkste onderbouwde keten van bron naar doel, getoetst aan de drie poorten (schakelscore, schakelargumenten, padclaim).">
-      <input type="checkbox" id="derivedToggle" checked>
+      <input type="checkbox" id="derivedToggle">
       <span>Indirecte (afgeleide) pijlen</span>
       <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
     </label>
@@ -30796,7 +30796,7 @@ let state = {
   receivedMap: null,           // entity/rol-id -> som inkomende invloed (per buildGraph)
   showFieldEffects: false,     // emergente velden (goud, groeps-hyperedges) tonen? Default schoon.
   showHalos: false,            // halo's (veld-eigenschappen, violet) tonen? Default schoon.
-  showDerived: true,           // afgeleide (indirecte) pijlen bij selectie tonen?
+  showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
   fieldPropertyMap: null,      // node-id -> max inkomende veld-eigenschap-influence (halo-intensiteit)
 };
