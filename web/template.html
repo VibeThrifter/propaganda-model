@@ -1276,6 +1276,27 @@ let emergentLabelElements = null;
 let nodeByIdGlobal = null;         // id -> node-object van de huidige graaf (voor hull-geometrie)
 let derivedLinkGroup = null;       // laag voor afgeleide (indirecte) invloed-pijlen bij selectie
 let derivedLinkData = [];          // actieve afgeleide pijlen: {source, target, strength, chain}
+let drawnLinkSet = null;           // indices van de nu getekende edges (gezet door applyFilters)
+
+// Alleen de getekende edges positioneren — verborgen edges (filters/toggles) per tick
+// overslaan scheelt werk terwijl de simulatie warm is. applyFilters roept dit ook
+// eenmalig aan, zodat edges die nét weer zichtbaar werden hun actuele positie krijgen.
+function positionVisibleLinks() {
+  if (!linkElements) return;
+  const draw = i => state.showDirect && (!drawnLinkSet || drawnLinkSet.has(i));
+  linkElements.each(function(l, i) { if (draw(i)) this.setAttribute('d', linkArc(l)); });
+  if (linkHitElements) {
+    linkHitElements.each(function(l, i) { if (draw(i)) this.setAttribute('d', linkArc(l)); });
+  }
+  if (edgeLabelElements) {
+    edgeLabelElements.each(function(l, i) {
+      if (!draw(i)) return;
+      const p = linkLabelPos(l);
+      this.setAttribute('x', p.x);
+      this.setAttribute('y', p.y - 6);
+    });
+  }
+}
 
 // Hoeveel pixels de parallelle relaties tussen twee knooppunten uit elkaar buigen.
 const PARALLEL_EDGE_SPREAD = 22;
@@ -1558,15 +1579,8 @@ function buildGraph() {
     .style('text-shadow', '0 1px 4px rgba(0,0,0,0.8)');
 
   // Tick
-  const linkHitLines = linkHitElements;
   simulation.on('tick', () => {
-    linkElements.attr('d', linkArc);
-    linkHitLines.attr('d', linkArc);
-    if (edgeLabelElements) {
-      edgeLabelElements
-        .attr('x', d => linkLabelPos(d).x)
-        .attr('y', d => linkLabelPos(d).y - 6);
-    }
+    positionVisibleLinks();
     nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
     updateEmergentFields();   // emergente velden volgen de bewegende leden
     if (derivedLinkData.length) positionDerivedLinks();
@@ -3123,6 +3137,10 @@ function applyFilters() {
   // Directe pijlen-toggle: alleen het TEKENEN van de edges; de zichtbaarheidsset
   // (node-zichtbaarheid, afgeleide paden, stats) blijft op de echte filters lopen.
   const drawL = i => visibleLinkSet.has(i) && state.showDirect;
+  // De tick-handler positioneert alleen getekende edges; onthoud de set en ververs
+  // eenmalig, zodat nét weer zichtbare edges niet op een verouderde plek staan.
+  drawnLinkSet = visibleLinkSet;
+  positionVisibleLinks();
   linkElements
     .attr('stroke-opacity', (l, i) => drawL(i) ? linkBaseOpacity(l, isTheory) : 0)
     .attr('marker-end', (l, i) => drawL(i) ? markerFor(l, isTheory) : 'none');
@@ -3384,17 +3402,27 @@ function configureSliders(isTheory) {
   document.getElementById('inflVal').textContent = '0';
 }
 
+// Tijdens het slepen vuurt 'input' tientallen keren per seconde; de volledige verversing
+// (applyFilters + herselectie + afgeleide paden) throttlen we naar één per frame.
+let sliderRefreshPending = false;
+function sliderRefresh() {
+  if (sliderRefreshPending) return;
+  sliderRefreshPending = true;
+  requestAnimationFrame(() => {
+    sliderRefreshPending = false;
+    applyFilters();
+    if (state.selectedNode) selectNode(state.selectedNode);  // afgeleide pijlen volgen de sliders live
+  });
+}
 document.getElementById('certSlider').addEventListener('input', e => {
   state.certMin = parseFloat(e.target.value);
   document.getElementById('certVal').textContent = state.certMin.toFixed(2);
-  applyFilters();
-  if (state.selectedNode) selectNode(state.selectedNode);  // afgeleide pijlen volgen de sliders live
+  sliderRefresh();
 });
 document.getElementById('inflSlider').addEventListener('input', e => {
   state.inflMin = parseFloat(e.target.value);
   document.getElementById('inflVal').textContent = state.inflMin.toFixed(2);
-  applyFilters();
-  if (state.selectedNode) selectNode(state.selectedNode);  // afgeleide pijlen volgen de sliders live
+  sliderRefresh();
 });
 
 // Search
