@@ -34421,21 +34421,25 @@ let emergentLabelElements = null;
 let nodeByIdGlobal = null;         // id -> node-object van de huidige graaf (voor hull-geometrie)
 let derivedLinkGroup = null;       // laag voor afgeleide (indirecte) invloed-pijlen bij selectie
 let derivedLinkData = [];          // actieve afgeleide pijlen: {source, target, strength, chain}
-let drawnLinkSet = null;           // indices van de nu getekende edges (gezet door applyFilters)
+// Vaste <g>-lagen waarin applyFilters de data-joins uitvoert (joinNodes/joinLinks):
+// uitgefilterde elementen verlaten de DOM echt, in plaats van onzichtbaar te blijven staan.
+let linkGroupSel = null;
+let linkHitGroupSel = null;
+let edgeLabelGroupSel = null;
+let nodeGroupSel = null;
 
-// Alleen de getekende edges positioneren — verborgen edges (filters/toggles) per tick
-// overslaan scheelt werk terwijl de simulatie warm is. applyFilters roept dit ook
-// eenmalig aan, zodat edges die nét weer zichtbaar werden hun actuele positie krijgen.
+// Alleen de getekende edges positioneren — uitgefilterde edges staan niet meer in de
+// DOM (echte data-join in applyFilters), dus de selecties bevatten precies wat zichtbaar
+// is. applyFilters roept dit ook eenmalig aan, zodat nét verschenen edges meteen op hun
+// actuele plek staan terwijl de simulatie koud is.
 function positionVisibleLinks() {
   if (!linkElements) return;
-  const draw = i => state.showDirect && (!drawnLinkSet || drawnLinkSet.has(i));
-  linkElements.each(function(l, i) { if (draw(i)) this.setAttribute('d', linkArc(l)); });
+  linkElements.each(function(l) { this.setAttribute('d', linkArc(l)); });
   if (linkHitElements) {
-    linkHitElements.each(function(l, i) { if (draw(i)) this.setAttribute('d', linkArc(l)); });
+    linkHitElements.each(function(l) { this.setAttribute('d', linkArc(l)); });
   }
   if (edgeLabelElements) {
-    edgeLabelElements.each(function(l, i) {
-      if (!draw(i)) return;
+    edgeLabelElements.each(function(l) {
       const p = linkLabelPos(l);
       this.setAttribute('x', p.x);
       this.setAttribute('y', p.y - 6);
@@ -34536,6 +34540,11 @@ function buildGraph() {
   // zodat ze niet op elkaar vallen en elk afzonderlijk hoverbaar zijn.
   assignParallelEdges(links);
 
+  // Vaste join-key voor de data-join in applyFilters; ook de sleutel waarmee
+  // computeVisibleLinks/computeDownstream (index in currentLinks) en de DOM-selecties
+  // naar elkaar verwijzen nu niet elke link meer een element heeft.
+  links.forEach((l, i) => { l._idx = i; });
+
   // Simulation
   const chargeStr = isTheory ? -800 : -300;
   const linkDist = isTheory ? 200 : 100;
@@ -34596,73 +34605,82 @@ function buildGraph() {
     .attr('opacity', 0)
     .text(d => d.label);
 
-  // Draw links (no dashed lines — timeline slider handles temporal visibility)
-  const linkGroup = g.append('g').attr('class', 'links');
-  linkElements = linkGroup.selectAll('path').data(links).join('path')
-    .attr('fill', 'none')
-    .attr('stroke', d => getLinkColor(d, isTheory))
-    .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
-    .attr('stroke-opacity', d => linkBaseOpacity(d, isTheory))
-    .attr('marker-end', d => markerFor(d, isTheory));
+  // Edges, hit-lijnen, labels en nodes komen hier NIET in de DOM: applyFilters doet een
+  // echte data-join (joinLinks/joinNodes), zodat uitgefilterde elementen de DOM verlaten
+  // (exit-fade) en nieuwe met een fade verschijnen — in plaats van alles te tekenen en
+  // onzichtbaar te maken. Hier alleen de lagen (tekenvolgorde!) + lege selecties.
+  linkGroupSel = g.append('g').attr('class', 'links');
+  linkElements = linkGroupSel.selectAll('path.link');
 
   // Afgeleide (indirecte) invloed — gestippelde violette pijlen, alleen gevuld bij
   // node-selectie (cascade ≥2 hops). Boven de gewone links, onder de nodes.
   derivedLinkGroup = g.append('g').attr('class', 'derived-links');
   derivedLinkData = [];
 
-  // Invisible wider hit-area for clicking on edges
-  const linkHitGroup = g.append('g').attr('class', 'link-hits');
-  linkHitElements = linkHitGroup.selectAll('path').data(links).join('path')
-    .attr('fill', 'none')
-    .attr('stroke', 'transparent')
-    .attr('stroke-width', 14)
-    .style('cursor', 'pointer')
-    .on('click', (event, d) => { event.stopPropagation(); selectRelation(d); })
-    .on('mouseover', (event, d) => {
-      const src = typeof d.source === 'object' ? d.source : entityMap.get(d.source);
-      const tgt = typeof d.target === 'object' ? d.target : entityMap.get(d.target);
-      const relArgs = argsByRelation[d.id] || [];
-      const counts = relArgs.length ? countStances(relArgs) : null;
-      const period = formatPeriod(d);
-      const tooltip = document.getElementById('tooltip');
-      tooltip.innerHTML = `
-        <div class="tt-type" style="color:${getLinkColor(d, isTheory)}">${isTheory ? (d.name || 'Mechanisme') : (RELATION_LABELS[d.relation_type] || d.relation_type)}</div>
-        <div class="tt-name">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
-        ${period ? `<div class="tt-desc" style="margin-bottom:4px">${period}</div>` : ''}
-        ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
-        ${counts ? `<div class="tt-desc" style="margin-top:4px">${counts.total} argumenten: ${counts.sup} voor, ${counts.con} tegen</div>` : ''}
-        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor discussie</div>
-      `;
-      tooltip.classList.add('visible');
-    })
-    .on('mousemove', (event) => {
-      const tooltip = document.getElementById('tooltip');
-      tooltip.style.left = (event.clientX + 16) + 'px';
-      tooltip.style.top = (event.clientY - 8) + 'px';
-    })
-    .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
+  // Invisible wider hit-area for clicking on edges (gevuld door joinLinks)
+  linkHitGroupSel = g.append('g').attr('class', 'link-hits');
+  linkHitElements = linkHitGroupSel.selectAll('path.link-hit');
 
-  // Edge labels (theory only)
-  if (isTheory) {
-    const labelGroup = g.append('g').attr('class', 'edge-labels');
-    edgeLabelElements = labelGroup.selectAll('text').data(links).join('text')
-      .attr('class', 'edge-label')
-      .text(d => d.name || '');
-  } else {
-    edgeLabelElements = null;
-  }
+  // Edge labels (theory only; gevuld door joinLinks)
+  edgeLabelGroupSel = g.append('g').attr('class', 'edge-labels');
+  edgeLabelElements = isTheory ? edgeLabelGroupSel.selectAll('text.edge-label') : null;
 
-  // Draw nodes
-  const nodeGroup = g.append('g').attr('class', 'nodes');
-  nodeElements = nodeGroup.selectAll('g').data(nodes).join('g')
+  // Nodes (gevuld door joinNodes)
+  nodeGroupSel = g.append('g').attr('class', 'nodes');
+  nodeElements = nodeGroupSel.selectAll('g.node');
+
+  // Tick
+  simulation.on('tick', () => {
+    positionVisibleLinks();
+    nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
+    updateEmergentFields();   // emergente velden volgen de bewegende leden
+    if (derivedLinkData.length) positionDerivedLinks();
+  });
+
+  svgEl.on('click', () => deselectNode());
+
+  // Zoom fit
+  setTimeout(() => {
+    svgEl.transition().duration(600).call(zoom.transform, d3.zoomIdentity
+      .translate(width * 0.1, height * 0.1).scale(isTheory ? 0.7 : 0.8));
+  }, 100);
+
+  applyFilters();
+}
+
+// ── Echte data-joins voor nodes & edges ──
+// applyFilters tekent niet langer alles om het daarna onzichtbaar te maken: alleen wat de
+// filters passeert staat in de DOM. Verschijnen = enter-fade, verdwijnen = exit-fade +
+// remove. Keys (node-id / link-_idx) zorgen dat blijvende elementen niet hertekend worden
+// en hun simulatiepositie houden. De benoemde 'vis'-transitie kan veilig onderbroken
+// worden (selectNode) of door een nieuwe join vervangen worden zonder halve removes.
+const VIS_FADE_MS = 250;
+
+function joinNodes(nodesArr) {
+  const isTheory = state.model === 'theory';
+  const tooltip = document.getElementById('tooltip');
+
+  nodeElements = nodeGroupSel.selectAll('g.node').data(nodesArr, d => d.id);
+
+  nodeElements.exit()
+    .style('pointer-events', 'none')   // wegvagende nodes meteen niet meer hoverbaar/klikbaar
+    .transition('vis').duration(VIS_FADE_MS)
+    .attr('opacity', 0)
+    .remove();
+
+  const enter = nodeElements.enter().append('g')
     .attr('class', 'node')
+    .attr('opacity', 0)
+    // De simulatie bevat álle nodes (ook uitgefilterde), dus een herintreder verschijnt
+    // op zijn actuele simulatiepositie — ook als de simulatie koud is en er geen tick komt.
+    .attr('transform', d => `translate(${d.x},${d.y})`)
     .call(d3.drag()
       .on('start', (ev, d) => { if (!ev.active) simulation.alphaTarget(0.15).restart(); d.fx = d.x; d.fy = d.y; })
       .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
       .on('end', (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
   // Halo voor veld-eigenschap (niveau 2) — vóór de hoofdcircle zodat hij erachter ligt.
-  nodeElements.append('circle')
+  enter.append('circle')
     .attr('class', 'field-halo')
     .attr('fill', 'none')
     .attr('stroke', FIELD_COLOR)
@@ -34673,7 +34691,6 @@ function buildGraph() {
     .style('pointer-events', 'all')
     .style('cursor', 'pointer')
     .attr('r', d => fieldHaloRadius(d))
-    .attr('opacity', d => fieldHaloOpacity(d))
     // Eigen, gerichte tooltip op de halo zelf: hover op de ring toont alléén het/de
     // systeemeffect(en) (mét effecttekst), apart van de node-tooltip. Geen systeemeffect →
     // niets doen en laten doorbubbelen naar de node-tooltip.
@@ -34706,7 +34723,7 @@ function buildGraph() {
       document.getElementById('tooltip').classList.remove('visible');
     });
 
-  nodeElements.append('circle')
+  enter.append('circle')
     .attr('class', 'node-circle')
     .attr('r', d => getRadius(d))
     .attr('fill', d => getNodeColor(d))
@@ -34715,7 +34732,7 @@ function buildGraph() {
     .attr('stroke-opacity', 0.4)
     .style('cursor', 'pointer');
 
-  nodeElements.append('text')
+  enter.append('text')
     .text(d => truncate(d.name, isTheory ? 22 : 18))
     .attr('dy', d => getRadius(d) + (isTheory ? 16 : 12))
     .attr('text-anchor', 'middle')
@@ -34725,18 +34742,7 @@ function buildGraph() {
     .style('pointer-events', 'none')
     .style('text-shadow', '0 1px 4px rgba(0,0,0,0.8)');
 
-  // Tick
-  simulation.on('tick', () => {
-    positionVisibleLinks();
-    nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
-    updateEmergentFields();   // emergente velden volgen de bewegende leden
-    if (derivedLinkData.length) positionDerivedLinks();
-  });
-
-  // Events
-  const tooltip = document.getElementById('tooltip');
-
-  nodeElements
+  enter
     .on('mouseover', (event, d) => {
       const isT = state.model === 'theory';
       const period = formatPeriod(d);
@@ -34757,15 +34763,96 @@ function buildGraph() {
     .on('mouseout', () => tooltip.classList.remove('visible'))
     .on('click', (event, d) => { event.stopPropagation(); selectNode(d); });
 
-  svgEl.on('click', () => deselectNode());
+  nodeElements = enter.merge(nodeElements);
+  nodeElements.style('pointer-events', 'all');
+  // Basisstand van de kinderen herstellen — selectNode kan ze gedimd hebben en
+  // applyFilters is (net als voorheen) het reset-pad. Halo volgt zijn eigen intensiteit.
+  nodeElements.select('.node-circle').attr('opacity', 1);
+  nodeElements.select('text').attr('opacity', 1);
+  nodeElements.select('.field-halo').attr('opacity', d => fieldHaloOpacity(d));
+  nodeElements.transition('vis').duration(VIS_FADE_MS).attr('opacity', 1);
+}
 
-  // Zoom fit
-  setTimeout(() => {
-    svgEl.transition().duration(600).call(zoom.transform, d3.zoomIdentity
-      .translate(width * 0.1, height * 0.1).scale(isTheory ? 0.7 : 0.8));
-  }, 100);
+function joinLinks(linksArr) {
+  const isTheory = state.model === 'theory';
 
-  applyFilters();
+  // Zichtbare lijnen
+  linkElements = linkGroupSel.selectAll('path.link').data(linksArr, d => d._idx);
+  linkElements.exit()
+    .attr('marker-end', 'none')   // de pijlpunt fadet niet mee met de lijn; meteen weg
+    .transition('vis').duration(VIS_FADE_MS)
+    .attr('stroke-opacity', 0)
+    .remove();
+  const enter = linkElements.enter().append('path')
+    .attr('class', 'link')
+    .attr('fill', 'none')
+    .attr('stroke', d => getLinkColor(d, isTheory))
+    .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
+    .attr('stroke-opacity', 0)
+    .attr('d', linkArc);
+  linkElements = enter.merge(linkElements);
+  linkElements
+    .attr('marker-end', d => markerFor(d, isTheory))   // reset ná selectNode-dimming
+    .transition('vis').duration(VIS_FADE_MS)
+    .attr('stroke-opacity', d => linkBaseOpacity(d, isTheory));
+
+  // Hit-lijnen: onzichtbaar, dus geen fade — direct erbij/eruit.
+  linkHitElements = linkHitGroupSel.selectAll('path.link-hit').data(linksArr, d => d._idx);
+  linkHitElements.exit().remove();
+  const hitEnter = linkHitElements.enter().append('path')
+    .attr('class', 'link-hit')
+    .attr('fill', 'none')
+    .attr('stroke', 'transparent')
+    .attr('stroke-width', 14)
+    .style('cursor', 'pointer')
+    .attr('d', linkArc)
+    .on('click', (event, d) => { event.stopPropagation(); selectRelation(d); })
+    .on('mouseover', (event, d) => {
+      const isT = state.model === 'theory';
+      const src = typeof d.source === 'object' ? d.source : entityMap.get(d.source);
+      const tgt = typeof d.target === 'object' ? d.target : entityMap.get(d.target);
+      const relArgs = argsByRelation[d.id] || [];
+      const counts = relArgs.length ? countStances(relArgs) : null;
+      const period = formatPeriod(d);
+      const tooltip = document.getElementById('tooltip');
+      tooltip.innerHTML = `
+        <div class="tt-type" style="color:${getLinkColor(d, isT)}">${isT ? (d.name || 'Mechanisme') : (RELATION_LABELS[d.relation_type] || d.relation_type)}</div>
+        <div class="tt-name">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
+        ${period ? `<div class="tt-desc" style="margin-bottom:4px">${period}</div>` : ''}
+        ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
+        ${counts ? `<div class="tt-desc" style="margin-top:4px">${counts.total} argumenten: ${counts.sup} voor, ${counts.con} tegen</div>` : ''}
+        <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor discussie</div>
+      `;
+      tooltip.classList.add('visible');
+    })
+    .on('mousemove', (event) => {
+      const tooltip = document.getElementById('tooltip');
+      tooltip.style.left = (event.clientX + 16) + 'px';
+      tooltip.style.top = (event.clientY - 8) + 'px';
+    })
+    .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
+  linkHitElements = hitEnter.merge(linkHitElements)
+    .style('pointer-events', 'auto');   // reset ná selectNode-dimming
+
+  // Edge-labels (alleen theorie). Labels blijven muis-transparant (CSS pointer-events:
+  // none): de tooltip hoort bij de hit-lijn erónder, ook als die onder een label doorloopt.
+  if (isTheory) {
+    edgeLabelElements = edgeLabelGroupSel.selectAll('text.edge-label').data(linksArr, d => d._idx);
+    edgeLabelElements.exit()
+      .transition('vis').duration(VIS_FADE_MS)
+      .attr('opacity', 0)
+      .remove();
+    const lblEnter = edgeLabelElements.enter().append('text')
+      .attr('class', 'edge-label')
+      .attr('opacity', 0)
+      .attr('x', d => linkLabelPos(d).x)
+      .attr('y', d => linkLabelPos(d).y - 6)
+      .text(d => d.name || '');
+    edgeLabelElements = lblEnter.merge(edgeLabelElements);
+    edgeLabelElements.transition('vis').duration(VIS_FADE_MS).attr('opacity', 1);
+  } else {
+    edgeLabelElements = null;
+  }
 }
 
 // ============================================================
@@ -35748,6 +35835,13 @@ function selectNode(d) {
   // Only links that pass the current filters/timeline can be highlighted/hovered
   const { visibleLinkSet } = computeVisibleLinks();
 
+  // Een nog lopende verschijn-fade (data-join in applyFilters) zou de dim-waarden
+  // hieronder weer overschrijven: stoppen en op de eindstand zetten. Exit-fades lopen
+  // op elementen buiten deze selecties en ruimen zichzelf gewoon op.
+  nodeElements.interrupt('vis').attr('opacity', 1);
+  linkElements.interrupt('vis');
+  if (edgeLabelElements) edgeLabelElements.interrupt('vis');
+
   // Licht de DOWNSTREAM-invloedcascade op (multi-hop) i.p.v. alleen directe buren.
   // Instantiemodel: relatie-influence. Theoretisch model: mechanisme-sterkte.
   {
@@ -35759,8 +35853,8 @@ function selectNode(d) {
       nodeElements.select('.node-circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
       nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
       nodeElements.select('.field-halo').attr('opacity', n => nodeOn(n.id) ? fieldHaloOpacity(n) : 0.02);
-      linkElements.each(function(l, i) {
-        const s = state.showDirect ? linkStrength.get(i) : null;
+      linkElements.each(function(l) {
+        const s = state.showDirect ? linkStrength.get(l._idx) : null;
         const el = d3.select(this);
         if (s != null) {
           el.attr('stroke-opacity', 0.35 + 0.6 * Math.min(1, s));  // sterker pad = feller
@@ -35771,8 +35865,8 @@ function selectNode(d) {
           el.attr('marker-end', 'none');
         }
       });
-      if (linkHitElements) linkHitElements.style('pointer-events', (l, i) => (state.showDirect && linkStrength.has(i)) ? 'auto' : 'none');
-      if (edgeLabelElements) edgeLabelElements.attr('opacity', (l, i) => (state.showDirect && linkStrength.has(i)) ? 1 : 0.1);
+      if (linkHitElements) linkHitElements.style('pointer-events', l => (state.showDirect && linkStrength.has(l._idx)) ? 'auto' : 'none');
+      if (edgeLabelElements) edgeLabelElements.attr('opacity', l => (state.showDirect && linkStrength.has(l._idx)) ? 1 : 0.1);
 
       // Afgeleide (indirecte) invloed: alleen paden waarvan élke schakel onderbouwd
       // is krijgen een pijl — geen willekeurige top-N. Ook naar directe buren als
@@ -35790,13 +35884,13 @@ function selectNode(d) {
   }
 
   // A link counts as "connected" only when it touches d AND is currently visible
-  const isConnected = (l, i) => visibleLinkSet.has(i) &&
+  const isConnected = (l) => visibleLinkSet.has(l._idx) &&
     ((typeof l.source === 'object' ? l.source.id : l.source) === d.id ||
      (typeof l.target === 'object' ? l.target.id : l.target) === d.id);
 
   const connectedIds = new Set([d.id]);
-  currentLinks.forEach((l, i) => {
-    if (!isConnected(l, i)) return;
+  currentLinks.forEach(l => {
+    if (!isConnected(l)) return;
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     connectedIds.add(sid);
@@ -35806,8 +35900,8 @@ function selectNode(d) {
   nodeElements.select('.node-circle').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.08);
   nodeElements.select('text').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.06);
   nodeElements.select('.field-halo').attr('opacity', n => connectedIds.has(n.id) ? fieldHaloOpacity(n) : 0.02);
-  linkElements.each(function(l, i) {
-    const connected = state.showDirect && isConnected(l, i);
+  linkElements.each(function(l) {
+    const connected = state.showDirect && isConnected(l);
     const el = d3.select(this);
     el.attr('stroke-opacity', connected ? 0.8 : (state.showDirect ? 0.03 : 0));
     el.attr('marker-end', connected ? el.attr('marker-end') || 'none' : 'none');
@@ -35817,10 +35911,10 @@ function selectNode(d) {
   });
   // Only connected + visible relations stay hoverable (tooltips live on the hit-lines)
   if (linkHitElements) {
-    linkHitElements.style('pointer-events', (l, i) => (state.showDirect && isConnected(l, i)) ? 'auto' : 'none');
+    linkHitElements.style('pointer-events', l => (state.showDirect && isConnected(l)) ? 'auto' : 'none');
   }
   if (edgeLabelElements) {
-    edgeLabelElements.attr('opacity', (l, i) => (state.showDirect && isConnected(l, i)) ? 1 : 0.1);
+    edgeLabelElements.attr('opacity', l => (state.showDirect && isConnected(l)) ? 1 : 0.1);
   }
 
   updateEmergentFields();   // velden van de geselecteerde node oplichten
@@ -36285,7 +36379,7 @@ function computeVisibleLinks() {
 }
 
 function applyFilters() {
-  if (!nodeElements || !linkElements) return;
+  if (!nodeGroupSel || !linkGroupSel) return;
   clearDerivedLinks();   // schoon herbeginnen; verderop tekenen we ze opnieuw (globaal of per selectie)
   const isTheory = state.model === 'theory';
   const search = state.searchTerm.toLowerCase();
@@ -36326,35 +36420,13 @@ function applyFilters() {
     nodesWithVisibleLinks.forEach(id => visibleNodes.add(id));
   }
 
-  // Step 4: Apply visibility to nodes
-  nodeElements.select('.node-circle').attr('opacity', d => visibleNodes.has(d.id) ? 1 : 0);
-  nodeElements.select('text').attr('opacity', d => visibleNodes.has(d.id) ? 1 : 0);
-  nodeElements.select('.field-halo').attr('opacity', d => visibleNodes.has(d.id) ? fieldHaloOpacity(d) : 0);
-  nodeElements.style('pointer-events', d => visibleNodes.has(d.id) ? 'all' : 'none');
-
-  // Step 5: Apply visibility to links — including marker-end
-  // Directe pijlen-toggle: alleen het TEKENEN van de edges; de zichtbaarheidsset
-  // (node-zichtbaarheid, afgeleide paden, stats) blijft op de echte filters lopen.
-  const drawL = i => visibleLinkSet.has(i) && state.showDirect;
-  // De tick-handler positioneert alleen getekende edges; onthoud de set en ververs
-  // eenmalig, zodat nét weer zichtbare edges niet op een verouderde plek staan.
-  drawnLinkSet = visibleLinkSet;
-  positionVisibleLinks();
-  linkElements
-    .attr('stroke-opacity', (l, i) => drawL(i) ? linkBaseOpacity(l, isTheory) : 0)
-    .attr('marker-end', (l, i) => drawL(i) ? markerFor(l, isTheory) : 'none');
-
-  // Verborgen links niet hoverbaar: tooltip-handlers zitten op de hit-lijnen,
-  // dus pointer-events daar uitschakelen voor uitgefilterde/verleden relaties
-  if (linkHitElements) {
-    linkHitElements.style('pointer-events', (l, i) => drawL(i) ? 'auto' : 'none');
-  }
-
-  // Labels blijven muis-transparant (CSS pointer-events: none): de tooltip
-  // hoort bij de hit-lijn erónder, ook als die onder een label doorloopt.
-  if (edgeLabelElements) {
-    edgeLabelElements.attr('opacity', (l, i) => drawL(i) ? 1 : 0);
-  }
+  // Steps 4 & 5: echte data-join — uitgefilterde nodes/edges verlaten de DOM met een
+  // fade, nieuwe verschijnen met een fade (joinNodes/joinLinks). De directe-pijlen-toggle
+  // bepaalt alleen het TEKENEN van de edges; de zichtbaarheidsset (node-zichtbaarheid,
+  // afgeleide paden, stats) blijft op de echte filters lopen.
+  joinNodes(currentNodes.filter(n => visibleNodes.has(n.id)));
+  joinLinks(state.showDirect ? currentLinks.filter(l => visibleLinkSet.has(l._idx)) : []);
+  positionVisibleLinks();   // nét verschenen edges meteen op hun actuele plek
 
   updateEmergentFields();   // emergente velden tonen/verbergen (theorie + toggle)
 
