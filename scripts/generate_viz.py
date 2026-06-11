@@ -61,12 +61,12 @@ def export_data():
     """)
     relations = [dict(row) for row in cur.fetchall()]
 
-    # Roles
-    cur.execute("SELECT id, name, category, description FROM roles")
+    # Roles (+ temporele velden: ook de theorielaag is historisch contingent)
+    cur.execute("SELECT id, name, category, description, active_from, active_until FROM roles")
     roles = [dict(row) for row in cur.fetchall()]
 
     # Mechanisms (incl. `aard`: direct / veld_instantiatie / veld_eigenschap)
-    cur.execute("SELECT id, name, filter, mechanism_type, aard, description, effect, source_role_id, target_role_id FROM mechanisms")
+    cur.execute("SELECT id, name, filter, mechanism_type, aard, description, effect, source_role_id, target_role_id, active_from, active_until FROM mechanisms")
     mechanisms = [dict(row) for row in cur.fetchall()]
 
     # Twee-assen-tags: alle filters (multi) + thema's (dwarsverbanden) per mechanisme.
@@ -89,7 +89,7 @@ def export_data():
         "SELECT name FROM sqlite_master WHERE type='table' AND name='emergent_effects'"
     ).fetchone()
     if have_emergent:
-        cur.execute("SELECT id, name, label, category, description, effect FROM emergent_effects")
+        cur.execute("SELECT id, name, label, category, description, effect, active_from, active_until FROM emergent_effects")
         emergent_effects = [dict(row) for row in cur.fetchall()]
         members = {}
         for eid, rid in cur.execute(

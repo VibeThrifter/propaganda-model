@@ -1203,7 +1203,10 @@ let state = {
 function parseYear(v) { return v ? parseInt(v, 10) : null; }
 
 const allYears = new Set();
-[...DATA.entities, ...DATA.relations].forEach(d => {
+// Praktijk- én theorielaag: ook rollen/mechanismen/emergente effecten dragen
+// optionele active_from/active_until (NULL = onbegrensd voor zover bekend).
+[...DATA.entities, ...DATA.relations, ...DATA.roles, ...DATA.mechanisms,
+ ...(DATA.emergent_effects || [])].forEach(d => {
   const f = parseYear(d.active_from);
   const u = parseYear(d.active_until);
   if (f && !isNaN(f)) allYears.add(f);
@@ -1249,6 +1252,8 @@ function initTimeline() {
     state.timelineYear = steps[idx];
     document.getElementById('timeLabel').textContent =
       state.timelineYear === null ? 'Alle jaren' : state.timelineYear;
+    // Halo-intensiteiten volgen het jaar (veld-eigenschap-mechanismen kunnen gedateerd zijn)
+    state.fieldPropertyMap = computeFieldPropertyMap();
     applyFilters();
     // Ververs een open detailpaneel zodat de relatielijst het jaar volgt
     if (state.selectedNode) showDetail(state.selectedNode);
@@ -1535,10 +1540,12 @@ function buildGraph() {
       const tgt = typeof d.target === 'object' ? d.target : entityMap.get(d.target);
       const relArgs = argsByRelation[d.id] || [];
       const counts = relArgs.length ? countStances(relArgs) : null;
+      const period = formatPeriod(d);
       const tooltip = document.getElementById('tooltip');
       tooltip.innerHTML = `
         <div class="tt-type" style="color:${getLinkColor(d, isTheory)}">${isTheory ? (d.name || 'Mechanisme') : (RELATION_LABELS[d.relation_type] || d.relation_type)}</div>
         <div class="tt-name">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
+        ${period ? `<div class="tt-desc" style="margin-bottom:4px">${period}</div>` : ''}
         ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
         ${counts ? `<div class="tt-desc" style="margin-top:4px">${counts.total} argumenten: ${counts.sup} voor, ${counts.con} tegen</div>` : ''}
         <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor discussie</div>
@@ -1728,7 +1735,8 @@ function updateEmergentFields() {
   const show = emergentVisible();
   const lit = d => state.emergentSelection.has(d.id) || state.emergentHover === d.id
                 || state.emergentActive === d.id;
-  const on = d => (state.model === 'theory' && (show || lit(d)) && emergentMemberNodes(d).length) ? 1 : 0;
+  const on = d => (state.model === 'theory' && (show || lit(d)) && emergentMemberNodes(d).length
+                && isActiveAt(d, state.timelineYear)) ? 1 : 0;
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
     .attr('opacity', on)
@@ -1897,6 +1905,7 @@ function computeFieldPropertyMap() {
   const map = new Map();
   (currentLinks || []).forEach(l => {
     if (!isFieldProperty(l)) return;
+    if (!isActiveAt(l, state.timelineYear)) return;
     const w = (l.influence != null) ? l.influence : (THEORY_BASE + THEORY_SPAN * (l.sterkte || 0));
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (w > (map.get(tid) || 0)) map.set(tid, w);
@@ -2080,6 +2089,8 @@ function openTimespanForm(idField, id, property, slotId) {
   if (slot.innerHTML) { slot.innerHTML = ''; return; }
   const item = idField === 'relation_id'
     ? (currentLinks || []).find(l => l.id === id) || DATA.relations.find(l => l.id === id)
+    : idField === 'mechanism_id' ? DATA.mechanisms.find(m => m.id === id)
+    : idField === 'role_id' ? roleMap.get(id)
     : entityMap.get(id);
   const current = item ? (property === 'active_from' ? item.active_from : item.active_until) : null;
   slot.innerHTML = renderArgForm({ [idField]: id, property, property_value: current || '' });
@@ -2192,6 +2203,7 @@ function showMechanismDetail(m, content) {
       { open: true });
   }
   html += renderTheoryScores(m);
+  html += renderTimespanSection(m, 'mechanism_id', m.id);
   html += renderInstanceList('mechanism_id', m.id);
   html += renderLiteratureSection('mechanism_id', m.id, argsByMechanism[m.id]);
   if (state.adminMode) {
@@ -2793,6 +2805,7 @@ function renderLiteratureSection(field, id, roots) {
 function nodeFieldProperties(d) {
   return (currentLinks || []).filter(l => {
     if (!isFieldProperty(l)) return false;
+    if (!isActiveAt(l, state.timelineYear)) return false;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     return tid === d.id;
   });
@@ -2951,6 +2964,7 @@ function showTheoryDetail(d, content, color) {
 
   html += renderFieldPropertySection(d);   // halo → systeemeffect, prominent bovenaan
   html += renderTheoryScores(d);
+  html += renderTimespanSection(d, 'role_id', d.id);
 
   if (d.examples) {
     html += collapsibleSection('Voorbeelden',
@@ -3157,7 +3171,7 @@ function computeVisibleLinks() {
     const matchLegend = !legendSel.size || legendSel.has(legendKeyOf(n));
     const matchSearch = !search || n.name.toLowerCase().includes(search)
       || (n.description && n.description.toLowerCase().includes(search));
-    const matchTime = isTheory || isActiveAt(n, year);
+    const matchTime = isActiveAt(n, year);
     nodePassesFilter.set(n.id, matchLegend && matchSearch && matchTime);
   });
 
@@ -3171,14 +3185,16 @@ function computeVisibleLinks() {
     if (!axisPass('filter', l, isTheory)) return;   // filter-as (kan meerdere filters dragen)
     if (!axisPass('theme', l, isTheory)) return;    // thema-as (dwarsverbanden)
     // Drempels werken in beide modellen, op model-eigen velden:
-    //   instantie: zekerheid (certainty) + invloed (influence) — plus tijdlijn.
+    //   instantie: zekerheid (certainty) + invloed (influence).
     //   theorie:   geloofwaardigheid (bewijslast) + sterkte (theorie-score).
+    // De tijdlijn werkt óók in beide modellen: mechanismen dragen net als
+    // relaties active_from/active_until (NULL = onbegrensd voor zover bekend).
     if (isTheory) {
       if ((l.geloofwaardigheid||0) < cf || (l.sterkte||0) < inf) return;
     } else {
       if ((l.certainty||0) < cf || (l.influence||0) < inf) return;
-      if (!isActiveAt(l, year)) return;
     }
+    if (!isActiveAt(l, year)) return;
     visibleLinkSet.add(i);
   });
 
@@ -3294,7 +3310,7 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     const isTheory = state.model === 'theory';
     configureSliders(isTheory);     // drempels werken in beide modellen, op model-eigen velden
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
-    document.getElementById('timelineSection').style.display = isTheory ? 'none' : '';
+    // Tijdlijn blijft in beide modellen zichtbaar: ook theorie-elementen zijn temporeel.
     // Veld-effecten bestaan alleen in het theoriemodel; in het praktijkmodel verbergen we die
     // rij en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
     // De toggles voor directe/indirecte pijlen gelden in beide modellen.
@@ -4139,7 +4155,6 @@ populateSizeMetricOptions();
 const initTheory = state.model === 'theory';
 configureSliders(initTheory);
 document.getElementById('colorModeSection').style.display = initTheory ? 'none' : '';
-document.getElementById('timelineSection').style.display = initTheory ? 'none' : '';
 document.getElementById('fieldToggleRow').style.display = initTheory ? '' : 'none';
 buildGraph();
 renderLegend();

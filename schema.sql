@@ -20,7 +20,11 @@ CREATE TABLE roles (
         'overig'
     )),
     description TEXT NOT NULL,
-    examples TEXT                         -- generieke voorbeelden ter illustratie
+    examples TEXT,                        -- generieke voorbeelden ter illustratie
+    -- Temporeel (zie migrate_tijdsdimensie_theorielaag.py): ook de theorielaag is
+    -- historisch contingent. NULL = onbegrensd voor zover bekend.
+    active_from TEXT,
+    active_until TEXT
 );
 
 CREATE TABLE mechanisms (
@@ -58,7 +62,11 @@ CREATE TABLE mechanisms (
         'veld_eigenschap',    -- geen zinnige externe bron; eigenschap ván de getroffen node — halo (LEVEND)
         'indirect',           -- DEPRECATED/leeg: "een edge tussen twee nodes is direct"; teken de keten i.p.v. een stippelpijl. Tekent als directe edge.
         'veld_instantiatie'   -- DEPRECATED/leeg: was diffuse waaier; echte dyade → direct, systeemeigenschap → veld_eigenschap, anders verwijderen. Behouden voor migratie-replay.
-    ))
+    )),
+    -- Temporeel: mechanismen zijn historisch contingent (kijkcijferdisciplinering
+    -- vereist een kijkmeterpanel, sinds 1987). NULL = onbegrensd voor zover bekend.
+    active_from TEXT,
+    active_until TEXT
 );
 
 -- Twee-assen-categorisatie van mechanismen (zie enrich_filters_themas.py).
@@ -93,7 +101,9 @@ CREATE TABLE emergent_effects (
         'eigendom','advertentie','sourcing','flak','ideologie','systeemactor','overig'
     )),
     description TEXT NOT NULL,            -- wat is het emergente effect (uit welk samenspel)
-    effect TEXT NOT NULL                 -- gevolg voor de berichtgeving
+    effect TEXT NOT NULL,                -- gevolg voor de berichtgeving
+    active_from TEXT,                    -- temporeel; NULL = onbegrensd voor zover bekend
+    active_until TEXT
 );
 CREATE TABLE emergent_effect_members (
     emergent_effect_id INTEGER NOT NULL REFERENCES emergent_effects(id) ON DELETE CASCADE,

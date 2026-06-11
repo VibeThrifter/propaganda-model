@@ -64,7 +64,9 @@ Achter béíde structuren ligt een derde, diffuse laag: het systemische aandeelh
 Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeur creëert voor content die het consumentistische wereldbeeld bevestigt. De `adverteerder` is geen losse actor maar de **advertentie-hoed van een `belanghebbende`**: dezelfde corporate of sector die elders lobbyt of procedeert, zet hier het advertentiebudget in als drukmiddel (`adverteren_als_belang`). Zie *Systeemactoren* voor de principaal-superklasse die door alle filters heen werkt.
 
 **Rollen:** `adverteerder` (instrument-rol van `belanghebbende`)
-**Mechanismen:** `adverteren_als_belang`, `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `stakeholder_capitalism_frame`
+**Mechanismen:** `adverteren_als_belang`, `advertentiedruk`, `commerciele_afhankelijkheid`, `supportive_selling_environment`, `stakeholder_capitalism_frame`, `kijkcijferdisciplinering`
+
+> `kijkcijferdisciplinering` is de enige uitgaande pijl van het `publiek` in het model: het per minuut gemeten zapgedrag (NMO-panel) disciplineert de redactie — gasten worden als 'wegzepper' geëvalueerd, onderwerpen op zapgedrag geselecteerd. Het publiek stuurt dus mee, maar alleen langs de dimensie die gemeten en gemonetariseerd wordt (aandacht, niet kwaliteit). Platformonafhankelijk: YouTube-views/view-duration zijn hetzelfde mechanisme.
 
 ### Filter 3: Sourcing
 Economische druk dwingt redacties tot afhankelijkheid van een beperkt aantal routineuze bronnen: het ANP, de overheid, en door de elite gefinancierde denktanks. Toegang (*access*) is hierbij zelf een schaarse hulpbron: wie aan tafel mag krijgt een podium, wie fundamenteel afwijkt verliest die toegang geruisloos (`toegangsdisciplinering`).
@@ -78,7 +80,7 @@ Naast deze principalen gelden officiële instituties zelf als gezaghebbende rout
 Een grensgeval tussen Sourcing en Flak is `inlichtingen_cooptatie`: een inlichtingendienst (AIVD/MIVD) werft journalisten als bron of agent. Gedocumenteerd door NRC/de Volkskrant (2024) — van 32 benaderde redacteuren/correspondenten meldde ~de helft een verzoek; een intern AIVD-document noemde 8 journalisten onder 21 "bronnen en agenten". Het compromitteert de onafhankelijkheid van de bronvergaarder (Sourcing) en ondermijnt de geloofwaardigheid van het vak (Flak). Dit is geen emergent veld-effect maar een *bewezen, doelgerichte* ingreep — en hoort daarom expliciet in het model. (Op instantieniveau is bewust nog géén specifieke dienst→journalist-relatie opgenomen: *dát* een dienst journalisten werft is bewezen, *welke* dienst wie benaderde niet — het praktijkmodel wacht op een gedocumenteerd, specifiek geval. Zo kan het theoretische model wél een verband met geheime diensten dragen terwijl de praktijklaag leeg blijft tot het bewijs er is.)
 
 **Rollen:** `persbureau`, `journalist`, `voorlichter`, `lobbyist`, `denktank`, `belanghebbende`, `gezagsinstituut`, `gezagsexpert`
-**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `klantvraag_persbureau`, `verifieerbaarheidsroutine`, `expert_framing`, `pr_subsidie`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_financiering_bias`, `denktank_levert_expert`, `denktank_naar_politiek`, `denktank_naar_persbureau`, `woo_obstructie`, `draaideur_politiek_institutie`, `inlichtingen_cooptatie`
+**Mechanismen:** `bron_afhankelijkheid`, `pakketjournalistiek`, `persbureau_brongebondenheid`, `klantvraag_persbureau`, `verifieerbaarheidsroutine`, `expert_framing`, `pr_subsidie`, `toegangsdisciplinering`, `belangenbehartiging`, `gecoordineerde_voorlichting`, `institutionele_voorlichting`, `partijlijn`, `institutioneel_gezag`, `expert_legitimatie`, `journalist_bronrelatie`, `politicus_als_bron`, `voorlichter_informatiefilter`, `lobbyist_naar_journalist`, `lobbyist_naar_politicus`, `denktank_financiering_bias`, `denktank_levert_expert`, `denktank_naar_politiek`, `denktank_naar_persbureau`, `woo_obstructie`, `draaideur_politiek_institutie`, `inlichtingen_cooptatie`, `mediageniekheidsselectie`
 
 ### Filter 4: Flak
 Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde lijn af te wijken: juridische dreiging, publieke aanvallen, etikettering, en interne zelfcensuur. De hedendaagse *cancelling* — een gast die iets onwelgevalligs zegt en niet meer wordt uitgenodigd — valt hier onder via `deplatforming`. Het uiterste van het flak-spectrum is fysiek én online `geweld_intimidatie` tegen journalisten; de bron daarvan is bewust diffuus gelaten (geen vaste principaal), passend bij het emergente — niet samenzweerderige — karakter van dát mechanisme. Externe flak en interne redactiecultuur versterken elkaar bovendien in een vicieuze cirkel — empirisch gedocumenteerd door PersVeilig/I&O (2021: 8 op de 10 journalisten ervaart agressie of bedreiging, 16% past de berichtgeving aan, ±15% publiceert soms niet) — gemodelleerd als emergent effect `verkillingsspiraal`: het collectieve chilling effect dat de individuele zelfcensuur-halo overstijgt.
@@ -86,13 +88,13 @@ Disciplineringsmechanismen die journalisten ontmoedigen om van de geaccepteerde 
 Niet álle flak is echter diffuus: een hedendaagse, *wél* doelgerichte en gedocumenteerde variant is `statelijke_inhoudsmoderatie` — een overheid (bv. het ministerie van BZK met trusted-flagger-status bij vijf platforms) of de Europese Commissie (Code of Practice, EU Internet Forum 'borderline content'-handboek dat o.a. anti-elite en meme-content benoemt) zet techplatforms onder druk om legale maar ongewenste uitingen te modereren of demoten. Anders dan `deplatforming` (één mediagast) werkt dit digitaal en publieksbreed, op platformniveau, en raakt het ook Ideologie (spectrumbewaking). Het is het schoolvoorbeeld van bewezen sturing binnen een verder emergent systeem.
 
 **Rollen:** _(geen — flak is een functie, geen identiteit; de mechanismen werken op bestaande rollen)_
-**Mechanismen:** `juridische_dreiging`, `publieke_aanval`, `deplatforming`, `etikettering`, `zelfcensuur`, `geweld_intimidatie`, `statelijke_inhoudsmoderatie`
+**Mechanismen:** `juridische_dreiging`, `publieke_aanval`, `deplatforming`, `etikettering`, `zelfcensuur`, `geweld_intimidatie`, `statelijke_inhoudsmoderatie`, `statelijke_bronnenjacht`
 
 ### Filter 5: Ideologie
 Het overkoepelende filter: een denkkader dat als "gezond verstand" wordt gepresenteerd (Gramsci's culturele hegemonie). In de Nederlandse context is die hegemonie een specifieke combinatie — **cultureel links-progressief** (een *politics of recognition*: diversiteit, identiteit) én **economisch neoliberaal**, pro-Atlantisch: wat Nancy Fraser "progressief neoliberalisme" noemt. Elite-fora synchroniseren dit wereldbeeld, en **universiteiten en journalistiekopleidingen** (`kennisinstituut`) reproduceren het als neutrale, wetenschappelijke vanzelfsprekendheid: ze socialiseren de journalisten (`academische_socialisatie`) én leveren de `gezagsexpert`s (`academische_autoriteit`). Doordat journalist én "onafhankelijke" bron uit dezelfde instituten komen, ontstaat **ideologische homofilie** — empirisch zichtbaar in de sterk afwijkende stemvoorkeur van NL-journalisten (D66/GroenLinks fors oververtegenwoordigd t.o.v. de bevolking; parlementair journalisten: D66 27% vs. 9% landelijk, 'Haagse waakhonden') — gemodelleerd als het gelijknamige emergente effect `ideologische_homofilie`. De hegemonie-*reproductie* reikt verder dan de media: het `kennisinstituut` vormt de hele hoogopgeleide elite die álle instituties bevolkt (Bovens & Wille, *diplomademocratie*) — politici (`academische_socialisatie_politiek`), denktanks (`academische_orthodoxie_denktank`), de "primaire definieerders" als CPB/DNB (`academische_orthodoxie_instituut`) en opiniemakers (`academische_vorming_opinie`). Afwijking verschijnt niet als ander standpunt maar als gebrek aan kennis of als "activisme". (De *academisch criticus die het filtersysteem blootlegt* is bewust geen aparte rol: in NL een marginaal, niet-bepalend verschijnsel — de relevante academische kracht is juist hegemonie-*dragend*.)
 
 **Rollen:** `elite_forum`, `columnist_opiniemaker`, `kennisinstituut`
-**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`, `publieksfragmentatie`
+**Mechanismen:** `schijndebat`, `ideologische_synchronisatie`, `elite_referentiekader`, `spectrum_bewaking`, `journalist_socialisatie`, `academische_socialisatie`, `academische_socialisatie_hoofdredacteur`, `preselectie_hoofdredacteur`, `politicus_als_ideoloog`, `columnist_als_hegemon`, `omroepverzuiling`, `omroepsignatuur`, `sociologische_homogeniteit`, `academische_autoriteit`, `academische_socialisatie_politiek`, `academische_orthodoxie_denktank`, `academische_orthodoxie_instituut`, `academische_vorming_opinie`, `publieksfragmentatie`, `conflictregie`
 
 <a id="themas-dwarsverbanden"></a>
 ### Thema's: dwarsverbanden
@@ -168,12 +170,14 @@ Zie "Scores: van discussieboom naar theorie".
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples |
-| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id |
+| `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples, active_from/active_until (temporeel) |
+| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id, active_from/active_until (temporeel) |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
 | `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`systemisch`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`) |
-| `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl) | name, label, category, description, effect |
+| `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl) | name, label, category, description, effect, active_from/active_until (temporeel) |
 | `emergent_effect_members` | Koppeltabel: welke rollen dragen samen een emergent effect | emergent_effect_id, role_id |
+
+> **Tijdsdimensie.** Ook de theorielaag is historisch contingent: mechanismen ontstaan (kijkcijferdisciplinering vereist een kijkmeterpanel — 1987; algoritmische_filtering een algoritmische feed — 2006) en kunnen verdwijnen. `roles`, `mechanisms` en `emergent_effects` dragen daarom dezelfde optionele `active_from`/`active_until` als de praktijklaag; NULL = onbegrensd voor zover bekend. Alleen invullen bij evident technologie- of bestelgebonden elementen — zie `scripts/migrate_tijdsdimensie_theorielaag.py` voor de zes gedateerde mechanismen plus rationale. De **tijdbalk** in de visualisatie werkt in beide modellen: op het gekozen jaar verdwijnen mechanismen, rollen en emergente velden (en in het praktijkmodel relaties/entiteiten) die toen niet actief waren; de stand "Alle jaren" toont alles. De looptijd is per mechanisme en rol bespreekbaar in het detailpaneel (via de discussieboom, net als bij relaties). `scoring.py` en `influence.py` blijven tijdloos: bewijs telt ongeacht datum even zwaar; tijdsweging van argumenten (ouder bewijs telt lichter) is een bewust uitgestelde, aparte modelkeuze.
 
 ### Instantiemodel
 
@@ -600,14 +604,14 @@ ORDER BY s.author;
 | Onderdeel | Aantal |
 |---|---|
 | Rollen (theoretisch) | 35 |
-| Mechanismen (theoretisch) | 122 |
+| Mechanismen (theoretisch) | 126 |
 | Emergente effecten (hyperedges) | 12 |
-| Entiteiten (concreet) | 162 |
-| Relaties (concreet) | 392 |
-| Argumenten | 422 |
-| Citaties | 157 |
-| Bronnen | 62 |
-| Bronlocaties | 51 |
+| Entiteiten (concreet) | 167 |
+| Relaties (concreet) | 398 |
+| Argumenten | 443 |
+| Citaties | 212 |
+| Bronnen | 67 |
+| Bronlocaties | 57 |
 
 > Let op: de meeste argumenten zijn automatisch gegenereerde `supporting`-onderbouwingen met status `ongecontroleerd` en nog grotendeels zonder citatie. Het aanvullen van citaties en het controleren van argumentstatus is openstaand werk.
 
