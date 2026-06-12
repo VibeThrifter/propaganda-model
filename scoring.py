@@ -295,13 +295,16 @@ def beta_interval(steun: float, tegen: float, k: float) -> tuple:
     return (round(_beta_ppf(0.025, a, b), 4), round(_beta_ppf(0.975, a, b), 4))
 
 
-def instance_detail(roots, prior_certainty=None, k: float = K_INSTANCE) -> dict:
+def instance_detail(roots, prior_certainty=None, k=None) -> dict:
     """Afgeleide geloofwaardigheid van een praktijk-instantie, met interval en vlaggen.
 
     Zonder voor/tegen-rootargumenten valt de score terug op de handmatige certainty
     (prior, bron='prior') of 0.0 (bron='geen'); het tegenspraak-plafond (M1.4) geldt
     óók voor de prior — een onweersproken aanname is niet zekerder dan 0,70.
     """
+    # K_INSTANCE bij aanroep opzoeken (geen default-argument: dat zou de constante
+    # bevriezen bij import en de parameter-sweep van M1.6 blind maken).
+    k = K_INSTANCE if k is None else k
     bal = balance_from_roots(roots, k)
     if bal["score"] is None:
         score = float(prior_certainty) if prior_certainty is not None else 0.0

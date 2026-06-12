@@ -4,3 +4,4 @@ data/tokens/
 __pycache__/
 *.pyc
 .DS_Store
+data/gevoeligheid.json

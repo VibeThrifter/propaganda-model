@@ -433,10 +433,45 @@ def kerngetallen(conn):
             WHERE NOT EXISTS (SELECT 1 FROM instantiations i WHERE i.entity_id = e.id)"""),
         "hyperedges": een("SELECT COUNT(*) FROM emergent_effects"),
         "hyperedges_met_bewijslijn": hyperedges_met_bewijs,
+        "hyperedges_met_compositieclaim": (een("""
+            SELECT COUNT(DISTINCT emergent_effect_id) FROM arguments
+            WHERE emergent_effect_id IS NOT NULL AND property = 'compositie'""")
+            if "emergent_effect_id" in arg_kolommen else 0),
+        "bronclusters": een(
+            "SELECT COUNT(DISTINCT COALESCE(cluster_key, 'bron' || id)) FROM sources"),
         "citatie_concentratie_top3": top3,
         "citatie_concentratie_aandeel": (
             round(sum(t["citaties"] for t in top3) / citaties_totaal, 3) if citaties_totaal else None),
     }
+
+
+# ── Scoring v2 (fase 1): clusters & compositieclaims ─────────
+
+def check_scoring_v2(conn):
+    """M1.2/M1.5-dekking: clustertoekenning en compositieclaims."""
+    zonder_cluster = [
+        f"bron #{s['id']}: {s['title'][:70]}"
+        for s in conn.execute("""
+            SELECT id, title FROM sources WHERE cluster_key IS NULL ORDER BY id""")]
+
+    zonder_compositie = [
+        f"veld #{e['id']}: {e['label']}"
+        for e in conn.execute("""
+            SELECT id, label FROM emergent_effects e
+            WHERE NOT EXISTS (SELECT 1 FROM arguments a
+                              WHERE a.emergent_effect_id = e.id AND a.property = 'compositie')
+            ORDER BY id""")]
+
+    return [
+        _bevinding("CLUSTER-BRON", "Bronnen zonder cluster_key", "waarschuwing",
+                   zonder_cluster,
+                   "Zonder cluster telt de bron als eigen cluster; dat is veilig maar "
+                   "verbergt verwantschap met andere bronnen (M1.2)."),
+        _bevinding("EFF-COMPOSITIE", "Hyperedges zonder compositieclaim", "waarschuwing",
+                   zonder_compositie,
+                   "Zonder bewijs dat het sámenspel bestaat is de veldscore gemaximeerd "
+                   "op 0,50 (M1.5; analoog aan padclaims)."),
+    ]
 
 
 # ── Alles in één run ─────────────────────────────────────────
@@ -448,6 +483,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_balans(conn)
     bevindingen += check_padclaims(conn)
     bevindingen += check_bronnen(conn, network=network)
+    bevindingen += check_scoring_v2(conn)
     bevindingen += check_schema_pariteit(conn, schema_path)
 
     totalen = {"fout": 0, "waarschuwing": 0, "info": 0}

@@ -1010,10 +1010,19 @@ def delete_instantiation(iid):
 def get_health():
     """Gezondheidsdashboard (M0.5): zelfde checkfuncties als de validator-CLI,
     dus de cijfers hier zijn per constructie identiek aan scripts/validate_model.py.
-    (Zonder linkrot-check; die blijft CLI-only achter --network.)"""
+    (Zonder linkrot-check; die blijft CLI-only achter --network.)
+
+    Als scripts/analyse_gevoeligheid.py (M1.6) een rapport heeft geschreven,
+    komt dat mee onder 'gevoeligheid' (SPOF-lijst + parameter-robuustheid)."""
     conn = get_db()
     rapport = validation.run_all(conn)
     conn.close()
+    gevoeligheid = Path(__file__).parent / "data" / "gevoeligheid.json"
+    if gevoeligheid.exists():
+        try:
+            rapport["gevoeligheid"] = json.loads(gevoeligheid.read_text())
+        except (OSError, json.JSONDecodeError):
+            pass
     return jsonify(rapport)
 
 

@@ -1,8 +1,12 @@
 # Verbeterplan: discussieboom & scoringsketen
 
-**Status: in uitvoering — Fase 0 is gebouwd en geverifieerd op 12 juni 2026 (zie §9;
-alleen het M0.4-slotcriterium wacht op de 6 theorie-kandidaten uit `BACKFILL_REVIEW.md`).
-Fase 1 en verder: nog niet gestart.**
+**Status: in uitvoering — Fase 0 gebouwd en geverifieerd op 12 juni 2026 (alleen het
+M0.4-slotcriterium wacht op de 6 theorie-kandidaten uit `BACKFILL_REVIEW.md`).
+Fase 1 (scoring v2) is op 12 juni 2026 gebouwd en geverifieerd: M1.1–M1.7 volledig
+(zie §9), M1.8/M1.9 hebben hun infrastructuur (accounts, briefs, `objection_type`,
+logging-conventies in `missies/`) maar de eerste rondes + menselijke review staan open.
+Open eigenaarsacties: clusterreview (`BRONCLUSTER_REVIEW.md`), monitor-ronde 1,
+eerste scout-missie. Fase 2 en verder: nog niet gestart.**
 Geschreven juni 2026 na een audit van schema, `scoring.py`, `server.py` en de live database. Doel: het discussiesysteem dat nodes,
 edges en systeemeffecten onderbouwt robuuster en wetenschappelijker maken, en het klaarmaken
 voor open bijdragen door gebruikers én agents. De domeinspec blijft `DOCUMENTATIE.md`; dit
@@ -683,85 +687,121 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
 
 ### Fase 1 — scoring v2
 
-- [ ] **M1.1 Boomsemantiek** (Z3)
-  - [ ] Semantiek vastleggen in DOCUMENTATIE.md: basiskracht τ per argument (laag A);
+- [x] **M1.1 Boomsemantiek** (Z3)
+  - [x] Semantiek vastleggen in DOCUMENTATIE.md: basiskracht τ per argument (laag A);
         eindkracht σ = τ gemoduleerd door de σ's van steunende en aanvallende kinderen
         (DF-QuAD-combinatie); 2–3 doorgerekende voorbeelden
-  - [ ] Regels afdwingen: een reply draagt géén eigen target (API-validatie; CHECK samen
-        met M1.5 herdefiniëren); stance is relatief aan de parent
-  - [ ] `scoring.py`: recursieve propagatie; een platte boom reproduceert de huidige
-        uitkomsten (regressie-eis)
-  - [ ] Golden-snapshot: fixture-DB + `scripts/test_scoring.py` (stdlib `unittest`),
-        draait mee in M0.1 `--strict`
-  - [ ] Viz: reply-formulier stuurt geen target meer mee; per argument de gedempte
-        σ tonen
-  - [ ] **Klaar wanneer:** snapshottest groen én een demo-ondergraving dempt aantoonbaar
-        in `/api/scores`
+  - [x] Regels afdwingen: een reply draagt géén eigen target (API-validatie; CHECK
+        herbouwd in `migrate_scoring_v2.py`, sámen met M1.5/M1.8); stance is relatief
+        aan de parent; replies dragen ook geen property
+  - [x] `scoring.py`: recursieve propagatie (`propagate_sigma`); een platte boom
+        reproduceert de huidige uitkomsten *(geverifieerd: σ=τ voor alle 462
+        bestaande argumenten)*
+  - [x] Golden-snapshot: fixture-DB + `scripts/test_scoring.py` (stdlib `unittest`,
+        22 tests, handberekende verwachtingen), draait mee in M0.1 `--strict`
+  - [x] Viz: reply-formulier stuurt geen target meer mee (en biedt `objection_type`);
+        per argument τ→σ ("kracht 12% ↓ van 14%") in de discussieboom
+  - [x] **Klaar wanneer:** snapshottest groen én een demo-ondergraving dempt aantoonbaar
+        in `/api/scores` *(12 juni 2026: σ 0,1425→0,1233, relatiescore 0,1247→0,1097
+        op een kopie-DB via het bijdragepad; reply-met-doel geeft 400)*
 
-- [ ] **M1.2 Bronclusters** (Z4)
-  - [ ] Migratie: `cluster_key` op `sources` + vulregels (zelfde auteur / uitgever /
+- [x] **M1.2 Bronclusters** (Z4) — *op de handmatige clusterreview na*
+  - [x] Migratie: `cluster_key` op `sources` + vulregels (zelfde auteur / uitgever /
         onderliggende data); reliability-klasse `eigen_synthese` met gewicht 0
-  - [ ] Clustertoekenning voor de bestaande ~65 bronnen, handmatig gereviewd
-  - [ ] `scoring.py`: binnen een cluster telt de sterkste citatie, combineren gebeurt
-        over clusters; SPOF-vlag ("drijft op één cluster") in de output
-  - [ ] Viz: SPOF-badge in het detailpaneel; DOCUMENTATIE.md bijwerken
-  - [ ] **Klaar wanneer:** scores verschuiven aantoonbaar waar één boek nu meervoudig
-        telt, en de badge verschijnt
+        *(`migrate_scoring_v2.py`; `register_source.py` leidt het cluster voortaan af)*
+  - [ ] Clustertoekenning voor de bestaande 69 bronnen: initieel toegekend (9
+        meervoudige clusters) — **handmatige review door de eigenaar staat open:
+        `BRONCLUSTER_REVIEW.md`**
+  - [x] `scoring.py`: binnen een cluster telt het sterkste argument, combineren over
+        clusters; bronloze voor/tegen-argumenten delen per doel één pseudocluster;
+        SPOF-vlag ("drijft op één cluster") in de output
+  - [x] Viz: SPOF-badge ("1 broncluster") in de detailpanelen; DOCUMENTATIE.md bijgewerkt
+  - [x] **Klaar wanneer:** scores verschuiven aantoonbaar waar één boek nu meervoudig
+        telt, en de badge verschijnt *(massaal: 97% ongebronde steun stortte van
+        stapelen naar één pseudocluster per doel; bv. relatie #9: 0,97 → 0,125)*
 
-- [ ] **M1.3 Onzekerheidsband** (Z7)
-  - [ ] Methode vastleggen: Beta-interval op steun/tegen-massa's (laag B); bootstrap
-        over instanties (laag C)
-  - [ ] `scoring.py`: interval naast elke puntscore in `compute_all_scores`
-  - [ ] Viz: band/kleurverzadiging + notatie "0,62 [0,45–0,76]" in de detailpanelen
-  - [ ] **Klaar wanneer:** geen enkele score wordt nog zonder interval getoond
+- [x] **M1.3 Onzekerheidsband** (Z7)
+  - [x] Methode vastgelegd (DOCUMENTATIE.md): Beta-posterior met Jeffreys-smoothing
+        op de steun/tegen-massa's (laag B, k als tegenmassa); bootstrap (n=200,
+        deterministische seed) over instanties (laag C); lijn zonder bewijs = 0
+        zonder onzekerheid (score meet onderbouwing, niet waarheid)
+  - [x] `scoring.py`: `lo`/`hi` naast elke geloofwaardigheid in `compute_all_scores`
+        (pure-stdlib onvolledige-beta + kwantiel)
+  - [x] Viz: notatie "62% [45–76]" in alle detailpanelen (relatie, entiteit,
+        mechanisme/rol, emergent veld)
+  - [x] **Klaar wanneer:** geen enkele geloofwaardigheid wordt nog zonder interval
+        getoond *(12 juni 2026)*
 
-- [ ] **M1.4 Tegenspraak-plafond** (Z1)
-  - [ ] Criterium vastleggen (wat telt als "overwogen tegenspraak") + startplafond 0,70
-  - [ ] `scoring.py`: cap + `onweersproken`-vlag; label in de viz
-  - [ ] Herijken op de M1.6-uitkomsten
-  - [ ] **Klaar wanneer:** onweersproken elementen tonen label én cap in API en viz
+- [x] **M1.4 Tegenspraak-plafond** (Z1)
+  - [x] Criterium vastgelegd: overwogen tegenspraak = ≥ 1 niet-verworpen
+        contradicting-argument mét echte citatie op het doel; startplafond 0,70
+        (geldt ook voor handmatige priors)
+  - [x] `scoring.py`: cap + `onweersproken`-vlag; label + tooltip in de viz
+  - [x] Herijken op de M1.6-uitkomsten *(sweep 0,60/0,80: top-10-overlap 10/10,
+        max Δ 0,017 — 0,70 gehandhaafd; opnieuw bezien zodra er echte tegenspraak is)*
+  - [x] **Klaar wanneer:** onweersproken elementen tonen label én cap in API en viz
+        *(12 juni 2026; vrijwel het hele corpus draagt het label — dat is Z1 zichtbaar
+        gemaakt; de tegenspraakronde zelf is prioriteit 4 / M3.3-voorproef)*
 
-- [ ] **M1.5 Hyperedges & halo's in de keten** (Z5)
-  - [ ] Migratie: `arguments.emergent_effect_id` + index; CHECK-herdefinitie sámen met
-        de M1.1-replyregel; `schema.sql`
-  - [ ] API: GET/POST argumenten op een emergent effect
-  - [ ] Compositieclaim-conventie vastleggen (analoog aan padclaims) + `scoring.py`:
-        literatuurlijn + compositielijn per hyperedge
-  - [ ] Halo-sterkte: eigen bewijslijn via `property='influence'`-argumenten
-  - [ ] Viz: discussieboom + score + dekking in het hyperedge-detailpaneel
-  - [ ] **Klaar wanneer:** alle 12 hyperedges kunnen argumenten dragen en tonen een
-        score met dekking
+- [x] **M1.5 Hyperedges & halo's in de keten** (Z5)
+  - [x] Migratie: `arguments.emergent_effect_id` + index bestonden al
+        (`migrate_velden_eersteklas.py`); property `compositie` + CHECK-herdefinitie
+        sámen met de M1.1-replyregel in `migrate_scoring_v2.py`; `schema.sql` mee
+  - [x] API: GET/POST argumenten op een emergent effect (incl. recursieve subboom-CTE)
+  - [x] Compositieclaim-conventie vastgelegd (property `compositie`, analoog aan
+        padclaims) + `scoring.py`: literatuurlijn ⊕ compositielijn per hyperedge;
+        zonder compositieclaim plafond 0,50 + vlag (validator-check EFF-COMPOSITIE)
+  - [x] Halo-sterkte: eigen bewijslijn via `property='influence'`-argumenten op het
+        mechanisme (M1.7-machinerie; `sterkte_bewijs_args` in de output)
+  - [x] Viz: discussieboom (bestond), score mét compositielijn + dekking + vlaggen in
+        het hyperedge-detailpaneel; compositie-optie in het argumentformulier
+  - [x] **Klaar wanneer:** alle 12 hyperedges kunnen argumenten dragen en tonen een
+        score met dekking *(12 juni 2026: alle 12 vlaggen nu eerlijk "geen
+        compositieclaim" — de claims zelf zijn bijdrage-werk, geen migratie)*
 
-- [ ] **M1.6 Gevoeligheidsanalyse** (Z7)
-  - [ ] `scripts/analyse_gevoeligheid.py`: leave-one-cluster-out over alle
-        theorie-elementen; parameter-sweep over de `scoring.py`-constanten
-  - [ ] Rapport: top-10 kwetsbaarste elementen; advies voor het M1.4-plafond;
-        resultaat zichtbaar in het dashboard
-  - [ ] **Klaar wanneer:** het rapport draait herhaalbaar en de SPOF-lijst staat in
-        het dashboard
+- [x] **M1.6 Gevoeligheidsanalyse** (Z7)
+  - [x] `scripts/analyse_gevoeligheid.py`: leave-one-cluster-out over alle
+        theorie-elementen; one-at-a-time-sweep over de `scoring.py`-constanten
+        *(legde meteen een echte bug bloot: K_INSTANCE stond bevroren als
+        default-argument — gerepareerd)*
+  - [x] Rapport: top-10 kwetsbaarste elementen (omroep-mechanismen hangen op het
+        rijksoverheid/staten-generaal-cluster; Mediahype op Vasterman); plafond-advies
+        (zie M1.4); resultaat in `data/gevoeligheid.json` → `/api/health` →
+        Modelgezondheid-paneel
+  - [x] **Klaar wanneer:** het rapport draait herhaalbaar en de SPOF-lijst staat in
+        het dashboard *(12 juni 2026: top-10 mechanismen parameter-robuust,
+        overlap ≥ 9/10 in elke variant)*
 
-- [ ] **M1.7 Influence bewijsbaar**
-  - [ ] `scoring.py`: `property='influence'`-argumenten verschuiven de afgeleide
-        invloed (handmatige kolom blijft de prior)
-  - [ ] Viz + DOCUMENTATIE.md: beide assen tonen hun bewijs
-  - [ ] **Klaar wanneer:** een influence-argument verschuift de sterkte aantoonbaar
-        in `/api/scores`
+- [x] **M1.7 Influence bewijsbaar**
+  - [x] `scoring.py`: `property='influence'`-argumenten verschuiven de afgeleide
+        invloed van relaties én de sterkte van mechanismen (handmatige kolom blijft
+        de prior; gewicht massa/(massa+k)); aspect-argumenten tellen nooit mee in de
+        zekerheids-balans
+  - [x] Viz + DOCUMENTATIE.md: beide assen tonen hun bewijs (●-marker "verschoven
+        door n invloed-argument(en)"; invloed-optie in het formulier)
+  - [x] **Klaar wanneer:** een influence-argument verschuift de sterkte aantoonbaar
+        in `/api/scores` *(golden-snapshot: prior 0,60 → 0,5605 door één
+        geverifieerd invloed-argument; het live corpus heeft nog geen invloed-args)*
 
-- [ ] **M1.8 Monitor-agent** (→ §6.2)
-  - [ ] Beslissen + doorvoeren: `objection_type` als kolom of property-conventie
-        (migratie + `schema.sql`)
-  - [ ] Missie-brief schrijven: drogreden-taxonomie, ondergraving vs weerlegging,
-        verplichte stap-citatie, alles landt als `voorgesteld`
-  - [ ] Agent-account aanmaken (M0.6-CLI) en ronde 1 over het bestaande corpus draaien
-        (Claude Code background agent, §6.2-runtime)
+- [ ] **M1.8 Monitor-agent** (→ §6.2) — *infrastructuur staat; ronde 1 + review open*
+  - [x] Beslist + doorgevoerd: `objection_type` als kolom (taxonomie in de CHECK;
+        `migrate_scoring_v2.py` + `schema.sql`; alleen op contradicting-replies)
+  - [x] Missie-brief geschreven (`missies/monitor_brief.md`): drogreden-taxonomie,
+        ondergraving vs weerlegging, verplichte stap-citatie in `reasoning`,
+        terughoudendheid (liever 5 raak dan 50 vaag), nooit statuswijzigingen
+        *(landingsstatus is tot M2.2 `ongecontroleerd`; mens reviewt vóór verificatie)*
+  - [x] Agent-account `monitor-agent` aangemaakt (provenance + token)
+  - [ ] Ronde 1 over het bestaande corpus draaien (Claude Code background agent)
   - [ ] Menselijke review van ronde 1: vals-positief-ratio meten, brief bijstellen
   - [ ] **Klaar wanneer:** een ronde levert reviewbare bevindingen, < 50% vals-positief,
         0 directe statuswijzigingen
 
-- [ ] **M1.9 Scout-agents** (→ §6.3)
-  - [ ] Blind-zoekprotocol als missie-brief (neutrale vraag, tweezijdige oogstplicht,
-        afwezigheidsrapport)
-  - [ ] Query- en brief-logging inrichten (auditbaar)
+- [ ] **M1.9 Scout-agents** (→ §6.3) — *protocol staat; eerste missie open*
+  - [x] Blind-zoekprotocol als missie-brief (`missies/scout_brief.md`: neutrale vraag,
+        DB niet lezen vóór het zoeken, tweezijdige oogstplicht, afwezigheidsrapport,
+        buiten-de-bril-bemonstering); agent-account `scout-agent` aangemaakt
+  - [x] Query- en brief-logging ingericht (`missies/README.md`: logformaat in
+        `missies/logs/`, incl. negatieve-resultatenregister en stance-balans per ronde)
   - [ ] Eerste missie op een zwak onderbouwd mechanisme; nieuwheid + stance-balans
         meten in het dashboard
   - [ ] **Klaar wanneer:** de missie levert bronnen voor beide stances óf een gelogd

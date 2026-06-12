@@ -58,7 +58,7 @@ Achter béíde structuren ligt een derde, diffuse laag: het systemische aandeelh
 **Rollen:** `mediaeigenaar`, `mediaorganisatie`, `aandeelhouder` (passief-systemisch én actief-strategisch), `overnamevehikel`, `administratiekantoor`, `hoofdredacteur`, `omroepkoepel`, `ledenomroep`
 **Mechanismen:** `familiezeggenschap`, `certificaatconstructie`, `holdingconstructie`, `winstmaximalisatie`, `acquisitiestrategie`, `cross_media_eigendom`, `strategische_zeggenschap`, `systemisch_eigenaarschap`, `benoemingspolitiek`, `hoofdredacteur_als_filter`, `podiumverlening`, `redactioneel_budgetcontrole`, `bestelsturing`, `politieke_benoeming_omroeptop`, `ledeneis`, `intekensturing`, `erkenningverlening`, `staatsreclame_exploitatie`
 
-> De eigendomskant kent geen directe `mediaeigenaar → mediaorganisatie`-pijl: de eigenaarsinvloed loopt strikt via de controleketen `mediaeigenaar → administratiekantoor → overnamevehikel → mediaorganisatie`. De eigenaar heeft daarmee **één uitgaande eigendomspijl — naar de STAK** — die alle eigenaar-niveau-mechanismen draagt (`familiezeggenschap`, `acquisitiestrategie`, `cross_media_eigendom`, en de structurele `eigendomsconcentratie`). De STAK certificeert vervolgens de holding (`certificaatconstructie`: vier effecten — stemmacht-concentratie, cash/controle-ontkoppeling, overnamebestendigheid, UBO-afscherming), en de holding bezit de titel en legt het rendementsregime op (`holdingconstructie`, `winstmaximalisatie`). De redactionele hefbomen liggen ná de keten, op org-niveau: de `mediaorganisatie` benoemt de hoofdredacteur (`benoemingspolitiek`) en stelt het redactiebudget vast (`redactioneel_budgetcontrole`, binnen het door de holding opgelegde rendementsregime). De eigenaar raakt de redactionele laag dus **nooit direct** — zijn invloed is volledig gemedieerd via de keten; alleen zijn persoonlijke elite-netwerk (`mediaeigenaar_elite_netwerk`, Eigendom + Ideologie; thema Elite-netwerk) loopt rechtstreeks. De `borgingsstichting` zet zich als tegenmacht precies op het benoemingspunt (`onafhankelijkheidsborging` → hoofdredacteur). De macro-concentratie zelf is een emergent systeemkenmerk — zie het thema *Systemisch* onder [Thema's: dwarsverbanden](#themas-dwarsverbanden).
+> De eigendomskant kent geen directe `mediaeigenaar → mediaorganisatie`-pijl: de eigenaarsinvloed loopt strikt via de controleketen `mediaeigenaar → administratiekantoor → overnamevehikel → mediaorganisatie`. De eigenaar heeft daarmee **één uitgaande eigendomspijl — naar de STAK** — die alle eigenaar-niveau-mechanismen draagt (`familiezeggenschap`, `acquisitiestrategie`, `cross_media_eigendom`, en de structurele `eigendomsconcentratie`). De STAK certificeert vervolgens de holding (`certificaatconstructie`: vier effecten — stemmacht-concentratie, cash/controle-ontkoppeling, overnamebestendigheid, UBO-afscherming), en de holding bezit de titel en legt het rendementsregime op (`holdingconstructie`, `winstmaximalisatie`). De redactionele hefbomen liggen ná de keten, op org-niveau: de `mediaorganisatie` benoemt de hoofdredacteur (`benoemingspolitiek`) en stelt het redactiebudget vast (`redactioneel_budgetcontrole`, binnen het door de holding opgelegde rendementsregime). De eigenaar raakt de redactionele laag dus **nooit direct** — zijn invloed is volledig gemedieerd via de keten; alleen zijn persoonlijke elite-netwerk (`mediaeigenaar_elite_netwerk`, Eigendom + Ideologie; thema Elite-netwerk) loopt rechtstreeks. De `borgingsstichting` zet zich als tegenmacht precies op het benoemingspunt (`onafhankelijkheidsborging` → hoofdredacteur). De macro-concentratie zelf is een emergent systeemkenmerk — net als bij de halo's en hyperedges codeert de aard-laag dat, niet een thema.
 
 ### Filter 2: Advertentie
 Media zijn financieel afhankelijk van adverteerders, wat een structurele voorkeur creëert voor content die het consumentistische wereldbeeld bevestigt. De `adverteerder` is geen losse actor maar de **advertentie-hoed van een `belanghebbende`**: dezelfde corporate of sector die elders lobbyt of procedeert, zet hier het advertentiebudget in als drukmiddel (`adverteren_als_belang`). Zie *Systeemactoren* voor de principaal-superklasse die door alle filters heen werkt.
@@ -108,9 +108,13 @@ De zeven thema's:
 - **Elite-netwerk** — synchronisatie van wereldbeeld in elite-fora (Bilderberg/WEF/ERT); combinatie van lobby (Sourcing) en Ideologie. Zeldzaam publiek spoor: de VN-herstelterm "build back better" (Sendai-raamwerk, 2015) werd na WEF- en OESO-publicaties van begin juni 2020 binnen maanden de herstelslogan van meerdere westerse regeringsleiders — gedocumenteerde vocabulaire-convergentie via gedeelde circuits, geen bewijs van regie (zie de argumenten bij `ideologische_synchronisatie`).
 - **Geldstromen** — agenda-gebonden geld dat buiten eigendom én advertentie om naar partij of titel stroomt (partij-/mediafinanciering, groeileningen, platformfinanciering), plus de neutrale tegenpool `projectfinanciering_journalistiek`.
 - **Platform/digitaal** — techplatforms en algoritmes (filtering, socialisatie, verdienmodeldruk, advertentieconcentratie).
-- **Systemisch** — emergente, zelfversterkende systeemkenmerken (eigendomsconcentratie, economische terugkoppeling, emergente bias, homeostase).
 - **Publiek omroepbestel** — de bestel-specifieke krachten (ledeneis, intekensturing, erkenningverlening, omroepsignatuur/-verzuiling, Ster); spant Eigendom + Ideologie + Advertentie.
 - **Kennis & expertise** — het expert-/autoriteitscomplex (academische vorming/orthodoxie, denktanks, expert-framing/-legitimatie); spant Sourcing + Ideologie.
+- **Benoemingsketen** — de keten waarlangs kapitaal de hoofdredactie bereikt (commissaris- en directiebenoeming, STAK-stemzeggenschap, benoemingspolitiek, voorselectie en de hoofdredacteur als doorgeefluik), met het redactieraad-instemmingsrecht als tegenmacht op precies dat punt; spant Eigendom + Ideologie + Tegenmacht.
+
+> Een thema *Systemisch* bestond eerder, maar was dubbelop: een staande systeemtoestand is al een
+> `veld_eigenschap` (halo) en een groepseigenschap een `emergent_effects`-hyperedge — de aard-laag
+> codeert systemisch-zijn, een thema-as ernaast voegt niets toe (zie `migrate_thema_opschoning.py`).
 
 ### Uitbreiding B: Tegenmacht
 Het model is niet deterministisch: het modelleert óók de krachten die het filtersysteem begrenzen of doorbreken. Zulke doorbraken zijn mogelijk, maar vaak incidenteel en onder druk (zie ook `toezicht_tandeloosheid`).
@@ -173,7 +177,7 @@ Zie "Scores: van discussieboom naar theorie".
 | `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples, active_from/active_until (temporeel) |
 | `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id, active_from/active_until (temporeel) |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
-| `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`systemisch`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`) |
+| `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`; `systemisch` deprecated/leeg — aard-laag codeert dat) |
 | `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl). Eersteklas theorie-element: eigen discussieboom (`arguments.emergent_effect_id`), eigen tijdvenster en eigen score (lit-only) | name, label, category, description, effect, active_from/active_until (temporeel) |
 | `emergent_effect_members` | Koppeltabel: welke rollen dragen samen een emergent effect | emergent_effect_id, role_id |
 | `emergent_effect_subeffects` | Tweede-orde-structuur: deel-effecten van een emergent effect. Gebruikt voor het apex-veld `fabricage_van_instemming` ⊃ de elf overige velden; de ledenset van het apex-veld blijft pars pro toto | parent_effect_id, child_effect_id |
@@ -273,9 +277,10 @@ levende aarden, met de visuele grammatica **pijlpunt = gericht, doorgetrokken = 
 | `direct` | lokaal feit; de oorzaak ís de twee eindpunten — óók als de invloed gemedieerd of onzeker is (mediatie → de keten; twijfel → de `certainty`-score) | verander de bron/het doel → de claim wordt onwaar | doorgetrokken pijl **mét** punt, filterkleur | DPG → Het Parool (eigendom); Bilderberg → mediabestuurder (`ideologische_synchronisatie`, cert ≈ 0,05) |
 | `veld_eigenschap` | een staande *toestand* ván de getroffen node (die de node *ondergaat*); oorzaken bestaan wél, maar zijn diffuus/overgedetermineerd — er is geen toerekenbare levende zender, en de toestand blijft werken zonder levende input | wie is de zénder (niet: de oorzaak)? niemand specifieks — én: bevries alle andere nodes; werkt het effect morgen nog door? (zelfcensuur: ja; eigenaarsinvloed via de hoofdredacteur: nee, die heeft de levende keten nodig) | **halo** om de node (geen edge); bron-rol mag `NULL` zijn of de diffuse herkomst aanduiden | `zelfcensuur`, `sociologische_homogeniteit` (homogene redactie → blinde vlekken), `geweld_intimidatie`, `elite_referentiekader` (media opereren binnen het elite-frame; herkomst diffuus — er is geen handeling van forum naar redactie) |
 
-> Let op: dat een mechanisme thema `systemisch` draagt zegt niets over zijn `aard`. `eigendomsconcentratie`
-> is thematisch systemisch, maar elke afzonderlijke edge (DPG → Het Parool) is een lokaal eigendomsfeit —
-> dus `direct`. Het emergente zit daar in de *optelsom* (de concentratie), niet in de losse edge.
+> Let op: dat een mechanisme een systemisch *kenmerk* beschrijft zegt niets over zijn `aard`.
+> `eigendomsconcentratie` is een macro-systeemkenmerk, maar elke afzonderlijke edge (DPG → Het Parool)
+> is een lokaal eigendomsfeit — dus `direct`. Het emergente zit daar in de *optelsom* (de concentratie),
+> niet in de losse edge.
 
 **Afgeschaft.** Twee oudere aarden zijn leeg en hun viz-rendering is verwijderd:
 - `indirect` (gericht-maar-gemedieerd; was een gestippelde pijl mét punt) — vervangen door het principe
@@ -383,28 +388,79 @@ Een theoretisch element (rol/mechanisme) is een **klasse**; de concrete entiteit
 zijn *emergent*: ze bouwen op uit de bewijslast eronder. De berekening (in `scoring.py`, gedeeld door
 `generate_viz.py` en het `/api/scores`-endpoint) kent drie lagen.
 
-**Laag A — bewijskracht per argument:** `weight × statusfactor × bronfactor`. De statusfactor schaalt
-op verificatiestatus (geverifieerd 1,0 → betwist 0,25); de bronfactor op de betrouwbaarste citatie.
-Brongewichten: `academisch 1,0 · primair 0,95 · institutioneel 0,85 · kwaliteitsjournalistiek 0,70 ·
-regulier 0,50 · opinie 0,35 · grijs 0,20 · onbeoordeeld 0,15`.
+**Laag A — basiskracht τ per argument:** `weight × statusfactor × bronfactor`. De statusfactor schaalt
+op verificatiestatus (geverifieerd 1,0 → betwist 0,25 → verworpen 0,0); de bronfactor op de
+betrouwbaarste citatie. Brongewichten: `academisch 1,0 · primair 0,95 · institutioneel 0,85 ·
+kwaliteitsjournalistiek 0,70 · regulier 0,50 · opinie 0,35 · grijs 0,20 · eigen_synthese 0,0 ·
+onbeoordeeld 0,15`. Projectmateriaal (`sources/AI/`, klasse `eigen_synthese`) weegt 0: vindplaats,
+nooit bewijs.
 
-**Laag B — afgeleide praktijkscore per relatie/entiteit:** `steun / (steun + tegen + k)`, waar steun en
-tegen de optelsom van de bewijskracht van de supporting- resp. contradicting-argumenten zijn. Zonder
-argumenten valt het terug op de handmatige `certainty` (prior). Een entiteit zonder eigen argumenten
-erft het gemiddelde van haar relaties.
+**Boomsemantiek (M1.1) — eindkracht σ per argument (DF-QuAD).** Replies dragen géén eigen doel
+(DB-CHECK + API): hun stance is relatief aan de *parent*. Kracht stroomt van blad naar wortel: de
+steunende en aanvallende kinderen worden elk geaggregeerd met de probabilistische som
+`1 − ∏(1 − σᵢ)`, waarna het verschil de basiskracht moduleert — aanvallers trekken σ richting 0
+(`σ = τ·(1−(a−s))`), steuners richting 1 (`σ = τ + (1−τ)·(s−a)`), in balans blijft τ. Een blad houdt
+σ = τ, dus een platte boom reproduceert exact de oude formule. **Doorgerekend voorbeeld** (ook de
+golden-snapshot-test, `scripts/test_scoring.py`):
+
+```
+A1 voor   (w 0,8 · geverifieerd · academische bron)            τ = 0,80
+ └─ B1 ondergraving (w 0,5 · geverifieerd · geen bron)         τ = 0,5·1,0·0,3 = 0,15
+     └─ C1 versterkt B1 (w 0,6 · ongecontroleerd · geen bron)  τ = 0,6·0,5·0,3 = 0,09
+σ_B1 = 0,15 + (1−0,15)·0,09 = 0,2265        (B1 versterkt door C1)
+σ_A1 = 0,80 · (1 − 0,2265)  = 0,6188        (A1 gedempt door B1)
+```
+
+Alleen **root**-argumenten tellen voor het doel zelf; een ondergraving dempt dus alleen het argument
+dat ze aanvalt (een drogredelijk argument vóór een ware claim trekt de claim niet omlaag — het houdt
+alleen op haar te stutten). Tegenbewijs voor het doel zelf is een **weerlegging**: een contradicting
+*root*-argument mét bron.
+
+**Laag B — afgeleide praktijkscore per relatie/entiteit:** `steun / (steun + tegen + k)` over de
+σ's van de root-argumenten, met **clusteraggregatie (M1.2)**: elke bron heeft een `cluster_key`
+(zelfde auteur/uitgever/onderliggende data = zelfde cluster); binnen een (stance, cluster)-paar telt
+alleen de sterkste σ, en argumenten zonder echte citatie delen per doel één pseudocluster — tien
+citaten uit hetzelfde boek zijn geen tien bewijzen, en tien bronloze beweringen ook niet. In het
+voorbeeld: een tweede voor-argument (σ 0,60) uit hetzelfde broncluster als A1 voegt níéts toe
+(max, geen som); een weerlegging D1 (τ 0,6265, institutionele bron) wél:
+`score = 0,6188 / (0,6188 + 0,6265 + 1) = 0,2756`. Zonder argumenten valt de score terug op de
+handmatige `certainty` (prior); een entiteit zonder eigen argumenten erft het gemiddelde van haar
+relaties.
 
 **Laag C — theoriescore per rol/mechanisme**, uit twee onafhankelijke bewijslijnen:
 - **Praktijk (bottom-up):** geloofwaardigheid-gewogen aggregatie over de gekoppelde instanties, met
   volume-verzadiging `gem_cert × n/(n+k)` — veel goed-onderbouwde voorbeelden tillen de klasse op.
   De **sterkte** is de geloofwaardigheid-gewogen gemiddelde invloed van die instanties.
 - **Literatuur (top-down):** argumenten/citaties die *direct* op de rol/het mechanisme hangen
-  (`arguments.role_id`/`mechanism_id`). Zo onderbouwt bijvoorbeeld Luyendijk's *Je hebt het niet van
-  mij* een mechanisme als bronafhankelijkheid; het gewicht volgt uit de `reliability` van die bron.
+  (`arguments.role_id`/`mechanism_id`), met dezelfde cluster- en boomsemantiek.
 
-De twee lijnen worden gecombineerd met een **noisy-OR**: `geloofwaardigheid = 1 − (1−literatuur)(1−praktijk)`
-— sterke literatuur óf veel geloofwaardige praktijkvoorbeelden maken de theorie geloofwaardiger, samen
-nog meer. In het theoriemodel codeert de node-grootte/lijndikte de **sterkte**; het detailpaneel toont
-beide scores met de opsplitsing literatuur ⊕ praktijk. Alle constanten staan boven in `scoring.py`.
+De twee lijnen worden gecombineerd met een **noisy-OR**: `geloofwaardigheid = 1 − (1−literatuur)(1−praktijk)`.
+**Emergente velden (M1.5)** hebben hun eigen twee lijnen: literatuur op het effect zelf ⊕ de
+**compositieclaim** (`property='compositie'`) — bewijs dat het *samenspel* bestaat, niet alleen de
+leden (analoog aan padclaims). Zonder compositieclaim is de veldscore gemaximeerd op **0,50**.
+
+**Dwarsmaatregelen over alle lagen:**
+- **Onzekerheidsband (M1.3):** elke geloofwaardigheid krijgt een 95%-interval — laag B analytisch
+  (Beta-posterior op de steun/tegen-massa's, Jeffreys-smoothing, demping k als tegenmassa), laag C
+  via bootstrap over de instanties gecombineerd met het Beta-interval van de literatuurlijn. Een
+  lijn zónder bewijs telt als 0 zonder onzekerheid: de score meet *onderbouwing*, niet waarheid.
+  Toon nooit een puntscore zonder interval en dekking erbij.
+- **Tegenspraak-plafond (M1.4):** zonder *overwogen tegenspraak* — minstens één niet-verworpen
+  contradicting-argument mét echte citatie op het doel — is de geloofwaardigheid gemaximeerd op
+  **0,70** en draagt het element het label **onweersproken**. Het plafond geldt óók voor priors.
+- **SPOF-vlag (M1.2):** drijft alle steun op één broncluster, dan vlagt de score "1 broncluster".
+- **Invloed-as bewijsbaar (M1.7):** aspect-argumenten met `property='influence'` verschuiven de
+  afgeleide invloed van een relatie (of de sterkte van een mechanisme/halo): de handmatige kolom
+  blijft de prior en de bewijsbalans trekt hem naar zich toe met gewicht `massa/(massa+k)`.
+  Aspect-argumenten (influence, padclaims, compositie) tellen nooit mee in de zekerheids-balans:
+  twee assen, één bewijsstandaard.
+
+In het theoriemodel codeert de node-grootte/lijndikte de **sterkte**; het detailpaneel toont beide
+scores met interval, opsplitsing literatuur ⊕ praktijk en de vlaggen. Alle constanten staan boven in
+`scoring.py`; `scripts/analyse_gevoeligheid.py` (M1.6) rapporteert leave-one-cluster-out en een
+parameter-sweep (resultaat zichtbaar in het Modelgezondheid-paneel), en
+`scripts/test_scoring.py` legt de einduitkomsten vast als golden snapshot (draait mee in
+`scripts/validate_model.py --strict`).
 
 **Emergente velden** doorlopen dezelfde laag C, maar alleen langs de literatuurlijn
 (`arguments.emergent_effect_id`): een veld heeft geen instanties — zijn praktijk leeft in de
@@ -451,7 +507,7 @@ Entiteit: DPG Media
 | `contradicting` | - | Bewijs dat de relatie tegenspreekt |
 | `contextual` | ~ | Nuancering, noch voor noch tegen |
 
-**Citatiepoort (M0.3).** Een `supporting`- of `contradicting`-argument is een
+**Citatiepoort (M0.3).** Een `supporting`- of `contradicting`-**root**-argument is een
 bewijsclaim en vereist daarom een bron: wordt het zonder citaties ingediend
 (via `POST /api/arguments`), dan start het met status `bronvermelding_nodig`
 (statusfactor 0,40 in `scoring.py`) in plaats van `ongecontroleerd`. De eerste
@@ -459,6 +515,18 @@ citatie (`POST /api/citations`, of direct meegegeven in het `citations`-veld van
 `POST /api/arguments`) heft dat automatisch op naar `ongecontroleerd` — uitsluitend
 die overgang; `geverifieerd` blijft een menselijke review-stap. Alleen `contextual`
 mag bronloos starten.
+
+**Reply-regels (M1.1/M1.8).** Een reply (`parent_argument_id` gevuld) draagt **geen
+eigen doel en geen property** (DB-CHECK; de API weigert anders): zijn stance is
+relatief aan de parent. Een `supporting`-reply versterkt het parent-argument; een
+`contradicting`-reply is een **ondergraving** ("de redenering deugt niet") — die mag
+bronloos (het aanwijzen van het logische gat volstaat, de citatiepoort geldt niet) en
+kan een machineleesbaar `objection_type` dragen (drogreden-taxonomie:
+`cirkelredenering`, `stroman`, `non_sequitur`, `correlatie_als_causatie`,
+`vals_dilemma`, `ad_hominem`, `autoriteit_buiten_domein`, `anekdote_als_regel`,
+`cherry_picking`, `equivocatie`, `citaat_dekking`, `overig`), met in `reasoning`
+de exact aangevochten redeneerstap. Een **weerlegging** (tegenbewijs voor het doel
+zelf) is géén reply maar een contradicting root-argument mét bron.
 
 ---
 
@@ -691,42 +759,50 @@ ORDER BY s.author;
 
 ### Argument toevoegen aan een relatie
 
-```sql
--- 1. Root-argument op een relatie
-INSERT INTO arguments (relation_id, stance, claim, reasoning, weight)
-VALUES (42, 'contradicting',
-        'De Volkskrant publiceerde kritisch Shell-dossier',
-        'Als zelfcensuur dominant was, zou dit dossier niet gepubliceerd zijn.',
-        0.40);
+Inhoud gaat sinds M0.6 uitsluitend via het bijdragepad (REST-API met een ingelogde
+gebruiker of Bearer-token), nooit via directe SQL:
 
--- 2. Voeg citatie(s) toe
-INSERT INTO citations (argument_id, source_id, quote, page, section)
-VALUES (last_insert_rowid(), 3,
-        'Het onderzoeksteam werkte zes maanden aan het dossier',
-        'pp. 12-15',
-        'Redactioneel verantwoording');
+```bash
+TOKEN=$(cat data/tokens/maxime.token)
+# Root-argument mét citatie in één call (citatiepoort tevreden)
+curl -s -X POST localhost:5000/api/arguments \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"relation_id": 42, "stance": "contradicting", "weight": 0.4,
+       "claim": "De Volkskrant publiceerde kritisch Shell-dossier",
+       "reasoning": "Als zelfcensuur dominant was, was dit dossier niet gepubliceerd.",
+       "citations": [{"source_id": 3, "quote": "Het onderzoeksteam werkte zes maanden aan het dossier", "page": "pp. 12-15"}]}'
 ```
 
 ### Reactie op een bestaand argument (discussieboom)
 
-```sql
--- Tegenargument op argument #15
-INSERT INTO arguments (relation_id, parent_argument_id, stance, claim, reasoning, weight)
-VALUES (42, 15, 'supporting',
-        'Dit was een uitzondering die de regel bevestigt',
-        'Het Shell-dossier was het enige kritische stuk in 5 jaar. Structurele zelfcensuur sluit incidentele doorbraken niet uit.',
-        0.55);
+Een reply draagt géén eigen doel en geen property (M1.1); een contradicting-reply is
+een ondergraving en mag bronloos, met optioneel `objection_type` (M1.8):
+
+```bash
+curl -s -X POST localhost:5000/api/arguments \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"parent_argument_id": 15, "stance": "contradicting", "weight": 0.55,
+       "claim": "Eén casus draagt geen algemene regel",
+       "reasoning": "Aangevochten stap: uit het ene Shell-dossier wordt een structurele conclusie getrokken.",
+       "objection_type": "anekdote_als_regel"}'
 ```
 
-### Argument over een entiteit
+### Argument over een entiteit of over de invloed-as
 
-```sql
--- Bewering over een entiteit (bijv. "Is DPG Media een monopolist?")
-INSERT INTO arguments (entity_id, stance, claim, reasoning, weight)
-VALUES (1, 'supporting',
-        'DPG bezit >60% van de online commerciële nieuwsmarkt',
-        'Volgens ACM marktanalyse 2023 is DPG de dominante speler.',
-        0.80);
+```bash
+# Bewering over een entiteit
+curl -s -X POST localhost:5000/api/arguments \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"entity_id": 1, "stance": "supporting", "weight": 0.8,
+       "claim": "DPG bezit >60% van de online commerciële nieuwsmarkt",
+       "citations": [{"source_id": 12}]}'
+
+# Invloed-as (M1.7): bewijs dat de invloed van relatie 42 sterk is
+curl -s -X POST localhost:5000/api/arguments \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"relation_id": 42, "property": "influence", "stance": "supporting",
+       "claim": "Adverteerderdruk leidde aantoonbaar tot het intrekken van de rubriek",
+       "citations": [{"source_id": 5}]}'
 ```
 
 ### Certainty herberekenen

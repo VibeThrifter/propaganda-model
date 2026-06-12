@@ -69,8 +69,19 @@ def main():
         print()
         print(f"Totaal: {t['fout']} fouten · {t['waarschuwing']} waarschuwingen · {t['info']} info")
 
-    if args.strict and rapport["totalen"]["fout"]:
-        sys.exit(1)
+    if args.strict:
+        # Golden-snapshot-test op scoring.py (M1.1): scores mogen alleen bewust
+        # veranderen. Draait op een fixture-DB, raakt de live DB niet.
+        import subprocess
+        toets = subprocess.run([sys.executable, str(Path(__file__).parent / "test_scoring.py")],
+                               capture_output=True, text=True)
+        if toets.returncode:
+            print("\nGolden-snapshot-test scoring.py FAALT:", file=sys.stderr)
+            print(toets.stderr or toets.stdout, file=sys.stderr)
+            sys.exit(1)
+        print("\nGolden-snapshot-test scoring.py: groen")
+        if rapport["totalen"]["fout"]:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

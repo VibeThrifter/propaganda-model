@@ -608,11 +608,6 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <span class="val" id="inflVal">0</span>
     </div>
   </div>
-  <div class="panel-section" id="sizeSection">
-    <h3>Node-grootte</h3>
-    <select id="sizeMetric" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);font-size:12px"></select>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
-  </div>
   <div class="panel-section" id="fieldSection">
     <h3>Systemische effecten</h3>
     <div id="fieldToggleRow">
@@ -696,9 +691,10 @@ details.detail-section > .sec-body { margin-top: 8px; }
       </label>
     </div>
   </div>
-  <div class="panel-section" id="legendSection">
-    <h3>Legenda</h3>
-    <div id="legend"></div>
+  <div class="panel-section" id="sizeSection">
+    <h3>Node-grootte</h3>
+    <select id="sizeMetric" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);font-size:12px"></select>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
   </div>
   <div class="panel-section" id="healthSection">
     <h3 id="healthHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
@@ -796,12 +792,12 @@ const FILTER_LABELS = {
 // Thema's = dwarsliggende verbanden die meerdere filters overspannen (eigen selectie-as).
 const THEME_LABELS = {
   draaideur: 'Draaideur', elite_netwerk: 'Elite-netwerk', geldstromen: 'Geldstromen',
-  platform: 'Platform/digitaal', systemisch: 'Systemisch',
+  platform: 'Platform/digitaal', benoemingsketen: 'Benoemingsketen',
   omroepbestel: 'Publiek omroepbestel', kennis_expertise: 'Kennis & expertise',
 };
 const THEME_COLORS = {
   draaideur: '#c56cf0', elite_netwerk: '#7d5fff', geldstromen: '#ffd32a',
-  platform: '#34e7e4', systemisch: '#ff5e57',
+  platform: '#34e7e4', benoemingsketen: '#ff5e57',
   omroepbestel: '#0be881', kennis_expertise: '#ffa801',
 };
 
@@ -3821,6 +3817,19 @@ async function loadHealth() {
       `<div><b style="color:var(--text)">Bewijsdekking:</b> ${k.voor_tegen_zonder_citatie} voor/tegen-argumenten zonder citaat · ` +
       `${k.relaties_zonder_argumenten} relaties zonder argumenten</div>` +
       `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${bevindingen || 'Geen bevindingen.'}</div>` +
+      // M1.6: gevoeligheidsrapport (leave-one-cluster-out + parameter-sweep), indien gedraaid
+      (h.gevoeligheid ? (() => {
+        const g = h.gevoeligheid;
+        const rijen = (g.leave_one_cluster_out || []).slice(0, 5).map(r =>
+          `<div style="display:flex;gap:6px" title="basis ${Math.round(r.basis * 100)}%; valt cluster '${esc(r.cluster)}' weg, dan −${Math.round(r.delta * 100)}pt">` +
+          `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.naam)}</span>` +
+          `<b style="color:#e0635f">−${Math.round(r.delta * 100)}pt</b></div>`).join('');
+        return `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">` +
+          `<b style="color:var(--text)">Gevoeligheid (M1.6):</b> top-10 mechanismen zijn ` +
+          `${g.top10_robuust ? '<span style="color:#2ecc71">parameter-robuust</span>' : '<span style="color:#e0635f">niet parameter-robuust</span>'}` +
+          `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Kwetsbaarst bij wegvallen van één broncluster:</div>${rijen}` +
+          `<div style="font-size:10px;color:var(--text-muted)">${esc(g.gegenereerd)} · scripts/analyse_gevoeligheid.py</div></div>`;
+      })() : '') +
       `<div style="margin-top:6px;font-size:10px">Identiek aan <code>scripts/validate_model.py</code> · ${esc(h.gegenereerd)}</div>`;
     healthLoaded = true;
   } catch (e) {
@@ -3980,9 +3989,11 @@ function legendKeyOf(node) {
   return state.colorMode === 'filter' ? node.filterCat : node.type;
 }
 
-// Legend
+// Legend (sectie verwijderd uit het zijpaneel — dubbelde de Filters-chips;
+// de functie blijft als no-op zodat alle aanroepen onschadelijk zijn)
 function renderLegend() {
   const legend = document.getElementById('legend');
+  if (!legend) return;
   const isTheory = state.model === 'theory';
   const items = isTheory ? DATA.roles : DATA.entities;
   const colors = (isTheory || state.colorMode === 'filter') ? FILTER_COLORS : TYPE_COLORS;

@@ -86,7 +86,8 @@ CREATE TABLE mechanism_themes (
     mechanism_id INTEGER NOT NULL REFERENCES mechanisms(id) ON DELETE CASCADE,
     theme TEXT NOT NULL CHECK(theme IN (
         'draaideur', 'elite_netwerk', 'geldstromen', 'platform',
-        'systemisch', 'omroepbestel', 'kennis_expertise', 'benoemingsketen'
+        'systemisch',   -- DEPRECATED/leeg: systemisch-zijn wordt gecodeerd door aard (halo) en de hyperedges; behouden voor migratie-replay
+        'omroepbestel', 'kennis_expertise', 'benoemingsketen'
     )),
     PRIMARY KEY (mechanism_id, theme)
 );
