@@ -542,6 +542,8 @@ details.detail-section > .sec-body { margin-top: 8px; }
 <header id="topbar">
   <h1>Propagandamodel</h1>
   <span class="subtitle">NL Politiek &amp; Media</span>
+  <span class="subtitle" id="releaseTag" style="display:none;border:1px solid var(--border);border-radius:10px;padding:1px 8px"
+        title="Nieuwste modelrelease (M3.1): gescoorde snapshot + changelog in releases/"></span>
   <div class="model-toggle" id="modelToggle">
     <button data-model="instance">Praktijk Model</button>
     <button class="active" data-model="theory">Theoretisch Model</button>
@@ -696,6 +698,18 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <select id="sizeMetric" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);font-size:12px"></select>
     <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
   </div>
+  <div class="panel-section" id="reviewSection">
+    <h3 id="reviewHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
+        title="Review-wachtrij (M2.2): voorgestelde argumenten en open voorstellen (RfC's, splitsen/samenvoegen). Een voorstel telt pas mee na merge; de score-diff toont vooraf wat acceptatie verschuift.">
+      Review-wachtrij
+      <span class="chev" id="reviewChev" style="margin-left:auto;font-size:9px;transition:transform 0.15s" aria-hidden="true">▶</span>
+    </h3>
+    <div id="reviewBody" style="display:none">
+      <div id="reviewContent" style="font-size:11px;line-height:1.5;color:var(--text-muted)">Nog niet geladen.</div>
+      <button type="button" id="reviewRefresh" class="dropdown-btn" style="margin-top:8px"
+              title="Herlaad via /api/review_queue (vereist een draaiende server.py)">Ververs</button>
+    </div>
+  </div>
   <div class="panel-section" id="healthSection">
     <h3 id="healthHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
         title="Gezondheidsfoto van het model — dezelfde checks als scripts/validate_model.py, live via /api/health.">
@@ -816,7 +830,8 @@ const pathClaims = {};      // 'bronRolId>doelRolId' → [root arguments]: eindc
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
 const roleIdByName = {};
-(DATA.roles || []).forEach(r => { roleIdByName[r.name] = r.id; });
+const roleById = {};
+(DATA.roles || []).forEach(r => { roleIdByName[r.name] = r.id; roleById[r.id] = r; });
 
 // Index citations
 (DATA.citations || []).forEach(c => {
@@ -846,7 +861,8 @@ const roleIdByName = {};
     if (a.role_id) {
       if (a.property === 'indirecte_invloed_op') {
         // Padclaim: hoort bij de afgeleide pijl rol ⇢ rol, niet bij de rol zelf.
-        const tgtRole = roleIdByName[a.property_value];
+        // property_value draagt sinds M2.6 het ROL-ID (hernoem-vast).
+        const tgtRole = roleById[parseInt(a.property_value, 10)] ? parseInt(a.property_value, 10) : null;
         if (tgtRole != null) {
           const key = a.role_id + '>' + tgtRole;
           if (!pathClaims[key]) pathClaims[key] = [];
@@ -877,11 +893,12 @@ const PROPERTY_LABELS = {
   compositie: 'Compositieclaim'
 };
 const STATUS_LABELS = {
-  ongecontroleerd: '?', bronvermelding_nodig: '!', betwist: '⚡',
+  voorgesteld: '◇', ongecontroleerd: '?', bronvermelding_nodig: '!', betwist: '⚡',
   geverifieerd: '✓', verouderd: '⏳', verworpen: '✕'
 };
 const STATUS_COLORS = {
-  ongecontroleerd: 'var(--text-muted)', bronvermelding_nodig: '#f0a030',
+  voorgesteld: '#6c8aff', ongecontroleerd: 'var(--text-muted)',
+  bronvermelding_nodig: '#f0a030',
   betwist: '#e74c3c', geverifieerd: '#2ecc71', verouderd: '#7f8c9a',
   verworpen: '#e74c3c'
 };
@@ -933,7 +950,10 @@ function renderArgNode(arg, depth) {
   const depthClass = depth === 0 ? 'root' : '';
 
   const propLabel = arg.property ? PROPERTY_LABELS[arg.property] || arg.property : null;
-  const propBadge = propLabel ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(108,138,255,0.12);color:var(--accent);margin-right:2px;white-space:nowrap">${propLabel}${arg.property_value ? ': '+arg.property_value : ''}</span>` : '';
+  // Padclaims dragen het doel als rol-ID (M2.6) — toon de rolnaam, niet het nummer.
+  const propWaarde = (arg.property === 'indirecte_invloed_op' && roleById[parseInt(arg.property_value, 10)])
+    ? roleById[parseInt(arg.property_value, 10)].name : arg.property_value;
+  const propBadge = propLabel ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(108,138,255,0.12);color:var(--accent);margin-right:2px;white-space:nowrap">${propLabel}${propWaarde ? ': '+propWaarde : ''}</span>` : '';
   const statusSym = arg.status ? STATUS_LABELS[arg.status] || '' : '';
   const statusCol = arg.status ? STATUS_COLORS[arg.status] || 'var(--text-muted)' : '';
   const statusBadge = statusSym ? `<span style="font-size:10px;color:${statusCol}" title="${arg.status}">${statusSym}</span>` : '';
@@ -968,6 +988,10 @@ function renderArgNode(arg, depth) {
     html += `<div class="arg-weight">${parts.join(' · ')}</div>`;
   }
 
+  // M2.5: ratings — je beoordeelt onderbouwing/relevantie/eerlijkheid, nooit waarheid;
+  // eigen werk raten weigert de server; agent-ratings zijn zichtbaar advies.
+  html += `<div id="ratings-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingTekst(arg.ratings)}<a href="#" onclick="rateArgument(${arg.id},'nuttig');return false" title="Goed onderbouwd, relevant en eerlijk (beoordeelt het argument, niet de waarheid)">nuttig</a> · <a href="#" onclick="rateArgument(${arg.id},'niet_nuttig');return false" title="Bijv. citaat dekt de claim niet, duplicaat, onheldere claim">niet nuttig</a></div>`;
+
   if (cites.length) {
     html += '<div class="arg-citations">';
     cites.forEach(c => {
@@ -994,6 +1018,32 @@ function renderArgNode(arg, depth) {
   return html;
 }
 
+// M2.5: ratings-helpers (mens telt mee in bridging zodra de pool het toelaat;
+// agent-ratings zijn advies en tellen nooit onderling)
+function ratingTekst(rt) {
+  if (!rt) return '';
+  const deel = (label, m, a) => `${label} ${m}${a ? ` (+${a} agent)` : ''}`;
+  return deel('👍', rt.mens.nuttig, rt.agent.nuttig) + ' · '
+       + deel('👎', rt.mens.niet_nuttig, rt.agent.niet_nuttig) + ' · ';
+}
+
+async function rateArgument(argId, oordeel) {
+  const el = document.getElementById('ratings-' + argId);
+  try {
+    const resp = await fetch(`/api/arguments/${argId}/ratings`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oordeel }),
+    });
+    const j = await resp.json();
+    if (!resp.ok) { el.innerHTML = `<span style="color:#e74c3c">${j.error}</span>`; return; }
+    const data = await (await fetch(`/api/arguments/${argId}/ratings`)).json();
+    el.innerHTML = ratingTekst(data.telling)
+      + `<span style="color:#2ecc71">oordeel opgeslagen${j.advies ? ' (advies — agent)' : ''}</span>`;
+  } catch (e) {
+    el.innerHTML = `<span style="color:#e74c3c">Netwerkfout: ${e.message}</span>`;
+  }
+}
+
 // ============================================================
 // ARGUMENT FORMULIER & API
 // ============================================================
@@ -1015,9 +1065,9 @@ function renderArgForm(opts) {
        (“de redenering deugt niet” — een logisch gat aanwijzen volstaat, een tegenbron
        hoeft niet). Tegenbewijs voor de relatie/het element zelf hoort als nieuw
        root-argument, niet als reactie.`
-    : `Voor- en tegenargumenten starten zonder citaat als “bronvermelding nodig” en
-       tellen dan nauwelijks mee; voeg na het opslaan een citaat toe. Alleen context
-       mag bronloos.`;
+    : `Elk argument landt als <b>voorstel</b> (M2.2) en telt pas mee nadat een
+       reviewer het merget. Voeg een citaat toe (alleen context mag bronloos):
+       zonder bron telt het na de merge nauwelijks mee.`;
 
   const propertyRows = isReply ? `
       <div class="form-row">
@@ -1139,7 +1189,11 @@ async function submitArgument(formId, opts) {
       msgEl.innerHTML = `<div class="form-message error">${result.error || 'Fout bij opslaan'}</div>`;
       return;
     }
-    if (result.status === 'bronvermelding_nodig') {
+    if (result.status === 'voorgesteld') {
+      msgEl.innerHTML = '<div class="form-message success">Argument ingediend als ' +
+        '<b>voorstel</b> — het telt mee zodra een reviewer het merget ' +
+        '(zie de review-wachtrij). Tip: voeg een citaat toe.</div>';
+    } else if (result.status === 'bronvermelding_nodig') {
       msgEl.innerHTML = '<div class="form-message success">Argument toegevoegd — status: ' +
         '<b>bronvermelding nodig</b>. Voeg een citaat toe zodat het volwaardig meetelt.</div>';
     } else {
@@ -3666,6 +3720,13 @@ function applyFilters() {
 // UI WIRING
 // ============================================================
 
+// Releasetag (M3.1): nieuwste release uit releases/, geïnjecteerd door generate_viz.py.
+if (DATA.release && DATA.release.versie) {
+  const el = document.getElementById('releaseTag');
+  el.textContent = `model v${DATA.release.versie} · ${(DATA.release.gegenereerd || '').slice(0, 7)}`;
+  el.style.display = '';
+}
+
 // Model toggle
 document.querySelectorAll('#modelToggle button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -3830,6 +3891,25 @@ async function loadHealth() {
           `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Kwetsbaarst bij wegvallen van één broncluster:</div>${rijen}` +
           `<div style="font-size:10px;color:var(--text-muted)">${esc(g.gegenereerd)} · scripts/analyse_gevoeligheid.py</div></div>`;
       })() : '') +
+      // M3.2: onderzoeksagenda (belang × bewijsarmoede), indien gedraaid
+      (h.onderzoeksagenda ? (() => {
+        const rijen = (h.onderzoeksagenda.agenda || []).slice(0, 5).map(a =>
+          `<div style="display:flex;gap:6px" title="${esc(a.type)} · belang ${a.belang} × bewijsarmoede ${a.bewijsarmoede}${(a.ontbreekt || []).length ? ' — ontbreekt: ' + esc(a.ontbreekt.join('; ')) : ''}">` +
+          `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.naam)}</span>` +
+          `<b style="color:var(--text)">${a.prioriteit.toFixed(2)}</b></div>`).join('');
+        return `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">` +
+          `<b style="color:var(--text)">Onderzoeksagenda (M3.2):</b> waar één goede bron het meest verschuift` +
+          `<div style="margin-top:4px">${rijen}</div>` +
+          `<div style="font-size:10px;color:var(--text-muted)">${esc(h.onderzoeksagenda.gegenereerd)} · scripts/onderzoeksagenda.py</div></div>`;
+      })() : '') +
+      // M3.4: voorspellingsregister (alleen tonen zodra het register bestaat/gevuld is)
+      ((k.voorspellingen_open || k.voorspellingen_gescoord) ?
+        `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">` +
+        `<b style="color:var(--text)">Voorspellingen (M3.4):</b> ${k.voorspellingen_open} open · ` +
+        `${k.voorspellingen_gescoord} gescoord` +
+        (k.voorspellingen_brier_gem != null ? ` · gem. Brier ${k.voorspellingen_brier_gem}` : '') +
+        `<div style="font-size:10px;color:var(--text-muted)">/api/predictions · scripts/voorspellingen.py</div></div>` : '') +
+      (h.release ? `<div style="margin-top:6px;font-size:10px">Release: model v${esc(h.release.versie)} (${esc(h.release.gegenereerd)})</div>` : '') +
       `<div style="margin-top:6px;font-size:10px">Identiek aan <code>scripts/validate_model.py</code> · ${esc(h.gegenereerd)}</div>`;
     healthLoaded = true;
   } catch (e) {
@@ -3845,6 +3925,128 @@ document.getElementById('healthHeader').addEventListener('click', () => {
   if (open && !healthLoaded) loadHealth();
 });
 document.getElementById('healthRefresh').addEventListener('click', loadHealth);
+
+// ── Review-wachtrij (M2.2/M2.3/M2.6) ─────────────────────────
+// Voorgestelde argumenten + open voorstellen uit /api/review_queue. Mergen of
+// afwijzen vergt reviewer (globaal of per filter, M2.1); de score-diff toont
+// vooraf wat er epistemisch op het spel staat.
+let reviewLoaded = false;
+const escR = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+async function loadReviewQueue() {
+  const el = document.getElementById('reviewContent');
+  el.innerHTML = 'Laden…';
+  try {
+    const resp = await fetch('/api/review_queue');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const q = await resp.json();
+    const args = q.argumenten.map(a =>
+      `<div style="border-top:1px solid var(--border);padding:5px 0" id="queue-arg-${a.id}">` +
+      `<div><span class="arg-stance ${a.stance}" style="font-size:10px">${STANCE_SYMBOLS[a.stance] || ''}</span> ` +
+      `<span style="color:var(--text)">${escR(a.claim).slice(0, 90)}</span></div>` +
+      `<div style="font-size:10px">${escR(a.doel)} · ${escR(a.contributed_by)} · ${a.n_citaties} citaat/citaten</div>` +
+      `<div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap">` +
+      `<a href="#" onclick="toonScoreDiff(${a.id});return false" title="Wat verschuift er als dit gemerged wordt?">score-diff</a>` +
+      `<a href="#" onclick="mergeVoorstelArg(${a.id});return false" style="color:#2ecc71">merge</a>` +
+      `<a href="#" onclick="wijsVoorstelArgAf(${a.id});return false" style="color:#e74c3c">afwijzen</a></div>` +
+      `<div id="queue-arg-${a.id}-uit" style="font-size:10px"></div></div>`).join('');
+    const stelsel = q.voorstellen.map(v => {
+      const t = v.telling;
+      const stand = `${(new Set(t.akkoorden)).size}/${v.benodigde_akkoorden} akkoord` +
+        (t.advies.length ? ` · ${t.advies.length} advies` : '');
+      return `<div style="border-top:1px solid var(--border);padding:5px 0" id="queue-vst-${v.id}">` +
+        `<div style="color:var(--text)">[${escR(v.soort)}] ${escR(v.titel)}</div>` +
+        `<div style="font-size:10px">${escR(v.ingediend_door)} · ${stand}` +
+        `${v.theorielaag ? ' · theorielaag (2 menselijke reviewers)' : ''}</div>` +
+        `<div style="margin-top:3px;display:flex;gap:6px">` +
+        `<a href="#" onclick="reviewVoorstel(${v.id},'akkoord');return false" style="color:#2ecc71">akkoord</a>` +
+        `<a href="#" onclick="reviewVoorstel(${v.id},'afwijzen');return false" style="color:#e74c3c">afwijzen</a></div>` +
+        `<div id="queue-vst-${v.id}-uit" style="font-size:10px"></div></div>`;
+    }).join('');
+    el.innerHTML =
+      `<div><b style="color:var(--text)">Voorgestelde argumenten (${q.argumenten.length})</b></div>` +
+      (args || '<div style="font-size:10px">Geen.</div>') +
+      `<div style="margin-top:8px"><b style="color:var(--text)">Open voorstellen (${q.voorstellen.length})</b> — RfC's, splitsen/samenvoegen</div>` +
+      (stelsel || '<div style="font-size:10px">Geen.</div>');
+    reviewLoaded = true;
+  } catch (e) {
+    el.innerHTML = `Kon /api/review_queue niet bereiken (${escR(e.message)}).<br>` +
+      `Start <code>python3 server.py</code> — de statische viz heeft geen wachtrij.`;
+  }
+}
+
+async function toonScoreDiff(argId) {
+  const uit = document.getElementById(`queue-arg-${argId}-uit`);
+  uit.innerHTML = 'Rekenen…';
+  try {
+    const d = await (await fetch(`/api/arguments/${argId}/score_diff`)).json();
+    if (!d.diff) { uit.innerHTML = escR(d.error || 'geen diff'); return; }
+    uit.innerHTML = d.diff.length
+      ? 'Mergen verschuift: ' + d.diff.slice(0, 4).map(x =>
+          `${escR(x.naam || x.categorie + ' #' + x.id)} ${Math.round(x.voor * 100)}% → ${Math.round(x.na * 100)}%`).join(' · ')
+        + (d.diff.length > 4 ? ` · +${d.diff.length - 4} meer` : '')
+      : 'Mergen verschuift (nog) geen scores (bv. bronloos voorstel).';
+  } catch (e) { uit.innerHTML = `Netwerkfout: ${escR(e.message)}`; }
+}
+
+async function mergeVoorstelArg(argId) {
+  const uit = document.getElementById(`queue-arg-${argId}-uit`);
+  try {
+    const resp = await fetch(`/api/arguments/${argId}/merge`, { method: 'POST' });
+    const j = await resp.json();
+    if (!resp.ok) { uit.innerHTML = `<span style="color:#e74c3c">${escR(j.error)}</span>`; return; }
+    uit.innerHTML = `<span style="color:#2ecc71">Gemerged → ${escR(j.status)}` +
+      `${j.self_merged ? ' (zelf-merge: gevlagd)' : ''}</span>`;
+    await refreshScores();
+  } catch (e) { uit.innerHTML = `Netwerkfout: ${escR(e.message)}`; }
+}
+
+async function wijsVoorstelArgAf(argId) {
+  const uit = document.getElementById(`queue-arg-${argId}-uit`);
+  try {
+    const resp = await fetch(`/api/arguments/${argId}/status`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'verworpen' }),
+    });
+    const j = await resp.json();
+    if (!resp.ok) { uit.innerHTML = `<span style="color:#e74c3c">${escR(j.error)}</span>`; return; }
+    uit.innerHTML = '<span style="color:#e74c3c">Afgewezen (verworpen — blijft herleidbaar)</span>';
+  } catch (e) { uit.innerHTML = `Netwerkfout: ${escR(e.message)}`; }
+}
+
+async function reviewVoorstel(vid, oordeel) {
+  const uit = document.getElementById(`queue-vst-${vid}-uit`);
+  let motivatie = null;
+  if (oordeel === 'afwijzen') {
+    motivatie = prompt('Motivatie (verplicht bij afwijzen):');
+    if (!motivatie) return;
+  }
+  try {
+    const resp = await fetch(`/api/voorstellen/${vid}/reviews`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oordeel, motivatie }),
+    });
+    const j = await resp.json();
+    if (resp.status === 409) {
+      uit.innerHTML = `<span style="color:#f0a030">Uitvoering geblokkeerd: ${escR(j.blokkade)}</span>`;
+      return;
+    }
+    if (!resp.ok) { uit.innerHTML = `<span style="color:#e74c3c">${escR(j.error)}</span>`; return; }
+    uit.innerHTML = j.besluit === 'open'
+      ? '<span style="color:var(--text)">Oordeel vastgelegd; voorstel blijft open.</span>'
+      : `<span style="color:${j.besluit === 'geaccepteerd' ? '#2ecc71' : '#e74c3c'}">Voorstel ${escR(j.besluit)}.` +
+        `${j.besluit === 'geaccepteerd' ? ' Regenereer de viz (scripts/generate_viz.py) voor nieuwe theorie-elementen.' : ''}</span>`;
+  } catch (e) { uit.innerHTML = `Netwerkfout: ${escR(e.message)}`; }
+}
+
+document.getElementById('reviewHeader').addEventListener('click', () => {
+  const body = document.getElementById('reviewBody');
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  document.getElementById('reviewChev').style.transform = open ? 'rotate(90deg)' : '';
+  if (open && !reviewLoaded) loadReviewQueue();
+});
+document.getElementById('reviewRefresh').addEventListener('click', loadReviewQueue);
 
 // ── Identiteit (M0.6) ────────────────────────────────────────
 // De vrije "jouw naam"-velden zijn vervallen: attributie volgt server-side de

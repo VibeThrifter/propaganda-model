@@ -49,6 +49,9 @@ def main():
     parser.add_argument("--set-password", action="store_true",
                         help="zet interactief een wachtwoord (alleen mensen)")
     parser.add_argument("--deactivate", action="store_true", help="zet het account op inactief")
+    parser.add_argument("--filter-rol", action="append", metavar="FILTER=ROL",
+                        help="M2.1: filterrol toekennen, bv. --filter-rol sourcing=reviewer "
+                             "(herhaalbaar; ROL leeg laten = intrekken: sourcing=)")
     parser.add_argument("--list", action="store_true", help="toon alle accounts")
     args = parser.parse_args()
 
@@ -56,11 +59,17 @@ def main():
     conn.row_factory = sqlite3.Row
 
     if args.list:
+        filterrollen = {}
+        for fr in conn.execute("""SELECT u.username, f.filter, f.rol
+                                  FROM user_filter_rollen f JOIN users u ON u.id = f.user_id"""):
+            filterrollen.setdefault(fr["username"], []).append(f"{fr['filter']}={fr['rol']}")
         for u in conn.execute("SELECT username, kind, role, active, provenance,"
                               " password_hash IS NOT NULL AS pw, token_hash IS NOT NULL AS tok,"
                               " created_at, last_login_at FROM users ORDER BY id"):
             vlag = "" if u["active"] else " [INACTIEF]"
             extra = f" provenance={u['provenance']}" if u["provenance"] else ""
+            fr = filterrollen.get(u["username"])
+            extra += f" filterrollen=[{', '.join(fr)}]" if fr else ""
             print(f"{u['username']:<20} {u['kind']:<6} {u['role']:<11}"
                   f" wachtwoord={'ja' if u['pw'] else 'nee'} token={'ja' if u['tok'] else 'nee'}"
                   f"{extra}{vlag}")
@@ -94,6 +103,27 @@ def main():
         conn.execute("UPDATE users SET active = FALSE WHERE username = ?", (naam,))
         conn.commit()
         print(f"Account gedeactiveerd: {naam}")
+
+    if args.filter_rol:
+        uid = conn.execute("SELECT id FROM users WHERE username = ?", (naam,)).fetchone()[0]
+        for spec in args.filter_rol:
+            if "=" not in spec:
+                sys.exit(f"--filter-rol verwacht FILTER=ROL, kreeg '{spec}'")
+            filt, _, rol = spec.partition("=")
+            if not rol:
+                conn.execute("DELETE FROM user_filter_rollen WHERE user_id = ? AND filter = ?",
+                             (uid, filt))
+                print(f"Filterrol ingetrokken: {filt}")
+            else:
+                try:
+                    conn.execute("""INSERT INTO user_filter_rollen (user_id, filter, rol)
+                                    VALUES (?, ?, ?)
+                                    ON CONFLICT (user_id, filter) DO UPDATE SET rol = excluded.rol""",
+                                 (uid, filt, rol))
+                except sqlite3.IntegrityError as e:
+                    sys.exit(f"Ongeldige filterrol '{spec}': {e}")
+                print(f"Filterrol gezet: {filt} → {rol}")
+        conn.commit()
 
     if args.set_password:
         kind = conn.execute("SELECT kind FROM users WHERE username = ?", (naam,)).fetchone()[0]

@@ -45,6 +45,7 @@ def _bevinding(code, titel, ernst, items, toelichting="", aantal=None):
 # ── Koppelingsplicht (Z6) ────────────────────────────────────
 
 def check_koppelingsplicht(conn):
+    # Vervangen elementen (M2.6) zijn bewust uit de keten; de plicht geldt het levende model.
     rel_zonder_mech = [
         f"relatie #{r['id']}: {r['src']} —{r['relation_type']}→ {r['tgt']}"
         for r in conn.execute("""
@@ -52,7 +53,7 @@ def check_koppelingsplicht(conn):
             FROM relations r
             JOIN entities e1 ON r.source_id = e1.id
             JOIN entities e2 ON r.target_id = e2.id
-            WHERE r.mechanism_id IS NULL ORDER BY r.id
+            WHERE r.mechanism_id IS NULL AND NOT r.vervangen ORDER BY r.id
         """)]
 
     rel_zonder_inst = [
@@ -65,6 +66,7 @@ def check_koppelingsplicht(conn):
             JOIN mechanisms m ON r.mechanism_id = m.id
             WHERE NOT EXISTS (SELECT 1 FROM instantiations i
                               WHERE i.relation_id = r.id AND i.mechanism_id = r.mechanism_id)
+              AND NOT r.vervangen AND NOT m.vervangen
             ORDER BY r.id
         """)]
 
@@ -72,7 +74,7 @@ def check_koppelingsplicht(conn):
         f"entiteit #{e['id']}: {e['name']} ({e['type']})"
         for e in conn.execute("""
             SELECT e.id, e.name, e.type FROM entities e
-            WHERE e.primary_role_id IS NULL
+            WHERE e.primary_role_id IS NULL AND NOT e.vervangen
               AND NOT EXISTS (SELECT 1 FROM entity_roles er WHERE er.entity_id = e.id)
             ORDER BY e.id
         """)]
@@ -82,6 +84,7 @@ def check_koppelingsplicht(conn):
         for e in conn.execute("""
             SELECT e.id, e.name, e.type FROM entities e
             WHERE NOT EXISTS (SELECT 1 FROM instantiations i WHERE i.entity_id = e.id)
+              AND NOT e.vervangen
             ORDER BY e.id
         """)]
 
@@ -132,11 +135,17 @@ def check_bewijs(conn):
 
 # ── Stance-balans (Z1) ───────────────────────────────────────
 
+_BALANS_TABEL = {"relation_id": "relations", "entity_id": "entities",
+                 "mechanism_id": "mechanisms", "role_id": "roles",
+                 "emergent_effect_id": "emergent_effects"}
+
+
 def _alleen_steun(conn, kolom, naam_sql):
     """Doelen (relatie/entiteit/mechanisme/rol/emergent veld) met wél steun maar nul tegenspraak.
 
     Padclaims (property='indirecte_invloed_op') tellen niet mee: dat zijn
     compositieclaims, geen onderbouwing van het doel zelf (conform scoring.py).
+    Voorgestelde argumenten (M2.2) en vervangen doelen (M2.6) tellen evenmin.
     """
     rows = conn.execute(f"""
         SELECT a.{kolom} AS doel_id, {naam_sql} AS naam,
@@ -145,6 +154,8 @@ def _alleen_steun(conn, kolom, naam_sql):
         FROM arguments a
         WHERE a.{kolom} IS NOT NULL
           AND (a.property IS NULL OR a.property != 'indirecte_invloed_op')
+          AND a.status != 'voorgesteld'
+          AND NOT (SELECT vervangen FROM {_BALANS_TABEL[kolom]} WHERE id = a.{kolom})
         GROUP BY a.{kolom}
         HAVING steun > 0 AND tegen = 0
         ORDER BY steun DESC
@@ -185,15 +196,19 @@ def check_balans(conn):
 
 def check_padclaims(conn):
     """Elke padclaim moet ≥ 1 keten van directe mechanisme-edges tussen bron- en doelrol
-    hebben (eerste versie zonder drempels; later dezelfde gates als de viz)."""
+    hebben (eerste versie zonder drempels; later dezelfde gates als de viz).
+
+    Sinds M2.6 verwijst property_value met het ROL-ID (hernoem-vast); routes door
+    of naar vervangen elementen zijn een fout — hertriage hoort ze te verleggen."""
     edges = {}
     for m in conn.execute("""
         SELECT source_role_id AS s, target_role_id AS t FROM mechanisms
         WHERE aard = 'direct' AND source_role_id IS NOT NULL AND target_role_id IS NOT NULL
+          AND NOT vervangen
     """):
         edges.setdefault(m["s"], set()).add(m["t"])
 
-    rol_id = {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM roles")}
+    rollen = {r["id"]: r for r in conn.execute("SELECT id, name, vervangen FROM roles")}
 
     def bereikbaar(van, naar):
         gezien, rand = {van}, [van]
@@ -209,22 +224,36 @@ def check_padclaims(conn):
             rand = volgende
         return False
 
-    problemen = []
+    problemen, vervangen_route = [], []
     for a in conn.execute("""
-        SELECT a.id, a.property_value, r.name AS bronrol
+        SELECT a.id, a.property_value, a.role_id, r.name AS bronrol, r.vervangen AS bron_vervangen
         FROM arguments a JOIN roles r ON a.role_id = r.id
         WHERE a.property = 'indirecte_invloed_op' ORDER BY a.id
     """):
         doel = (a["property_value"] or "").strip()
-        if doel not in rol_id:
-            problemen.append(f"padclaim #{a['id']}: doelrol '{doel}' bestaat niet (bronrol {a['bronrol']})")
-        elif not bereikbaar(rol_id[a["bronrol"]], rol_id[doel]):
-            problemen.append(f"padclaim #{a['id']}: geen keten van directe edges {a['bronrol']} → {doel}")
+        doel_id = int(doel) if doel.isdigit() else None
+        if doel_id is None or doel_id not in rollen:
+            problemen.append(f"padclaim #{a['id']}: doelrol-id '{doel}' bestaat niet "
+                             f"(bronrol {a['bronrol']})")
+            continue
+        doelrol = rollen[doel_id]
+        if a["bron_vervangen"] or doelrol["vervangen"]:
+            vervangen_route.append(
+                f"padclaim #{a['id']}: {a['bronrol']} → {doelrol['name']} "
+                f"({'bronrol' if a['bron_vervangen'] else 'doelrol'} is vervangen)")
+        elif not bereikbaar(a["role_id"], doel_id):
+            problemen.append(f"padclaim #{a['id']}: geen keten van directe edges "
+                             f"{a['bronrol']} → {doelrol['name']}")
 
-    return [_bevinding("PADCLAIM-ROUTE", "Padclaims zonder doorlatende route", "fout", problemen,
-                       "Een compositieclaim zonder keten van directe edges kan nooit als "
-                       "afgeleide pijl getoond worden; doelrollen matchen op naam (kwetsbaar "
-                       "bij hernoemen — zie M2.6).")]
+    return [
+        _bevinding("PADCLAIM-ROUTE", "Padclaims zonder doorlatende route", "fout", problemen,
+                   "Een compositieclaim zonder keten van directe edges kan nooit als "
+                   "afgeleide pijl getoond worden (doelverwijzing op rol-id, M2.6)."),
+        _bevinding("PADCLAIM-VERVANGEN", "Padclaims door vervangen rollen", "fout",
+                   vervangen_route,
+                   "Bij splitsen/samenvoegen hoort de hertriage padclaims naar de "
+                   "opvolger(s) te verleggen (M2.6); deze bleven hangen."),
+    ]
 
 
 # ── Bronnen (locaties, archief, linkrot) ─────────────────────
@@ -382,6 +411,8 @@ def check_schema_pariteit(conn, schema_path=SCHEMA_PATH):
 
 def kerngetallen(conn):
     een = lambda sql: conn.execute(sql).fetchone()[0]  # noqa: E731
+    tabellen = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table'")}
 
     stance = {r["stance"]: r["n"] for r in conn.execute(
         "SELECT stance, COUNT(*) AS n FROM arguments GROUP BY stance")}
@@ -442,6 +473,25 @@ def kerngetallen(conn):
         "citatie_concentratie_top3": top3,
         "citatie_concentratie_aandeel": (
             round(sum(t["citaties"] for t in top3) / citaties_totaal, 3) if citaties_totaal else None),
+        # Fase 2 (M2.2–M2.6): review-wachtrij, ratings en opvolging
+        "voorgestelde_argumenten": status.get("voorgesteld", 0),
+        "open_voorstellen": (een("SELECT COUNT(*) FROM voorstellen WHERE status = 'open'")
+                             if "voorstellen" in tabellen else 0),
+        "ratings": een("SELECT COUNT(*) FROM argument_ratings") if "argument_ratings" in tabellen else 0,
+        "vervangen_elementen": (sum(
+            een(f"SELECT COUNT(*) FROM {t} WHERE vervangen")
+            for t in ("roles", "mechanisms", "entities", "relations", "emergent_effects"))
+            if "lineage" in tabellen else 0),
+        # Fase 3 (M3.4): voorspellingsregister
+        "voorspellingen_open": (een(
+            "SELECT COUNT(*) FROM predictions WHERE status = 'open'")
+            if "predictions" in tabellen else 0),
+        "voorspellingen_gescoord": (een(
+            "SELECT COUNT(*) FROM predictions WHERE status != 'open'")
+            if "predictions" in tabellen else 0),
+        "voorspellingen_brier_gem": (een(
+            "SELECT ROUND(AVG(brier), 4) FROM predictions WHERE brier IS NOT NULL")
+            if "predictions" in tabellen else None),
     }
 
 
@@ -474,6 +524,108 @@ def check_scoring_v2(conn):
     ]
 
 
+# ── Fase 2 (M2.1–M2.6): voorstellen, lineage & vervangen ─────
+
+def check_fase2(conn):
+    """Integriteit van het voorstel-/lineage-systeem en de vervangen-status."""
+    tabellen = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "lineage" not in tabellen:
+        return []  # pre-fase-2-database (bv. oude backup)
+
+    lineage_zonder_voorstel = [
+        f"lineage #{r['id']}: {r['soort']} {r['element_type']} "
+        f"#{r['oud_id']} → #{r['nieuw_id']} (voorstel: {r['vstatus'] or 'ontbreekt'})"
+        for r in conn.execute("""
+            SELECT l.id, l.soort, l.element_type, l.oud_id, l.nieuw_id, v.status AS vstatus
+            FROM lineage l LEFT JOIN voorstellen v ON v.id = l.voorstel_id
+            WHERE v.id IS NULL OR v.status != 'geaccepteerd'
+            ORDER BY l.id""")]
+
+    vervangen_zonder_lineage = []
+    for element_type, tabel, label in (
+            ("rol", "roles", "t.name"), ("mechanisme", "mechanisms", "t.name"),
+            ("entiteit", "entities", "t.name"),
+            ("relatie", "relations", "t.relation_type"),
+            ("emergent_effect", "emergent_effects", "t.name")):
+        vervangen_zonder_lineage += [
+            f"{element_type} #{r['id']}: {r['label']}"
+            for r in conn.execute(f"""
+                SELECT t.id, {label} AS label FROM {tabel} t
+                WHERE t.vervangen AND NOT EXISTS (
+                    SELECT 1 FROM lineage l
+                    WHERE l.element_type = ? AND l.oud_id = t.id)
+                ORDER BY t.id""", (element_type,))]
+
+    rel_naar_vervangen_mech = [
+        f"relatie #{r['id']} → vervangen mechanisme '{r['mech']}'"
+        for r in conn.execute("""
+            SELECT r.id, m.name AS mech FROM relations r
+            JOIN mechanisms m ON m.id = r.mechanism_id
+            WHERE m.vervangen AND NOT r.vervangen ORDER BY r.id""")]
+
+    open_voorstellen = [
+        f"voorstel #{r['id']} ({r['soort']}): {r['titel'][:60]} — "
+        f"ingediend door {r['ingediend_door']}"
+        for r in conn.execute(
+            "SELECT id, soort, titel, ingediend_door FROM voorstellen "
+            "WHERE status = 'open' ORDER BY id")]
+    voorgestelde_args = conn.execute(
+        "SELECT COUNT(*) FROM arguments WHERE status = 'voorgesteld'").fetchone()[0]
+
+    return [
+        _bevinding("LINEAGE-VOORSTEL", "Lineage-rijen zonder geaccepteerd voorstel", "fout",
+                   lineage_zonder_voorstel,
+                   "Elke opvolgingsrij hoort bij een geaccepteerd voorstel (M2.6); "
+                   "een losse rij wijst op een omzeilde poort."),
+        _bevinding("VERVANGEN-LINEAGE", "Vervangen elementen zonder lineage", "fout",
+                   vervangen_zonder_lineage,
+                   "Vervangen zonder opvolgingsspoor maakt het oude id onherleidbaar "
+                   "(M2.6-kernregel: niets wissen, alles herleidbaar)."),
+        _bevinding("VERVANGEN-REL-MECH", "Relaties gekoppeld aan een vervangen mechanisme",
+                   "info", rel_naar_vervangen_mech,
+                   "Niet-herbevestigd bewijs blijft bewust bij het vervangen element "
+                   "achter en telt nergens in mee; herbevestig of koppel om."),
+        _bevinding("REVIEW-WACHTRIJ", "Openstaande voorstellen", "info", open_voorstellen,
+                   f"Plus {voorgestelde_args} argument(en) met status 'voorgesteld' — "
+                   "zie /api/review_queue."),
+    ]
+
+
+# ── Fase 3 (M3.4): voorspellingsregister ─────────────────────
+
+def check_fase3(conn):
+    """Hygiëne van het voorspellingsregister: scoren wat scoorbaar is, en de
+    heraudit-lijst van zelf gescoorde uitkomsten zichtbaar houden (§6.1)."""
+    tabellen = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "predictions" not in tabellen:
+        return []  # pre-fase-3-database (bv. oude backup)
+
+    verlopen = [
+        f"voorspelling #{r['id']} (deadline {r['deadline']}): {r['claim'][:70]}"
+        for r in conn.execute("""
+            SELECT id, deadline, claim FROM predictions
+            WHERE status = 'open' AND deadline < date('now') ORDER BY deadline""")]
+    zelf_gescoord = [
+        f"voorspelling #{r['id']} ({r['status']}): {r['claim'][:70]}"
+        for r in conn.execute("""
+            SELECT id, status, claim FROM predictions
+            WHERE self_scored ORDER BY id""")]
+
+    return [
+        _bevinding("VOORSPELLING-DEADLINE", "Open voorspellingen voorbij hun deadline",
+                   "waarschuwing", verlopen,
+                   "De uitkomst is beoordeelbaar; scoor haar via "
+                   "PATCH /api/predictions/<id>/uitkomst (M3.4) — een register dat "
+                   "niet gescoord wordt, toetst niets."),
+        _bevinding("VOORSPELLING-ZELF", "Zelf gescoorde voorspellingen (heraudit-lijst)",
+                   "info", zelf_gescoord,
+                   "Indiener = beoordelaar (n=1-realiteit, §6.1); herauditeren zodra "
+                   "er onafhankelijke reviewers zijn."),
+    ]
+
+
 # ── Alles in één run ─────────────────────────────────────────
 
 def run_all(conn, schema_path=SCHEMA_PATH, network=False):
@@ -484,6 +636,8 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_padclaims(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
+    bevindingen += check_fase2(conn)
+    bevindingen += check_fase3(conn)
     bevindingen += check_schema_pariteit(conn, schema_path)
 
     totalen = {"fout": 0, "waarschuwing": 0, "info": 0}

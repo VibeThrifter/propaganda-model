@@ -5,3 +5,10 @@ __pycache__/
 *.pyc
 .DS_Store
 data/gevoeligheid.json
+# Fase 2: herleidbare analyse-uitvoer (regenereerbaar uit de DB)
+data/granulariteit.json
+data/kalibratie.json
+data/bridging.json
+# Fase 3: idem (releases/ daarentegen wordt ingecheckt — dat ís de release)
+data/onderzoeksagenda.json
+data/voorspellingen_kalibratie.json

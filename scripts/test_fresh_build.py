@@ -54,19 +54,24 @@ def main():
             f"verse DB gevuld ({rollen} rollen, {mechanismen} mechanismen, "
             f"{entiteiten} entiteiten, {relaties} relaties)")
 
-        print("2. Schrijf-endpoints op de verse DB (als maintainer, via Bearer-token)")
+        print("2. Schrijf-endpoints op de verse DB (maintainer + 2 reviewers, via Bearer)")
         import auth
         import server
         server.DB_PATH = db
+        server._rate_emmers.clear()
 
-        token = auth.new_token()
+        tokens = {}
         conn = sqlite3.connect(db)
-        conn.execute("INSERT INTO users (username, kind, role, token_hash)"
-                     " VALUES ('verse-buildtest', 'mens', 'maintainer', ?)",
-                     (auth.hash_token(token),))
+        for naam, rol in (("verse-buildtest", "maintainer"),
+                          ("verse-reviewer-1", "reviewer"), ("verse-reviewer-2", "reviewer")):
+            tokens[naam] = auth.new_token()
+            conn.execute("INSERT INTO users (username, kind, role, token_hash)"
+                         " VALUES (?, 'mens', ?, ?)", (naam, rol, auth.hash_token(tokens[naam])))
         conn.commit()
         conn.close()
-        kop = {"Authorization": f"Bearer {token}"}
+        kop = {"Authorization": f"Bearer {tokens['verse-buildtest']}"}
+        kop_r1 = {"Authorization": f"Bearer {tokens['verse-reviewer-1']}"}
+        kop_r2 = {"Authorization": f"Bearer {tokens['verse-reviewer-2']}"}
         client = server.app.test_client()
 
         r = client.post("/api/entities", json={"name": "Verse-build Testentiteit",
@@ -83,18 +88,39 @@ def main():
         eis(r.status_code == 201, f"POST /api/entities 2e ({r.status_code})")
         ent_b = r.get_json()["id"]
 
+        # Theorielaag (M2.3): alleen nog via een RfC met twee menselijke reviewers
         r = client.post("/api/roles", headers=kop, json={
-            "name": "verse_build_testrol", "category": "tegenmacht",
-            "description": "Testrol voor de verse-buildtest."})
-        eis(r.status_code == 201, f"POST /api/roles incl. categorie 'tegenmacht' ({r.status_code})")
-        rol_id = r.get_json()["id"]
+            "name": "verse_build_testrol", "category": "tegenmacht", "description": "x"})
+        eis(r.status_code == 403, f"directe POST /api/roles is dicht (M2.3) ({r.status_code})")
 
-        r = client.post("/api/mechanisms", headers=kop, json={
-            "name": "verse_build_testmechanisme", "filter": "tegenmacht",
-            "description": "Testmechanisme.", "effect": "Geen.",
+        def rfc(titel, payload):
+            r = client.post("/api/voorstellen", headers=kop, json={
+                "soort": "nieuw_theorie_element", "titel": titel, "payload": payload})
+            eis(r.status_code == 201, f"RfC '{titel}' ingediend ({r.status_code}: {r.get_json()})")
+            vid = r.get_json()["id"]
+            client.post(f"/api/voorstellen/{vid}/reviews", headers=kop_r1,
+                        json={"oordeel": "akkoord"})
+            r = client.post(f"/api/voorstellen/{vid}/reviews", headers=kop_r2,
+                            json={"oordeel": "akkoord"})
+            j = r.get_json()
+            eis(j.get("besluit") == "geaccepteerd",
+                f"RfC '{titel}' geaccepteerd na 2 menselijke akkoorden ({j.get('besluit')})")
+            return j["resultaat"]["id"]
+
+        rol_id = rfc("Rol: verse_build_testrol", {
+            "element_type": "rol", "naam": "verse_build_testrol", "categorie": "tegenmacht",
+            "definitie": "Testrol voor de verse-buildtest.",
+            "afgrenzing": "Bestaat alleen in deze test.",
+            "falsificatiecriterium": "De test faalt.",
+            "instantiaties": ["Verse-build Testentiteit"], "bronnen": ["testbron"]})
+        mech_id = rfc("Mechanisme: verse_build_testmechanisme", {
+            "element_type": "mechanisme", "naam": "verse_build_testmechanisme",
+            "filter": "tegenmacht", "definitie": "Testmechanisme.", "effect": "Geen.",
+            "aard": "direct", "freeze_test": "n.v.t. (direct kanaal)",
+            "afgrenzing": "Bestaat alleen in deze test.",
+            "falsificatiecriterium": "De test faalt.",
+            "instantiaties": ["testrelatie"], "bronnen": ["testbron"],
             "source_role_id": rol_id, "target_role_id": rol_id})
-        eis(r.status_code == 201, f"POST /api/mechanisms incl. filter 'tegenmacht' ({r.status_code})")
-        mech_id = r.get_json()["id"]
 
         r = client.post("/api/relations", headers=kop, json={
             "source_id": ent_a, "target_id": ent_b, "relation_type": "financiering",
@@ -115,9 +141,13 @@ def main():
             "relation_id": rel_id, "stance": "supporting",
             "claim": "Testclaim voor de verse build."})
         a = r.get_json()
-        eis(r.status_code == 201 and a["status"] == "bronvermelding_nodig",
-            f"POST /api/arguments; citatiepoort actief ({a.get('status')})")
+        eis(r.status_code == 201 and a["status"] == "voorgesteld",
+            f"POST /api/arguments landt als voorstel (M2.2) ({a.get('status')})")
         arg_id = a["id"]
+
+        r = client.post(f"/api/arguments/{arg_id}/merge", headers=kop_r1)
+        eis(r.status_code == 200 and r.get_json()["status"] == "bronvermelding_nodig",
+            f"merge past de citatiepoort toe ({r.get_json().get('status')})")
 
         bron_id = sqlite3.connect(db).execute("SELECT MIN(id) FROM sources").fetchone()[0]
         r = client.post("/api/citations", headers=kop, json={
@@ -125,14 +155,18 @@ def main():
         eis(r.status_code == 201 and r.get_json()["argument_status"] == "ongecontroleerd",
             f"POST /api/citations promoveert het argument ({r.status_code})")
 
-        r = client.patch(f"/api/arguments/{arg_id}/status", headers=kop,
+        r = client.patch(f"/api/arguments/{arg_id}/status", headers=kop_r1,
                          json={"status": "geverifieerd"})
-        eis(r.status_code == 200, f"PATCH /api/arguments/{arg_id}/status ({r.status_code})")
+        eis(r.status_code == 200, f"PATCH status door niet-auteur ({r.status_code})")
 
         r = client.get("/api/scores")
         eis(r.status_code == 200, f"GET /api/scores ({r.status_code})")
         r = client.get("/api/health")
         eis(r.status_code == 200, f"GET /api/health ({r.status_code})")
+        r = client.get("/api/review_queue")
+        eis(r.status_code == 200, f"GET /api/review_queue ({r.status_code})")
+        r = client.get(f"/api/arguments/{arg_id}/score_diff?status=verworpen")
+        eis(r.status_code == 200, f"GET score_diff ({r.status_code})")
 
         r = client.delete(f"/api/instantiations/{inst_id}", headers=kop)
         eis(r.status_code == 200, f"DELETE /api/instantiations ({r.status_code})")

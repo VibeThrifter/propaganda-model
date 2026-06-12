@@ -91,26 +91,31 @@ def main():
     a = r.get_json()
     eis(r.status_code == 201 and a["contributed_by"] == "smoke-agent",
         "agent-POST geattribueerd aan agent-account")
-    eis(a["status"] == "bronvermelding_nodig", "citatiepoort geldt ook voor agents")
+    eis(a["status"] == "voorgesteld", "voorstel-workflow (M2.2) geldt ook voor agents")
     r = c.post("/api/arguments", headers={"Authorization": "Bearer pm_ongeldig"},
                json={"relation_id": 1, "stance": "contextual", "claim": "x"})
     eis(r.status_code == 401, f"ongeldig token -> 401 ({r.status_code})")
 
-    print("5. Maintainer + zelf-merge")
+    print("5. Maintainer: merge-flow + zelf-verificatieblok (M2.1/M2.2)")
     kop = {"Authorization": f"Bearer {maintainer_token}"}
     r = c.post("/api/arguments", headers=kop,
                json={"relation_id": 1, "stance": "contextual", "claim": "Eigen claim"})
     eigen_arg = r.get_json()["id"]
     r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
                 json={"status": "geverifieerd"})
+    eis(r.status_code == 400, f"voorgesteld vergt eerst merge ({r.status_code})")
+    r = c.post(f"/api/arguments/{eigen_arg}/merge", headers=kop)
     j = r.get_json()
     eis(r.status_code == 200 and j["self_merged"] is True,
-        "eigen argument verifiëren zet de self_merged-vlag")
+        "eigen voorstel mergen mag (n=1) maar zet de self_merged-vlag")
+    r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
+                json={"status": "geverifieerd"})
+    eis(r.status_code == 403, f"eigen werk verifiëren is onmogelijk (M2.1) ({r.status_code})")
+    r = c.post(f"/api/arguments/{arg_mens}/merge", headers=kop)
+    eis(r.status_code == 200, f"andermans voorstel mergen ({r.status_code})")
     r = c.patch(f"/api/arguments/{arg_mens}/status", headers=kop,
                 json={"status": "geverifieerd"})
-    j = r.get_json()
-    eis(r.status_code == 200 and j["self_merged"] is False,
-        "andermans argument verifiëren: geen vlag")
+    eis(r.status_code == 200, "andermans argument verifiëren mag wel")
     r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
                 json={"status": "verworpen"})
     eis(r.status_code == 200, "status 'verworpen' wordt geaccepteerd")

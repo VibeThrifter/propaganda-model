@@ -4,6 +4,13 @@
 **Doel:** wetenschap en internet afzoeken naar bronnen en verbanden voor een
 opgegeven onderzoeksvraag — **alsof het model nog niet bestaat**.
 
+**Onderwerpkeuze:** tenzij de eigenaar anders brieft, komt het missie-onderwerp
+uit de top van de onderzoeksagenda (M3.2): draai `python3 scripts/onderzoeksagenda.py`
+en neem het hoogst geprioriteerde element waarvoor nog geen ronde liep. Let op de
+volgorde van het protocol: de agenda levert alleen het ónderwerp (en de
+`ontbreekt`-lijst zegt wat het corpus mist); de zoekvraag formuleer je daarna
+neutraal en je leest de database verder niet vóór het zoeken.
+
 ## Het anti-overfit-protocol (verplicht)
 
 1. **Neutrale missievraag.** Je krijgt (of formuleert) de zoekvraag zónder de

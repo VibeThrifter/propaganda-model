@@ -1,4 +1,4 @@
-# Agent-missies (verbeterplan §6.2, M1.8/M1.9)
+# Agent-missies (verbeterplan §6.2, M1.8/M1.9/M3.3)
 
 Alle agent-rollen draaien als Claude Code (background) sessies — geen aparte integratie.
 Ze gebruiken exact dezelfde REST-API als menselijke gebruikers en authenticeren met het
@@ -37,3 +37,4 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 |---|---|---|---|
 | `monitor-agent` | bijdrager | `monitor_brief.md` | statussen zetten; alleen bevindingen indienen |
 | `scout-agent` | bijdrager | `scout_brief.md` | rechtstreeks de score in; alles wacht op review |
+| `redteam-agent` | bijdrager | `redteam_brief.md` | stromannen; statussen zetten; alles wacht op review |

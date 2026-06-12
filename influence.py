@@ -260,7 +260,8 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
     ``FIELD_MODES``); standaard 'collapse' = eerlijk met veld, fan-out gedempt. Geïsoleerde
     entiteiten krijgen nullen.
     """
-    rows = conn.execute("SELECT id, type FROM entities").fetchall()
+    # Vervangen elementen (M2.6, splitsen/samenvoegen) doen niet meer mee in de graaf.
+    rows = conn.execute("SELECT id, type FROM entities WHERE NOT vervangen").fetchall()
     entity_ids = [r[0] for r in rows]
     public_ids = {r[0] for r in rows if r[1] in PUBLIC_TYPES}
     # De politiek als doelwit: individuele politici worden in de data vooral als BRON
@@ -268,7 +269,7 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
     # politici-personen ∪ partij-entiteiten.
     politiek_ids = {r[0] for r in conn.execute(
         "SELECT e.id FROM entities e JOIN roles r ON e.primary_role_id = r.id "
-        "WHERE r.name = 'politicus'")}
+        "WHERE r.name = 'politicus' AND NOT e.vervangen")}
     politiek_ids |= {r[0] for r in rows if r[1] == "partij"}
 
     relations = [
@@ -277,7 +278,8 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
         for s, t, inf, rt, mid, aard in conn.execute(
             "SELECT r.source_id, r.target_id, r.influence, r.relation_type, r.mechanism_id, "
             "       COALESCE(m.aard, 'direct') "
-            "FROM relations r LEFT JOIN mechanisms m ON m.id = r.mechanism_id")
+            "FROM relations r LEFT JOIN mechanisms m ON m.id = r.mechanism_id "
+            "WHERE NOT r.vervangen")
     ]
     adj = build_adjacency(relations, field_mode=field_mode)
     target_sets = {

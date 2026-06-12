@@ -5,8 +5,20 @@ M0.4-slotcriterium wacht op de 6 theorie-kandidaten uit `BACKFILL_REVIEW.md`).
 Fase 1 (scoring v2) is op 12 juni 2026 gebouwd en geverifieerd: M1.1–M1.7 volledig
 (zie §9), M1.8/M1.9 hebben hun infrastructuur (accounts, briefs, `objection_type`,
 logging-conventies in `missies/`) maar de eerste rondes + menselijke review staan open.
-Open eigenaarsacties: clusterreview (`BRONCLUSTER_REVIEW.md`), monitor-ronde 1,
-eerste scout-missie. Fase 2 en verder: nog niet gestart.**
+Fase 2 (openstellen) is op 12 juni 2026 gebouwd en end-to-end geverifieerd
+(`scripts/test_fase2.py`): M2.1–M2.6 volledig; de vier theorie-RfC's uit de
+M0.4-restlijst staan open (voorstellen #1–#4) en wachten — net als bridging-activatie
+(M2.5) en de heraudit van `self_merged` — per ontwerp op een tweede menselijke
+reviewer (§6.6). Open eigenaarsacties: clusterreview (`BRONCLUSTER_REVIEW.md`),
+monitor-ronde 1, eerste scout-missie, reviewers werven (§6.5).
+Fase 3 (levend & falsifieerbaar) is op 12 juni 2026 gebouwd en geverifieerd
+(`scripts/test_fase3.py`): release-infrastructuur + live release v0.1.0 (M3.1),
+onderzoeksagenda + red-team-doelwitten in het dashboard (M3.2/M3.3),
+voorspellingsregister met de eerste vijf vooraf vastgelegde voorspellingen
+(M3.4), auditchecklist + planning juni 2027 (M3.5). Per ontwerp doorlopend/open:
+de adversarial voorproefronde (red-team-brief en account staan klaar), de eerste
+agenda-gestuurde scout-missie, het scoren van een echte voorspelling (vroegste
+deadline 2027-03-01) en de audit van juni 2027.**
 Geschreven juni 2026 na een audit van schema, `scoring.py`, `server.py` en de live database. Doel: het discussiesysteem dat nodes,
 edges en systeemeffecten onderbouwt robuuster en wetenschappelijker maken, en het klaarmaken
 voor open bijdragen door gebruikers én agents. De domeinspec blijft `DOCUMENTATIE.md`; dit
@@ -809,111 +821,173 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
 
 ### Fase 2 — openstellen
 
-- [ ] **M2.1 Identiteit volwaardig**
-  - [ ] Migratie: `contributed_by`/`changed_by` → FK naar `users` (bestaande
+- [x] **M2.1 Identiteit volwaardig**
+  - [x] Migratie: `contributed_by`/`changed_by` → FK naar `users` (bestaande
         tekstwaarden mappen op accounts of een `legacy`-account)
-  - [ ] Reviewer-/maintainer-rollen per filter (koppeltabel)
-  - [ ] Regel afdwingen: niemand verifieert eigen werk (API-check auteur ≠ beoordelaar)
-  - [ ] **Klaar wanneer:** elke mutatie is herleidbaar tot een account en
-        zelf-verificatie is technisch onmogelijk
+        *(`migrate_fase2_openstellen.py`: 26 historische tags → inactieve
+        legacy-accounts met de oorspronkelijke tag in `provenance`; 305
+        ongeattribueerde argumenten → account `legacy`)*
+  - [x] Reviewer-/maintainer-rollen per filter (koppeltabel)
+        *(`user_filter_rollen`; effectieve rol = max(globaal, filterrol);
+        beheer via `create_user.py --filter-rol sourcing=reviewer`)*
+  - [x] Regel afdwingen: niemand verifieert eigen werk (API-check auteur ≠ beoordelaar)
+  - [x] **Klaar wanneer:** elke mutatie is herleidbaar tot een account en
+        zelf-verificatie is technisch onmogelijk *(12 juni 2026; getest in
+        `test_fase2.py` en `test_auth_smoke.py`)*
 
-- [ ] **M2.2 Voorstel-workflow**
-  - [ ] Status `voorgesteld` toevoegen (CHECK + `scoring.py`: telt als 0)
-  - [ ] Merge-flow: reviewer accepteert (`voorgesteld` → `ongecontroleerd` of
+- [x] **M2.2 Voorstel-workflow**
+  - [x] Status `voorgesteld` toevoegen (CHECK + `scoring.py`: telt als 0 — óók
+        buiten de tegenspraak-balans en het M1.4-criterium)
+  - [x] Merge-flow: reviewer accepteert (`voorgesteld` → `ongecontroleerd` of
         `bronvermelding_nodig`); `merged_by` vastleggen — zelf-merge is dan afleidbaar
         (auteur = merger) en wordt gevlagd (§6.1)
-  - [ ] Score-diff-preview: herberekening op een tijdelijke kopie mét het voorstel;
-        delta tonen in de review-UI
-  - [ ] Review-wachtrij in de viz (openstaande voorstellen)
-  - [ ] **Klaar wanneer:** een voorstel telt pas mee na merge en de reviewer ziet
-        vooraf de score-impact
+        *(`POST /api/arguments/<id>/merge`; de citatiepoort M0.3 geldt op het
+        merge-moment; afwijzen = status `verworpen`)*
+  - [x] Score-diff-preview: herberekening op een tijdelijke kopie mét het voorstel;
+        delta tonen in de review-UI *(`GET /api/arguments/<id>/score_diff`)*
+  - [x] Review-wachtrij in de viz (openstaande voorstellen)
+        *(paneel "Review-wachtrij": `/api/review_queue` + merge/afwijzen/score-diff)*
+  - [x] **Klaar wanneer:** een voorstel telt pas mee na merge en de reviewer ziet
+        vooraf de score-impact *(12 juni 2026)*
 
-- [ ] **M2.3 Theory-RfC**
-  - [ ] Sjabloon vastleggen: definitie, aard-keuze + freeze-test, afgrenzing van
+- [x] **M2.3 Theory-RfC**
+  - [x] Sjabloon vastleggen: definitie, aard-keuze + freeze-test, afgrenzing van
         bestaande elementen, falsificatiecriterium, ≥ 1 instantiatie, ≥ 1
-        onafhankelijke bron
-  - [ ] Twee-reviewer-eis op de theorielaag afdwingen (rolpoort + merge-regel)
-  - [ ] De M0.4-restlijst als eerste RfC's indienen
-  - [ ] **Klaar wanneer:** een nieuw theorie-element kan alleen nog via een RfC ontstaan
+        onafhankelijke bron *(afgedwongen in `voorstellen.valideer_payload`)*
+  - [x] Twee-reviewer-eis op de theorielaag afdwingen (rolpoort + merge-regel)
+        *(2 akkoorden van menselijke reviewers; indiener telt niet; agent-oordelen
+        zijn advies en tellen nooit (§6.4); directe roles/mechanisms-POSTs → 403)*
+  - [x] De M0.4-restlijst als eerste RfC's indienen *(voorstellen #1–#4: publieke
+        kapitaalketen, institutionele gezagsketen, academische doorlichting,
+        belanghebbende als adviseur — open tot er een tweede menselijke reviewer
+        is; de twee verwijder-adviezen (#327/#328) blijven eigenaarsbesluit in
+        `BACKFILL_REVIEW.md`)*
+  - [x] **Klaar wanneer:** een nieuw theorie-element kan alleen nog via een RfC
+        ontstaan *(12 juni 2026)*
 
-- [ ] **M2.4 Anti-misbruik**
-  - [ ] Rate-limits per account; recent-changes-feed + watchlist op `edit_log`
-  - [ ] Duplicaatdetectie (stdlib-tekstsimilariteit per target; bewust geen externe
-        embeddings — repo-conventie)
-  - [ ] **Klaar wanneer:** een dubbele claim wordt bij indienen gesignaleerd en de
-        feed toont alle mutaties
+- [x] **M2.4 Anti-misbruik**
+  - [x] Rate-limits per account; recent-changes-feed + watchlist op `edit_log`
+        *(30/60/120 schrijfacties per minuut naar rol; `/api/recent_changes`
+        (+ `?watchlist=1`), `/api/watchlist`)*
+  - [x] Duplicaatdetectie (stdlib-tekstsimilariteit per target; bewust geen externe
+        embeddings — repo-conventie) *(difflib ≥ 0,85 → 409 + kandidaten;
+        override met `negeer_duplicaten`)*
+  - [x] **Klaar wanneer:** een dubbele claim wordt bij indienen gesignaleerd en de
+        feed toont alle mutaties *(12 juni 2026)*
 
-- [ ] **M2.5 Ratings & bridging**
-  - [ ] Tabel `argument_ratings` (beoordelaar × argument × oordeel + gestructureerde
+- [x] **M2.5 Ratings & bridging** — *bridging-activatie wacht per ontwerp op de pool*
+  - [x] Tabel `argument_ratings` (beoordelaar × argument × oordeel + gestructureerde
         redenen; UNIQUE per paar)
-  - [ ] Ratings-UI per argument; agent-ratings zichtbaar als advies (§6.4)
-  - [ ] Kalibratiescript: agent-oordelen vs latere menselijke uitkomsten → verdiend,
-        gecapt gewicht; agent×agent telt nooit
-  - [ ] Bridging-model (matrixfactorisatie, stdlib) activeren zodra de pool divers
+  - [x] Ratings-UI per argument; agent-ratings zichtbaar als advies (§6.4)
+        *(nuttig/niet-nuttig per argument in de discussieboom; nooit eigen werk)*
+  - [x] Kalibratiescript: agent-oordelen vs latere menselijke uitkomsten → verdiend,
+        gecapt gewicht; agent×agent telt nooit *(`scripts/kalibratie_agents.py`,
+        cap 0,5, demping n/(n+10) → `data/kalibratie.json`)*
+  - [x] Bridging-model (matrixfactorisatie, stdlib) activeren zodra de pool divers
         genoeg is (§6.6); tot die tijd gelden de noodregels
-  - [ ] **Klaar wanneer:** weight in laag A komt uit bridged ratings zodra de pool het
-        toelaat
+        *(`scripts/bridging.py`: μ+b_u+b_i+p·q, poort ≥ 5 menselijke beoordelaars /
+        ≥ 25 ratings; schrijft `data/bridging.json`)*
+  - [x] **Klaar wanneer:** weight in laag A komt uit bridged ratings zodra de pool het
+        toelaat *(bedrading staat: `compute_all_scores(bridged_weights=…)` wordt
+        gevoed door `/api/scores` én `generate_viz.py`; onder de drempel geldt het
+        zelfgekozen gewicht)*
 
-- [ ] **M2.6 Splitsen & samenvoegen (granulariteitsbeheer)**
-  - [ ] Voorwaarde-migratie: padclaims verwijzen nu naar rolnámen (`property_value`) —
-        omzetten naar id-verwijzing, anders breken ze stil bij hernoemen, splitsen of
-        samenvoegen
-  - [ ] `lineage`-tabel (oud element → opvolger(s), richting, voorstel-id, datum) +
-        status `vervangen` op rollen, mechanismen, entiteiten, relaties én hyperedges;
-        `scoring.py`, `influence.py` en de viz slaan vervangen elementen over; de API
-        beantwoordt oude ID's met een verwijzing naar de opvolger(s)
-  - [ ] Voorstelsjabloon (RfC-conventie van M2.3): betrokken elementen, richting
-        (splitsen / samenvoegen / hernoemen), nieuwe definitie(s) + aard-keuze,
-        afgrenzing, en een hertriage-plan voor al het aanhangende bewijs
-  - [ ] Merge-hertriage in de review-UI: checklist per aanhangend argument —
-        herbevestigd voor de bredere claim → verhuist mee; niet herbevestigd → blijft
-        bij het vervangen element en telt nergens meer in mee
-  - [ ] Split-hertriage: restlijst (argumenten, relaties, instantiaties, padclaims)
-        moet leeg zijn vóór afronding; relaties zo nodig dupliceren met eigen
-        certainty/influence per opvolger
-  - [ ] Validator-checks (uitbreiding M0.1): padclaim- of afgeleide-routes door
-        `vervangen` elementen → fout; lineage-rij zonder geaccepteerd voorstel → fout
-  - [ ] `scripts/analyse_granulariteit.py`: kandidaten vlaggen via argument-overlap,
-        gedeelde citaties en stdlib-tekstgelijkenis → voedt de onderzoeksagenda (M3.2),
+- [x] **M2.6 Splitsen & samenvoegen (granulariteitsbeheer)**
+  - [x] Voorwaarde-migratie: padclaims verwijzen nu naar rolnámen (`property_value`) —
+        omzetten naar id-verwijzing *(18 padclaims → rol-ID; validator en viz
+        matchen op id)*
+  - [x] `lineage`-tabel + `vervangen`-kolom op rollen, mechanismen, entiteiten,
+        relaties én hyperedges; `scoring.py`, `influence.py` en de viz slaan
+        vervangen elementen over; de API beantwoordt oude ID's met een verwijzing
+        naar de opvolger(s) *(`GET /api/lineage/<type>/<id>`)*
+  - [x] Voorstelsjabloon (RfC-conventie van M2.3): betrokken elementen, richting,
+        nieuwe definitie(s) + aard-keuze, afgrenzing, en een hertriage-plan
+        *(soorten `splitsen`/`samenvoegen`/`hernoemen` in `voorstellen.py`)*
+  - [x] Merge-hertriage in de review-UI: checklist per aanhangend argument
+        *(checklist per item via `GET /api/voorstellen/<id>` (herbevestigd ja/nee);
+        het hertriage-plan zelf staat in de payload; de wachtrij-UI toont stand en
+        blokkades)*
+  - [x] Split-hertriage: restlijst (argumenten, relaties, instantiaties, padclaims)
+        moet leeg zijn vóór afronding; relaties zo nodig dupliceren
+        *(uitvoering weigert met de restlijst (409) zolang die niet leeg is;
+        één-op-veel dupliceert argumenten/relaties/instantiaties)*
+  - [x] Validator-checks: padclaim-routes door `vervangen` elementen → fout
+        (PADCLAIM-VERVANGEN); lineage-rij zonder geaccepteerd voorstel → fout
+        (LINEAGE-VOORSTEL); plus VERVANGEN-LINEAGE en REVIEW-WACHTRIJ
+  - [x] `scripts/analyse_granulariteit.py`: kandidaten vlaggen via bron-overlap,
+        tekstgelijkenis en disjuncte bewijsgroepen → `data/granulariteit.json`,
         beslist niets
-  - [ ] **Klaar wanneer:** één samenvoeging en één splitsing zijn end-to-end via het
-        voorstelpad uitgevoerd (op een kopie-DB of op een echte kandidaat) met lege
-        hertriage-restlijst, werkende oude ID's en herberekende scores zonder
-        dubbeltelling
+  - [x] **Klaar wanneer:** één samenvoeging en één splitsing zijn end-to-end via het
+        voorstelpad uitgevoerd met lege hertriage-restlijst, werkende oude ID's en
+        herberekende scores zonder dubbeltelling *(12 juni 2026: `test_fase2.py`
+        §7–8 op een fixture-DB — mechanismen 1+2 → fusie → splitsing in twee
+        opvolgers, validator groen)*
 
 ### Fase 3 — levend & falsifieerbaar
 
-- [ ] **M3.1 Modelreleases**
-  - [ ] `scripts/release_model.py`: git-tag + scores-snapshot (JSON) +
-        changelog-sjabloon + score-diff t.o.v. de vorige release
-  - [ ] Releasetag tonen in de viz
-  - [ ] **Klaar wanneer:** er bestaan twee releases en hun score-diff is leesbaar
+- [x] **M3.1 Modelreleases** — *infrastructuur staat; release-ritme is doorlopend werk*
+  - [x] `scripts/release_model.py`: scores-snapshot (JSON) + changelog mét
+        score-diff t.o.v. de vorige release in `releases/` (ingecheckt);
+        git-tag via `--tag` of de geprinte commando's (het script commit niet
+        zelf); releases zijn onveranderlijk
+  - [x] Releasetag tonen in de viz (topbar, via `generate_viz.py` uit
+        `releases/`) + nieuwste release in `/api/health`
+  - [x] **Klaar wanneer:** er bestaan twee releases en hun score-diff is leesbaar
+        *(12 juni 2026: end-to-end geverifieerd in `test_fase3.py` §5 — twee
+        releases op een fixture met leesbare diff na een merge; live staat
+        v0.1.0 als nulmeting, de volgende inhoudsronde levert de tweede)*
 
-- [ ] **M3.2 Onderzoeksagenda**
-  - [ ] `scripts/onderzoeksagenda.py`: ranglijst sterkte × bewijsarmoede (dekking =
-        bronclusters, argumenten, stance-balans)
-  - [ ] In het dashboard + als voordeur voor nieuwkomers (§6.5)
+- [x] **M3.2 Onderzoeksagenda** — *de lijst draait; de eerste erdoor gestuurde
+      scout-missie staat open (= dezelfde open actie als M1.9 ronde 1)*
+  - [x] `scripts/onderzoeksagenda.py`: ranglijst belang × bewijsarmoede
+        (dekking = bronclusters, argument-/instantievolume, tegenspraak,
+        compositieclaim) → `data/onderzoeksagenda.json`, met per element de
+        concrete `ontbreekt`-lijst
+  - [x] In het dashboard (`/api/health` → Modelgezondheid-paneel, top-5) +
+        als voordeur: `scout_brief.md` kiest het missie-onderwerp voortaan
+        uit de top van de agenda (§6.5)
   - [ ] **Klaar wanneer:** de lijst draait en stuurt aantoonbaar de eerstvolgende
-        scout-missie (M1.9)
+        scout-missie (M1.9) — *wacht op scout-ronde 1*
 
-- [ ] **M3.3 Adversarial rondes** (voorproef = prioriteit 4 in §8)
-  - [ ] Red-team-brief (doel: sterkste eerlijke tegenbewijs, geen stromannen)
-  - [ ] Voorproefronde: top-20 invloedrijkste edges (ranking uit `influence.py`),
-        handmatig of als agent-missie; bevindingen als contradicting/contextual args
+- [ ] **M3.3 Adversarial rondes** (voorproef = prioriteit 4 in §8) —
+      *brief + doelwittenlijst + account staan; de ronde zelf is open*
+  - [x] Red-team-brief (`missies/redteam_brief.md`: sterkste eerlijke
+        tegenbewijs, anti-stroman-regels, afwezigheidsrapporten); agent-account
+        `redteam-agent` aangemaakt (provenance + token)
+  - [x] Doelwittenlijst: top-20 invloedrijkste edges (afgeleide invloed ×
+        zekerheid + stance-balans) in `data/onderzoeksagenda.json`
+        (`redteam_top20`), herhaalbaar te verversen
+  - [ ] Voorproefronde draaien (handmatig of als agent-missie); bevindingen
+        als contradicting/contextual args
   - [ ] Ritme afspreken + een externe criticus uitnodigen als co-reviewer (§6.5)
   - [ ] **Klaar wanneer:** de stance-balans van de top-20 is geen 98/2 meer en de
         ronde is herhaalbaar
 
-- [ ] **M3.4 Voorspellingsregister**
-  - [ ] Tabel `predictions` (claim, afleiding uit het model, deadline, uitkomst,
-        score) + minimale UI/CLI
-  - [ ] De eerste 3–5 voorspellingen afleiden en vastleggen vóórdat de uitkomst
-        bekend is
+- [x] **M3.4 Voorspellingsregister** — *op het scoren van een echte uitkomst na*
+  - [x] Tabel `predictions` (claim, afleiding, meetcriterium, kans, deadline,
+        theorie-anker, uitkomst, Brier; `migrate_fase3_voorspellingen.py` +
+        `schema.sql`) + API (`GET/POST /api/predictions`,
+        `PATCH /api/predictions/<id>/uitkomst` — reviewer scoort, vanuit
+        'open' alleen, zelf scoren gevlagd `self_scored`) + CLI
+        `scripts/voorspellingen.py` (overzicht + kalibratierapport →
+        `data/voorspellingen_kalibratie.json`); validator-checks
+        VOORSPELLING-DEADLINE/-ZELF; telling in het gezondheidspaneel
+  - [x] De eerste 3–5 voorspellingen afleiden en vastleggen vóórdat de uitkomst
+        bekend is *(voorspellingen #1–#5 via de API, 12 juni 2026: overname-
+        consolidatie (eigendomsconcentratie), adverteerder-follow-up
+        (commerciële afhankelijkheid), programmering-om-kijkcijfers,
+        ANP-churnalism-steekproef (pr_subsidie), NPO-topbenoeming —
+        deadlines 2027)*
   - [ ] **Klaar wanneer:** minstens één voorspelling is gescoord en er een
-        kalibratierapport bestaat
+        kalibratierapport bestaat — *per ontwerp pas mogelijk als een
+        deadline/uitkomst zich aandient (vroegste: 2027-03-01); de
+        scoringsflow zelf is geverifieerd in `test_fase3.py`*
 
-- [ ] **M3.5 Jaarlijkse audit**
-  - [ ] Auditchecklist vastleggen (aard/tiers, bronclassificaties, halo-criteria;
-        precedent: juni 2026)
-  - [ ] Eerstvolgende audit inplannen (juni 2027)
+- [ ] **M3.5 Jaarlijkse audit** — *checklist + planning staan; de audit zelf is juni 2027*
+  - [x] Auditchecklist vastgelegd (`missies/audit_checklist.md`: aard/tiers,
+        bronclassificaties, halo-criteria & constanten, proces/provenance-
+        heraudits; precedent juni 2026 als nulmeting; verslag in
+        `missies/logs/YYYY-MM_audit.md`)
+  - [x] Eerstvolgende audit ingepland: juni 2027 (in de checklist; sluit af
+        met een modelrelease)
   - [ ] **Klaar wanneer:** audit 2027 is uitgevoerd en gedocumenteerd

@@ -25,7 +25,11 @@ CREATE TABLE roles (
     -- Temporeel (zie migrate_tijdsdimensie_theorielaag.py): ook de theorielaag is
     -- historisch contingent. NULL = onbegrensd voor zover bekend.
     active_from TEXT,
-    active_until TEXT
+    active_until TEXT,
+    -- M2.6: vervangen door opvolger(s) na een geaccepteerd splits-/samenvoegvoorstel.
+    -- Nooit wissen: de opvolging staat in `lineage`; scoring/influence/viz slaan
+    -- vervangen elementen over en de API verwijst oude id's door.
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE mechanisms (
@@ -68,7 +72,9 @@ CREATE TABLE mechanisms (
     -- Temporeel: mechanismen zijn historisch contingent (kijkcijferdisciplinering
     -- vereist een kijkmeterpanel, sinds 1987). NULL = onbegrensd voor zover bekend.
     active_from TEXT,
-    active_until TEXT
+    active_until TEXT,
+    -- M2.6: vervangen door opvolger(s); zie `lineage`.
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Twee-assen-categorisatie van mechanismen (zie enrich_filters_themas.py).
@@ -109,7 +115,9 @@ CREATE TABLE emergent_effects (
     description TEXT NOT NULL,            -- wat is het emergente effect (uit welk samenspel)
     effect TEXT NOT NULL,                -- gevolg voor de berichtgeving
     active_from TEXT,                    -- temporeel; NULL = onbegrensd voor zover bekend
-    active_until TEXT
+    active_until TEXT,
+    -- M2.6: vervangen door opvolger(s); zie `lineage`.
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE TABLE emergent_effect_members (
     emergent_effect_id INTEGER NOT NULL REFERENCES emergent_effects(id) ON DELETE CASCADE,
@@ -187,7 +195,9 @@ CREATE TABLE entities (
     -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
     active_from TEXT,
     active_until TEXT,
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    -- M2.6: vervangen door opvolger(s); zie `lineage`.
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Een entiteit kan meerdere rollen vervullen
@@ -251,7 +261,9 @@ CREATE TABLE relations (
     -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
     active_from TEXT,
     active_until TEXT,
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    -- M2.6: vervangen door opvolger(s); zie `lineage`.
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 --------------------------------------------------------------
@@ -369,7 +381,9 @@ CREATE TABLE arguments (
         'description',       -- klopt de beschrijving?
         'type',              -- klopt het entiteittype?
         'role',              -- klopt de toegewezen rol?
-        'indirecte_invloed_op', -- padclaim: rol heeft samengestelde invloed op rol in property_value
+        'indirecte_invloed_op', -- padclaim: rol heeft samengestelde invloed op de rol wiens ID
+                             -- in property_value staat (rol-ID sinds M2.6; voorheen rolnaam —
+                             -- naam brak stil bij hernoemen/splitsen/samenvoegen)
         'compositie'         -- compositieclaim (M1.5): het SAMENSPEL van een emergent veld bestaat,
                              -- niet alleen de leden — analoog aan padclaims voor afgeleide pijlen
     )),
@@ -385,16 +399,21 @@ CREATE TABLE arguments (
     weight REAL CHECK(weight BETWEEN 0.0 AND 1.0),  -- hoe sterk is dit argument
     -- Verificatie-status (Wikipedia-stijl)
     status TEXT NOT NULL DEFAULT 'ongecontroleerd' CHECK(status IN (
-        'ongecontroleerd',   -- net toegevoegd, nog niet beoordeeld
+        'voorgesteld',       -- M2.2: landingsstatus via de API; telt in niets mee (factor 0)
+                             -- tot een reviewer merget (→ ongecontroleerd/bronvermelding_nodig)
+        'ongecontroleerd',   -- gemerged, nog niet inhoudelijk beoordeeld
         'bronvermelding_nodig', -- claim zonder voldoende citaties
         'betwist',           -- actief betwist door tegenargumenten
         'geverifieerd',      -- citaties gecontroleerd en bevestigd
         'verouderd',         -- informatie mogelijk niet meer actueel
         'verworpen'          -- na review afgewezen; telt niet mee (scoring: factor 0)
     )),
-    -- Zelf-merge (M0.6): inbrenger zette zijn eigen argument op 'geverifieerd'.
-    -- Toegestaan (n=1) maar gemarkeerd, zodat het later herauditeerbaar is.
+    -- Zelf-merge (M0.6/M2.2): inbrenger mergede of verifieerde zijn eigen argument.
+    -- Bij merge toegestaan (n=1) maar gemarkeerd, zodat het later herauditeerbaar is;
+    -- eigen werk VERIFIËREN is sinds M2.1 technisch onmogelijk (API weigert).
     self_merged BOOLEAN NOT NULL DEFAULT FALSE,
+    -- M2.2: wie het voorstel mergede (voorgesteld → ongecontroleerd/bronvermelding_nodig).
+    merged_by TEXT REFERENCES users(username),
     -- M1.8: machineleesbare classificatie van een ONDERGRAVING — een contradicting-reply
     -- die de redenering van zijn parent aanvalt ("de gevolgtrekking deugt niet"), géén
     -- tegenbewijs voor het doel. NULL voor gewone argumenten en weerleggingen.
@@ -403,7 +422,9 @@ CREATE TABLE arguments (
         'vals_dilemma', 'ad_hominem', 'autoriteit_buiten_domein', 'anekdote_als_regel',
         'cherry_picking', 'equivocatie', 'citaat_dekking', 'overig'
     )),
-    contributed_by TEXT,                 -- wie voegde dit toe (accountability)
+    -- M2.1: attributie is een FK naar users (historische tags kregen een inactief
+    -- legacy-account; NULL bestaat alleen nog in seed-replay, nooit via de API).
+    contributed_by TEXT REFERENCES users(username),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- Doelregel (M1.1, boomsemantiek): een ROOT-argument draagt minstens één doel
     -- (praktijk: relatie/entiteit; theorie: rol/mechanisme/emergent veld); een REPLY
@@ -458,6 +479,148 @@ CREATE TABLE users (
     CHECK (kind != 'agent' OR provenance IS NOT NULL)
 );
 
+-- M2.1: reviewer-/maintainer-rechten per filter, bovenop de globale rol.
+-- De effectieve rol binnen een filter = max(globale rol, filterrol); zo kan een
+-- bijdrager reviewer zijn voor alleen 'sourcing' (CODEOWNERS-idee, verbeterplan 4.2).
+CREATE TABLE user_filter_rollen (
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    filter TEXT NOT NULL CHECK(filter IN (
+        'eigendom', 'advertentie', 'sourcing', 'flak', 'ideologie',
+        'cross_filter', 'systeemactor', 'tegenmacht', 'overig'
+    )),
+    rol TEXT NOT NULL CHECK(rol IN ('reviewer', 'maintainer')),
+    PRIMARY KEY (user_id, filter)
+);
+
+--------------------------------------------------------------
+-- VOORSTELLEN (M2.3/M2.6): theory-RfC's en granulariteitsbeheer
+-- Een nieuw theorie-element, splitsing, samenvoeging of hernoeming ontstaat
+-- alleen nog via een voorstel. Theorielaag = beschermd niveau: acceptatie
+-- vereist twee akkoorden van menselijke reviewers (de indiener telt niet mee;
+-- agent-oordelen zijn advies en tellen nooit — alle LLM's zijn één familie, §6.4).
+--------------------------------------------------------------
+
+CREATE TABLE voorstellen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    soort TEXT NOT NULL CHECK(soort IN (
+        'nieuw_theorie_element', -- M2.3-RfC: definitie, aard+freeze-test, afgrenzing,
+                                 -- falsificatiecriterium, ≥1 instantiatie, ≥1 bron
+        'splitsen',              -- M2.6: één element → meerdere opvolgers (+ hertriage-plan)
+        'samenvoegen',           -- M2.6: meerdere elementen → één opvolger (+ herbevestiging)
+        'hernoemen'              -- M2.6: lichte variant, geen hertriage
+    )),
+    titel TEXT NOT NULL,
+    payload JSON NOT NULL,               -- sjabloonvelden + hertriage-/herbevestigingsplan
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN (
+        'open', 'geaccepteerd', 'afgewezen', 'ingetrokken'
+    )),
+    ingediend_door TEXT NOT NULL REFERENCES users(username),
+    resultaat JSON,                      -- na acceptatie: aangemaakte/gewijzigde element-id's
+    besloten_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE voorstel_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    voorstel_id INTEGER NOT NULL REFERENCES voorstellen(id) ON DELETE CASCADE,
+    reviewer TEXT NOT NULL REFERENCES users(username),
+    oordeel TEXT NOT NULL CHECK(oordeel IN ('akkoord', 'afwijzen')),
+    motivatie TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (voorstel_id, reviewer)       -- één oordeel per reviewer per voorstel
+);
+
+--------------------------------------------------------------
+-- RATINGS (M2.5): menselijke oordelen óver argumenten
+-- Geen stemmen over waarheid: je beoordeelt of een argument goed onderbouwd,
+-- relevant en eerlijk is. Bridging-aggregatie (matrixfactorisatie) activeert pas
+-- bij een diverse pool; tot die tijd zijn ratings zichtbaar advies. Agent-ratings
+-- tellen nooit onderling (één gecorreleerde familie) en wegen pas na kalibratie.
+--------------------------------------------------------------
+
+CREATE TABLE argument_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    argument_id INTEGER NOT NULL REFERENCES arguments(id),
+    rater TEXT NOT NULL REFERENCES users(username),
+    oordeel TEXT NOT NULL CHECK(oordeel IN ('nuttig', 'niet_nuttig')),
+    -- Gestructureerde redenen (Community-Notes-les): machineleesbaar naast het oordeel.
+    reden TEXT CHECK(reden IS NULL OR reden IN (
+        'citaat_dekt_claim_niet', 'bron_onbetrouwbaar', 'duplicaat', 'onheldere_claim',
+        'drogreden', 'sterke_onderbouwing', 'eerlijke_tegenwerping', 'overig'
+    )),
+    motivatie TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (argument_id, rater)          -- één rating per beoordelaar per argument
+);
+
+--------------------------------------------------------------
+-- WATCHLISTS (M2.4): volglijsten op de recent-changes-feed (edit_log)
+--------------------------------------------------------------
+
+CREATE TABLE watchlists (
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    table_name TEXT NOT NULL CHECK(table_name IN (
+        'relations', 'entities', 'roles', 'mechanisms', 'emergent_effects', 'arguments'
+    )),
+    record_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, table_name, record_id)
+);
+
+--------------------------------------------------------------
+-- LINEAGE (M2.6): opvolging bij splitsen/samenvoegen/hernoemen
+-- Niets wissen: het oude element krijgt vervangen=TRUE en blijft herleidbaar;
+-- elke rij (oud → nieuw) hangt aan een geaccepteerd voorstel (validator-eis).
+--------------------------------------------------------------
+
+CREATE TABLE lineage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    soort TEXT NOT NULL CHECK(soort IN ('splitsen', 'samenvoegen', 'hernoemen')),
+    element_type TEXT NOT NULL CHECK(element_type IN (
+        'rol', 'mechanisme', 'entiteit', 'relatie', 'emergent_effect'
+    )),
+    oud_id INTEGER NOT NULL,             -- het vervangen element (bij hernoemen: hetzelfde id)
+    nieuw_id INTEGER NOT NULL,           -- de opvolger
+    voorstel_id INTEGER NOT NULL REFERENCES voorstellen(id),
+    reden TEXT,                          -- bv. de oude naam bij hernoemen
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--------------------------------------------------------------
+-- VOORSPELLINGSREGISTER (M3.4): vooraf vastgelegde, toetsbare verwachtingen
+-- De stap van "consistent verhaal" naar "getoetst model": claim, kans en
+-- meetcriterium worden vastgelegd vóór de uitkomst bekend is; na de deadline
+-- scoort een reviewer de uitkomst (Brier = (kans − uitkomst)²). Zelf scoren
+-- mag (n=1-realiteit) maar draagt een self_scored-vlag, zoals self_merged (§6.1).
+--------------------------------------------------------------
+
+CREATE TABLE predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    claim TEXT NOT NULL,                 -- de toetsbare verwachting zelf
+    afleiding TEXT NOT NULL,             -- hoe dit uit het model volgt (elementen + redeneerstap)
+    meetcriterium TEXT NOT NULL,         -- hoe de uitkomst wordt vastgesteld (operationalisering)
+    kans REAL NOT NULL CHECK(kans > 0 AND kans < 1),  -- vooraf uitgesproken waarschijnlijkheid
+    deadline DATE NOT NULL,              -- uiterlijk dan wordt de uitkomst beoordeeld
+    -- Theorie-anker: een voorspelling volgt uit ten minste één theorie-element
+    mechanism_id INTEGER REFERENCES mechanisms(id),
+    role_id INTEGER REFERENCES roles(id),
+    emergent_effect_id INTEGER REFERENCES emergent_effects(id),
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN (
+        'open',              -- wacht op de uitkomst
+        'uitgekomen',        -- meetcriterium gehaald
+        'niet_uitgekomen',   -- meetcriterium niet gehaald
+        'onbeslisbaar'       -- meetcriterium bleek niet toepasbaar (telt niet in Brier)
+    )),
+    uitkomst TEXT,                       -- wat er feitelijk gebeurde + bronverwijzing
+    brier REAL,                          -- (kans − uitkomst)²; alleen bij (niet_)uitgekomen
+    self_scored BOOLEAN NOT NULL DEFAULT FALSE,  -- beoordelaar = indiener (heraudit-lijst)
+    contributed_by TEXT NOT NULL REFERENCES users(username),
+    beoordeeld_door TEXT REFERENCES users(username),
+    beoordeeld_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (mechanism_id IS NOT NULL OR role_id IS NOT NULL OR emergent_effect_id IS NOT NULL)
+);
+
 --------------------------------------------------------------
 -- AUDIT LOG
 -- Wie veranderde wat, wanneer, en waarom (Wikipedia-stijl versiebeheer)
@@ -472,9 +635,12 @@ CREATE TABLE edit_log (
         'updated',           -- bestaand record gewijzigd
         'deleted',           -- record verwijderd
         'verified',          -- status → geverifieerd
-        'disputed'           -- status → betwist
+        'disputed',          -- status → betwist
+        'merged'             -- M2.2: voorstel gemerged (voorgesteld → telt mee)
     )),
-    changed_by TEXT,                      -- wie (gebruikersnaam, e-mail, of systeem)
+    -- M2.1: FK naar users; historische vrije-tekstwaarden zijn gemapt op
+    -- legacy-accounts (migrate_fase2_openstellen.py).
+    changed_by TEXT REFERENCES users(username),
     old_value TEXT,                       -- vorige waarde (JSON)
     new_value TEXT,                       -- nieuwe waarde (JSON)
     reason TEXT,                          -- reden voor de wijziging
@@ -527,6 +693,12 @@ CREATE INDEX idx_edit_log_changed_by ON edit_log(changed_by);
 CREATE INDEX idx_arguments_status ON arguments(status);
 CREATE INDEX idx_sources_reliability ON sources(reliability);
 CREATE INDEX idx_mechanisms_type ON mechanisms(mechanism_type);
+CREATE INDEX idx_voorstellen_status ON voorstellen(status);
+CREATE INDEX idx_voorstel_reviews_voorstel ON voorstel_reviews(voorstel_id);
+CREATE INDEX idx_ratings_argument ON argument_ratings(argument_id);
+CREATE INDEX idx_lineage_oud ON lineage(element_type, oud_id);
+CREATE INDEX idx_lineage_nieuw ON lineage(element_type, nieuw_id);
+CREATE INDEX idx_predictions_status ON predictions(status);
 
 --------------------------------------------------------------
 -- SEED DATA: ROLLEN (theoretisch model)

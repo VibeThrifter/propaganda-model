@@ -69,6 +69,7 @@ STATUS_FACTOR = {
     "verouderd": 0.40,
     "betwist": 0.25,
     "verworpen": 0.00,  # na review afgewezen: draagt geen bewijskracht meer
+    "voorgesteld": 0.00,  # M2.2: telt in niets mee tot een reviewer merget
 }
 DEFAULT_STATUS_FACTOR = 0.50
 
@@ -203,8 +204,10 @@ def balance_from_roots(roots, k: float) -> dict:
             n_voor += 1
         else:
             n_tegen += 1
-            # M1.4: een serieuze tegenwerping is niet verworpen en draagt een echte bron.
-            if r.get("status") != "verworpen" and (r.get("n_citaties") or 0) > 0:
+            # M1.4: een serieuze tegenwerping is niet verworpen (en niet slechts
+            # voorgesteld, M2.2) en draagt een echte bron.
+            if (r.get("status") not in ("verworpen", "voorgesteld")
+                    and (r.get("n_citaties") or 0) > 0):
                 overwogen = True
         key = (stance, r.get("cluster") or ZONDER_BRON_CLUSTER)
         per_cluster[key] = max(per_cluster.get(key, 0.0), float(r.get("sigma") or 0.0))
@@ -499,7 +502,27 @@ def emergent_scores(literature_roots, compositie_roots) -> dict:
 
 # ── DB-aggregatie: alle afgeleide scores in één keer ────────
 
-def compute_all_scores(conn, exclude_cluster=None) -> dict:
+def bridged_weights_from_file(path) -> dict | None:
+    """Laad bridged argumentgewichten (M2.5) uit data/bridging.json, indien aanwezig.
+
+    Het bestand wordt geschreven door scripts/bridging.py en bevat
+    {"weights": {argument_id: gewicht}}; zolang de beoordelaarspool te klein is
+    schrijft dat script geen gewichten en geldt het zelfgekozen ``weight``.
+    """
+    import json
+    from pathlib import Path
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text())
+        weights = data.get("weights") or {}
+        return {int(k): float(v) for k, v in weights.items()} or None
+    except (OSError, ValueError):
+        return None
+
+
+def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict:
     """Bereken de volledige scoringsketen uit een SQLite-connectie.
 
     Retourneert (gekeyd op id):
@@ -513,6 +536,14 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
 
     ``exclude_cluster`` laat alle citaties uit één broncluster weg — de basis van de
     leave-one-cluster-out-analyse (scripts/analyse_gevoeligheid.py, M1.6).
+
+    ``bridged_weights`` (M2.5): {argument_id: gewicht} uit de bridging-aggregatie van
+    ratings; vervangt waar aanwezig het zelfgekozen ``weight`` (Z2). Zie
+    ``bridged_weights_from_file`` voor het laden van data/bridging.json.
+
+    Fase 2: argumenten met status 'voorgesteld' tellen in niets mee (M2.2), en
+    ``vervangen`` elementen (M2.6, splitsen/samenvoegen) worden overgeslagen — hun
+    niet-herbevestigde bewijs telt nergens meer in mee.
 
     Gedeeld door scripts/generate_viz.py (statische snapshot) en de /api/scores-endpoint
     (live herberekening), zodat de aggregatielogica op één plek staat.
@@ -534,6 +565,8 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
             SELECT id, relation_id, entity_id, role_id, mechanism_id, emergent_effect_id,
                    parent_argument_id, property, stance, weight, status FROM arguments"""):
         cites = cites_by_arg.get(aid, [])
+        if bridged_weights and aid in bridged_weights:
+            weight = bridged_weights[aid]  # M2.5: bridged rating vervangt eigen gewicht
         taus[aid] = argument_force(weight, status, [r for r, _ in cites])
         parents[aid] = parent_id
         stances[aid] = stance
@@ -556,6 +589,8 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
     by_eff, by_eff_comp = {}, {}
     for aid, m in meta.items():
         if parents[aid] is not None:      # replies tellen alleen via de boom (M1.1)
+            continue
+        if m["status"] == "voorgesteld":  # M2.2: telt in niets mee tot eerste review
             continue
         payload = {"stance": m["stance"], "sigma": sigma[aid], "cluster": m["cluster"],
                    "n_citaties": m["n_citaties"], "status": m["status"]}
@@ -583,8 +618,10 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
                 by_eff.setdefault(m["emergent_effect_id"], []).append(payload)
 
     # Laag B: afgeleide praktijkscore + afgeleide invloed per relatie
+    # (vervangen elementen — M2.6 — doen in de hele keten niet meer mee)
     rel_rows = conn.execute(
-        "SELECT id, source_id, target_id, certainty, influence FROM relations").fetchall()
+        "SELECT id, source_id, target_id, certainty, influence FROM relations "
+        "WHERE NOT vervangen").fetchall()
     rel_detail, rel_infl_detail = {}, {}
     ent_cert_acc, ent_infl_acc = {}, {}
     for rid, src, tgt, certainty, influence in rel_rows:
@@ -599,30 +636,32 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
 
     # Afgeleide geloofwaardigheid per entiteit (prior = gem. zekerheid van haar relaties)
     entity_detail = {}
-    for (eid,) in conn.execute("SELECT id FROM entities"):
+    for (eid,) in conn.execute("SELECT id FROM entities WHERE NOT vervangen"):
         rel_cert = ent_cert_acc.get(eid)
         prior = (sum(rel_cert) / len(rel_cert)) if rel_cert else None
         entity_detail[eid] = instance_detail(by_entity.get(eid, []), prior_certainty=prior)
 
-    # Instanties per klasse uit de koppeltabel (invloed = afgeleide invloed, M1.7)
+    # Instanties per klasse uit de koppeltabel (invloed = afgeleide invloed, M1.7).
+    # Een instantiatie waarvan de praktijkkant vervangen is, telt niet meer mee
+    # (rel_detail/entity_detail bevatten alleen niet-vervangen elementen).
     role_instances, mech_instances = {}, {}
     for role_id, mech_id, ent_id, rel_id, exemplarity in conn.execute(
             "SELECT role_id, mechanism_id, entity_id, relation_id, exemplarity FROM instantiations"):
         ex = exemplarity if exemplarity is not None else 1.0
-        if role_id and ent_id:
+        if role_id and ent_id and ent_id in entity_detail:
             role_instances.setdefault(role_id, []).append({
-                "exemplarity": ex, "certainty": entity_detail.get(ent_id, {}).get("score", 0.0),
+                "exemplarity": ex, "certainty": entity_detail[ent_id]["score"],
                 "influence": ent_infl.get(ent_id, 0.0)})
-        elif mech_id and rel_id:
+        elif mech_id and rel_id and rel_id in rel_detail:
             mech_instances.setdefault(mech_id, []).append({
-                "exemplarity": ex, "certainty": rel_detail.get(rel_id, {}).get("score", 0.0),
+                "exemplarity": ex, "certainty": rel_detail[rel_id]["score"],
                 "influence": rel_infl_detail.get(rel_id, {}).get("score", 0.0)})
 
     roles = {role_id: theory_scores(by_role.get(role_id, []),
                                     role_instances.get(role_id, []), seed=f"rol{role_id}")
-             for (role_id,) in conn.execute("SELECT id FROM roles")}
+             for (role_id,) in conn.execute("SELECT id FROM roles WHERE NOT vervangen")}
     mechs = {}
-    for (mech_id,) in conn.execute("SELECT id FROM mechanisms"):
+    for (mech_id,) in conn.execute("SELECT id FROM mechanisms WHERE NOT vervangen"):
         scores = theory_scores(by_mech.get(mech_id, []),
                                mech_instances.get(mech_id, []), seed=f"mech{mech_id}")
         # M1.7: invloedsbewijs op het mechanisme zelf verschuift de sterkte
@@ -637,7 +676,8 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
     if conn.execute("SELECT name FROM sqlite_master WHERE type='table' "
                     "AND name='emergent_effects'").fetchone():
         effs = {eff_id: emergent_scores(by_eff.get(eff_id, []), by_eff_comp.get(eff_id, []))
-                for (eff_id,) in conn.execute("SELECT id FROM emergent_effects")}
+                for (eff_id,) in conn.execute(
+                    "SELECT id FROM emergent_effects WHERE NOT vervangen")}
 
     # Structurele invloed-centraliteit (topologie, los van de bewijslast):
     #   - entiteiten: relatiegraaf, gewicht = influence.
@@ -647,10 +687,11 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
     entity_influence = influence_graph.compute_influence(conn, field_mode="collapse")
     entity_influence_clean = influence_graph.compute_influence(conn, field_mode="exclude")
 
-    role_ids = [r[0] for r in conn.execute("SELECT id FROM roles")]
+    role_ids = [r[0] for r in conn.execute("SELECT id FROM roles WHERE NOT vervangen")]
     mech_edges = []
     for mid, src_role, tgt_role, flt, aard in conn.execute(
-            "SELECT id, source_role_id, target_role_id, filter, aard FROM mechanisms"):
+            "SELECT id, source_role_id, target_role_id, filter, aard FROM mechanisms "
+            "WHERE NOT vervangen"):
         if flt == "tegenmacht":     # tegenkracht: geen pro-elite invloedskanaal
             continue
         mech_edges.append((src_role, tgt_role,
@@ -659,7 +700,8 @@ def compute_all_scores(conn, exclude_cluster=None) -> dict:
     def _role_ids(*role_names):
         ids = set()
         for rn in role_names:
-            row = conn.execute("SELECT id FROM roles WHERE name = ?", (rn,)).fetchone()
+            row = conn.execute("SELECT id FROM roles WHERE name = ? AND NOT vervangen",
+                               (rn,)).fetchone()
             if row:
                 ids.add(row[0])
         return ids

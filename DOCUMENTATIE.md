@@ -205,10 +205,16 @@ Zie "Scores: van discussieboom naar theorie".
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `arguments` | Discussieboom: argumenten op een praktijk-target (relatie/entiteit) óf een theorie-target (rol/mechanisme/emergent veld = literatuuronderbouwing), met nesting | relation_id / entity_id / role_id / mechanism_id / emergent_effect_id (minstens één), parent_argument_id (NULL=root), property/property_value (optioneel), stance, claim, reasoning, weight, status (`ongecontroleerd` default; ook `bronvermelding_nodig`/`betwist`/`geverifieerd`/`verouderd`/`verworpen`), self_merged (vlag: inbrenger verifieerde eigen argument), contributed_by |
+| `arguments` | Discussieboom: argumenten op een praktijk-target (relatie/entiteit) óf een theorie-target (rol/mechanisme/emergent veld = literatuuronderbouwing), met nesting | relation_id / entity_id / role_id / mechanism_id / emergent_effect_id (minstens één), parent_argument_id (NULL=root), property/property_value (optioneel), stance, claim, reasoning, weight, status (via de API landt alles als `voorgesteld` (M2.2); verder `ongecontroleerd`/`bronvermelding_nodig`/`betwist`/`geverifieerd`/`verouderd`/`verworpen`), self_merged (vlag: inbrenger mergede eigen voorstel), merged_by, contributed_by (FK naar users, M2.1) |
 | `citations` | Bronvermeldingen per argument | argument_id, source_id, quote, page, section, context |
-| `edit_log` | Auditlog van wijzigingen (aanmaak, statuswijziging) | table_name, record_id, action (`created`/`updated`/`deleted`/`verified`/`disputed`), changed_by, old_value, new_value, reason |
+| `edit_log` | Auditlog van wijzigingen (aanmaak, status, merge) | table_name, record_id, action (`created`/`updated`/`deleted`/`verified`/`disputed`/`merged`), changed_by (FK naar users), old_value, new_value, reason |
 | `users` | Identiteit voor het bijdragepad (M0.6): mensen én agents | username, kind (`mens`/`agent`), role (`bijdrager`/`reviewer`/`maintainer`), password_hash (alleen mensen), token_hash (sha256; token zelf wordt nooit opgeslagen), provenance (verplicht voor agents: model+versie), active, last_login_at |
+| `user_filter_rollen` | M2.1: reviewer/maintainer per filter, bovenop de globale rol | user_id, filter, rol |
+| `voorstellen` + `voorstel_reviews` | M2.3/M2.6: theory-RfC's en splitsen/samenvoegen/hernoemen; theorielaag vergt 2 menselijke akkoorden | soort, titel, payload (JSON-sjabloon), status (`open`/`geaccepteerd`/`afgewezen`/`ingetrokken`), ingediend_door, resultaat; reviews: reviewer, oordeel, motivatie |
+| `argument_ratings` | M2.5: oordelen óver argumenten (nooit over waarheid); agent-ratings = advies | argument_id, rater, oordeel (`nuttig`/`niet_nuttig`), reden (gestructureerd), motivatie; UNIQUE per (argument, rater) |
+| `watchlists` | M2.4: volglijsten op de recent-changes-feed | user_id, table_name, record_id |
+| `lineage` | M2.6: opvolging bij splitsen/samenvoegen/hernoemen — niets wissen | soort, element_type, oud_id, nieuw_id, voorstel_id, reden |
+| `predictions` | M3.4: voorspellingsregister — toetsbare verwachtingen, vastgelegd vóór de uitkomst | claim, afleiding, meetcriterium, kans (0–1 exclusief), deadline (toekomst), theorie-anker (mechanism_id/role_id/emergent_effect_id, ≥1), status (`open`/`uitgekomen`/`niet_uitgekomen`/`onbeslisbaar`), uitkomst, brier, self_scored, contributed_by, beoordeeld_door |
 
 Argumenten vormen een boomstructuur:
 - **Root-argumenten** (`parent_argument_id = NULL`) hangen direct aan een relatie of entiteit
@@ -224,10 +230,102 @@ Mensen loggen in met een wachtwoord (sessie); agents en Claude Code sturen
 als die mens (de mens blijft de bijdrager). De attributie (`contributed_by`,
 `changed_by`) volgt altijd de ingelogde gebruiker; payload-velden worden genegeerd.
 Rollen: `bijdrager` (inhoud toevoegen) < `reviewer` (ook statussen beoordelen) <
-`maintainer` (ook theorielaag en DELETEs). Eigen argumenten verifiëren mag (n=1)
-maar zet de `self_merged`-vlag zodat het herauditeerbaar blijft. **Dogfood-regel:**
+`maintainer` (ook DELETEs). Sinds M2.1 bestaan daarnaast **filterrollen**
+(`user_filter_rollen`, beheer via `create_user.py --filter-rol sourcing=reviewer`):
+de effectieve rol binnen een filter is max(globale rol, filterrol). **Dogfood-regel:**
 inhoud gaat sinds juni 2026 uitsluitend via dit bijdragepad; migratiescripts zijn
 alleen nog voor schema en structuur.
+
+### Openstellen (fase 2, M2.1–M2.6)
+
+**Voorstel-workflow (M2.2).** Elk argument landt via de API als `voorgesteld` en
+telt in *niets* mee (statusfactor 0; ook niet in de tegenspraak-balans) tot een
+reviewer het merget: `POST /api/arguments/<id>/merge` → `ongecontroleerd`, of
+`bronvermelding_nodig` als de citatiepoort (M0.3) dat eist — de poort verhuist dus
+naar het merge-moment. `merged_by` wordt vastgelegd; zelf-merge mag (n=1) maar zet
+de `self_merged`-vlag. Afwijzen = status `verworpen` (blijft herleidbaar). De
+**score-diff-preview** (`GET /api/arguments/<id>/score_diff`, op een tijdelijke
+kopie) toont vooraf wat acceptatie verschuift; de **review-wachtrij**
+(`/api/review_queue`, paneel in de viz) bundelt voorgestelde argumenten en open
+voorstellen.
+
+**Zelf-verificatie is technisch onmogelijk (M2.1).** Niemand zet eigen werk op
+`geverifieerd` — de API weigert (403); verificatie door een ander wist een oude
+zelf-merge-vlag (heraudit).
+
+**Theory-RfC's (M2.3).** Een nieuw theorie-element ontstaat alleen nog via
+`POST /api/voorstellen` (soort `nieuw_theorie_element`); de directe
+roles/mechanisms-POSTs zijn dicht. Sjabloon verplicht: definitie, aard-keuze +
+freeze-test (mechanismen), afgrenzing, falsificatiecriterium, ≥ 1 instantiatie,
+≥ 1 bron. Acceptatie op de theorielaag vergt **twee akkoorden van menselijke
+reviewers** (de indiener telt niet mee; agent-oordelen zijn zichtbaar advies en
+tellen nooit — alle LLM's gelden als één gecorreleerde familie); de praktijklaag
+vergt één akkoord (zelf-akkoord gevlagd). Eén gemotiveerde menselijke afwijzing
+sluit het voorstel (`afgewezen`); de indiener kan herzien en opnieuw indienen.
+
+**Anti-misbruik (M2.4).** Rate limit per account (30/60/120 schrijfacties per
+minuut voor bijdrager/reviewer/maintainer); duplicaatdetectie bij indienen
+(stdlib-tekstgelijkenis tegen bestaande claims op hetzelfde doel; 409 met
+kandidaten, override via `negeer_duplicaten`); recent-changes-feed
+(`/api/recent_changes`, open) + persoonlijke watchlist (`/api/watchlist`).
+
+**Ratings & bridging (M2.5).** `POST /api/arguments/<id>/ratings`
+(`nuttig`/`niet_nuttig` + gestructureerde reden): je beoordeelt onderbouwing,
+relevantie en eerlijkheid — nooit waarheid, en nooit eigen werk. Agent-ratings
+zijn advies; hun gewicht wordt verdiend via kalibratie
+(`scripts/kalibratie_agents.py`, gecapt) en agent×agent telt nooit. Zodra de
+menselijke pool groot genoeg is, vervangt bridging (matrixfactorisatie,
+`scripts/bridging.py` → `data/bridging.json`) het zelfgekozen argumentgewicht in
+laag A; tot die tijd gelden de noodregels.
+
+**Splitsen & samenvoegen (M2.6).** Granulariteit is score-relevant; de knip loopt
+daarom via voorstellen (soorten `splitsen`/`samenvoegen`/`hernoemen`). Twee
+kernregels: (1) **niets wissen** — het oude element krijgt `vervangen = TRUE` plus
+`lineage`-rijen naar de opvolger(s); scoring, influence en viz slaan vervangen
+elementen over en `GET /api/lineage/<type>/<id>` beantwoordt oude id's met de
+opvolging; (2) **bewijs verhuist nooit automatisch** — bij samenvoegen verhuist
+alleen wat in `herbevestigd` staat (de rest blijft achter en telt nergens meer in
+mee), bij splitsen moet de hertriage-restlijst (argumenten, relaties,
+instantiaties, padclaims) leeg zijn vóór uitvoering; één-op-veel = dupliceren.
+`scripts/analyse_granulariteit.py` vlagt kandidaten (bron-overlap, tekstgelijkenis,
+disjuncte bewijsgroepen) maar beslist niets.
+
+### Levend & falsifieerbaar (fase 3, M3.1–M3.5)
+
+**Modelreleases (M3.1).** `python3 scripts/release_model.py <X.Y.Z> --titel "…"`
+schrijft een onveranderlijk scores-snapshot (`releases/model-vX.Y.Z.json`) en een
+changelog mét score-diff t.o.v. de vorige release (`releases/model-vX.Y.Z.md`:
+"geloofwaardigheid mechanisme X: 0,62 → 0,71"). `releases/` is ingecheckt; het
+script commit/tagt niet zelf (wel via `--tag`). De viz-topbar en `/api/health`
+tonen de nieuwste releasetag.
+
+**Onderzoeksagenda (M3.2).** `python3 scripts/onderzoeksagenda.py` rangschikt alle
+theorie-elementen op **belang × bewijsarmoede** (brontekort, volumetekort,
+tegenspraaktekort en — voor velden — compositietekort), met per element de
+concrete `ontbreekt`-lijst: dáár levert één nieuwe goede bron de grootste
+verschuiving op. Uitvoer in `data/onderzoeksagenda.json` → `/api/health` →
+Modelgezondheid-paneel; de scout-brief (M1.9) kiest zijn missie-onderwerp uit de
+top van deze lijst.
+
+**Adversarial rondes (M3.3).** Hetzelfde rapport levert de red-team-doelwitten:
+de top-20 invloedrijkste edges (afgeleide invloed × zekerheid, met stance-balans).
+De rondes draaien onder `redteam-agent` met `missies/redteam_brief.md` (sterkste
+eerlijke tegenbewijs, anti-stroman-regels, afwezigheidsrapporten); bevindingen
+volgen het gewone voorstelpad.
+
+**Voorspellingsregister (M3.4).** De stap van "consistent verhaal" naar "getoetst
+model": `POST /api/predictions` legt een toetsbare verwachting vast vóór de
+uitkomst bekend is (claim + afleiding uit het model + meetcriterium + kans +
+deadline in de toekomst + ≥ 1 theorie-anker). Na de deadline scoort een reviewer
+de uitkomst (`PATCH /api/predictions/<id>/uitkomst`): Brier = (kans − uitkomst)²;
+`onbeslisbaar` telt niet mee in de kalibratie; gescoord = onveranderlijk; zelf
+scoren mag (n=1) maar draagt de `self_scored`-vlag. `scripts/voorspellingen.py`
+geeft het overzicht + kalibratierapport; de validator vlagt verlopen open
+voorspellingen (VOORSPELLING-DEADLINE) en de heraudit-lijst (VOORSPELLING-ZELF).
+
+**Jaarlijkse audit (M3.5).** Checklist in `missies/audit_checklist.md`
+(aard/tiers, bronclassificaties, halo-criteria & constanten, proces/provenance);
+eerstvolgende audit: juni 2027, afgesloten met een modelrelease.
 
 ---
 
@@ -370,7 +468,8 @@ sterkste ≥2-hops-route (max-product over de zichtbare graaf) tekent als violet
 3. **Eindclaim (padclaim)** — de *compositie* zelf is onderbouwd. Dat A→B en B→C elk kloppen, bewijst
    nog niet A ⇢ C: invloed is niet automatisch transitief (wat A bij B verandert hoeft niet het kanaal
    te zijn waarlangs B C beïnvloedt). Een padclaim is een gewoon argument in `arguments` met
-   `role_id` = bronrol, `property = 'indirecte_invloed_op'`, `property_value` = naam van de doelrol,
+   `role_id` = bronrol, `property = 'indirecte_invloed_op'`, `property_value` = **ID van de doelrol**
+   (sinds M2.6; voorheen de rolnaam, die brak stil bij hernoemen/splitsen/samenvoegen),
    plus citaties — dezelfde bewijsstandaard als een directe pijl. `scoring.py` sluit padclaims uit van
    de rolscore (ze gaan over het pad, niet over de rol); de viz toetst er elke kandidaat-pijl aan, in
    het praktijkmodel via de rollen van de twee entiteiten. Vuistregel: claim alleen een paar als de
@@ -507,14 +606,15 @@ Entiteit: DPG Media
 | `contradicting` | - | Bewijs dat de relatie tegenspreekt |
 | `contextual` | ~ | Nuancering, noch voor noch tegen |
 
-**Citatiepoort (M0.3).** Een `supporting`- of `contradicting`-**root**-argument is een
-bewijsclaim en vereist daarom een bron: wordt het zonder citaties ingediend
-(via `POST /api/arguments`), dan start het met status `bronvermelding_nodig`
-(statusfactor 0,40 in `scoring.py`) in plaats van `ongecontroleerd`. De eerste
-citatie (`POST /api/citations`, of direct meegegeven in het `citations`-veld van
-`POST /api/arguments`) heft dat automatisch op naar `ongecontroleerd` — uitsluitend
-die overgang; `geverifieerd` blijft een menselijke review-stap. Alleen `contextual`
-mag bronloos starten.
+**Voorstel-poort (M2.2) + citatiepoort (M0.3).** Elk argument landt via
+`POST /api/arguments` als `voorgesteld` en telt nergens in mee tot een reviewer het
+merget. Op het merge-moment geldt de citatiepoort: een `supporting`- of
+`contradicting`-**root**-argument zonder citaties wordt `bronvermelding_nodig`
+(statusfactor 0,40), mét citaties `ongecontroleerd`. De eerste citatie
+(`POST /api/citations`, of direct in het `citations`-veld van `POST /api/arguments`)
+heft `bronvermelding_nodig` automatisch op naar `ongecontroleerd` — uitsluitend die
+overgang; `geverifieerd` blijft een menselijke review-stap, en sinds M2.1 per
+definitie door een ánder dan de auteur. Alleen `contextual` mag bronloos.
 
 **Reply-regels (M1.1/M1.8).** Een reply (`parent_argument_id` gevuld) draagt **geen
 eigen doel en geen property** (DB-CHECK; de API weigert anders): zijn stance is
@@ -601,6 +701,15 @@ propaganda-model/
 │
 ├── data/
 │   └── propaganda_model.db             # SQLite database (niet in git)
+│
+├── releases/                           # M3.1: modelreleases (wél in git): per versie
+│   ├── model-vX.Y.Z.json               #   onveranderlijk scores-snapshot
+│   └── model-vX.Y.Z.md                 #   changelog met score-diff t.o.v. de vorige
+│
+├── missies/                            # Agent-missies: briefs + logs (M1.8/M1.9/M3.3)
+│   ├── monitor_brief.md / scout_brief.md / redteam_brief.md
+│   ├── audit_checklist.md              # M3.5: jaarlijkse audit (volgende: juni 2027)
+│   └── logs/                           # rondelogs (queries, oogst, stance-balans)
 │
 ├── web/
 │   ├── template.html                   # BRON van de D3-visualisatie (handmatig bewerken)

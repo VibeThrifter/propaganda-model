@@ -4,6 +4,7 @@ Leest de SQLite database en produceert een standalone HTML-bestand
 met een D3.js force-directed graph.
 """
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -14,6 +15,24 @@ import scoring  # noqa: E402  (repo-root module met de scoringsketen)
 DB_PATH = Path(__file__).parent.parent / "data" / "propaganda_model.db"
 OUT_PATH = Path(__file__).parent.parent / "web" / "index.html"
 TEMPLATE_PATH = Path(__file__).parent.parent / "web" / "template.html"
+RELEASES_DIR = Path(__file__).parent.parent / "releases"
+
+
+def laatste_release():
+    """Nieuwste release-snapshot (M3.1) voor de releasetag in de topbar, of None."""
+    nieuwste, beste = None, ()
+    for pad in RELEASES_DIR.glob("model-v*.json"):
+        m = re.fullmatch(r"model-v(\d+)\.(\d+)\.(\d+)\.json", pad.name)
+        if m and tuple(map(int, m.groups())) > beste:
+            beste, nieuwste = tuple(map(int, m.groups())), pad
+    if nieuwste is None:
+        return None
+    try:
+        snap = json.loads(nieuwste.read_text())
+        return {"versie": snap.get("versie"), "gegenereerd": snap.get("gegenereerd"),
+                "titel": snap.get("titel")}
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def export_data():
@@ -21,13 +40,16 @@ def export_data():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # Entities with role info + temporal data
+    # Entities with role info + temporal data.
+    # Vervangen elementen (M2.6) blijven overal buiten beeld: de viz toont het
+    # levende model; opvolging is opvraagbaar via /api/lineage.
     cur.execute("""
         SELECT e.id, e.name, e.type, e.description,
                e.active_from, e.active_until, e.active,
                r.name as role_name, r.category as filter_category
         FROM entities e
         LEFT JOIN roles r ON e.primary_role_id = r.id
+        WHERE NOT e.vervangen
     """)
     entities = [dict(row) for row in cur.fetchall()]
 
@@ -58,15 +80,19 @@ def export_data():
         JOIN entities e1 ON r.source_id = e1.id
         JOIN entities e2 ON r.target_id = e2.id
         LEFT JOIN mechanisms m ON r.mechanism_id = m.id
+        WHERE NOT r.vervangen
     """)
     relations = [dict(row) for row in cur.fetchall()]
 
     # Roles (+ temporele velden: ook de theorielaag is historisch contingent)
-    cur.execute("SELECT id, name, category, description, active_from, active_until FROM roles")
+    cur.execute("SELECT id, name, category, description, active_from, active_until "
+                "FROM roles WHERE NOT vervangen")
     roles = [dict(row) for row in cur.fetchall()]
 
     # Mechanisms (incl. `aard`: direct / veld_instantiatie / veld_eigenschap)
-    cur.execute("SELECT id, name, filter, mechanism_type, aard, description, effect, source_role_id, target_role_id, active_from, active_until FROM mechanisms")
+    cur.execute("SELECT id, name, filter, mechanism_type, aard, description, effect, "
+                "source_role_id, target_role_id, active_from, active_until "
+                "FROM mechanisms WHERE NOT vervangen")
     mechanisms = [dict(row) for row in cur.fetchall()]
 
     # Twee-assen-tags: alle filters (multi) + thema's (dwarsverbanden) per mechanisme.
@@ -89,7 +115,8 @@ def export_data():
         "SELECT name FROM sqlite_master WHERE type='table' AND name='emergent_effects'"
     ).fetchone()
     if have_emergent:
-        cur.execute("SELECT id, name, label, category, description, effect, active_from, active_until FROM emergent_effects")
+        cur.execute("SELECT id, name, label, category, description, effect, active_from, "
+                    "active_until FROM emergent_effects WHERE NOT vervangen")
         emergent_effects = [dict(row) for row in cur.fetchall()]
         members = {}
         for eid, rid in cur.execute(
@@ -135,8 +162,25 @@ def export_data():
     cur.execute("SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity FROM instantiations")
     instantiations = [dict(r) for r in cur.fetchall()]
 
-    # Volledige scoringsketen (gedeeld met /api/scores), zolang de connectie nog open is
-    scores = scoring.compute_all_scores(conn)
+    # Ratings-aggregaat per argument (M2.5): mens en agent apart (agent = advies)
+    ratings = {}
+    if cur.execute("SELECT name FROM sqlite_master WHERE type='table' "
+                   "AND name='argument_ratings'").fetchone():
+        for aid, kind, oordeel, n in cur.execute("""
+            SELECT ar.argument_id, u.kind, ar.oordeel, COUNT(*)
+            FROM argument_ratings ar JOIN users u ON u.username = ar.rater
+            GROUP BY ar.argument_id, u.kind, ar.oordeel"""):
+            ratings.setdefault(aid, {"mens": {"nuttig": 0, "niet_nuttig": 0},
+                                     "agent": {"nuttig": 0, "niet_nuttig": 0}})
+            ratings[aid][kind][oordeel] = n
+    for a in arguments:
+        a['ratings'] = ratings.get(a['id'])
+
+    # Volledige scoringsketen (gedeeld met /api/scores), zolang de connectie nog open is.
+    # Bridged gewichten (M2.5) tellen mee zodra scripts/bridging.py ze geschreven heeft.
+    scores = scoring.compute_all_scores(
+        conn, bridged_weights=scoring.bridged_weights_from_file(
+            DB_PATH.parent / "bridging.json"))
 
     # Argument counts per relation (voor edge labels)
     arg_counts = {}
@@ -228,6 +272,7 @@ def export_data():
         'arguments': arguments,
         'citations': citations,
         'instantiations': instantiations,
+        'release': laatste_release(),   # M3.1: releasetag in de topbar (of null)
     }
 
 

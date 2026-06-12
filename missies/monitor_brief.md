@@ -44,6 +44,6 @@ claim niet) · `overig`.
 
 - **Nooit** statuswijzigingen (PATCH status) — ook niet op eigen werk.
 - **Nooit** een doel meegeven aan een reply.
-- Alles wat je indient blijft `ongecontroleerd` tot een mens het reviewt; je logt
-  je ronde in `missies/logs/` (zie `missies/README.md`) zodat de vals-positief-ratio
-  gemeten kan worden (doel: < 50%).
+- Alles wat je indient landt als `voorgesteld` (M2.2) en telt in niets mee tot een
+  mens het merget; je logt je ronde in `missies/logs/` (zie `missies/README.md`)
+  zodat de vals-positief-ratio gemeten kan worden (doel: < 50%).

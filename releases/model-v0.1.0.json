@@ -1,0 +1,4071 @@
+{
+  "versie": "0.1.0",
+  "titel": "Eerste gescoorde snapshot: fase 0-3 infrastructuur compleet",
+  "gegenereerd": "2026-06-12T20:50:12",
+  "git_commit": "5ad2482",
+  "kerngetallen": {
+    "entiteiten": 177,
+    "relaties": 418,
+    "argumenten": 492,
+    "bronnen": 77,
+    "citaties": 271,
+    "replies": 0,
+    "stance": {
+      "contextual": 6,
+      "contradicting": 7,
+      "supporting": 479
+    },
+    "status": {
+      "geverifieerd": 8,
+      "ongecontroleerd": 484
+    },
+    "voor_tegen_zonder_citatie": 306,
+    "relaties_zonder_argumenten": 54,
+    "relaties_zonder_mechanisme": 6,
+    "relaties_met_mech_zonder_instantiatie": 0,
+    "entiteiten_zonder_rol": 0,
+    "entiteiten_zonder_instantiatie": 0,
+    "hyperedges": 12,
+    "hyperedges_met_bewijslijn": 12,
+    "hyperedges_met_compositieclaim": 0,
+    "bronclusters": 62,
+    "citatie_concentratie_top3": [
+      {
+        "titel": "De Nieuwe Wereld: Talitha Muusse en Victor Vlam over de talkshowwereld",
+        "citaties": 41
+      },
+      {
+        "titel": "De Nederlandse Nieuwsfabriek: Onthulling van het propagandamodel",
+        "citaties": 27
+      },
+      {
+        "titel": "In de top van de NPO grossieren (oud-)politici in toezichthoudende baantjes",
+        "citaties": 20
+      }
+    ],
+    "citatie_concentratie_aandeel": 0.325,
+    "voorgestelde_argumenten": 0,
+    "open_voorstellen": 4,
+    "ratings": 0,
+    "vervangen_elementen": 0,
+    "voorspellingen_open": 5,
+    "voorspellingen_gescoord": 0,
+    "voorspellingen_brier_gem": null
+  },
+  "scores": {
+    "mechanismen": {
+      "1": {
+        "naam": "eigendomsconcentratie",
+        "geloofwaardigheid": 0.344,
+        "lo": 0.1037,
+        "hi": 0.9143,
+        "sterkte": 0.7262
+      },
+      "2": {
+        "naam": "winstmaximalisatie",
+        "geloofwaardigheid": 0.28,
+        "lo": 0.0354,
+        "hi": 0.9053,
+        "sterkte": 0.6516
+      },
+      "3": {
+        "naam": "advertentiedruk",
+        "geloofwaardigheid": 0.2984,
+        "lo": 0.0908,
+        "hi": 0.9069,
+        "sterkte": 0.3621
+      },
+      "4": {
+        "naam": "commerciele_afhankelijkheid",
+        "geloofwaardigheid": 0.2509,
+        "lo": 0.0252,
+        "hi": 0.8758,
+        "sterkte": 0.7
+      },
+      "5": {
+        "naam": "supportive_selling_environment",
+        "geloofwaardigheid": 0.0388,
+        "lo": 0.036,
+        "hi": 0.0415,
+        "sterkte": 0.2991
+      },
+      "6": {
+        "naam": "bron_afhankelijkheid",
+        "geloofwaardigheid": 0.331,
+        "lo": 0.0993,
+        "hi": 0.9127,
+        "sterkte": 0.6136
+      },
+      "7": {
+        "naam": "pakketjournalistiek",
+        "geloofwaardigheid": 0.4797,
+        "lo": 0.1168,
+        "hi": 0.9366,
+        "sterkte": 0.6696
+      },
+      "8": {
+        "naam": "expert_framing",
+        "geloofwaardigheid": 0.3069,
+        "lo": 0.0854,
+        "hi": 0.9086,
+        "sterkte": 0.4604
+      },
+      "9": {
+        "naam": "pr_subsidie",
+        "geloofwaardigheid": 0.2723,
+        "lo": 0.0585,
+        "hi": 0.9035,
+        "sterkte": 0.7185
+      },
+      "10": {
+        "naam": "juridische_dreiging",
+        "geloofwaardigheid": 0.0116,
+        "lo": 0.0116,
+        "hi": 0.0116,
+        "sterkte": 0.55
+      },
+      "11": {
+        "naam": "publieke_aanval",
+        "geloofwaardigheid": 0.0545,
+        "lo": 0.049,
+        "hi": 0.0594,
+        "sterkte": 0.4621
+      },
+      "12": {
+        "naam": "deplatforming",
+        "geloofwaardigheid": 0.0169,
+        "lo": 0.0169,
+        "hi": 0.0169,
+        "sterkte": 0.8
+      },
+      "13": {
+        "naam": "etikettering",
+        "geloofwaardigheid": 0.3404,
+        "lo": 0.0318,
+        "hi": 0.9153,
+        "sterkte": 0.75
+      },
+      "14": {
+        "naam": "zelfcensuur",
+        "geloofwaardigheid": 0.3801,
+        "lo": 0.0675,
+        "hi": 0.921,
+        "sterkte": 0.6097
+      },
+      "15": {
+        "naam": "geweld_intimidatie",
+        "geloofwaardigheid": 0.2952,
+        "lo": 0.064,
+        "hi": 0.9072,
+        "sterkte": 0.5677
+      },
+      "17": {
+        "naam": "schijndebat",
+        "geloofwaardigheid": 0.3615,
+        "lo": 0.0341,
+        "hi": 0.9186,
+        "sterkte": 0.7
+      },
+      "18": {
+        "naam": "draaideurconstructie",
+        "geloofwaardigheid": 0.2409,
+        "lo": 0.0541,
+        "hi": 0.8987,
+        "sterkte": 0.5381
+      },
+      "19": {
+        "naam": "ideologische_synchronisatie",
+        "geloofwaardigheid": 0.2608,
+        "lo": 0.0814,
+        "hi": 0.9007,
+        "sterkte": 0.4455
+      },
+      "20": {
+        "naam": "elite_referentiekader",
+        "geloofwaardigheid": 0.28,
+        "lo": 0.0652,
+        "hi": 0.9047,
+        "sterkte": 0.5615
+      },
+      "21": {
+        "naam": "algoritmische_filtering",
+        "geloofwaardigheid": 0.0813,
+        "lo": 0.0777,
+        "hi": 0.0844,
+        "sterkte": 0.6059
+      },
+      "22": {
+        "naam": "cross_media_eigendom",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "23": {
+        "naam": "acquisitiestrategie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "24": {
+        "naam": "holdingconstructie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "25": {
+        "naam": "systemisch_eigenaarschap",
+        "geloofwaardigheid": 0.077,
+        "lo": 0.0758,
+        "hi": 0.0782,
+        "sterkte": 0.1864
+      },
+      "32": {
+        "naam": "woo_obstructie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "35": {
+        "naam": "spectrum_bewaking",
+        "geloofwaardigheid": 0.3478,
+        "lo": 0.0343,
+        "hi": 0.9165,
+        "sterkte": 0.15
+      },
+      "40": {
+        "naam": "platform_advertentie_concentratie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "41": {
+        "naam": "algoritmische_socialisatie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "42": {
+        "naam": "toezicht_tandeloosheid",
+        "geloofwaardigheid": 0.0508,
+        "lo": 0.0503,
+        "hi": 0.0518,
+        "sterkte": 0.2911
+      },
+      "43": {
+        "naam": "klokkenluider_doorbraak",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "44": {
+        "naam": "benoemingspolitiek",
+        "geloofwaardigheid": 0.2727,
+        "lo": 0.0097,
+        "hi": 0.9047,
+        "sterkte": 0.0
+      },
+      "45": {
+        "naam": "redactioneel_budgetcontrole",
+        "geloofwaardigheid": 0.2593,
+        "lo": 0.0085,
+        "hi": 0.9025,
+        "sterkte": 0.0
+      },
+      "46": {
+        "naam": "hoofdredacteur_als_filter",
+        "geloofwaardigheid": 0.0143,
+        "lo": 0.0143,
+        "hi": 0.0143,
+        "sterkte": 0.55
+      },
+      "48": {
+        "naam": "voorlichter_informatiefilter",
+        "geloofwaardigheid": 0.2157,
+        "lo": 0.0055,
+        "hi": 0.895,
+        "sterkte": 0.0
+      },
+      "49": {
+        "naam": "politicus_als_bron",
+        "geloofwaardigheid": 0.0547,
+        "lo": 0.0515,
+        "hi": 0.0575,
+        "sterkte": 0.5538
+      },
+      "50": {
+        "naam": "lobbyist_naar_politicus",
+        "geloofwaardigheid": 0.2478,
+        "lo": 0.0568,
+        "hi": 0.8992,
+        "sterkte": 0.5769
+      },
+      "51": {
+        "naam": "lobbyist_naar_journalist",
+        "geloofwaardigheid": 0.1916,
+        "lo": 0.0043,
+        "hi": 0.8908,
+        "sterkte": 0.4
+      },
+      "52": {
+        "naam": "denktank_financiering_bias",
+        "geloofwaardigheid": 0.0622,
+        "lo": 0.0584,
+        "hi": 0.0663,
+        "sterkte": 0.5349
+      },
+      "54": {
+        "naam": "denktank_naar_politiek",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "56": {
+        "naam": "journalist_bronrelatie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "63": {
+        "naam": "sociologische_homogeniteit",
+        "geloofwaardigheid": 0.3515,
+        "lo": 0.0195,
+        "hi": 0.9173,
+        "sterkte": 0.0
+      },
+      "64": {
+        "naam": "columnist_als_hegemon",
+        "geloofwaardigheid": 0.1837,
+        "lo": 0.004,
+        "hi": 0.8894,
+        "sterkte": 0.0
+      },
+      "66": {
+        "naam": "politicus_als_ideoloog",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "67": {
+        "naam": "journalist_socialisatie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "69": {
+        "naam": "platform_verdienmodel_druk",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "70": {
+        "naam": "draaideur_journalistiek_politiek",
+        "geloofwaardigheid": 0.221,
+        "lo": 0.0292,
+        "hi": 0.8972,
+        "sterkte": 0.5431
+      },
+      "72": {
+        "naam": "mediaeigenaar_elite_netwerk",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "74": {
+        "naam": "onderzoeksjournalist_doorbraak",
+        "geloofwaardigheid": 0.0354,
+        "lo": 0.0328,
+        "hi": 0.0367,
+        "sterkte": 0.5673
+      },
+      "75": {
+        "naam": "burgerinitiatief_druk",
+        "geloofwaardigheid": 0.0156,
+        "lo": 0.0156,
+        "hi": 0.0156,
+        "sterkte": 0.45
+      },
+      "76": {
+        "naam": "toezichthouder_interventie",
+        "geloofwaardigheid": 0.0311,
+        "lo": 0.0162,
+        "hi": 0.0404,
+        "sterkte": 0.4563
+      },
+      "78": {
+        "naam": "onafhankelijk_medium_tegenwicht",
+        "geloofwaardigheid": 0.0359,
+        "lo": 0.0347,
+        "hi": 0.0371,
+        "sterkte": 0.2508
+      },
+      "79": {
+        "naam": "vakbond_bescherming",
+        "geloofwaardigheid": 0.0561,
+        "lo": 0.0548,
+        "hi": 0.0575,
+        "sterkte": 0.1936
+      },
+      "80": {
+        "naam": "parlementaire_controle",
+        "geloofwaardigheid": 0.0554,
+        "lo": 0.0554,
+        "hi": 0.0554,
+        "sterkte": 0.76
+      },
+      "82": {
+        "naam": "toegangsdisciplinering",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "83": {
+        "naam": "belangenbehartiging",
+        "geloofwaardigheid": 0.2906,
+        "lo": 0.0637,
+        "hi": 0.911,
+        "sterkte": 0.55
+      },
+      "84": {
+        "naam": "gecoordineerde_voorlichting",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "85": {
+        "naam": "onafhankelijkheidsborging",
+        "geloofwaardigheid": 0.1167,
+        "lo": 0.1167,
+        "hi": 0.1167,
+        "sterkte": 0.5
+      },
+      "86": {
+        "naam": "institutioneel_gezag",
+        "geloofwaardigheid": 0.3328,
+        "lo": 0.0167,
+        "hi": 0.9144,
+        "sterkte": 0.0
+      },
+      "87": {
+        "naam": "expert_legitimatie",
+        "geloofwaardigheid": 0.0223,
+        "lo": 0.0215,
+        "hi": 0.023,
+        "sterkte": 0.3258
+      },
+      "88": {
+        "naam": "academische_socialisatie",
+        "geloofwaardigheid": 0.2479,
+        "lo": 0.0279,
+        "hi": 0.9001,
+        "sterkte": 0.2258
+      },
+      "89": {
+        "naam": "familiezeggenschap",
+        "geloofwaardigheid": 0.0548,
+        "lo": 0.0528,
+        "hi": 0.0571,
+        "sterkte": 0.3463
+      },
+      "90": {
+        "naam": "certificaatconstructie",
+        "geloofwaardigheid": 0.2372,
+        "lo": 0.0148,
+        "hi": 0.8986,
+        "sterkte": 0.7
+      },
+      "91": {
+        "naam": "institutionele_voorlichting",
+        "geloofwaardigheid": 0.2157,
+        "lo": 0.0055,
+        "hi": 0.895,
+        "sterkte": 0.0
+      },
+      "92": {
+        "naam": "partijlijn",
+        "geloofwaardigheid": 0.0449,
+        "lo": 0.0362,
+        "hi": 0.0579,
+        "sterkte": 0.5709
+      },
+      "93": {
+        "naam": "draaideur_politiek_bedrijfsleven",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "94": {
+        "naam": "draaideur_politiek_lobby",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "95": {
+        "naam": "draaideur_politiek_institutie",
+        "geloofwaardigheid": 0.4251,
+        "lo": 0.1022,
+        "hi": 0.9287,
+        "sterkte": 0.4973
+      },
+      "96": {
+        "naam": "draaideur_politiek_media",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "97": {
+        "naam": "persbureau_brongebondenheid",
+        "geloofwaardigheid": 0.2308,
+        "lo": 0.0065,
+        "hi": 0.8977,
+        "sterkte": 0.0
+      },
+      "98": {
+        "naam": "bestelsturing",
+        "geloofwaardigheid": 0.2762,
+        "lo": 0.0233,
+        "hi": 0.905,
+        "sterkte": 0.55
+      },
+      "99": {
+        "naam": "politieke_benoeming_omroeptop",
+        "geloofwaardigheid": 0.3759,
+        "lo": 0.0475,
+        "hi": 0.9047,
+        "sterkte": 0.55
+      },
+      "100": {
+        "naam": "omroepverzuiling",
+        "geloofwaardigheid": 0.4427,
+        "lo": 0.0552,
+        "hi": 0.9308,
+        "sterkte": 0.45
+      },
+      "101": {
+        "naam": "staatsreclame_exploitatie",
+        "geloofwaardigheid": 0.0083,
+        "lo": 0.0083,
+        "hi": 0.0083,
+        "sterkte": 0.4
+      },
+      "102": {
+        "naam": "adverteren_als_belang",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "103": {
+        "naam": "belang_elite_netwerk",
+        "geloofwaardigheid": 0.0566,
+        "lo": 0.0548,
+        "hi": 0.0579,
+        "sterkte": 0.273
+      },
+      "105": {
+        "naam": "strategische_zeggenschap",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "106": {
+        "naam": "klantvraag_persbureau",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "107": {
+        "naam": "verifieerbaarheidsroutine",
+        "geloofwaardigheid": 0.2117,
+        "lo": 0.0053,
+        "hi": 0.8943,
+        "sterkte": 0.0
+      },
+      "108": {
+        "naam": "redactiestatuut_borging",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "109": {
+        "naam": "continuiteitsborging",
+        "geloofwaardigheid": 0.104,
+        "lo": 0.055,
+        "hi": 0.1531,
+        "sterkte": 0.4764
+      },
+      "110": {
+        "naam": "afgedwongen_borging",
+        "geloofwaardigheid": 0.0302,
+        "lo": 0.0302,
+        "hi": 0.0302,
+        "sterkte": 0.55
+      },
+      "111": {
+        "naam": "politicus_elite_netwerk",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "112": {
+        "naam": "partijfinanciering",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "113": {
+        "naam": "externe_mediafinanciering",
+        "geloofwaardigheid": 0.0139,
+        "lo": 0.0139,
+        "hi": 0.0139,
+        "sterkte": 0.25
+      },
+      "114": {
+        "naam": "projectfinanciering_journalistiek",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "115": {
+        "naam": "publieke_groeifinanciering",
+        "geloofwaardigheid": 0.2665,
+        "lo": 0.0745,
+        "hi": 0.9016,
+        "sterkte": 0.5
+      },
+      "116": {
+        "naam": "platform_journalistiekfinanciering",
+        "geloofwaardigheid": 0.2468,
+        "lo": 0.045,
+        "hi": 0.8992,
+        "sterkte": 0.35
+      },
+      "118": {
+        "naam": "denktank_levert_expert",
+        "geloofwaardigheid": 0.2292,
+        "lo": 0.0226,
+        "hi": 0.8968,
+        "sterkte": 0.2
+      },
+      "119": {
+        "naam": "academische_autoriteit",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "120": {
+        "naam": "denktank_naar_persbureau",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "121": {
+        "naam": "ledeneis",
+        "geloofwaardigheid": 0.4461,
+        "lo": 0.0413,
+        "hi": 0.9315,
+        "sterkte": 0.0
+      },
+      "122": {
+        "naam": "intekensturing",
+        "geloofwaardigheid": 0.4675,
+        "lo": 0.0722,
+        "hi": 0.9343,
+        "sterkte": 0.5
+      },
+      "123": {
+        "naam": "erkenningverlening",
+        "geloofwaardigheid": 0.4461,
+        "lo": 0.0413,
+        "hi": 0.9315,
+        "sterkte": 0.0
+      },
+      "124": {
+        "naam": "omroepsignatuur",
+        "geloofwaardigheid": 0.3852,
+        "lo": 0.0258,
+        "hi": 0.9225,
+        "sterkte": 0.0
+      },
+      "125": {
+        "naam": "academische_socialisatie_politiek",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "126": {
+        "naam": "academische_orthodoxie_denktank",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "127": {
+        "naam": "academische_orthodoxie_instituut",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "128": {
+        "naam": "academische_vorming_opinie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "129": {
+        "naam": "podiumverlening",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "130": {
+        "naam": "academische_socialisatie_hoofdredacteur",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "131": {
+        "naam": "preselectie_hoofdredacteur",
+        "geloofwaardigheid": 0.2453,
+        "lo": 0.0075,
+        "hi": 0.9001,
+        "sterkte": 0.0
+      },
+      "132": {
+        "naam": "statelijke_inhoudsmoderatie",
+        "geloofwaardigheid": 0.2247,
+        "lo": 0.0769,
+        "hi": 0.895,
+        "sterkte": 0.336
+      },
+      "133": {
+        "naam": "inlichtingen_cooptatie",
+        "geloofwaardigheid": 0.4975,
+        "lo": 0.0819,
+        "hi": 0.9385,
+        "sterkte": 0.25
+      },
+      "134": {
+        "naam": "politieke_kadervorming",
+        "geloofwaardigheid": 0.0698,
+        "lo": 0.001,
+        "hi": 0.8678,
+        "sterkte": 0.0
+      },
+      "135": {
+        "naam": "elite_kennisnetwerk",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "136": {
+        "naam": "elite_media_netwerk",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "137": {
+        "naam": "commissarisbenoeming",
+        "geloofwaardigheid": 0.2785,
+        "lo": 0.0102,
+        "hi": 0.9057,
+        "sterkte": 0.0
+      },
+      "138": {
+        "naam": "directiebenoeming",
+        "geloofwaardigheid": 0.2785,
+        "lo": 0.0102,
+        "hi": 0.9057,
+        "sterkte": 0.0
+      },
+      "139": {
+        "naam": "redactieraad_instemming",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "144": {
+        "naam": "stak_stemzeggenschap",
+        "geloofwaardigheid": 0.2245,
+        "lo": 0.0061,
+        "hi": 0.8966,
+        "sterkte": 0.0
+      },
+      "147": {
+        "naam": "eigenaar_directiekeuze",
+        "geloofwaardigheid": 0.2453,
+        "lo": 0.0075,
+        "hi": 0.9001,
+        "sterkte": 0.0
+      },
+      "148": {
+        "naam": "media_agendering",
+        "geloofwaardigheid": 0.4543,
+        "lo": 0.0614,
+        "hi": 0.9324,
+        "sterkte": 0.3
+      },
+      "149": {
+        "naam": "woordvoerdersregie",
+        "geloofwaardigheid": 0.1916,
+        "lo": 0.0043,
+        "hi": 0.8908,
+        "sterkte": 0.0
+      },
+      "150": {
+        "naam": "citaatautorisatie",
+        "geloofwaardigheid": 0.1649,
+        "lo": 0.0032,
+        "hi": 0.886,
+        "sterkte": 0.0
+      },
+      "151": {
+        "naam": "draaideur_journalistiek_voorlichting",
+        "geloofwaardigheid": 0.1785,
+        "lo": 0.0037,
+        "hi": 0.8885,
+        "sterkte": 0.0
+      },
+      "152": {
+        "naam": "pr_inhuur",
+        "geloofwaardigheid": 0.1785,
+        "lo": 0.0037,
+        "hi": 0.8885,
+        "sterkte": 0.0
+      },
+      "153": {
+        "naam": "primeurconcurrentie",
+        "geloofwaardigheid": 0.1916,
+        "lo": 0.0043,
+        "hi": 0.8908,
+        "sterkte": 0.0
+      },
+      "154": {
+        "naam": "publieksfragmentatie",
+        "geloofwaardigheid": 0.2385,
+        "lo": 0.007,
+        "hi": 0.899,
+        "sterkte": 0.0
+      },
+      "155": {
+        "naam": "politieke_synchronisatie",
+        "geloofwaardigheid": 0.0274,
+        "lo": 0.0274,
+        "hi": 0.0274,
+        "sterkte": 0.65
+      },
+      "156": {
+        "naam": "indexering",
+        "geloofwaardigheid": 0.2,
+        "lo": 0.0047,
+        "hi": 0.8923,
+        "sterkte": 0.0
+      },
+      "157": {
+        "naam": "intermedia_agendering",
+        "geloofwaardigheid": 0.4534,
+        "lo": 0.0592,
+        "hi": 0.9324,
+        "sterkte": 0.25
+      },
+      "158": {
+        "naam": "nieuwswaardenroutine",
+        "geloofwaardigheid": 0.2308,
+        "lo": 0.0065,
+        "hi": 0.8977,
+        "sterkte": 0.0
+      },
+      "159": {
+        "naam": "statelijke_bronnenjacht",
+        "geloofwaardigheid": 0.2939,
+        "lo": 0.0472,
+        "hi": 0.9073,
+        "sterkte": 0.3
+      },
+      "160": {
+        "naam": "kijkcijferdisciplinering",
+        "geloofwaardigheid": 0.3457,
+        "lo": 0.0423,
+        "hi": 0.9159,
+        "sterkte": 0.4
+      },
+      "161": {
+        "naam": "mediageniekheidsselectie",
+        "geloofwaardigheid": 0.1784,
+        "lo": 0.0037,
+        "hi": 0.8885,
+        "sterkte": 0.0
+      },
+      "162": {
+        "naam": "conflictregie",
+        "geloofwaardigheid": 0.1618,
+        "lo": 0.0031,
+        "hi": 0.8854,
+        "sterkte": 0.0
+      },
+      "163": {
+        "naam": "partijbinding",
+        "geloofwaardigheid": 0.4381,
+        "lo": 0.1482,
+        "hi": 0.9288,
+        "sterkte": 0.2057
+      }
+    },
+    "rollen": {
+      "1": {
+        "naam": "mediaeigenaar",
+        "geloofwaardigheid": 0.0824,
+        "lo": 0.0677,
+        "hi": 0.09,
+        "sterkte": 0.5437
+      },
+      "2": {
+        "naam": "mediaorganisatie",
+        "geloofwaardigheid": 0.0922,
+        "lo": 0.0848,
+        "hi": 0.1031,
+        "sterkte": 0.5566
+      },
+      "3": {
+        "naam": "aandeelhouder",
+        "geloofwaardigheid": 0.0784,
+        "lo": 0.0748,
+        "hi": 0.0825,
+        "sterkte": 0.2684
+      },
+      "5": {
+        "naam": "adverteerder",
+        "geloofwaardigheid": 0.0733,
+        "lo": 0.067,
+        "hi": 0.0838,
+        "sterkte": 0.344
+      },
+      "8": {
+        "naam": "persbureau",
+        "geloofwaardigheid": 0.079,
+        "lo": 0.0585,
+        "hi": 0.0921,
+        "sterkte": 0.5431
+      },
+      "15": {
+        "naam": "elite_forum",
+        "geloofwaardigheid": 0.057,
+        "lo": 0.0532,
+        "hi": 0.062,
+        "sterkte": 0.4865
+      },
+      "17": {
+        "naam": "klokkenluider",
+        "geloofwaardigheid": 0.0334,
+        "lo": 0.0328,
+        "hi": 0.0339,
+        "sterkte": 0.6227
+      },
+      "18": {
+        "naam": "techplatform",
+        "geloofwaardigheid": 0.0603,
+        "lo": 0.0549,
+        "hi": 0.0668,
+        "sterkte": 0.4464
+      },
+      "19": {
+        "naam": "toezichthouder",
+        "geloofwaardigheid": 0.0434,
+        "lo": 0.0299,
+        "hi": 0.056,
+        "sterkte": 0.3961
+      },
+      "20": {
+        "naam": "lobbyist",
+        "geloofwaardigheid": 0.0456,
+        "lo": 0.0202,
+        "hi": 0.0942,
+        "sterkte": 0.5937
+      },
+      "21": {
+        "naam": "alternatief_medium",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "23": {
+        "naam": "parlementair_controleur",
+        "geloofwaardigheid": 0.0227,
+        "lo": 0.0227,
+        "hi": 0.0227,
+        "sterkte": 0.6083
+      },
+      "24": {
+        "naam": "overnamevehikel",
+        "geloofwaardigheid": 0.0493,
+        "lo": 0.0423,
+        "hi": 0.0528,
+        "sterkte": 0.4791
+      },
+      "25": {
+        "naam": "vakbond_media",
+        "geloofwaardigheid": 0.0291,
+        "lo": 0.0271,
+        "hi": 0.031,
+        "sterkte": 0.2358
+      },
+      "26": {
+        "naam": "journalist",
+        "geloofwaardigheid": 0.0282,
+        "lo": 0.0243,
+        "hi": 0.0321,
+        "sterkte": 0.4034
+      },
+      "27": {
+        "naam": "voorlichter",
+        "geloofwaardigheid": 0.0083,
+        "lo": 0.0083,
+        "hi": 0.0083,
+        "sterkte": 0.5
+      },
+      "28": {
+        "naam": "denktank",
+        "geloofwaardigheid": 0.0569,
+        "lo": 0.0519,
+        "hi": 0.0619,
+        "sterkte": 0.3793
+      },
+      "29": {
+        "naam": "hoofdredacteur",
+        "geloofwaardigheid": 0.0272,
+        "lo": 0.0272,
+        "hi": 0.0272,
+        "sterkte": 0.375
+      },
+      "32": {
+        "naam": "columnist_opiniemaker",
+        "geloofwaardigheid": 0.0288,
+        "lo": 0.0271,
+        "hi": 0.0306,
+        "sterkte": 0.3438
+      },
+      "33": {
+        "naam": "politicus",
+        "geloofwaardigheid": 0.1063,
+        "lo": 0.082,
+        "hi": 0.1229,
+        "sterkte": 0.4058
+      },
+      "34": {
+        "naam": "redactie",
+        "geloofwaardigheid": 0.0143,
+        "lo": 0.0143,
+        "hi": 0.0143,
+        "sterkte": 0.55
+      },
+      "35": {
+        "naam": "publiek",
+        "geloofwaardigheid": 0.0168,
+        "lo": 0.0168,
+        "hi": 0.0168,
+        "sterkte": 0.575
+      },
+      "36": {
+        "naam": "onderzoeksjournalist",
+        "geloofwaardigheid": 0.02,
+        "lo": 0.02,
+        "hi": 0.02,
+        "sterkte": 0.57
+      },
+      "37": {
+        "naam": "burgerinitiatief",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "39": {
+        "naam": "belanghebbende",
+        "geloofwaardigheid": 0.0777,
+        "lo": 0.0622,
+        "hi": 0.0923,
+        "sterkte": 0.4003
+      },
+      "40": {
+        "naam": "borgingsstichting",
+        "geloofwaardigheid": 0.073,
+        "lo": 0.073,
+        "hi": 0.073,
+        "sterkte": 0.4375
+      },
+      "41": {
+        "naam": "gezagsinstituut",
+        "geloofwaardigheid": 0.0978,
+        "lo": 0.0835,
+        "hi": 0.1125,
+        "sterkte": 0.4652
+      },
+      "42": {
+        "naam": "gezagsexpert",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "43": {
+        "naam": "kennisinstituut",
+        "geloofwaardigheid": 0.0432,
+        "lo": 0.0298,
+        "hi": 0.063,
+        "sterkte": 0.3456
+      },
+      "44": {
+        "naam": "administratiekantoor",
+        "geloofwaardigheid": 0.0141,
+        "lo": 0.0141,
+        "hi": 0.0141,
+        "sterkte": 0.5
+      },
+      "45": {
+        "naam": "partij",
+        "geloofwaardigheid": 0.0848,
+        "lo": 0.0704,
+        "hi": 0.1001,
+        "sterkte": 0.3878
+      },
+      "46": {
+        "naam": "omroepkoepel",
+        "geloofwaardigheid": 0.0114,
+        "lo": 0.0114,
+        "hi": 0.0114,
+        "sterkte": 0.5056
+      },
+      "47": {
+        "naam": "ledenomroep",
+        "geloofwaardigheid": 0.0416,
+        "lo": 0.0308,
+        "hi": 0.0526,
+        "sterkte": 0.4718
+      },
+      "48": {
+        "naam": "raad_van_commissarissen",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      },
+      "49": {
+        "naam": "directie",
+        "geloofwaardigheid": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "sterkte": 0.0
+      }
+    },
+    "velden": {
+      "1": {
+        "naam": "Fabricage van instemming",
+        "geloofwaardigheid": 0.2593,
+        "lo": 0.0085,
+        "hi": 0.9025
+      },
+      "2": {
+        "naam": "Zelfversterkende homeostase",
+        "geloofwaardigheid": 0.2308,
+        "lo": 0.0065,
+        "hi": 0.8977
+      },
+      "3": {
+        "naam": "De Haagse stam",
+        "geloofwaardigheid": 0.2166,
+        "lo": 0.0056,
+        "hi": 0.8952
+      },
+      "4": {
+        "naam": "Toeschouwersdemocratie",
+        "geloofwaardigheid": 0.2043,
+        "lo": 0.0049,
+        "hi": 0.8931
+      },
+      "5": {
+        "naam": "Lobby-makelaardij",
+        "geloofwaardigheid": 0.2043,
+        "lo": 0.0049,
+        "hi": 0.8931
+      },
+      "6": {
+        "naam": "Schijnpluriformiteit",
+        "geloofwaardigheid": 0.2727,
+        "lo": 0.0097,
+        "hi": 0.9047
+      },
+      "7": {
+        "naam": "Ideologische homofilie",
+        "geloofwaardigheid": 0.2453,
+        "lo": 0.0075,
+        "hi": 0.9001
+      },
+      "8": {
+        "naam": "Mediahype",
+        "geloofwaardigheid": 0.2593,
+        "lo": 0.0085,
+        "hi": 0.9025
+      },
+      "9": {
+        "naam": "Medialogica",
+        "geloofwaardigheid": 0.2385,
+        "lo": 0.007,
+        "hi": 0.899
+      },
+      "10": {
+        "naam": "Verkillingsspiraal",
+        "geloofwaardigheid": 0.2513,
+        "lo": 0.0079,
+        "hi": 0.9011
+      },
+      "11": {
+        "naam": "Voorlichtingsovermacht",
+        "geloofwaardigheid": 0.2166,
+        "lo": 0.0056,
+        "hi": 0.8952
+      },
+      "12": {
+        "naam": "Economische feedback-loop",
+        "geloofwaardigheid": 0.1975,
+        "lo": 0.0046,
+        "hi": 0.8919
+      }
+    },
+    "relaties": {
+      "1": {
+        "naam": "Epifin → DPG Media",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.7
+      },
+      "3": {
+        "naam": "Christian Van Thillo → Stichting Administratiekantoor Epifin",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.3
+      },
+      "7": {
+        "naam": "DPG Media → Het Parool",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "9": {
+        "naam": "DPG Media → RTL Nederland",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.8
+      },
+      "12": {
+        "naam": "Concentra → Mediahuis",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.3
+      },
+      "14": {
+        "naam": "VP Exploitatie → Mediahuis",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.3
+      },
+      "17": {
+        "naam": "Chris Oomen → ANP",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.5
+      },
+      "18": {
+        "naam": "John de Mol → Talpa Network",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.2
+      },
+      "19": {
+        "naam": "DPG Media → de Volkskrant",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.6
+      },
+      "20": {
+        "naam": "DPG Media → RTL Nederland",
+        "geloofwaardigheid": 0.1013,
+        "invloed": 0.7
+      },
+      "21": {
+        "naam": "Albert Heijn → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.4
+      },
+      "22": {
+        "naam": "Lidl → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "23": {
+        "naam": "Procter & Gamble → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.4
+      },
+      "24": {
+        "naam": "Unilever → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.4
+      },
+      "25": {
+        "naam": "Albert Heijn → NU.nl",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.7
+      },
+      "26": {
+        "naam": "Procter & Gamble → Mediahuis",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.35
+      },
+      "27": {
+        "naam": "Unilever → Mediahuis",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.35
+      },
+      "28": {
+        "naam": "Nederlandse Loterij → DPG Media",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.35
+      },
+      "29": {
+        "naam": "Shell → DPG Media",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.45
+      },
+      "30": {
+        "naam": "ANP → de Volkskrant",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.8
+      },
+      "31": {
+        "naam": "ANP → De Telegraaf",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.8
+      },
+      "32": {
+        "naam": "ANP → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.7
+      },
+      "33": {
+        "naam": "ANP → RTL Nederland",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.75
+      },
+      "34": {
+        "naam": "ANP → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.85
+      },
+      "35": {
+        "naam": "ANP → NU.nl",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.9
+      },
+      "36": {
+        "naam": "Clingendael Instituut → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "37": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies) → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.6
+      },
+      "38": {
+        "naam": "Rob de Wijk → HCSS (The Hague Centre for Strategic Studies)",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.2
+      },
+      "39": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies) → RTL Nederland",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.5
+      },
+      "40": {
+        "naam": "NAVO → HCSS (The Hague Centre for Strategic Studies)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.6
+      },
+      "41": {
+        "naam": "McKinsey → Nationale DenkTank",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.55
+      },
+      "42": {
+        "naam": "Belastingdienst → de Volkskrant",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.75
+      },
+      "43": {
+        "naam": "Ron Fresen → NOS",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.4
+      },
+      "44": {
+        "naam": "VVD → Teldersstichting",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.5
+      },
+      "45": {
+        "naam": "PvdA → Wiardi Beckman Stichting",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.45
+      },
+      "46": {
+        "naam": "PVV → NOS",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.65
+      },
+      "47": {
+        "naam": "NOS → Maarten van Rossem",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.8
+      },
+      "48": {
+        "naam": "Peter R. de Vries → NOS",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.7
+      },
+      "49": {
+        "naam": "Pieter Omtzigt → Belastingdienst",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "50": {
+        "naam": "Renske Leijten → Belastingdienst",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.75
+      },
+      "51": {
+        "naam": "DPG Media → de Volkskrant",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.75
+      },
+      "52": {
+        "naam": "Groupe Bruxelles Lambert → Free Press Unlimited",
+        "geloofwaardigheid": 0.0698,
+        "invloed": 0.55
+      },
+      "53": {
+        "naam": "Bilderberg Groep → Thomas Leysen",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.7
+      },
+      "54": {
+        "naam": "Trilaterale Commissie → Thomas Leysen",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.55
+      },
+      "55": {
+        "naam": "European Round Table of Industrialists → Thomas Leysen",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.55
+      },
+      "56": {
+        "naam": "Groupe Bruxelles Lambert → Christian Van Thillo",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.6
+      },
+      "57": {
+        "naam": "Bilderberg Groep → DPG Media",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.65
+      },
+      "58": {
+        "naam": "World Economic Forum → DPG Media",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.55
+      },
+      "59": {
+        "naam": "World Economic Forum → NOS",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.5
+      },
+      "60": {
+        "naam": "Bilderberg Groep → Shell",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.35
+      },
+      "61": {
+        "naam": "Bilderberg Groep → ING",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.3
+      },
+      "62": {
+        "naam": "Bilderberg Groep → ASML",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.25
+      },
+      "63": {
+        "naam": "NAVO → NOS",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.8
+      },
+      "64": {
+        "naam": "NAVO → Clingendael Instituut",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.55
+      },
+      "65": {
+        "naam": "NOS → BOinK",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.7
+      },
+      "66": {
+        "naam": "NOS → Maarten van Rossem",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.75
+      },
+      "67": {
+        "naam": "Google → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.75
+      },
+      "68": {
+        "naam": "Meta (Facebook/Instagram) → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.75
+      },
+      "69": {
+        "naam": "TikTok → NOS",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.65
+      },
+      "70": {
+        "naam": "BlackRock → Shell",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.25
+      },
+      "71": {
+        "naam": "BlackRock → ING",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.25
+      },
+      "72": {
+        "naam": "Vanguard → Shell",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "73": {
+        "naam": "Thomas Leysen → dsm-firmenich",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.45
+      },
+      "74": {
+        "naam": "Familie Baert → Concentra",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.3
+      },
+      "75": {
+        "naam": "Familie Van Puijenbroek → VP Exploitatie",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.3
+      },
+      "76": {
+        "naam": "Christian Van Thillo → European Publishers Council",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.5
+      },
+      "77": {
+        "naam": "ACM (Autoriteit Consument & Markt) → DPG Media",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.55
+      },
+      "78": {
+        "naam": "ANP → NRC",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.7
+      },
+      "79": {
+        "naam": "ANP → Trouw",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.75
+      },
+      "80": {
+        "naam": "ANP → Het Parool",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.75
+      },
+      "81": {
+        "naam": "Google → Mediahuis",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.7
+      },
+      "82": {
+        "naam": "Google → NOS",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.55
+      },
+      "83": {
+        "naam": "Meta (Facebook/Instagram) → Mediahuis",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.7
+      },
+      "84": {
+        "naam": "Meta (Facebook/Instagram) → NOS",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.55
+      },
+      "85": {
+        "naam": "TikTok → DPG Media",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.55
+      },
+      "86": {
+        "naam": "Belastingdienst → De Telegraaf",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.7
+      },
+      "87": {
+        "naam": "Belastingdienst → NOS",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.75
+      },
+      "88": {
+        "naam": "De Correspondent → Belastingdienst",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.55
+      },
+      "90": {
+        "naam": "BOinK → Belastingdienst",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.45
+      },
+      "91": {
+        "naam": "Bilderberg Groep → Koningshuis",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.45
+      },
+      "92": {
+        "naam": "Thomas Leysen → KBC Groep",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.4
+      },
+      "93": {
+        "naam": "Thomas Leysen → Umicore",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.35
+      },
+      "94": {
+        "naam": "Unibet → DPG Media",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.3
+      },
+      "95": {
+        "naam": "Albert Heijn → Mediahuis",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.4
+      },
+      "96": {
+        "naam": "Lidl → Mediahuis",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "97": {
+        "naam": "Nederlandse Loterij → Mediahuis",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.3
+      },
+      "98": {
+        "naam": "CDA → de Volkskrant",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.8
+      },
+      "99": {
+        "naam": "CDA → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.8
+      },
+      "100": {
+        "naam": "CDA → NRC",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.75
+      },
+      "101": {
+        "naam": "Bilderberg Groep → Philips",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.25
+      },
+      "103": {
+        "naam": "Pieter Omtzigt → Trouw",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.6
+      },
+      "104": {
+        "naam": "Renske Leijten → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.55
+      },
+      "105": {
+        "naam": "CDA → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.8
+      },
+      "106": {
+        "naam": "Bol.com → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "107": {
+        "naam": "Bol.com → Mediahuis",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.3
+      },
+      "108": {
+        "naam": "A.S. Watson (Kruidvat) → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "109": {
+        "naam": "A.S. Watson (Kruidvat) → Mediahuis",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.3
+      },
+      "110": {
+        "naam": "Postcode Loterij → DPG Media",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.35
+      },
+      "111": {
+        "naam": "Postcode Loterij → Mediahuis",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.3
+      },
+      "112": {
+        "naam": "Unibet → Mediahuis",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.25
+      },
+      "113": {
+        "naam": "Albert Heijn → NOS",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.25
+      },
+      "114": {
+        "naam": "Unilever → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.45
+      },
+      "115": {
+        "naam": "Procter & Gamble → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.45
+      },
+      "116": {
+        "naam": "Shell → Mediahuis",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.4
+      },
+      "117": {
+        "naam": "CvdM (Commissariaat voor de Media) → DPG Media",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.35
+      },
+      "118": {
+        "naam": "CvdM (Commissariaat voor de Media) → Mediahuis",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.35
+      },
+      "119": {
+        "naam": "CvdM (Commissariaat voor de Media) → NOS",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.4
+      },
+      "120": {
+        "naam": "WRR (Wetenschappelijke Raad voor het Regeringsbeleid) → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.3
+      },
+      "121": {
+        "naam": "WRR (Wetenschappelijke Raad voor het Regeringsbeleid) → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.25
+      },
+      "122": {
+        "naam": "Raad voor de Journalistiek → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "123": {
+        "naam": "Raad voor de Journalistiek → DPG Media",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.15
+      },
+      "124": {
+        "naam": "ACM (Autoriteit Consument & Markt) → Mediahuis",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.4
+      },
+      "125": {
+        "naam": "SP → Renske Leijten",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.5
+      },
+      "126": {
+        "naam": "CDA → Pieter Omtzigt",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.6
+      },
+      "127": {
+        "naam": "PVV → De Telegraaf",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.45
+      },
+      "128": {
+        "naam": "PVV → de Volkskrant",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.5
+      },
+      "129": {
+        "naam": "VVD → DPG Media",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "130": {
+        "naam": "VVD → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "131": {
+        "naam": "NSC (Nieuw Sociaal Contract) → Pieter Omtzigt",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.7
+      },
+      "137": {
+        "naam": "NVJ (Nederlandse Vereniging van Journalisten) → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.25
+      },
+      "138": {
+        "naam": "NVJ (Nederlandse Vereniging van Journalisten) → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "139": {
+        "naam": "Free Press Unlimited → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.2
+      },
+      "143": {
+        "naam": "RIVM → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.8
+      },
+      "144": {
+        "naam": "RIVM → RTL Nederland",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.75
+      },
+      "145": {
+        "naam": "RIVM → DPG Media",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.7
+      },
+      "146": {
+        "naam": "CPB (Centraal Planbureau) → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.65
+      },
+      "147": {
+        "naam": "CPB (Centraal Planbureau) → de Volkskrant",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.6
+      },
+      "148": {
+        "naam": "CPB (Centraal Planbureau) → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "149": {
+        "naam": "Politie → NOS",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.65
+      },
+      "150": {
+        "naam": "Politie → De Telegraaf",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.7
+      },
+      "151": {
+        "naam": "Politie → RTL Nederland",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.65
+      },
+      "152": {
+        "naam": "Ministerie van Defensie → HCSS (The Hague Centre for Strategic Studies)",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "153": {
+        "naam": "Ministerie van Defensie → Clingendael Instituut",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.5
+      },
+      "154": {
+        "naam": "Ministerie van Buitenlandse Zaken → Clingendael Instituut",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.6
+      },
+      "155": {
+        "naam": "Mediahuis Partners → Mediahuis",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.7
+      },
+      "156": {
+        "naam": "Thomas Leysen → Mediahuis Partners",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.65
+      },
+      "157": {
+        "naam": "DPG Media → De Morgen",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "158": {
+        "naam": "DPG Media → RTL Nieuws",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "159": {
+        "naam": "Talpa Network → ANP",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.3
+      },
+      "160": {
+        "naam": "Groupe Bruxelles Lambert → Adidas",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.15
+      },
+      "161": {
+        "naam": "Clingendael Instituut → de Volkskrant",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "162": {
+        "naam": "Clingendael Instituut → De Telegraaf",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.45
+      },
+      "163": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies) → de Volkskrant",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.5
+      },
+      "164": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies) → De Telegraaf",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.45
+      },
+      "165": {
+        "naam": "Nationale DenkTank → NOS",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.35
+      },
+      "166": {
+        "naam": "Nationale DenkTank → de Volkskrant",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.3
+      },
+      "167": {
+        "naam": "Teldersstichting → de Volkskrant",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.3
+      },
+      "168": {
+        "naam": "Wiardi Beckman Stichting → de Volkskrant",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.3
+      },
+      "169": {
+        "naam": "PVV → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.45
+      },
+      "170": {
+        "naam": "PVV → ANP",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.3
+      },
+      "171": {
+        "naam": "Brandpunt → Belastingdienst",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.55
+      },
+      "172": {
+        "naam": "RTL Nieuws → Belastingdienst",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.6
+      },
+      "173": {
+        "naam": "Google → ANP",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "174": {
+        "naam": "Meta (Facebook/Instagram) → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.6
+      },
+      "175": {
+        "naam": "TikTok → Mediahuis",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.5
+      },
+      "176": {
+        "naam": "TikTok → RTL Nederland",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.55
+      },
+      "177": {
+        "naam": "World Economic Forum → Mediahuis",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.45
+      },
+      "178": {
+        "naam": "World Economic Forum → Thomas Leysen",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.5
+      },
+      "179": {
+        "naam": "Bilderberg Groep → Christian Van Thillo",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.55
+      },
+      "180": {
+        "naam": "European Round Table of Industrialists → DPG Media",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.4
+      },
+      "181": {
+        "naam": "Trilaterale Commissie → Mediahuis",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.4
+      },
+      "182": {
+        "naam": "BlackRock → Unilever",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "183": {
+        "naam": "BlackRock → Philips",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "184": {
+        "naam": "Vanguard → ING",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.15
+      },
+      "185": {
+        "naam": "Vanguard → Unilever",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.15
+      },
+      "186": {
+        "naam": "Peter R. de Vries → De Telegraaf",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.55
+      },
+      "187": {
+        "naam": "Peter R. de Vries → RTL Nederland",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.65
+      },
+      "188": {
+        "naam": "DPG Media → PCM Uitgevers",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "189": {
+        "naam": "DPG Media → VNU Media",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.6
+      },
+      "190": {
+        "naam": "DPG Media → Sanoma Nederland",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.8
+      },
+      "191": {
+        "naam": "Mediahuis → TMG (Telegraaf Media Groep)",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.9
+      },
+      "192": {
+        "naam": "Mediahuis → NRC Media",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "193": {
+        "naam": "Mediahuis → Metro",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.5
+      },
+      "195": {
+        "naam": "PCM Uitgevers → de Volkskrant",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "196": {
+        "naam": "PCM Uitgevers → Trouw",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "197": {
+        "naam": "PCM Uitgevers → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "198": {
+        "naam": "Sanoma Nederland → NU.nl",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "199": {
+        "naam": "TMG (Telegraaf Media Groep) → De Telegraaf",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.9
+      },
+      "200": {
+        "naam": "Groupe Bruxelles Lambert → Imerys",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.15
+      },
+      "201": {
+        "naam": "DPG Media → Mediahuis",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.7
+      },
+      "202": {
+        "naam": "Albert Heijn → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.5
+      },
+      "203": {
+        "naam": "Lidl → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.45
+      },
+      "204": {
+        "naam": "Bol.com → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.35
+      },
+      "205": {
+        "naam": "A.S. Watson (Kruidvat) → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.35
+      },
+      "206": {
+        "naam": "Nederlandse Loterij → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.4
+      },
+      "207": {
+        "naam": "Postcode Loterij → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.4
+      },
+      "208": {
+        "naam": "Unibet → RTL Nederland",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.35
+      },
+      "209": {
+        "naam": "Albert Heijn → de Volkskrant",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.3
+      },
+      "210": {
+        "naam": "Albert Heijn → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "211": {
+        "naam": "Albert Heijn → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.3
+      },
+      "212": {
+        "naam": "Lidl → De Telegraaf",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.3
+      },
+      "213": {
+        "naam": "Unilever → de Volkskrant",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.35
+      },
+      "214": {
+        "naam": "Unilever → NOS",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.25
+      },
+      "215": {
+        "naam": "Procter & Gamble → De Telegraaf",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.3
+      },
+      "216": {
+        "naam": "Shell → NOS",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.35
+      },
+      "217": {
+        "naam": "Shell → RTL Nederland",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.4
+      },
+      "218": {
+        "naam": "ANP → De Correspondent",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.4
+      },
+      "219": {
+        "naam": "ANP → Metro",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.9
+      },
+      "220": {
+        "naam": "RIVM → de Volkskrant",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.7
+      },
+      "221": {
+        "naam": "RIVM → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.65
+      },
+      "222": {
+        "naam": "RIVM → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.65
+      },
+      "223": {
+        "naam": "OMT (Outbreak Management Team) → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.8
+      },
+      "224": {
+        "naam": "OMT (Outbreak Management Team) → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.75
+      },
+      "225": {
+        "naam": "OMT (Outbreak Management Team) → RIVM",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.6
+      },
+      "226": {
+        "naam": "CPB (Centraal Planbureau) → NRC",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "227": {
+        "naam": "CPB (Centraal Planbureau) → RTL Nederland",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "228": {
+        "naam": "CPB (Centraal Planbureau) → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "229": {
+        "naam": "Politie → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.6
+      },
+      "230": {
+        "naam": "Politie → de Volkskrant",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.5
+      },
+      "231": {
+        "naam": "Politie → NRC",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.45
+      },
+      "232": {
+        "naam": "Ministerie van Defensie → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.6
+      },
+      "233": {
+        "naam": "Ministerie van Defensie → De Telegraaf",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "234": {
+        "naam": "Ministerie van Buitenlandse Zaken → NOS",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "235": {
+        "naam": "Clingendael Instituut → RTL Nederland",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.45
+      },
+      "236": {
+        "naam": "Clingendael Instituut → NRC",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.45
+      },
+      "237": {
+        "naam": "Clingendael Instituut → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.4
+      },
+      "238": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies) → NRC",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.45
+      },
+      "239": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies) → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.4
+      },
+      "240": {
+        "naam": "Nationale DenkTank → RTL Nederland",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.3
+      },
+      "241": {
+        "naam": "Nationale DenkTank → De Telegraaf",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.25
+      },
+      "242": {
+        "naam": "Radboud Universiteit → ANP",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.35
+      },
+      "246": {
+        "naam": "DPG Media → Trouw",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.6
+      },
+      "247": {
+        "naam": "DPG Media → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.6
+      },
+      "248": {
+        "naam": "DPG Media → Het Parool",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.55
+      },
+      "249": {
+        "naam": "DPG Media → NU.nl",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.6
+      },
+      "250": {
+        "naam": "Mediahuis → De Telegraaf",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.6
+      },
+      "251": {
+        "naam": "Mediahuis → NRC",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.55
+      },
+      "252": {
+        "naam": "PVV → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.4
+      },
+      "253": {
+        "naam": "PVV → NRC",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.4
+      },
+      "254": {
+        "naam": "Belastingdienst → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.65
+      },
+      "255": {
+        "naam": "Belastingdienst → RTL Nederland",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.65
+      },
+      "256": {
+        "naam": "Tweede Kamer → Belastingdienst",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.85
+      },
+      "257": {
+        "naam": "Pieter Omtzigt → Tweede Kamer",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.7
+      },
+      "258": {
+        "naam": "Renske Leijten → Tweede Kamer",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.65
+      },
+      "259": {
+        "naam": "Pieter Omtzigt → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.65
+      },
+      "260": {
+        "naam": "Pieter Omtzigt → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "261": {
+        "naam": "Pieter Omtzigt → NRC",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "262": {
+        "naam": "Pieter Omtzigt → De Correspondent",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.5
+      },
+      "263": {
+        "naam": "De Correspondent → de Volkskrant",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.3
+      },
+      "264": {
+        "naam": "De Correspondent → NOS",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.25
+      },
+      "265": {
+        "naam": "Peter R. de Vries → de Volkskrant",
+        "geloofwaardigheid": 0.1189,
+        "invloed": 0.5
+      },
+      "266": {
+        "naam": "Peter R. de Vries → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.45
+      },
+      "267": {
+        "naam": "Bilderberg Groep → Mediahuis",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.65
+      },
+      "268": {
+        "naam": "Bilderberg Groep → NOS",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.45
+      },
+      "269": {
+        "naam": "World Economic Forum → de Volkskrant",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.45
+      },
+      "270": {
+        "naam": "World Economic Forum → De Telegraaf",
+        "geloofwaardigheid": 0.0698,
+        "invloed": 0.4
+      },
+      "271": {
+        "naam": "World Economic Forum → NRC",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.45
+      },
+      "272": {
+        "naam": "World Economic Forum → RTL Nederland",
+        "geloofwaardigheid": 0.0698,
+        "invloed": 0.4
+      },
+      "273": {
+        "naam": "World Economic Forum → Bilderberg Groep",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.55
+      },
+      "274": {
+        "naam": "World Economic Forum → Shell",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.3
+      },
+      "275": {
+        "naam": "World Economic Forum → ING",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.25
+      },
+      "276": {
+        "naam": "World Economic Forum → Philips",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.25
+      },
+      "277": {
+        "naam": "World Economic Forum → ASML",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.2
+      },
+      "278": {
+        "naam": "World Economic Forum → Koningshuis",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "279": {
+        "naam": "NAVO → De Telegraaf",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.75
+      },
+      "280": {
+        "naam": "NAVO → de Volkskrant",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.7
+      },
+      "281": {
+        "naam": "NAVO → NRC",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.7
+      },
+      "282": {
+        "naam": "NAVO → RTL Nederland",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.65
+      },
+      "283": {
+        "naam": "NAVO → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.6
+      },
+      "284": {
+        "naam": "NAVO → HCSS (The Hague Centre for Strategic Studies)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.65
+      },
+      "285": {
+        "naam": "NAVO → Clingendael Instituut",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.55
+      },
+      "286": {
+        "naam": "CDA → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.65
+      },
+      "287": {
+        "naam": "CDA → NAVO",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.7
+      },
+      "288": {
+        "naam": "VVD → NAVO",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.6
+      },
+      "289": {
+        "naam": "BlackRock → ASML",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "290": {
+        "naam": "Vanguard → ASML",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.15
+      },
+      "291": {
+        "naam": "Vanguard → Philips",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.15
+      },
+      "292": {
+        "naam": "BlackRock → Procter & Gamble",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.2
+      },
+      "293": {
+        "naam": "BlackRock → Albert Heijn",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.2
+      },
+      "301": {
+        "naam": "Ron Fresen → VVD",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.35
+      },
+      "302": {
+        "naam": "Ron Fresen → CDA",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.3
+      },
+      "303": {
+        "naam": "UvA Journalistiek → NOS",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.25
+      },
+      "304": {
+        "naam": "UvA Journalistiek → de Volkskrant",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.2
+      },
+      "305": {
+        "naam": "Gezond Verstand → NOS",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.25
+      },
+      "306": {
+        "naam": "Gezond Verstand → de Volkskrant",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.2
+      },
+      "307": {
+        "naam": "Google → de Volkskrant",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.65
+      },
+      "308": {
+        "naam": "Google → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.7
+      },
+      "309": {
+        "naam": "Google → NRC",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.6
+      },
+      "310": {
+        "naam": "Google → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.65
+      },
+      "311": {
+        "naam": "Meta (Facebook/Instagram) → de Volkskrant",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.6
+      },
+      "312": {
+        "naam": "Meta (Facebook/Instagram) → De Telegraaf",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.65
+      },
+      "313": {
+        "naam": "Meta (Facebook/Instagram) → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.6
+      },
+      "314": {
+        "naam": "Meta (Facebook/Instagram) → NU.nl",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.7
+      },
+      "315": {
+        "naam": "TikTok → de Volkskrant",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.45
+      },
+      "316": {
+        "naam": "TikTok → De Telegraaf",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.45
+      },
+      "317": {
+        "naam": "TikTok → AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.0762,
+        "invloed": 0.4
+      },
+      "318": {
+        "naam": "TikTok → NU.nl",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.55
+      },
+      "319": {
+        "naam": "NVJ (Nederlandse Vereniging van Journalisten) → Mediahuis",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.2
+      },
+      "320": {
+        "naam": "NVJ (Nederlandse Vereniging van Journalisten) → RTL Nederland",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.2
+      },
+      "321": {
+        "naam": "Free Press Unlimited → DPG Media",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.15
+      },
+      "322": {
+        "naam": "Free Press Unlimited → Mediahuis",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.15
+      },
+      "323": {
+        "naam": "Koningshuis → NOS",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.45
+      },
+      "324": {
+        "naam": "Koningshuis → World Economic Forum",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.35
+      },
+      "325": {
+        "naam": "Maarten van Rossem → de Volkskrant",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.35
+      },
+      "326": {
+        "naam": "Maarten van Rossem → RTL Nederland",
+        "geloofwaardigheid": 0.0888,
+        "invloed": 0.3
+      },
+      "327": {
+        "naam": "Chris Oomen → NOS",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.35
+      },
+      "328": {
+        "naam": "John de Mol → RTL Nederland",
+        "geloofwaardigheid": 0.095,
+        "invloed": 0.3
+      },
+      "329": {
+        "naam": "ACM (Autoriteit Consument & Markt) → RTL Nederland",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.55
+      },
+      "330": {
+        "naam": "ACM (Autoriteit Consument & Markt) → NU.nl",
+        "geloofwaardigheid": 0.1247,
+        "invloed": 0.55
+      },
+      "331": {
+        "naam": "ASML → Bilderberg Groep",
+        "geloofwaardigheid": 0.1011,
+        "invloed": 0.2
+      },
+      "332": {
+        "naam": "ING → Bilderberg Groep",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.25
+      },
+      "333": {
+        "naam": "Shell → Bilderberg Groep",
+        "geloofwaardigheid": 0.1131,
+        "invloed": 0.3
+      },
+      "334": {
+        "naam": "Philips → Bilderberg Groep",
+        "geloofwaardigheid": 0.1071,
+        "invloed": 0.25
+      },
+      "335": {
+        "naam": "Hans Hillen → NOS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.65
+      },
+      "336": {
+        "naam": "Hans Hillen → CDA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "337": {
+        "naam": "Tijs van den Brink → EO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.55
+      },
+      "338": {
+        "naam": "Paul Sneijder → NOS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "339": {
+        "naam": "Ron Fresen → NOS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.45
+      },
+      "340": {
+        "naam": "Jack de Vries → Hill+Knowlton",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.8
+      },
+      "341": {
+        "naam": "Jack de Vries → Ministerie van Defensie",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.7
+      },
+      "342": {
+        "naam": "Wouter Bos → KPMG",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.7
+      },
+      "343": {
+        "naam": "Wouter Bos → PvdA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.6
+      },
+      "344": {
+        "naam": "Jan Peter Balkenende → Ernst & Young",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.75
+      },
+      "345": {
+        "naam": "Jan Peter Balkenende → CDA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.6
+      },
+      "346": {
+        "naam": "Camiel Eurlings → KLM",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.8
+      },
+      "347": {
+        "naam": "Camiel Eurlings → CDA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.55
+      },
+      "348": {
+        "naam": "Neelie Kroes → Uber",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.75
+      },
+      "349": {
+        "naam": "Neelie Kroes → VVD",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.55
+      },
+      "350": {
+        "naam": "Frank Heemskerk → Royal HaskoningDHV",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.65
+      },
+      "351": {
+        "naam": "Bart de Liefde → Uber",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.75
+      },
+      "352": {
+        "naam": "Bart de Liefde → VVD",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "353": {
+        "naam": "Raymond Knops → Ministerie van Defensie",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.7
+      },
+      "354": {
+        "naam": "Raymond Knops → CDA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.55
+      },
+      "355": {
+        "naam": "Afke Schaart → Microsoft",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.75
+      },
+      "356": {
+        "naam": "Afke Schaart → VVD",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "357": {
+        "naam": "Eeke van der Veen → PvdA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.7
+      },
+      "359": {
+        "naam": "Stichting Administratiekantoor Epifin → Epifin",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.7
+      },
+      "360": {
+        "naam": "Stichting Democratie en Media → DPG Media",
+        "geloofwaardigheid": 0.7,
+        "invloed": 0.5
+      },
+      "361": {
+        "naam": "NPO → NOS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.6
+      },
+      "362": {
+        "naam": "NPO → NTR",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "363": {
+        "naam": "NPO → EO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "364": {
+        "naam": "NPO → BNNVARA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "365": {
+        "naam": "NPO → KRO-NCRV",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "366": {
+        "naam": "NPO → AVROTROS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "367": {
+        "naam": "NPO → VPRO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "368": {
+        "naam": "NPO → Omroep MAX",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "369": {
+        "naam": "NPO → WNL",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "370": {
+        "naam": "NPO → PowNed",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "371": {
+        "naam": "Ministerie van OCW → NPO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.7
+      },
+      "372": {
+        "naam": "CvdM (Commissariaat voor de Media) → NPO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.35
+      },
+      "373": {
+        "naam": "Ster → Ministerie van OCW",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.4
+      },
+      "374": {
+        "naam": "Frederieke Leeflang → NPO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.6
+      },
+      "375": {
+        "naam": "Tjibbe Joustra → NPO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.55
+      },
+      "376": {
+        "naam": "Tjibbe Joustra → Frederieke Leeflang",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "377": {
+        "naam": "Shula Rijxman → NPO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.55
+      },
+      "378": {
+        "naam": "Shula Rijxman → Ministerie van OCW",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.45
+      },
+      "380": {
+        "naam": "Kathleen Ferrier → KRO-NCRV",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.4
+      },
+      "382": {
+        "naam": "Arjan el Fassed → BNNVARA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.4
+      },
+      "384": {
+        "naam": "Rob van Gijzel → NOS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.45
+      },
+      "386": {
+        "naam": "Frits Huffnagel → AVROTROS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.4
+      },
+      "388": {
+        "naam": "BNNVARA → PvdA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.45
+      },
+      "389": {
+        "naam": "KRO-NCRV → CDA",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.4
+      },
+      "390": {
+        "naam": "WNL → De Telegraaf",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "391": {
+        "naam": "NOS-hoofdredactie → NOS",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.6
+      },
+      "392": {
+        "naam": "EO-redactie → EO",
+        "geloofwaardigheid": 0.05,
+        "invloed": 0.5
+      },
+      "394": {
+        "naam": "NRC Media → NRC",
+        "geloofwaardigheid": 0.0826,
+        "invloed": 0.9
+      },
+      "395": {
+        "naam": "EIB (Europese Investeringsbank) → DPG Media",
+        "geloofwaardigheid": 0.4172,
+        "invloed": 0.5
+      },
+      "396": {
+        "naam": "Google → DPG Media",
+        "geloofwaardigheid": 0.2604,
+        "invloed": 0.35
+      },
+      "397": {
+        "naam": "Europese Commissie → TikTok",
+        "geloofwaardigheid": 0.2166,
+        "invloed": 0.45
+      },
+      "398": {
+        "naam": "Europese Commissie → Meta (Facebook/Instagram)",
+        "geloofwaardigheid": 0.0983,
+        "invloed": 0.45
+      },
+      "399": {
+        "naam": "Europese Commissie → Google",
+        "geloofwaardigheid": 0.0983,
+        "invloed": 0.4
+      },
+      "400": {
+        "naam": "Europese Commissie → X (Twitter)",
+        "geloofwaardigheid": 0.0983,
+        "invloed": 0.4
+      },
+      "401": {
+        "naam": "Ministerie van Binnenlandse Zaken → Meta (Facebook/Instagram)",
+        "geloofwaardigheid": 0.1851,
+        "invloed": 0.3
+      },
+      "402": {
+        "naam": "Ministerie van Binnenlandse Zaken → X (Twitter)",
+        "geloofwaardigheid": 0.1785,
+        "invloed": 0.3
+      },
+      "403": {
+        "naam": "Ministerie van Binnenlandse Zaken → Google",
+        "geloofwaardigheid": 0.1785,
+        "invloed": 0.28
+      },
+      "404": {
+        "naam": "Ministerie van Binnenlandse Zaken → TikTok",
+        "geloofwaardigheid": 0.1785,
+        "invloed": 0.28
+      },
+      "405": {
+        "naam": "Ministerie van Binnenlandse Zaken → Snapchat",
+        "geloofwaardigheid": 0.1785,
+        "invloed": 0.25
+      },
+      "408": {
+        "naam": "Open Society Foundations → Stichting Democratie en Media",
+        "geloofwaardigheid": 0.1005,
+        "invloed": 0.25
+      },
+      "409": {
+        "naam": "ECB (Europese Centrale Bank) → EIB (Europese Investeringsbank)",
+        "geloofwaardigheid": 0.1166,
+        "invloed": 0.2
+      },
+      "411": {
+        "naam": "BlackRock → Europese Commissie",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.3
+      },
+      "412": {
+        "naam": "Stichting Democratie en Media → DPG Media",
+        "geloofwaardigheid": 0.2513,
+        "invloed": 0.55
+      },
+      "413": {
+        "naam": "Stichting Democratie en Media → NU.nl",
+        "geloofwaardigheid": 0.7,
+        "invloed": 0.45
+      },
+      "414": {
+        "naam": "Shell → VNO-NCW",
+        "geloofwaardigheid": 0.2253,
+        "invloed": 0.55
+      },
+      "415": {
+        "naam": "Unilever → VNO-NCW",
+        "geloofwaardigheid": 0.7,
+        "invloed": 0.55
+      },
+      "416": {
+        "naam": "VNO-NCW → Tweede Kamer",
+        "geloofwaardigheid": 0.2152,
+        "invloed": 0.6
+      },
+      "417": {
+        "naam": "KLM → Tweede Kamer",
+        "geloofwaardigheid": 0.2385,
+        "invloed": 0.55
+      },
+      "418": {
+        "naam": "VNO-NCW → ANP",
+        "geloofwaardigheid": 0.0,
+        "invloed": 0.4
+      },
+      "419": {
+        "naam": "Ernst Kuipers → WHO (Wereldgezondheidsorganisatie)",
+        "geloofwaardigheid": 0.2117,
+        "invloed": 0.35
+      },
+      "420": {
+        "naam": "Jet Bussemaker → RVS (Raad voor Volksgezondheid en Samenleving)",
+        "geloofwaardigheid": 0.2117,
+        "invloed": 0.7
+      },
+      "421": {
+        "naam": "WHO (Wereldgezondheidsorganisatie) → NOS",
+        "geloofwaardigheid": 0.1828,
+        "invloed": 0.5
+      },
+      "422": {
+        "naam": "RVS (Raad voor Volksgezondheid en Samenleving) → NOS",
+        "geloofwaardigheid": 0.1828,
+        "invloed": 0.35
+      },
+      "423": {
+        "naam": "Reuters → NOS",
+        "geloofwaardigheid": 0.1828,
+        "invloed": 0.55
+      },
+      "424": {
+        "naam": "AP (Associated Press) → NOS",
+        "geloofwaardigheid": 0.1828,
+        "invloed": 0.5
+      },
+      "425": {
+        "naam": "AFP (Agence France-Presse) → ANP",
+        "geloofwaardigheid": 0.2253,
+        "invloed": 0.55
+      },
+      "426": {
+        "naam": "Reuters → ANP",
+        "geloofwaardigheid": 0.3532,
+        "invloed": 0.5
+      },
+      "427": {
+        "naam": "NCTV (Nationaal Coördinator Terrorismebestrijding en Veiligheid) → NOS",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.4
+      },
+      "428": {
+        "naam": "AIVD (Algemene Inlichtingen- en Veiligheidsdienst) → De Telegraaf",
+        "geloofwaardigheid": 0.2785,
+        "invloed": 0.3
+      },
+      "429": {
+        "naam": "AIVD (Algemene Inlichtingen- en Veiligheidsdienst) → NRC",
+        "geloofwaardigheid": 0.2166,
+        "invloed": 0.25
+      },
+      "430": {
+        "naam": "Nationaal Media Onderzoek (NMO) → Op1",
+        "geloofwaardigheid": 0.1944,
+        "invloed": 0.4
+      },
+      "431": {
+        "naam": "NPO → Talitha Muusse",
+        "geloofwaardigheid": 0.1264,
+        "invloed": 0.15
+      },
+      "432": {
+        "naam": "de Volkskrant → RTL Nederland",
+        "geloofwaardigheid": 0.1445,
+        "invloed": 0.25
+      },
+      "433": {
+        "naam": "Vandaag Inside → Tweede Kamer",
+        "geloofwaardigheid": 0.1618,
+        "invloed": 0.3
+      },
+      "434": {
+        "naam": "D66 → Shula Rijxman",
+        "geloofwaardigheid": 0.2166,
+        "invloed": 0.2
+      },
+      "435": {
+        "naam": "CDA → Kathleen Ferrier",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "436": {
+        "naam": "GroenLinks → Arjan el Fassed",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "437": {
+        "naam": "PvdA → Rob van Gijzel",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "438": {
+        "naam": "VVD → Frits Huffnagel",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "439": {
+        "naam": "CDA → Tijs van den Brink",
+        "geloofwaardigheid": 0.1744,
+        "invloed": 0.3
+      },
+      "440": {
+        "naam": "CDA → Mirjam Sterk",
+        "geloofwaardigheid": 0.2245,
+        "invloed": 0.2
+      },
+      "441": {
+        "naam": "Mirjam Sterk → KRO-NCRV",
+        "geloofwaardigheid": 0.2245,
+        "invloed": 0.4
+      },
+      "442": {
+        "naam": "D66 → Abdeluheb Choho",
+        "geloofwaardigheid": 0.2245,
+        "invloed": 0.2
+      },
+      "443": {
+        "naam": "Abdeluheb Choho → KRO-NCRV",
+        "geloofwaardigheid": 0.2245,
+        "invloed": 0.4
+      },
+      "444": {
+        "naam": "VVD → Bruno Bruins",
+        "geloofwaardigheid": 0.1632,
+        "invloed": 0.2
+      },
+      "445": {
+        "naam": "Bruno Bruins → NPO",
+        "geloofwaardigheid": 0.1632,
+        "invloed": 0.55
+      },
+      "446": {
+        "naam": "VVD → Eric van der Burg",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "447": {
+        "naam": "Eric van der Burg → NTR",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.55
+      },
+      "448": {
+        "naam": "VVD → Loek Hermans",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "449": {
+        "naam": "Loek Hermans → WNL",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.4
+      },
+      "450": {
+        "naam": "VVD → Bas Eenhoorn",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "451": {
+        "naam": "Bas Eenhoorn → WNL",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.55
+      },
+      "452": {
+        "naam": "PvdA → Pieter Broertjes",
+        "geloofwaardigheid": 0.1632,
+        "invloed": 0.2
+      },
+      "453": {
+        "naam": "Pieter Broertjes → de Volkskrant",
+        "geloofwaardigheid": 0.1632,
+        "invloed": 0.55
+      },
+      "454": {
+        "naam": "PvdA → André van der Louw",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "455": {
+        "naam": "André van der Louw → NOS",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.55
+      },
+      "456": {
+        "naam": "D66 → Gerrit-Jan Wolffensperger",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "457": {
+        "naam": "Gerrit-Jan Wolffensperger → NOS",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.55
+      },
+      "458": {
+        "naam": "CDA → Harm Bruins Slot",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.2
+      },
+      "459": {
+        "naam": "Harm Bruins Slot → NPO",
+        "geloofwaardigheid": 0.1916,
+        "invloed": 0.55
+      }
+    },
+    "entiteiten": {
+      "1": {
+        "naam": "DPG Media",
+        "geloofwaardigheid": 0.1329
+      },
+      "2": {
+        "naam": "Mediahuis",
+        "geloofwaardigheid": 0.1034
+      },
+      "3": {
+        "naam": "AD (Algemeen Dagblad)",
+        "geloofwaardigheid": 0.0998
+      },
+      "4": {
+        "naam": "de Volkskrant",
+        "geloofwaardigheid": 0.1027
+      },
+      "5": {
+        "naam": "Trouw",
+        "geloofwaardigheid": 0.1084
+      },
+      "6": {
+        "naam": "Het Parool",
+        "geloofwaardigheid": 0.1048
+      },
+      "7": {
+        "naam": "NU.nl",
+        "geloofwaardigheid": 0.181
+      },
+      "8": {
+        "naam": "RTL Nederland",
+        "geloofwaardigheid": 0.1028
+      },
+      "9": {
+        "naam": "De Telegraaf",
+        "geloofwaardigheid": 0.106
+      },
+      "10": {
+        "naam": "NRC",
+        "geloofwaardigheid": 0.1058
+      },
+      "11": {
+        "naam": "NOS",
+        "geloofwaardigheid": 0.1081
+      },
+      "12": {
+        "naam": "ANP",
+        "geloofwaardigheid": 0.1228
+      },
+      "13": {
+        "naam": "De Correspondent",
+        "geloofwaardigheid": 0.095
+      },
+      "14": {
+        "naam": "Christian Van Thillo",
+        "geloofwaardigheid": 0.1143
+      },
+      "15": {
+        "naam": "Thomas Leysen",
+        "geloofwaardigheid": 0.1203
+      },
+      "16": {
+        "naam": "Familie Baert",
+        "geloofwaardigheid": 0.1189
+      },
+      "17": {
+        "naam": "Familie Van Puijenbroek",
+        "geloofwaardigheid": 0.1189
+      },
+      "18": {
+        "naam": "Chris Oomen",
+        "geloofwaardigheid": 0.1099
+      },
+      "19": {
+        "naam": "John de Mol",
+        "geloofwaardigheid": 0.1099
+      },
+      "20": {
+        "naam": "Bilderberg Groep",
+        "geloofwaardigheid": 0.1062
+      },
+      "21": {
+        "naam": "Trilaterale Commissie",
+        "geloofwaardigheid": 0.1038
+      },
+      "22": {
+        "naam": "European Round Table of Industrialists",
+        "geloofwaardigheid": 0.1008
+      },
+      "23": {
+        "naam": "World Economic Forum",
+        "geloofwaardigheid": 0.0906
+      },
+      "24": {
+        "naam": "European Publishers Council",
+        "geloofwaardigheid": 0.1247
+      },
+      "25": {
+        "naam": "Groupe Bruxelles Lambert",
+        "geloofwaardigheid": 0.1052
+      },
+      "26": {
+        "naam": "Epifin",
+        "geloofwaardigheid": 0.0874
+      },
+      "27": {
+        "naam": "VP Exploitatie",
+        "geloofwaardigheid": 0.1189
+      },
+      "28": {
+        "naam": "Concentra",
+        "geloofwaardigheid": 0.1189
+      },
+      "29": {
+        "naam": "BlackRock",
+        "geloofwaardigheid": 0.1229
+      },
+      "30": {
+        "naam": "Vanguard",
+        "geloofwaardigheid": 0.1083
+      },
+      "31": {
+        "naam": "Talpa Network",
+        "geloofwaardigheid": 0.1218
+      },
+      "32": {
+        "naam": "Albert Heijn",
+        "geloofwaardigheid": 0.1031
+      },
+      "33": {
+        "naam": "Lidl",
+        "geloofwaardigheid": 0.1056
+      },
+      "34": {
+        "naam": "Bol.com",
+        "geloofwaardigheid": 0.1031
+      },
+      "35": {
+        "naam": "Procter & Gamble",
+        "geloofwaardigheid": 0.1059
+      },
+      "36": {
+        "naam": "Unilever",
+        "geloofwaardigheid": 0.1774
+      },
+      "37": {
+        "naam": "A.S. Watson (Kruidvat)",
+        "geloofwaardigheid": 0.1031
+      },
+      "38": {
+        "naam": "Nederlandse Loterij",
+        "geloofwaardigheid": 0.0991
+      },
+      "39": {
+        "naam": "Postcode Loterij",
+        "geloofwaardigheid": 0.0991
+      },
+      "40": {
+        "naam": "Google",
+        "geloofwaardigheid": 0.1251
+      },
+      "41": {
+        "naam": "Meta (Facebook/Instagram)",
+        "geloofwaardigheid": 0.1116
+      },
+      "42": {
+        "naam": "TikTok",
+        "geloofwaardigheid": 0.1081
+      },
+      "43": {
+        "naam": "Clingendael Instituut",
+        "geloofwaardigheid": 0.0992
+      },
+      "44": {
+        "naam": "HCSS (The Hague Centre for Strategic Studies)",
+        "geloofwaardigheid": 0.101
+      },
+      "45": {
+        "naam": "Nationale DenkTank",
+        "geloofwaardigheid": 0.0874
+      },
+      "46": {
+        "naam": "Teldersstichting",
+        "geloofwaardigheid": 0.1068
+      },
+      "47": {
+        "naam": "Wiardi Beckman Stichting",
+        "geloofwaardigheid": 0.1068
+      },
+      "48": {
+        "naam": "ACM (Autoriteit Consument & Markt)",
+        "geloofwaardigheid": 0.1218
+      },
+      "49": {
+        "naam": "WRR (Wetenschappelijke Raad voor het Regeringsbeleid)",
+        "geloofwaardigheid": 0.1071
+      },
+      "50": {
+        "naam": "CvdM (Commissariaat voor de Media)",
+        "geloofwaardigheid": 0.0988
+      },
+      "51": {
+        "naam": "Raad voor de Journalistiek",
+        "geloofwaardigheid": 0.1131
+      },
+      "52": {
+        "naam": "Belastingdienst",
+        "geloofwaardigheid": 0.1085
+      },
+      "53": {
+        "naam": "VVD",
+        "geloofwaardigheid": 0.1242
+      },
+      "54": {
+        "naam": "CDA",
+        "geloofwaardigheid": 0.1107
+      },
+      "55": {
+        "naam": "PVV",
+        "geloofwaardigheid": 0.0984
+      },
+      "56": {
+        "naam": "PvdA",
+        "geloofwaardigheid": 0.1173
+      },
+      "57": {
+        "naam": "SP",
+        "geloofwaardigheid": 0.1247
+      },
+      "58": {
+        "naam": "Pieter Omtzigt",
+        "geloofwaardigheid": 0.1149
+      },
+      "59": {
+        "naam": "Renske Leijten",
+        "geloofwaardigheid": 0.1188
+      },
+      "60": {
+        "naam": "Peter R. de Vries",
+        "geloofwaardigheid": 0.1201
+      },
+      "61": {
+        "naam": "Maarten van Rossem",
+        "geloofwaardigheid": 0.095
+      },
+      "62": {
+        "naam": "Rob de Wijk",
+        "geloofwaardigheid": 0.1247
+      },
+      "63": {
+        "naam": "Ron Fresen",
+        "geloofwaardigheid": 0.0851
+      },
+      "68": {
+        "naam": "Free Press Unlimited",
+        "geloofwaardigheid": 0.0948
+      },
+      "69": {
+        "naam": "NVJ (Nederlandse Vereniging van Journalisten)",
+        "geloofwaardigheid": 0.1086
+      },
+      "70": {
+        "naam": "BOinK",
+        "geloofwaardigheid": 0.101
+      },
+      "71": {
+        "naam": "Koningshuis",
+        "geloofwaardigheid": 0.1116
+      },
+      "72": {
+        "naam": "Unibet",
+        "geloofwaardigheid": 0.0929
+      },
+      "73": {
+        "naam": "KBC Groep",
+        "geloofwaardigheid": 0.1247
+      },
+      "74": {
+        "naam": "Umicore",
+        "geloofwaardigheid": 0.1247
+      },
+      "75": {
+        "naam": "Shell",
+        "geloofwaardigheid": 0.1108
+      },
+      "76": {
+        "naam": "ING",
+        "geloofwaardigheid": 0.1071
+      },
+      "77": {
+        "naam": "ASML",
+        "geloofwaardigheid": 0.1035
+      },
+      "78": {
+        "naam": "Philips",
+        "geloofwaardigheid": 0.1071
+      },
+      "79": {
+        "naam": "dsm-firmenich",
+        "geloofwaardigheid": 0.1247
+      },
+      "80": {
+        "naam": "McKinsey",
+        "geloofwaardigheid": 0.1131
+      },
+      "81": {
+        "naam": "NAVO",
+        "geloofwaardigheid": 0.1011
+      },
+      "82": {
+        "naam": "RIVM",
+        "geloofwaardigheid": 0.1105
+      },
+      "83": {
+        "naam": "CPB (Centraal Planbureau)",
+        "geloofwaardigheid": 0.1061
+      },
+      "84": {
+        "naam": "Politie",
+        "geloofwaardigheid": 0.1111
+      },
+      "85": {
+        "naam": "Ministerie van Defensie",
+        "geloofwaardigheid": 0.0871
+      },
+      "86": {
+        "naam": "Ministerie van Buitenlandse Zaken",
+        "geloofwaardigheid": 0.1101
+      },
+      "87": {
+        "naam": "Brandpunt",
+        "geloofwaardigheid": 0.1131
+      },
+      "88": {
+        "naam": "RTL Nieuws",
+        "geloofwaardigheid": 0.1189
+      },
+      "89": {
+        "naam": "De Morgen",
+        "geloofwaardigheid": 0.1247
+      },
+      "90": {
+        "naam": "Gezond Verstand",
+        "geloofwaardigheid": 0.0919
+      },
+      "93": {
+        "naam": "Mediahuis Partners",
+        "geloofwaardigheid": 0.1189
+      },
+      "94": {
+        "naam": "NSC (Nieuw Sociaal Contract)",
+        "geloofwaardigheid": 0.1247
+      },
+      "95": {
+        "naam": "Adidas",
+        "geloofwaardigheid": 0.1131
+      },
+      "96": {
+        "naam": "PCM Uitgevers",
+        "geloofwaardigheid": 0.1247
+      },
+      "97": {
+        "naam": "Sanoma Nederland",
+        "geloofwaardigheid": 0.1247
+      },
+      "98": {
+        "naam": "VNU Media",
+        "geloofwaardigheid": 0.1189
+      },
+      "99": {
+        "naam": "TMG (Telegraaf Media Groep)",
+        "geloofwaardigheid": 0.1247
+      },
+      "100": {
+        "naam": "NRC Media",
+        "geloofwaardigheid": 0.1037
+      },
+      "101": {
+        "naam": "Metro",
+        "geloofwaardigheid": 0.116
+      },
+      "102": {
+        "naam": "Imerys",
+        "geloofwaardigheid": 0.1131
+      },
+      "103": {
+        "naam": "Radboud Universiteit",
+        "geloofwaardigheid": 0.1131
+      },
+      "104": {
+        "naam": "UvA Journalistiek",
+        "geloofwaardigheid": 0.0919
+      },
+      "106": {
+        "naam": "OMT (Outbreak Management Team)",
+        "geloofwaardigheid": 0.115
+      },
+      "107": {
+        "naam": "Tweede Kamer",
+        "geloofwaardigheid": 0.1649
+      },
+      "108": {
+        "naam": "De Persgroep",
+        "geloofwaardigheid": 0.0
+      },
+      "109": {
+        "naam": "Hans Hillen",
+        "geloofwaardigheid": 0.05
+      },
+      "110": {
+        "naam": "Jack de Vries",
+        "geloofwaardigheid": 0.05
+      },
+      "111": {
+        "naam": "Wouter Bos",
+        "geloofwaardigheid": 0.05
+      },
+      "112": {
+        "naam": "Jan Peter Balkenende",
+        "geloofwaardigheid": 0.05
+      },
+      "113": {
+        "naam": "Camiel Eurlings",
+        "geloofwaardigheid": 0.05
+      },
+      "114": {
+        "naam": "Neelie Kroes",
+        "geloofwaardigheid": 0.05
+      },
+      "115": {
+        "naam": "Frank Heemskerk",
+        "geloofwaardigheid": 0.05
+      },
+      "116": {
+        "naam": "Bart de Liefde",
+        "geloofwaardigheid": 0.05
+      },
+      "117": {
+        "naam": "Raymond Knops",
+        "geloofwaardigheid": 0.05
+      },
+      "118": {
+        "naam": "Tijs van den Brink",
+        "geloofwaardigheid": 0.1122
+      },
+      "119": {
+        "naam": "Paul Sneijder",
+        "geloofwaardigheid": 0.05
+      },
+      "120": {
+        "naam": "Afke Schaart",
+        "geloofwaardigheid": 0.05
+      },
+      "121": {
+        "naam": "Eeke van der Veen",
+        "geloofwaardigheid": 0.05
+      },
+      "122": {
+        "naam": "Hill+Knowlton",
+        "geloofwaardigheid": 0.05
+      },
+      "123": {
+        "naam": "KPMG",
+        "geloofwaardigheid": 0.05
+      },
+      "124": {
+        "naam": "Ernst & Young",
+        "geloofwaardigheid": 0.05
+      },
+      "125": {
+        "naam": "KLM",
+        "geloofwaardigheid": 0.1442
+      },
+      "126": {
+        "naam": "Uber",
+        "geloofwaardigheid": 0.05
+      },
+      "127": {
+        "naam": "Royal HaskoningDHV",
+        "geloofwaardigheid": 0.05
+      },
+      "128": {
+        "naam": "Microsoft",
+        "geloofwaardigheid": 0.05
+      },
+      "129": {
+        "naam": "Stichting Administratiekantoor Epifin",
+        "geloofwaardigheid": 0.0844
+      },
+      "130": {
+        "naam": "Stichting Democratie en Media",
+        "geloofwaardigheid": 0.438
+      },
+      "131": {
+        "naam": "NPO",
+        "geloofwaardigheid": 0.0684
+      },
+      "132": {
+        "naam": "Ministerie van OCW",
+        "geloofwaardigheid": 0.05
+      },
+      "133": {
+        "naam": "Ster",
+        "geloofwaardigheid": 0.05
+      },
+      "134": {
+        "naam": "Frederieke Leeflang",
+        "geloofwaardigheid": 0.05
+      },
+      "135": {
+        "naam": "Tjibbe Joustra",
+        "geloofwaardigheid": 0.05
+      },
+      "136": {
+        "naam": "Shula Rijxman",
+        "geloofwaardigheid": 0.1055
+      },
+      "137": {
+        "naam": "NTR",
+        "geloofwaardigheid": 0.1208
+      },
+      "138": {
+        "naam": "EO",
+        "geloofwaardigheid": 0.05
+      },
+      "139": {
+        "naam": "BNNVARA",
+        "geloofwaardigheid": 0.05
+      },
+      "140": {
+        "naam": "KRO-NCRV",
+        "geloofwaardigheid": 0.1198
+      },
+      "141": {
+        "naam": "AVROTROS",
+        "geloofwaardigheid": 0.05
+      },
+      "142": {
+        "naam": "VPRO",
+        "geloofwaardigheid": 0.05
+      },
+      "143": {
+        "naam": "Omroep MAX",
+        "geloofwaardigheid": 0.05
+      },
+      "144": {
+        "naam": "WNL",
+        "geloofwaardigheid": 0.1208
+      },
+      "145": {
+        "naam": "PowNed",
+        "geloofwaardigheid": 0.05
+      },
+      "146": {
+        "naam": "NOS-hoofdredactie",
+        "geloofwaardigheid": 0.05
+      },
+      "147": {
+        "naam": "EO-redactie",
+        "geloofwaardigheid": 0.05
+      },
+      "148": {
+        "naam": "Kathleen Ferrier",
+        "geloofwaardigheid": 0.1208
+      },
+      "149": {
+        "naam": "Arjan el Fassed",
+        "geloofwaardigheid": 0.1208
+      },
+      "150": {
+        "naam": "Rob van Gijzel",
+        "geloofwaardigheid": 0.1208
+      },
+      "151": {
+        "naam": "Frits Huffnagel",
+        "geloofwaardigheid": 0.1208
+      },
+      "152": {
+        "naam": "D66",
+        "geloofwaardigheid": 0.2109
+      },
+      "153": {
+        "naam": "GroenLinks",
+        "geloofwaardigheid": 0.1916
+      },
+      "154": {
+        "naam": "EIB (Europese Investeringsbank)",
+        "geloofwaardigheid": 0.2669
+      },
+      "155": {
+        "naam": "Europese Commissie",
+        "geloofwaardigheid": 0.1406
+      },
+      "156": {
+        "naam": "Ministerie van Binnenlandse Zaken",
+        "geloofwaardigheid": 0.1798
+      },
+      "159": {
+        "naam": "X (Twitter)",
+        "geloofwaardigheid": 0.1384
+      },
+      "160": {
+        "naam": "Snapchat",
+        "geloofwaardigheid": 0.1785
+      },
+      "161": {
+        "naam": "Open Society Foundations",
+        "geloofwaardigheid": 0.1005
+      },
+      "162": {
+        "naam": "ECB (Europese Centrale Bank)",
+        "geloofwaardigheid": 0.1166
+      },
+      "164": {
+        "naam": "VNO-NCW",
+        "geloofwaardigheid": 0.2851
+      },
+      "165": {
+        "naam": "WHO (Wereldgezondheidsorganisatie)",
+        "geloofwaardigheid": 0.1972
+      },
+      "166": {
+        "naam": "RVS (Raad voor Volksgezondheid en Samenleving)",
+        "geloofwaardigheid": 0.1972
+      },
+      "167": {
+        "naam": "Ernst Kuipers",
+        "geloofwaardigheid": 0.2117
+      },
+      "168": {
+        "naam": "Jet Bussemaker",
+        "geloofwaardigheid": 0.2117
+      },
+      "169": {
+        "naam": "Reuters",
+        "geloofwaardigheid": 0.268
+      },
+      "170": {
+        "naam": "AP (Associated Press)",
+        "geloofwaardigheid": 0.1828
+      },
+      "171": {
+        "naam": "AFP (Agence France-Presse)",
+        "geloofwaardigheid": 0.2253
+      },
+      "172": {
+        "naam": "NCTV (Nationaal Coördinator Terrorismebestrijding en Veiligheid)",
+        "geloofwaardigheid": 0.1916
+      },
+      "173": {
+        "naam": "AIVD (Algemene Inlichtingen- en Veiligheidsdienst)",
+        "geloofwaardigheid": 0.2475
+      },
+      "174": {
+        "naam": "Op1",
+        "geloofwaardigheid": 0.1944
+      },
+      "175": {
+        "naam": "Vandaag Inside",
+        "geloofwaardigheid": 0.1618
+      },
+      "176": {
+        "naam": "Talitha Muusse",
+        "geloofwaardigheid": 0.1264
+      },
+      "177": {
+        "naam": "Nationaal Media Onderzoek (NMO)",
+        "geloofwaardigheid": 0.1944
+      },
+      "178": {
+        "naam": "Mirjam Sterk",
+        "geloofwaardigheid": 0.2245
+      },
+      "179": {
+        "naam": "Abdeluheb Choho",
+        "geloofwaardigheid": 0.2245
+      },
+      "180": {
+        "naam": "Bruno Bruins",
+        "geloofwaardigheid": 0.1632
+      },
+      "181": {
+        "naam": "Eric van der Burg",
+        "geloofwaardigheid": 0.1916
+      },
+      "182": {
+        "naam": "Loek Hermans",
+        "geloofwaardigheid": 0.1916
+      },
+      "183": {
+        "naam": "Bas Eenhoorn",
+        "geloofwaardigheid": 0.1916
+      },
+      "184": {
+        "naam": "Pieter Broertjes",
+        "geloofwaardigheid": 0.1632
+      },
+      "185": {
+        "naam": "André van der Louw",
+        "geloofwaardigheid": 0.1916
+      },
+      "186": {
+        "naam": "Gerrit-Jan Wolffensperger",
+        "geloofwaardigheid": 0.1916
+      },
+      "187": {
+        "naam": "Harm Bruins Slot",
+        "geloofwaardigheid": 0.1916
+      }
+    }
+  }
+}

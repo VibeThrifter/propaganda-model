@@ -43,7 +43,12 @@ lopen correcties via het bijdragepad.
 
 Zes relaties passen op geen bestaand mechanisme; ze blijven bewust ongekoppeld
 (`KOPPEL-REL-MECH` in de validator houdt ze zichtbaar) tot er via een theorie-RfC
-(M2.3) een mechanisme voor bestaat — of tot review ze verwijdert:
+(M2.3) een mechanisme voor bestaat — of tot review ze verwijdert.
+
+**Stand 12 juni 2026 (fase 2):** de vier mechanisme-kandidaten zijn als theorie-RfC
+ingediend (voorstellen #1–#4, zie `/api/voorstellen` of de review-wachtrij in de
+viz); acceptatie wacht op twee menselijke reviewer-akkoorden (M2.3). De twee
+verwijder-adviezen (#327, #328 hieronder) blijven een eigenaarsbesluit.
 
 | Relatie | Inhoud | Voorstel |
 |---|---|---|
