@@ -655,6 +655,46 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
     </label>
   </div>
+  <div class="panel-section" id="layoutSection">
+    <h3 id="layoutHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
+        title="Klik om de layout-opties uit of in te klappen.">
+      Layout
+      <span class="chev" id="layoutChev" style="margin-left:auto;font-size:9px;transition:transform 0.15s" aria-hidden="true">▶</span>
+    </h3>
+    <div id="layoutBody" style="display:none">
+      <!-- Wat de physics doet als filters/sliders elementen laten verschijnen of verdwijnen. -->
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
+             title="Uitgefilterde nodes blijven onzichtbaar meedoen in de physics: de layout blijft stilstaan en terugkerende nodes verschijnen op hun vertrouwde plek.">
+        <input type="radio" name="layoutMode" value="stable">
+        <span>Stabiel</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
+             title="De physics volgt de zichtbare subset, maar met een zachte opwarm-puls: het netwerk schuift licht bij in de vrijgekomen ruimte zonder zich volledig te herschikken — posities blijven herkenbaar.">
+        <input type="radio" name="layoutMode" value="soft">
+        <span>Licht meebewegen</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
+             title="De physics volgt de zichtbare subset met een stevige opwarm-puls: het netwerk trekt samen als er elementen wegvallen en vouwt open als er iets bijkomt. Posities kunnen flink verschuiven.">
+        <input type="radio" name="layoutMode" value="reflow" checked>
+        <span>Volledig hervormen</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px" id="edgeLabelRow"
+             title="De mechanisme-namen op de directe pijlen. Uit = rustiger beeld; hover op een pijl toont de naam alsnog.">
+        <input type="checkbox" id="edgeLabelToggle" checked>
+        <span>Namen op directe pijlen</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
+             title="Korte samenvatting van de eindclaim op de afgeleide (indirecte) pijlen. Uit = rustiger beeld; hover en klik op de pijl blijven werken.">
+        <input type="checkbox" id="derivedLabelToggle" checked>
+        <span>Namen op indirecte pijlen</span>
+        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      </label>
+    </div>
+  </div>
   <div class="panel-section" id="legendSection">
     <h3>Legenda</h3>
     <div id="legend"></div>
@@ -34277,6 +34317,12 @@ let state = {
   showHalos: false,            // halo's (veld-eigenschappen, violet) tonen? Default schoon.
   showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
+  showEdgeLabels: true,        // mechanisme-namen op de directe pijlen (alleen theoriemodel)?
+  showDerivedLabels: true,     // "via …"-labels op de afgeleide (indirecte) pijlen?
+  layoutMode: 'reflow',        // 'stable' = alle nodes blijven in de physics (posities vast);
+                               // 'soft' = simulatie volgt de zichtbare subset, zachte reheat (licht bijschuiven);
+                               // 'reflow' = idem, stevige reheat (netwerk hervormt zich volledig) — default:
+                               // de layout weerspiegelt altijd de getekende pijlen
   fieldPropertyMap: null,      // node-id -> max inkomende veld-eigenschap-influence (halo-intensiteit)
 };
 
@@ -34427,6 +34473,7 @@ let linkGroupSel = null;
 let linkHitGroupSel = null;
 let edgeLabelGroupSel = null;
 let nodeGroupSel = null;
+let lastSimSig = null;             // membership-handtekening van de simulatie in reflow-modus
 
 // Alleen de getekende edges positioneren — uitgefilterde edges staan niet meer in de
 // DOM (echte data-join in applyFilters), dus de selecties bevatten precies wat zichtbaar
@@ -34557,6 +34604,7 @@ function buildGraph() {
     .force('x', d3.forceX(width / 2).strength(0.04))
     .force('y', d3.forceY(height / 2).strength(0.04))
     .alphaDecay(isTheory ? 0.015 : 0.02);
+  lastSimSig = null;   // verse simulatie: reflow-handtekening hoort bij de oude graaf
 
   // Emergente-effect-velden — achtergrondveld onder de directe edges/nodes.
   // Hyperedge over een groep rollen; geen pijl. Theorie + toggle aan.
@@ -34834,10 +34882,12 @@ function joinLinks(linksArr) {
   linkHitElements = hitEnter.merge(linkHitElements)
     .style('pointer-events', 'auto');   // reset ná selectNode-dimming
 
-  // Edge-labels (alleen theorie). Labels blijven muis-transparant (CSS pointer-events:
-  // none): de tooltip hoort bij de hit-lijn erónder, ook als die onder een label doorloopt.
+  // Edge-labels (alleen theorie, en alleen met de namen-toggle aan: uit = lege join,
+  // dus de labels verlaten de DOM echt). Labels blijven muis-transparant (CSS
+  // pointer-events: none): de tooltip hoort bij de hit-lijn erónder.
   if (isTheory) {
-    edgeLabelElements = edgeLabelGroupSel.selectAll('text.edge-label').data(linksArr, d => d._idx);
+    const lblData = state.showEdgeLabels ? linksArr : [];
+    edgeLabelElements = edgeLabelGroupSel.selectAll('text.edge-label').data(lblData, d => d._idx);
     edgeLabelElements.exit()
       .transition('vis').duration(VIS_FADE_MS)
       .attr('opacity', 0)
@@ -35753,10 +35803,12 @@ function derivedLabelPos(d) {
 }
 
 function derivedLabelText(d) {
+  // Korte samenvatting van de eindclaim (waar de pijl om draait) in plaats van de
+  // via-route; de volledige route en argumenten zitten in de tooltip en het pad-detail.
+  const claim = (d.claimRoots || [])[0]?.claim;
+  if (claim) return truncate(claim, 70);
   const via = d.chain.slice(1, -1).map(n => n.name);
-  if (!via.length) return '';
-  if (via.length > 2) return `via ${via[0]} → ${via[1]} …`;
-  return `via ${via.join(' → ')}`;
+  return via.length ? `via ${via[0]}${via.length > 1 ? ' …' : ''}` : '';
 }
 
 function positionDerivedLinks() {
@@ -35811,8 +35863,9 @@ function updateDerivedLinks(data) {
       tt.style.top = (event.clientY - 8) + 'px';
     })
     .on('mouseout', () => document.getElementById('tooltip').classList.remove('visible'));
-  // "via …"-labels: de tussenschakel(s) van het sterkste pad, leesbaar zonder hover.
-  derivedLinkGroup.selectAll('text.derived-label').data(data).join('text')
+  // Labels: korte samenvatting van de eindclaim, leesbaar zonder hover.
+  // Eigen toggle (lege join = labels echt weg; de pijlen zelf blijven staan).
+  derivedLinkGroup.selectAll('text.derived-label').data(state.showDerivedLabels ? data : []).join('text')
     .attr('class', 'derived-label')
     .attr('text-anchor', 'middle')
     .attr('fill', FIELD_COLOR)
@@ -35837,10 +35890,9 @@ function selectNode(d) {
 
   // Een nog lopende verschijn-fade (data-join in applyFilters) zou de dim-waarden
   // hieronder weer overschrijven: stoppen en op de eindstand zetten. Exit-fades lopen
-  // op elementen buiten deze selecties en ruimen zichzelf gewoon op.
+  // op elementen buiten deze selecties en ruimen zichzelf gewoon op. De edges krijgen
+  // hieronder hun eigen data-join: alleen de verbonden pijlen blijven in de DOM.
   nodeElements.interrupt('vis').attr('opacity', 1);
-  linkElements.interrupt('vis');
-  if (edgeLabelElements) edgeLabelElements.interrupt('vis');
 
   // Licht de DOWNSTREAM-invloedcascade op (multi-hop) i.p.v. alleen directe buren.
   // Instantiemodel: relatie-influence. Theoretisch model: mechanisme-sterkte.
@@ -35853,20 +35905,14 @@ function selectNode(d) {
       nodeElements.select('.node-circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
       nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
       nodeElements.select('.field-halo').attr('opacity', n => nodeOn(n.id) ? fieldHaloOpacity(n) : 0.02);
-      linkElements.each(function(l) {
-        const s = state.showDirect ? linkStrength.get(l._idx) : null;
-        const el = d3.select(this);
-        if (s != null) {
-          el.attr('stroke-opacity', 0.35 + 0.6 * Math.min(1, s));  // sterker pad = feller
-          if (!el.attr('data-marker')) el.attr('data-marker', markerFor(l, isTheory));
-          el.attr('marker-end', el.attr('data-marker'));
-        } else {
-          el.attr('stroke-opacity', state.showDirect ? 0.03 : 0);
-          el.attr('marker-end', 'none');
-        }
-      });
-      if (linkHitElements) linkHitElements.style('pointer-events', l => (state.showDirect && linkStrength.has(l._idx)) ? 'auto' : 'none');
-      if (edgeLabelElements) edgeLabelElements.attr('opacity', l => (state.showDirect && linkStrength.has(l._idx)) ? 1 : 0.1);
+      // Echte data-join: alleen de cascade-pijlen blijven in de DOM, de rest verdwijnt
+      // met een exit-fade (geen spookranden op 3% meer). joinLinks zet markers en
+      // hoverbaarheid al goed; de verschijn-fade meteen afronden zodat hij de
+      // sterkte-opacity hieronder niet alsnog overschrijft.
+      joinLinks(state.showDirect ? currentLinks.filter(l => linkStrength.has(l._idx)) : []);
+      linkElements.interrupt('vis')
+        .attr('stroke-opacity', l => 0.35 + 0.6 * Math.min(1, linkStrength.get(l._idx)));  // sterker pad = feller
+      if (edgeLabelElements) edgeLabelElements.interrupt('vis').attr('opacity', 1);
 
       // Afgeleide (indirecte) invloed: alleen paden waarvan élke schakel onderbouwd
       // is krijgen een pijl — geen willekeurige top-N. Ook naar directe buren als
@@ -35875,6 +35921,13 @@ function selectNode(d) {
       state.derivedAll = derived;
       state.derivedShown = derived;
       updateDerivedLinks(derived);
+
+      // Layout-modus 'soft'/'reflow': de physics volgt óók de selectie — alleen de
+      // cascade blijft in de simulatie, zodat het subnetwerk zich hergroepeert in
+      // plaats van in de stand van het volledige netwerk te blijven staan. In
+      // 'stable' doet syncSimulation niets; deselectNode → applyFilters herstelt.
+      // NB: reached is een Map (id -> sterkte), dus expliciet de keys spreiden.
+      syncSimulation(new Set([d.id, ...reached.keys()]), new Set(linkStrength.keys()));
 
       updateEmergentFields();   // velden van de geselecteerde node oplichten
       showDetail(d);
@@ -35900,22 +35953,16 @@ function selectNode(d) {
   nodeElements.select('.node-circle').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.08);
   nodeElements.select('text').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.06);
   nodeElements.select('.field-halo').attr('opacity', n => connectedIds.has(n.id) ? fieldHaloOpacity(n) : 0.02);
-  linkElements.each(function(l) {
-    const connected = state.showDirect && isConnected(l);
-    const el = d3.select(this);
-    el.attr('stroke-opacity', connected ? 0.8 : (state.showDirect ? 0.03 : 0));
-    el.attr('marker-end', connected ? el.attr('marker-end') || 'none' : 'none');
-    // Store original marker so we can restore it
-    if (connected && !el.attr('data-marker')) el.attr('data-marker', markerFor(l, isTheory));
-    if (connected) el.attr('marker-end', el.attr('data-marker'));
-  });
-  // Only connected + visible relations stay hoverable (tooltips live on the hit-lines)
-  if (linkHitElements) {
-    linkHitElements.style('pointer-events', l => (state.showDirect && isConnected(l)) ? 'auto' : 'none');
-  }
-  if (edgeLabelElements) {
-    edgeLabelElements.attr('opacity', l => (state.showDirect && isConnected(l)) ? 1 : 0.1);
-  }
+  // Echte data-join: alleen de pijlen aan deze node blijven in de DOM, de rest verdwijnt
+  // met een exit-fade (geen spookranden op 3% meer). joinLinks zet markers en
+  // hoverbaarheid al goed; de verschijn-fade meteen afronden zodat hij de
+  // highlight-opacity hieronder niet alsnog overschrijft.
+  joinLinks(state.showDirect ? currentLinks.filter(isConnected) : []);
+  linkElements.interrupt('vis').attr('stroke-opacity', 0.8);
+  if (edgeLabelElements) edgeLabelElements.interrupt('vis').attr('opacity', 1);
+
+  // Zelfde selectie-volgende physics als in de cascade-tak hierboven.
+  syncSimulation(connectedIds, new Set(currentLinks.filter(isConnected).map(l => l._idx)));
 
   updateEmergentFields();   // velden van de geselecteerde node oplichten
   showDetail(d);
@@ -36378,6 +36425,43 @@ function computeVisibleLinks() {
   return { nodePassesFilter, visibleLinkSet };
 }
 
+// Reflow-modi (state.layoutMode 'soft'/'reflow'): de simulatie krijgt alleen de
+// zichtbare subset, zodat het netwerk samentrekt als er elementen wegvallen en
+// openvouwt als er iets bijkomt — 'soft' met een zachte opwarm-puls (licht bijschuiven),
+// 'reflow' met een stevige (volledige herschikking). Uitgefilterde nodes bevriezen op
+// hun laatste positie en doen weer mee zodra ze terugkeren. Alleen opnieuw opwarmen als
+// de membership echt veranderde, anders jiggelt elke ongerelateerde
+// applyFilters-aanroep (bv. de directe-pijlen-toggle) de boel.
+function syncSimulation(visibleNodeIds, visibleLinkSet) {
+  if (!simulation || state.layoutMode === 'stable') return;
+  const simNodes = currentNodes.filter(n => visibleNodeIds.has(n.id));
+  // De physics volgt wat er getékend staat: directe edges trekken alleen als hun
+  // toggle aan staat — uitgezette pijlen oefenen dus géén "zwaartekracht" meer uit.
+  // Endpoints expliciet toetsen: een link waarvan een uiteinde buiten de simulatie
+  // valt zou forceLink op verweesde node-indices laten rekenen.
+  const simLinks = !state.showDirect ? [] : currentLinks.filter(l => {
+    if (!visibleLinkSet.has(l._idx)) return false;
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return visibleNodeIds.has(sid) && visibleNodeIds.has(tid);
+  });
+  // Getoonde afgeleide (indirecte) pijlen tellen als veerkracht mee: met alleen de
+  // indirecte laag aan ordent het netwerk zich dus naar de indirecte-invloedstructuur.
+  const derivedSprings = (state.showDerived ? derivedLinkData : []).filter(dd =>
+    visibleNodeIds.has(dd.source.id) && visibleNodeIds.has(dd.target.id));
+  const sig = simNodes.map(n => n.id).join(',') + '|' + simLinks.map(l => l._idx).join(',')
+    + '|' + derivedSprings.map(dd => dd.source.id + '>' + dd.target.id).join(',');
+  if (sig === lastSimSig) return;
+  lastSimSig = sig;
+  simulation.nodes(simNodes);
+  simulation.force('link').links(
+    simLinks.concat(derivedSprings.map(dd => ({ source: dd.source, target: dd.target }))));
+  // 'soft' beweegt nadrukkelijk traag: een heel kleine opwarm-puls én zware demping,
+  // zodat het netwerk rustig nadrijft in plaats van te verspringen.
+  simulation.velocityDecay(state.layoutMode === 'soft' ? 0.8 : 0.4);
+  simulation.alpha(state.layoutMode === 'soft' ? 0.02 : 0.4).restart();
+}
+
 function applyFilters() {
   if (!nodeGroupSel || !linkGroupSel) return;
   clearDerivedLinks();   // schoon herbeginnen; verderop tekenen we ze opnieuw (globaal of per selectie)
@@ -36439,6 +36523,11 @@ function applyFilters() {
     updateDerivedLinks(allDerived);
   }
 
+  // Ná de afgeleide pijlen: de physics (layout-modus 'soft'/'reflow') volgt de
+  // getekende lagen — directe edges alleen met de toggle aan, en de zojuist
+  // berekende afgeleide pijlen tellen als veerkrachten mee.
+  syncSimulation(visibleNodes, visibleLinkSet);
+
   // Stats — count only visible
   const nodeLabel = isTheory ? 'rollen' : 'entiteiten';
   const linkLabel = isTheory ? 'mechanismen' : 'relaties';
@@ -36470,6 +36559,8 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     // rij en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
     // De toggles voor directe/indirecte pijlen gelden in beide modellen.
     document.getElementById('fieldToggleRow').style.display = isTheory ? '' : 'none';
+    // NB: 'flex', niet '' — een lege string wist de inline display:flex van de rij.
+    document.getElementById('edgeLabelRow').style.display = isTheory ? 'flex' : 'none';
     if (!isTheory) {
       state.showFieldEffects = false;
       state.showHalos = false;
@@ -36557,6 +36648,41 @@ document.getElementById('directToggle').addEventListener('change', e => {
   state.showDirect = e.target.checked;
   applyFilters();
   if (state.selectedNode) selectNode(state.selectedNode);
+});
+// Inklapbaar Layout-kopje (standaard dicht).
+document.getElementById('layoutHeader').addEventListener('click', () => {
+  const body = document.getElementById('layoutBody');
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  document.getElementById('layoutChev').style.transform = open ? 'rotate(90deg)' : '';
+});
+// Namen op de directe pijlen: puur tekenen, geen invloed op physics of zichtbaarheidsset.
+document.getElementById('edgeLabelToggle').addEventListener('change', e => {
+  state.showEdgeLabels = e.target.checked;
+  applyFilters();
+  if (state.selectedNode) selectNode(state.selectedNode);
+});
+// Namen op de afgeleide (indirecte) pijlen: herteken de actieve pijlen met/zonder labels.
+document.getElementById('derivedLabelToggle').addEventListener('change', e => {
+  state.showDerivedLabels = e.target.checked;
+  updateDerivedLinks(derivedLinkData);
+});
+// Layout-modus: 'soft'/'reflow' laten de simulatie de zichtbare subset volgen
+// (applyFilters → syncSimulation, alleen de opwarm-sterkte verschilt); terug naar
+// 'stable' zet alle nodes/links weer in de physics en laat ze zachtjes zetten,
+// zodat de bevroren uitgefilterde nodes weer netjes hun stabiele plek innemen.
+document.querySelectorAll('input[name="layoutMode"]').forEach(radio => {
+  radio.addEventListener('change', e => {
+    state.layoutMode = e.target.value;
+    if (state.layoutMode === 'stable' && simulation) {
+      lastSimSig = null;
+      simulation.nodes(currentNodes);
+      simulation.force('link').links(currentLinks);
+      simulation.velocityDecay(0.4);   // soft-demping weer terug naar de standaard
+      simulation.alpha(0.2).restart();
+    }
+    applyFilters();
+  });
 });
 
 // Chips voor TWEE assen: Chomsky-filters en dwarsliggende thema's. Beide werken
@@ -37311,6 +37437,7 @@ const initTheory = state.model === 'theory';
 configureSliders(initTheory);
 document.getElementById('colorModeSection').style.display = initTheory ? 'none' : '';
 document.getElementById('fieldToggleRow').style.display = initTheory ? '' : 'none';
+document.getElementById('edgeLabelRow').style.display = initTheory ? 'flex' : 'none';
 buildGraph();
 renderLegend();
 
