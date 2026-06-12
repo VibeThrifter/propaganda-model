@@ -103,7 +103,7 @@ def export_data():
     cur.execute("""
         SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.parent_argument_id,
                a.property, a.property_value,
-               a.stance, a.claim, a.reasoning, a.weight, a.status
+               a.stance, a.claim, a.title, a.reasoning, a.weight, a.status
         FROM arguments a
         ORDER BY a.parent_argument_id NULLS FIRST, a.id
     """)

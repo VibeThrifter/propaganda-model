@@ -683,7 +683,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
       </label>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px" id="edgeLabelRow"
              title="De mechanisme-namen op de directe pijlen. Uit = rustiger beeld; hover op een pijl toont de naam alsnog.">
-        <input type="checkbox" id="edgeLabelToggle" checked>
+        <input type="checkbox" id="edgeLabelToggle">
         <span>Namen op directe pijlen</span>
         <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
       </label>
@@ -1234,7 +1234,7 @@ let state = {
   showHalos: false,            // halo's (veld-eigenschappen, violet) tonen? Default schoon.
   showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
-  showEdgeLabels: true,        // mechanisme-namen op de directe pijlen (alleen theoriemodel)?
+  showEdgeLabels: false,       // mechanisme-namen op de directe pijlen (alleen theoriemodel)? Default uit.
   showDerivedLabels: true,     // "via …"-labels op de afgeleide (indirecte) pijlen?
   layoutMode: 'reflow',        // 'stable' = alle nodes blijven in de physics (posities vast);
                                // 'soft' = simulatie volgt de zichtbare subset, zachte reheat (licht bijschuiven);
@@ -2720,10 +2720,12 @@ function derivedLabelPos(d) {
 }
 
 function derivedLabelText(d) {
-  // Korte samenvatting van de eindclaim (waar de pijl om draait) in plaats van de
-  // via-route; de volledige route en argumenten zitten in de tooltip en het pad-detail.
-  const claim = (d.claimRoots || [])[0]?.claim;
-  if (claim) return truncate(claim, 70);
+  // De redactionele titel van de padclaim (arguments.title, gezet in
+  // migrate_padclaim_titels.py); valt terug op een afgekapte claimzin en
+  // als laatste op de via-route. Argumenten en route zitten in tooltip/pad-detail.
+  const root = (d.claimRoots || [])[0];
+  if (root?.title) return root.title;
+  if (root?.claim) return truncate(root.claim, 70);
   const via = d.chain.slice(1, -1).map(n => n.name);
   return via.length ? `via ${via[0]}${via.length > 1 ? ' …' : ''}` : '';
 }
@@ -2768,8 +2770,10 @@ function updateDerivedLinks(data) {
       // "via …"-label; schakel-onderbouwing en bronnen zitten in het pad-detail (klik).
       const claimTexts = (dd.claimRoots || []).slice(0, 2).map(a =>
         `<div class="tt-desc" style="font-style:italic;color:var(--text)">“${truncate(a.claim, 260)}”</div>`).join('');
+      const claimTitle = (dd.claimRoots || [])[0]?.title;
       tt.innerHTML = `<div class="tt-type" style="color:${FIELD_COLOR}">Afgeleide (indirecte) invloed · pad</div>
         <div class="tt-name">${dd.source.name} ⇢ ${dd.target.name}</div>
+        ${claimTitle ? `<div class="tt-desc" style="font-weight:600;color:${FIELD_COLOR}">${claimTitle}</div>` : ''}
         ${claimTexts}
         <div class="tt-desc" style="margin-top:4px;color:var(--accent)">Klik voor de argumenten en bronnen</div>`;
       tt.classList.add('visible');

@@ -348,6 +348,7 @@ CREATE TABLE arguments (
         'contextual'        -- nuancering, noch voor noch tegen
     )),
     claim TEXT NOT NULL,                 -- de kernbewering, kort en bondig
+    title TEXT,                          -- korte redactionele titel (viz-label; gevuld voor padclaims)
     reasoning TEXT,                      -- uitgebreide redenering / toelichting
     weight REAL CHECK(weight BETWEEN 0.0 AND 1.0),  -- hoe sterk is dit argument
     -- Verificatie-status (Wikipedia-stijl)
