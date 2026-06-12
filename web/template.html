@@ -1872,7 +1872,11 @@ function updateEmergentFields() {
   const show = emergentVisible();
   const lit = d => state.emergentSelection.has(d.id) || state.emergentHover === d.id
                 || state.emergentActive === d.id;
-  const on = d => (state.model === 'theory' && (show || lit(d)) && emergentMemberNodes(d).length
+  // Is er een chip-selectie, dan verdwijnen de niet-geselecteerde velden helemaal
+  // (ook met de contour-toggle aan): selecteren = isoleren.
+  const on = d => (state.model === 'theory' && (show || lit(d))
+                && (!state.emergentSelection.size || lit(d))
+                && emergentMemberNodes(d).length
                 && isActiveAt(d, state.timelineYear)) ? 1 : 0;
   emergentHullElements
     .attr('d', d => emergentHullPath(d))
@@ -3532,6 +3536,12 @@ function rebuildEmergentChips() {
       const sel = state.emergentSelection;
       if (sel.has(eff.id)) sel.delete(eff.id); else sel.add(eff.id);
       item.classList.toggle('active', sel.has(eff.id));
+      // Aangeklikt veld bovenop de stapel leggen, zodat het in de graaf direct
+      // klikbaar is en niet onder overlappende velden ligt.
+      if (sel.has(eff.id) && emergentHullElements) {
+        emergentHullElements.filter(d => d.id === eff.id).raise();
+        emergentLabelElements.filter(d => d.id === eff.id).raise();
+      }
       syncEmergentCount();
       updateEmergentFields();
     });
