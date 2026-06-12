@@ -174,8 +174,9 @@ Zie "Scores: van discussieboom naar theorie".
 | `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id, active_from/active_until (temporeel) |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
 | `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`systemisch`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`) |
-| `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl) | name, label, category, description, effect, active_from/active_until (temporeel) |
+| `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl). Eersteklas theorie-element: eigen discussieboom (`arguments.emergent_effect_id`), eigen tijdvenster en eigen score (lit-only) | name, label, category, description, effect, active_from/active_until (temporeel) |
 | `emergent_effect_members` | Koppeltabel: welke rollen dragen samen een emergent effect | emergent_effect_id, role_id |
+| `emergent_effect_subeffects` | Tweede-orde-structuur: deel-effecten van een emergent effect. Gebruikt voor het apex-veld `fabricage_van_instemming` ⊃ de elf overige velden; de ledenset van het apex-veld blijft pars pro toto | parent_effect_id, child_effect_id |
 
 > **Tijdsdimensie.** Ook de theorielaag is historisch contingent: mechanismen ontstaan (kijkcijferdisciplinering vereist een kijkmeterpanel — 1987; algoritmische_filtering een algoritmische feed — 2006) en kunnen verdwijnen. `roles`, `mechanisms` en `emergent_effects` dragen daarom dezelfde optionele `active_from`/`active_until` als de praktijklaag; NULL = onbegrensd voor zover bekend. Alleen invullen bij evident technologie- of bestelgebonden elementen — zie `scripts/migrate_tijdsdimensie_theorielaag.py` voor de zes gedateerde mechanismen plus rationale. De **tijdbalk** in de visualisatie werkt in beide modellen: op het gekozen jaar verdwijnen mechanismen, rollen en emergente velden (en in het praktijkmodel relaties/entiteiten) die toen niet actief waren; de stand "Alle jaren" toont alles. De looptijd is per mechanisme en rol bespreekbaar in het detailpaneel (via de discussieboom, net als bij relaties). `scoring.py` en `influence.py` blijven tijdloos: bewijs telt ongeacht datum even zwaar; tijdsweging van argumenten (ouder bewijs telt lichter) is een bewust uitgestelde, aparte modelkeuze.
 
@@ -200,14 +201,29 @@ Zie "Scores: van discussieboom naar theorie".
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `arguments` | Discussieboom: argumenten op een praktijk-target (relatie/entiteit) óf een theorie-target (rol/mechanisme = literatuuronderbouwing), met nesting | relation_id / entity_id / role_id / mechanism_id (minstens één), parent_argument_id (NULL=root), property/property_value (optioneel), stance, claim, reasoning, weight, status (`ongecontroleerd` default), contributed_by |
+| `arguments` | Discussieboom: argumenten op een praktijk-target (relatie/entiteit) óf een theorie-target (rol/mechanisme/emergent veld = literatuuronderbouwing), met nesting | relation_id / entity_id / role_id / mechanism_id / emergent_effect_id (minstens één), parent_argument_id (NULL=root), property/property_value (optioneel), stance, claim, reasoning, weight, status (`ongecontroleerd` default; ook `bronvermelding_nodig`/`betwist`/`geverifieerd`/`verouderd`/`verworpen`), self_merged (vlag: inbrenger verifieerde eigen argument), contributed_by |
 | `citations` | Bronvermeldingen per argument | argument_id, source_id, quote, page, section, context |
 | `edit_log` | Auditlog van wijzigingen (aanmaak, statuswijziging) | table_name, record_id, action (`created`/`updated`/`deleted`/`verified`/`disputed`), changed_by, old_value, new_value, reason |
+| `users` | Identiteit voor het bijdragepad (M0.6): mensen én agents | username, kind (`mens`/`agent`), role (`bijdrager`/`reviewer`/`maintainer`), password_hash (alleen mensen), token_hash (sha256; token zelf wordt nooit opgeslagen), provenance (verplicht voor agents: model+versie), active, last_login_at |
 
 Argumenten vormen een boomstructuur:
 - **Root-argumenten** (`parent_argument_id = NULL`) hangen direct aan een relatie of entiteit
 - **Reacties** (`parent_argument_id = <id>`) reageren op een ander argument
 - Elk argument kan gericht zijn op een **relatie** (`relation_id`) of een **entiteit** (`entity_id`), minstens één is verplicht
+
+### Identiteit & poorten (M0.6)
+
+Lezen is open; **elke schrijfactie vereist een account** (`users`, beheer via
+`scripts/create_user.py`; inloggen op `/login`, token genereren/roteren op `/account`).
+Mensen loggen in met een wachtwoord (sessie); agents en Claude Code sturen
+`Authorization: Bearer <token>` mee — met het token van een méns werkt Claude Code
+als die mens (de mens blijft de bijdrager). De attributie (`contributed_by`,
+`changed_by`) volgt altijd de ingelogde gebruiker; payload-velden worden genegeerd.
+Rollen: `bijdrager` (inhoud toevoegen) < `reviewer` (ook statussen beoordelen) <
+`maintainer` (ook theorielaag en DELETEs). Eigen argumenten verifiëren mag (n=1)
+maar zet de `self_merged`-vlag zodat het herauditeerbaar blijft. **Dogfood-regel:**
+inhoud gaat sinds juni 2026 uitsluitend via dit bijdragepad; migratiescripts zijn
+alleen nog voor schema en structuur.
 
 ---
 
@@ -293,23 +309,41 @@ alleen *directe pijlen* aan (schone graaf).
 
 Naast deze edge-aarden kent het theoriemodel het **emergente effect als hyperedge**: een systeem-
 eigenschap die uit het samenspel van een hele *groep* rollen voortkomt en niet in één bron→doel-relatie
-te vangen is (eigen tabellen `emergent_effects` + `emergent_effect_members`; bv. *fabricage van consensus*,
+te vangen is (eigen tabellen `emergent_effects` + `emergent_effect_members`; bv. *fabricage van instemming*,
 *zelfversterkende homeostase*). Ook **terugkoppellussen tussen meerdere rollen** horen hier (medialogica,
 verkillingsspiraal, economische feedback-loop): een lus is geen toestand van één node en geen gerichte
 dyade — elke schakel is tegelijk oorzaak en gevolg. Het verschijnt als een transparant **goud veld** rond
 de leden, met label, hoverbaar/klikbaar (het detailpaneel toont het samenspel).
 
+Velden zijn **eersteklas theorie-elementen**, met dezelfde drie attributen als rollen en mechanismen:
+een eigen **discussieboom** (argumenten met `emergent_effect_id` + citaties — elk veld draagt zijn
+canonieke literatuur als argument, zie de tabel hieronder), een eigen **tijdvenster**
+(`active_from`/`active_until`, gefilterd door de tijdbalk) en een eigen **score** (`scoring.py`:
+lit-only — een veld heeft geen praktijk-instanties; de praktijk leeft in zijn mechanismen en rollen,
+dus geloofwaardigheid = literatuurpoot en 'sterkte' is niet van toepassing). Het detailpaneel toont
+score, samenspel, deel-effecten en de literatuuronderbouwing met invoerformulier.
+
+Eén veld is structureel anders: `fabricage_van_instemming` is het **apex-veld** — de conclusie van het
+hele model, niet "nóg een groepseigenschap". De elf overige velden zijn er formeel als **deel-effecten**
+aan gekoppeld (`emergent_effect_subeffects`): de kaasstolp-lussen, de uniformerings- en homogeniteits-
+velden en de versterkings- en disciplineringslussen komen erin samen. Zo zit de Haagse kaasstolp — en
+daarmee politicus, voorlichter en lobbyist — wél in het apex-effect (via hún velden), zonder
+alles-omvattende ledenset (een hyperedge die alles bevat ís het model zelf en verklaart niets) en
+zonder dubbeltelling. De *ledenset* van het apex-veld blijft pars pro toto: één dragende rol per
+filter (mediaeigenaar, adverteerder, persbureau, belanghebbende, elite_forum) plus mediaorganisatie
+en publiek.
+
 De twaalf emergente effecten, met de literatuur die de compositie benoemt:
 
 | effect | kern | literatuur |
 |---|---|---|
-| `fabricage_van_consensus` | pro-elite bias uit het samenspel van de vijf filters | Herman & Chomsky |
+| `fabricage_van_instemming` | pro-elite bias uit het samenspel van de vijf filters; 'manufacturing consent' = instemming van de geregeerden fabriceren (niet 'consensus' of 'toestemming'); ledenset pars pro toto — één dragende rol per filter + medium + publiek | Herman & Chomsky (naar Lippmann 1922) |
 | `zelfversterkende_homeostase` | afwijkingen worden gedempt, status quo reproduceert zichzelf | Bergman; systeemtheorie-duiding |
 | `haagse_stam` | politici, voorlichters, lobbyisten en journalisten als één stam | Luyendijk |
 | `toeschouwersdemocratie` | het publiek ziet de frontstage-opvoering, de afweging is backstage | Luyendijk |
 | `lobbymakelaardij` | de lobbyist regisseert journalist én politicus namens een onzichtbare opdrachtgever | Luyendijk |
 | `schijnpluriformiteit` | veel merknamen, één ANP-nieuwsstroom; pluriformiteit als façade | Boumans (2016): ±66% online nieuws ANP-gebaseerd |
-| `ideologische_homofilie` | journalist, expert en politicus uit dezelfde academische kring; bevestiging oogt als verificatie | Bovens & Wille (2011); 'Haagse waakhonden' |
+| `ideologische_homofilie` | journalist, expert en politicus uit dezelfde academische kring; bevestiging oogt als verificatie | Bovens & Wille (2011); Vis (2001, 'Haagse waakhonden'); Hermans (2016, WJS) |
 | `mediahype` | zelfversterkende nieuwsgolf, pack journalism; positieve feedback | Vasterman (2004) |
 | `medialogica` | wurggreep politiek↔media; incidenten verdringen inhoud (gevangenendilemma) | RMO (2003) |
 | `verkillingsspiraal` | extern flak ↔ intern conformisme; collectief chilling effect | PersVeilig/I&O (2021) |
@@ -372,6 +406,11 @@ De twee lijnen worden gecombineerd met een **noisy-OR**: `geloofwaardigheid = 1 
 nog meer. In het theoriemodel codeert de node-grootte/lijndikte de **sterkte**; het detailpaneel toont
 beide scores met de opsplitsing literatuur ⊕ praktijk. Alle constanten staan boven in `scoring.py`.
 
+**Emergente velden** doorlopen dezelfde laag C, maar alleen langs de literatuurlijn
+(`arguments.emergent_effect_id`): een veld heeft geen instanties — zijn praktijk leeft in de
+gekoppelde mechanismen en rollen — dus de geloofwaardigheid is de literatuurpoot en 'sterkte' is
+niet van toepassing. Het detailpaneel van een veld toont die score met dezelfde maatstaf.
+
 ---
 
 ## Argumentstructuur per relatie
@@ -411,6 +450,15 @@ Entiteit: DPG Media
 | `supporting` | + | Bewijs dat de relatie bevestigt |
 | `contradicting` | - | Bewijs dat de relatie tegenspreekt |
 | `contextual` | ~ | Nuancering, noch voor noch tegen |
+
+**Citatiepoort (M0.3).** Een `supporting`- of `contradicting`-argument is een
+bewijsclaim en vereist daarom een bron: wordt het zonder citaties ingediend
+(via `POST /api/arguments`), dan start het met status `bronvermelding_nodig`
+(statusfactor 0,40 in `scoring.py`) in plaats van `ongecontroleerd`. De eerste
+citatie (`POST /api/citations`, of direct meegegeven in het `citations`-veld van
+`POST /api/arguments`) heft dat automatisch op naar `ongecontroleerd` — uitsluitend
+die overgang; `geverifieerd` blijft een menselijke review-stap. Alleen `contextual`
+mag bronloos starten.
 
 ---
 
@@ -713,6 +761,8 @@ HAVING n_contra > 0;
 | *Medialogica* (2003) | RMO | Wurggreep politiek↔media (emergent effect `medialogica`) |
 | *Mediahype* (2004) | Peter Vasterman | Zelfversterkende nieuwsgolven (emergent effect `mediahype`) |
 | *Diplomademocratie* (2011) | Bovens & Wille | Dominantie van hoogopgeleiden in alle instituties (emergent effect `ideologische_homofilie`) |
+| *Haagse waakhonden* (2001) | J.C.P.M. Vis (RUG) | Stemvoorkeur parlementair journalisten: D66/GL fors oververtegenwoordigd (emergent effect `ideologische_homofilie`, halo `sociologische_homogeniteit`) |
+| *Journalists in the Netherlands* (2016) | Liesbeth Hermans (Worlds of Journalism Study) | Samenstelling en rolopvatting van het journalistencorps (halo `sociologische_homogeniteit`) |
 | *Outsourcing the news?* (2016) | Jelle Boumans | Kwantificering ANP-afhankelijkheid (emergent effect `schijnpluriformiteit`) |
 | *Agressie en bedreiging richting journalisten* (2021) | PersVeilig / I&O Research | Collectief chilling effect (emergent effect `verkillingsspiraal`) |
 | *Digital News Report Nederland* (2024/2025) | Commissariaat voor de Media | Fragmentatie en nieuwsmijding (halo `publieksfragmentatie`) |

@@ -1,6 +1,8 @@
 # Verbeterplan: discussieboom & scoringsketen
 
-**Status: voorstel — de uitvoering wordt bijgehouden in §9 (nog niets afgevinkt).**
+**Status: in uitvoering — Fase 0 is gebouwd en geverifieerd op 12 juni 2026 (zie §9;
+alleen het M0.4-slotcriterium wacht op de 6 theorie-kandidaten uit `BACKFILL_REVIEW.md`).
+Fase 1 en verder: nog niet gestart.**
 Geschreven juni 2026 na een audit van schema, `scoring.py`, `server.py` en de live database. Doel: het discussiesysteem dat nodes,
 edges en systeemeffecten onderbouwt robuuster en wetenschappelijker maken, en het klaarmaken
 voor open bijdragen door gebruikers én agents. De domeinspec blijft `DOCUMENTATIE.md`; dit
@@ -589,76 +591,95 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
 
 ### Fase 0 — meten & dichten
 
-- [ ] **M0.1 Validator** — `scripts/validate_model.py` (stdlib)
-  - [ ] Skelet: elke check een functie die (code, ernst, aantal, voorbeelden) teruggeeft;
+- [x] **M0.1 Validator** — `scripts/validate_model.py` (stdlib)
+  - [x] Skelet: elke check een functie die (code, ernst, aantal, voorbeelden) teruggeeft;
         uitvoer leesbaar én `--json` (voor agents/dashboard); `--strict` → exit-code ≠ 0
-  - [ ] Check koppelingsplicht: relaties zonder `mechanism_id`; relaties mét mechanisme
+        *(checks leven in `validation.py` op de repo-root, gedeeld met `/api/health`)*
+  - [x] Check koppelingsplicht: relaties zonder `mechanism_id`; relaties mét mechanisme
         zonder `instantiations`-rij; entiteiten zonder rol of instantiatie (Z6)
-  - [ ] Check bewijs: voor/tegen-argumenten zonder citatie; omvang statusachterstand (Z2)
-  - [ ] Check balans: alleen-steun-vlag per relatie/mechanisme/rol (Z1)
-  - [ ] Check padclaims: elke padclaim heeft ≥ 1 keten van directe edges tussen bron- en
+  - [x] Check bewijs: voor/tegen-argumenten zonder citatie; omvang statusachterstand (Z2)
+  - [x] Check balans: alleen-steun-vlag per relatie/mechanisme/rol (Z1)
+  - [x] Check padclaims: elke padclaim heeft ≥ 1 keten van directe edges tussen bron- en
         doelrol (eerste versie zonder drempels; later dezelfde gates als de viz)
-  - [ ] Check bronnen: bron zonder `source_locations`; url zonder `archive_url`;
+  - [x] Check bronnen: bron zonder `source_locations`; url zonder `archive_url`;
         linkrot achter een `--network`-vlag (HEAD-requests)
-  - [ ] Check schema-pariteit: verse DB in-memory bouwen uit `schema.sql` en per tabel
+  - [x] Check schema-pariteit: verse DB in-memory bouwen uit `schema.sql` en per tabel
         `PRAGMA table_info` + DDL diffen met de live DB (Z9)
-  - [ ] **Klaar wanneer:** draait foutloos op de live DB, rapporteert de bekende
-        achterstanden, en staat gedocumenteerd in CLAUDE.md
+  - [x] **Klaar wanneer:** draait foutloos op de live DB, rapporteert de bekende
+        achterstanden, en staat gedocumenteerd in CLAUDE.md *(12 juni 2026)*
 
-- [ ] **M0.2 Schema-pariteit herstellen** (Z9)
-  - [ ] Driftlijst vaststellen met de M0.1-schemacheck
-  - [ ] `schema.sql`: `active_from`/`active_until`/`active` op entities én relations;
+- [x] **M0.2 Schema-pariteit herstellen** (Z9)
+  - [x] Driftlijst vaststellen met de M0.1-schemacheck *(7 kolommen, 1 FK, 1 index +
+        `tegenmacht` ontbrak in beide CHECKs en `mechanism_type` moest nullable)*
+  - [x] `schema.sql`: `active_from`/`active_until`/`active` op entities én relations;
         `indirecte_invloed_op` in de property-CHECK; status `verworpen` toevoegen (4.5)
-  - [ ] Migratie: live `arguments`-tabel herbouwen mét CHECKs en FK op
+  - [x] Migratie: live `arguments`-tabel herbouwen mét CHECKs en FK op
         `parent_argument_id` (de 18 padclaims moeten geldig blijven)
-  - [ ] `scoring.py`: `STATUS_FACTOR['verworpen'] = 0.0`
-  - [ ] Verse-buildtest: `init_db` + seeds draaien schoon; alle POST-endpoints werken op
-        de verse DB
-  - [ ] **Klaar wanneer:** de M0.1-schemacheck meldt 0 verschillen
+        *(`migrate_schema_pariteit.py`; DDL wordt uit schema.sql gelezen; +`self_merged`)*
+  - [x] `scoring.py`: `STATUS_FACTOR['verworpen'] = 0.0`
+  - [x] Verse-buildtest: `init_db` + seeds draaien schoon; alle POST-endpoints werken op
+        de verse DB *(`scripts/test_fresh_build.py`)*
+  - [x] **Klaar wanneer:** de M0.1-schemacheck meldt 0 verschillen *(12 juni 2026;
+        resterende DDL-tekstverschillen zijn gedocumenteerd intentioneel, info-niveau)*
 
-- [ ] **M0.3 Citatiepoort** (Z2, Z8)
-  - [ ] `server.py`: voor/tegen-argument start als `bronvermelding_nodig`
+- [x] **M0.3 Citatiepoort** (Z2, Z8)
+  - [x] `server.py`: voor/tegen-argument start als `bronvermelding_nodig`
         (contextual blijft `ongecontroleerd`)
-  - [ ] `POST /api/citations` promoveert het doelargument automatisch
+  - [x] `POST /api/citations` promoveert het doelargument automatisch
         `bronvermelding_nodig` → `ongecontroleerd` (alleen die overgang)
-  - [ ] Optioneel: citaties direct meegeven in `POST /api/arguments` (één call voor agents)
-  - [ ] Viz: de regel tonen in het argumentformulier; DOCUMENTATIE.md § Stances bijwerken
-  - [ ] **Klaar wanneer:** handmatige test toont de automatische statusflow in beide
-        richtingen
+  - [x] Optioneel: citaties direct meegeven in `POST /api/arguments` (één call voor agents)
+  - [x] Viz: de regel tonen in het argumentformulier; DOCUMENTATIE.md § Stances bijwerken
+  - [x] **Klaar wanneer:** handmatige test toont de automatische statusflow in beide
+        richtingen *(12 juni 2026; geautomatiseerd herhaald in test_fresh_build +
+        test_auth_smoke)*
 
-- [ ] **M0.4 Backfill koppelingsplicht** (Z6)
-  - [ ] Werklijst uit M0.1 (peildatum juni 2026: 114 relaties / 10 instantiaties /
-        23 entiteiten)
-  - [ ] Per relatie een bestaand mechanisme koppelen; de restgroep wordt de
+- [x] **M0.4 Backfill koppelingsplicht** (Z6)
+  - [x] Werklijst uit M0.1 (stand 12 juni: 114 relaties / 14 instantiaties /
+        13 entiteiten zonder rol / 29 zonder instantiatie)
+  - [x] Per relatie een bestaand mechanisme koppelen; de restgroep wordt de
         kandidatenlijst voor nieuwe mechanismen (input voor M2.3-RfC's)
-  - [ ] Instantiaties en entiteit-rollen aanvullen (migratie met CONTRIB-tag;
-        eigenaar reviewt)
-  - [ ] **Klaar wanneer:** M0.1 meldt 0 ontbrekende koppelingen
+        *(108 gekoppeld via `migrate_backfill_koppelingen.py`; 6 kandidaten +
+        motiveringen + richting-mismatches in `BACKFILL_REVIEW.md`)*
+  - [x] Instantiaties en entiteit-rollen aanvullen (migratie met CONTRIB-tag
+        `backfill-M0.4`, exemplariteit 0,8; eigenaar reviewt via BACKFILL_REVIEW.md)
+  - [ ] **Klaar wanneer:** M0.1 meldt 0 ontbrekende koppelingen — *6 relaties blijven
+        bewust open (kandidaten voor nieuwe theorie-elementen, M2.3; twee daarvan zijn
+        verwijder-adviezen). Dit vakje sluit pas na de eerste theorie-RfC's of review.*
 
-- [ ] **M0.5 Gezondheidsdashboard**
-  - [ ] `/api/health` hergebruikt de M0.1-checkfuncties (zelfde module, geen duplicatie)
-  - [ ] Inklapbaar paneel in de viz met de §1-metrieken, stance-balans en bewijsdekking
-  - [ ] **Klaar wanneer:** de cijfers in de viz zijn identiek aan de validatoruitvoer
+- [x] **M0.5 Gezondheidsdashboard**
+  - [x] `/api/health` hergebruikt de M0.1-checkfuncties (zelfde module, geen duplicatie)
+  - [x] Inklapbaar paneel "Modelgezondheid" in de viz-zijbalk met kerngetallen,
+        stance-balans, bewijsdekking en alle bevindingen
+  - [x] **Klaar wanneer:** de cijfers in de viz zijn identiek aan de validatoruitvoer
+        *(per constructie: zelfde `validation.py`; gelijkheid van de totalen is
+        programmatisch geverifieerd, 12 juni 2026)*
 
-- [ ] **M0.6 Users, inlogportal & tokens** (ontwerp: §5/M0.6)
-  - [ ] `auth.py`: scrypt-wachtwoordhash + sha256-tokenhash (stdlib)
-  - [ ] Migratie `users`-tabel + token-index (+ `schema.sql`)
-  - [ ] `scripts/create_user.py`: mens/agent aanmaken, `--new-token --save`
-        (schrijft `data/tokens/<naam>.token`, chmod 600), `--set-password`
-  - [ ] `server.py`: `current_user` (Bearer gaat vóór sessie) + `require_user(min_rol)`;
+- [x] **M0.6 Users, inlogportal & tokens** (ontwerp: §5/M0.6)
+  - [x] `auth.py`: scrypt-wachtwoordhash + sha256-tokenhash (stdlib) *(met
+        PBKDF2-SHA256-fallback, 600k iteraties: de macOS-systeem-Python is tegen
+        LibreSSL gecompileerd en mist `hashlib.scrypt`; het opslagformaat draagt
+        het schema, dus beide blijven verifieerbaar)*
+  - [x] Migratie `users`-tabel (+ `schema.sql`; UNIQUE op token_hash levert de index)
+  - [x] `scripts/create_user.py`: mens/agent aanmaken, `--new-token --save`
+        (schrijft `data/tokens/<naam>.token`, chmod 600), `--set-password`, `--list`
+  - [x] `server.py`: `_zoek_user` (Bearer gaat vóór sessie) + `require_user(min_rol)`;
         álle schrijf-endpoints beschermd; attributie uit `g.user`, nooit uit de payload;
-        DELETEs en theorielaag = maintainer
-  - [ ] Portal: `/login`, `/logout`, accountpagina met token-generatie/rotatie;
-        `/api/me`; `/api/tokens`
-  - [ ] Viz: auth-chip in de topbar; "jouw naam"-velden vervangen door "ingediend als …"
-  - [ ] `.gitignore`: `data/secret_key`, `data/tokens/`
-  - [ ] Smoke-test (Flask `test_client` op een kopie-DB): 401 anoniem, sessieflow,
+        DELETEs en theorielaag = maintainer; status-PATCH = reviewer; zelf-merge zet
+        de `self_merged`-vlag
+  - [x] Portal: `/login`, `/api/logout`, accountpagina (`/account`) met
+        token-generatie/rotatie; `/api/me`; `/api/tokens`
+  - [x] Viz: auth-chip in de topbar; "jouw naam"-velden vervangen door "ingediend als …"
+  - [x] `.gitignore`: `data/secret_key`, `data/tokens/`
+  - [x] Smoke-test (Flask `test_client` op een kopie-DB): 401 anoniem, sessieflow,
         Bearer-flow, rolpoorten (403), attributie-spoofing genegeerd
-  - [ ] Eigenaarsaccount (maintainer) + token; eerste echte bijdrage via de API als
-        ingelogde gebruiker
-  - [ ] Dogfood-regel vastleggen in CLAUDE.md (inhoud nooit meer via migratiescripts)
-  - [ ] **Klaar wanneer:** een bijdrage via Claude Code landt onder het eigenaarsaccount,
-        zonder vrije naamvelden
+        *(`scripts/test_auth_smoke.py`, plus zelf-merge en tokenrotatie)*
+  - [x] Eigenaarsaccount (maintainer `maxime`) + token; eerste echte bijdrage via de
+        API als ingelogde gebruiker *(argument #483 op relatie #426, met citatie,
+        `contributed_by=maxime`; wachtwoord voor de browser-portal zet de eigenaar
+        zelf: `python3 scripts/create_user.py maxime --set-password`)*
+  - [x] Dogfood-regel vastleggen in CLAUDE.md (inhoud nooit meer via migratiescripts)
+  - [x] **Klaar wanneer:** een bijdrage via Claude Code landt onder het eigenaarsaccount,
+        zonder vrije naamvelden *(12 juni 2026)*
 
 ### Fase 1 — scoring v2
 

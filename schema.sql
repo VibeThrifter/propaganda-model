@@ -17,6 +17,7 @@ CREATE TABLE roles (
         'flak',              -- 4e filter: disciplineringsmechanisme
         'ideologie',         -- 5e filter: ideologisch kader
         'systeemactor',      -- actoren die meerdere filters bedienen
+        'tegenmacht',        -- rollen die de filters weerstaan/corrigeren
         'overig'
     )),
     description TEXT NOT NULL,
@@ -37,9 +38,10 @@ CREATE TABLE mechanisms (
         'flak',
         'ideologie',
         'cross_filter',      -- mechanismen die meerdere filters verbinden
+        'tegenmacht',        -- mechanismen die de filters weerstaan/corrigeren
         'overig'
     )),
-    mechanism_type TEXT NOT NULL CHECK(mechanism_type IN (
+    mechanism_type TEXT CHECK(mechanism_type IN (
         'structureel',       -- ingebouwd in het systeem (eigendomsconcentratie)
         'procedureel',       -- via routines en processen (pakketjournalistiek)
         'psychologisch',     -- via cognitieve/sociale processen (groepsdenken)
@@ -91,12 +93,15 @@ CREATE TABLE mechanism_themes (
 
 -- Emergente effecten als HYPEREDGE: een systeemeigenschap die uit het samenspel van
 -- MEERDERE rollen voortkomt en niet in een 1-op-1 relatie te vangen is (bv. 'fabricage
--- van consensus'). Geen bron→doel-pijl; het effect hoort bij de hele ledengroep.
--- Zie migrate_add_emergent_effects.py. In de viz: transparant veld rond de leden (theorie).
+-- van instemming'). Geen bron→doel-pijl; het effect hoort bij de hele ledengroep.
+-- Eersteklas theorie-element: eigen discussieboom (arguments.emergent_effect_id),
+-- eigen tijdvenster (active_from/until) en eigen score (scoring: literatuurpoot).
+-- Zie migrate_add_emergent_effects.py en migrate_velden_eersteklas.py.
+-- In de viz: transparant veld rond de leden (theorie).
 CREATE TABLE emergent_effects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,            -- machine-naam, bv. 'fabricage_van_consensus'
-    label TEXT NOT NULL,                  -- weergavenaam, bv. 'Fabricage van consensus'
+    name TEXT NOT NULL UNIQUE,            -- machine-naam, bv. 'fabricage_van_instemming'
+    label TEXT NOT NULL,                  -- weergavenaam, bv. 'Fabricage van instemming'
     category TEXT NOT NULL DEFAULT 'systeemactor' CHECK(category IN (
         'eigendom','advertentie','sourcing','flak','ideologie','systeemactor','overig'
     )),
@@ -109,6 +114,15 @@ CREATE TABLE emergent_effect_members (
     emergent_effect_id INTEGER NOT NULL REFERENCES emergent_effects(id) ON DELETE CASCADE,
     role_id INTEGER NOT NULL REFERENCES roles(id),
     PRIMARY KEY (emergent_effect_id, role_id)
+);
+-- Tweede-orde-structuur: een emergent effect kan deel-effecten hebben. Gebruikt voor
+-- het apex-veld 'fabricage_van_instemming': de overige velden zijn er formeel deel van
+-- (de ledenset van het apex-veld blijft pars pro toto — één dragende rol per filter).
+CREATE TABLE emergent_effect_subeffects (
+    parent_effect_id INTEGER NOT NULL REFERENCES emergent_effects(id) ON DELETE CASCADE,
+    child_effect_id  INTEGER NOT NULL REFERENCES emergent_effects(id) ON DELETE CASCADE,
+    PRIMARY KEY (parent_effect_id, child_effect_id),
+    CHECK (parent_effect_id != child_effect_id)
 );
 
 --------------------------------------------------------------
@@ -168,7 +182,11 @@ CREATE TABLE entities (
     description TEXT,
     metadata JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
+    active_from TEXT,
+    active_until TEXT,
+    active BOOLEAN DEFAULT TRUE
 );
 
 -- Een entiteit kan meerdere rollen vervullen
@@ -228,7 +246,11 @@ CREATE TABLE relations (
     certainty REAL CHECK(certainty BETWEEN 0.0 AND 1.0),
     influence REAL CHECK(influence BETWEEN 0.0 AND 1.0),
     bidirectional BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
+    active_from TEXT,
+    active_until TEXT,
+    active BOOLEAN DEFAULT TRUE
 );
 
 --------------------------------------------------------------
@@ -291,8 +313,13 @@ CREATE TABLE sources (
         'regulier',          -- dagblad, omroep, ANP
         'opinie',            -- column, essay, commentaar
         'grijs',             -- blog, podcast, social media, onafhankelijk
+        'eigen_synthese',    -- projectmateriaal (sources/AI/*.md): vindplaats, nooit bewijs — gewicht 0 (M1.2)
         'onbeoordeeld'       -- nog niet geclassificeerd
     )),
+    -- Broncluster (M1.2): bronnen met dezelfde auteur/uitgever/onderliggende data zijn
+    -- géén onafhankelijke bewijslijnen. Binnen een cluster telt alleen het sterkste
+    -- argument; combineren gebeurt over clusters (scoring.py). NULL = eigen cluster.
+    cluster_key TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -328,6 +355,7 @@ CREATE TABLE arguments (
     entity_id INTEGER REFERENCES entities(id),            -- optioneel: argument over een entiteit (praktijk)
     role_id INTEGER REFERENCES roles(id),                 -- optioneel: literatuur-argument over een rol (theorie)
     mechanism_id INTEGER REFERENCES mechanisms(id),       -- optioneel: literatuur-argument over een mechanisme (theorie)
+    emergent_effect_id INTEGER REFERENCES emergent_effects(id), -- optioneel: literatuur-argument over een emergent veld (theorie)
     parent_argument_id INTEGER REFERENCES arguments(id),  -- NULL = root, anders = reactie op parent
     -- Welk aspect wordt bediscussieerd? NULL = het bestaan/de kern van de relatie/entiteit
     property TEXT CHECK(property IN (
@@ -339,7 +367,10 @@ CREATE TABLE arguments (
         'relation_type',     -- klopt het type relatie?
         'description',       -- klopt de beschrijving?
         'type',              -- klopt het entiteittype?
-        'role'               -- klopt de toegewezen rol?
+        'role',              -- klopt de toegewezen rol?
+        'indirecte_invloed_op', -- padclaim: rol heeft samengestelde invloed op rol in property_value
+        'compositie'         -- compositieclaim (M1.5): het SAMENSPEL van een emergent veld bestaat,
+                             -- niet alleen de leden — analoog aan padclaims voor afgeleide pijlen
     )),
     property_value TEXT,     -- voorgestelde waarde (bijv. '2019' voor active_from)
     stance TEXT NOT NULL CHECK(stance IN (
@@ -357,13 +388,34 @@ CREATE TABLE arguments (
         'bronvermelding_nodig', -- claim zonder voldoende citaties
         'betwist',           -- actief betwist door tegenargumenten
         'geverifieerd',      -- citaties gecontroleerd en bevestigd
-        'verouderd'          -- informatie mogelijk niet meer actueel
+        'verouderd',         -- informatie mogelijk niet meer actueel
+        'verworpen'          -- na review afgewezen; telt niet mee (scoring: factor 0)
+    )),
+    -- Zelf-merge (M0.6): inbrenger zette zijn eigen argument op 'geverifieerd'.
+    -- Toegestaan (n=1) maar gemarkeerd, zodat het later herauditeerbaar is.
+    self_merged BOOLEAN NOT NULL DEFAULT FALSE,
+    -- M1.8: machineleesbare classificatie van een ONDERGRAVING — een contradicting-reply
+    -- die de redenering van zijn parent aanvalt ("de gevolgtrekking deugt niet"), géén
+    -- tegenbewijs voor het doel. NULL voor gewone argumenten en weerleggingen.
+    objection_type TEXT CHECK(objection_type IN (
+        'cirkelredenering', 'stroman', 'non_sequitur', 'correlatie_als_causatie',
+        'vals_dilemma', 'ad_hominem', 'autoriteit_buiten_domein', 'anekdote_als_regel',
+        'cherry_picking', 'equivocatie', 'citaat_dekking', 'overig'
     )),
     contributed_by TEXT,                 -- wie voegde dit toe (accountability)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- Minstens één target verplicht: praktijk (relatie/entiteit) óf theorie (rol/mechanisme)
-    CHECK (relation_id IS NOT NULL OR entity_id IS NOT NULL
-        OR role_id IS NOT NULL OR mechanism_id IS NOT NULL)
+    -- Doelregel (M1.1, boomsemantiek): een ROOT-argument draagt minstens één doel
+    -- (praktijk: relatie/entiteit; theorie: rol/mechanisme/emergent veld); een REPLY
+    -- (parent_argument_id gevuld) draagt GÉÉN eigen doel — zijn stance is relatief aan
+    -- de parent en zijn kracht stroomt via de boom (DF-QuAD), nooit direct naar een doel.
+    CHECK ((parent_argument_id IS NULL
+            AND (relation_id IS NOT NULL OR entity_id IS NOT NULL
+                 OR role_id IS NOT NULL OR mechanism_id IS NOT NULL
+                 OR emergent_effect_id IS NOT NULL))
+        OR (parent_argument_id IS NOT NULL
+            AND relation_id IS NULL AND entity_id IS NULL
+            AND role_id IS NULL AND mechanism_id IS NULL
+            AND emergent_effect_id IS NULL))
 );
 
 -- Citaties per argument: verwijzingen naar specifieke bronpassages
@@ -376,6 +428,33 @@ CREATE TABLE citations (
     section TEXT,                        -- hoofdstuk / sectie ("Hoofdstuk 3: Sourcing")
     context TEXT,                        -- korte toelichting bij het citaat
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--------------------------------------------------------------
+-- USERS (identiteit-licht, verbeterplan M0.6)
+-- Mensen én agents; schrijf-endpoints vereisen een account. Wachtwoord
+-- alleen voor mensen (scrypt-hash); het API-token staat als sha256-hash —
+-- het token zelf wordt nooit opgeslagen en is alleen bij generatie zichtbaar
+-- (scripts/create_user.py / POST /api/tokens). UNIQUE op token_hash levert
+-- de lookup-index. Beheer: scripts/create_user.py; poorten: server.py.
+--------------------------------------------------------------
+
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL DEFAULT 'mens' CHECK(kind IN ('mens', 'agent')),
+    role TEXT NOT NULL DEFAULT 'bijdrager' CHECK(role IN (
+        'bijdrager',         -- mag inhoud toevoegen (argumenten, citaties, praktijklaag)
+        'reviewer',          -- mag ook statussen beoordelen (geverifieerd/betwist/…)
+        'maintainer'         -- mag ook theorielaag wijzigen en verwijderen
+    )),
+    password_hash TEXT,                  -- scrypt; alleen voor mensen (inlogportal)
+    token_hash TEXT UNIQUE,              -- sha256 van het Bearer-token; nooit het token zelf
+    provenance TEXT,                     -- agents: model + versie (verplicht via CHECK)
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP,
+    CHECK (kind != 'agent' OR provenance IS NOT NULL)
 );
 
 --------------------------------------------------------------
@@ -434,6 +513,7 @@ CREATE INDEX idx_arguments_relation ON arguments(relation_id);
 CREATE INDEX idx_arguments_entity ON arguments(entity_id);
 CREATE INDEX idx_arguments_role ON arguments(role_id);
 CREATE INDEX idx_arguments_mechanism ON arguments(mechanism_id);
+CREATE INDEX idx_arguments_emergent ON arguments(emergent_effect_id);
 CREATE INDEX idx_arguments_parent ON arguments(parent_argument_id);
 CREATE INDEX idx_arguments_stance ON arguments(stance);
 CREATE INDEX idx_citations_argument ON citations(argument_id);

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Inloggen — Propagandamodel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: rgba(24,24,36,0.85); --border: rgba(255,255,255,0.12);
+  --text: #e8e8f0; --text-dim: #8888a0; --text-muted: #5a5a70; --accent: #6c8aff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+       background: var(--bg); color: var(--text);
+       font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+.kaart { width: 340px; background: var(--bg-card); border: 1px solid var(--border);
+         border-radius: 12px; padding: 28px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+h1 { font-size: 17px; margin: 0 0 2px; }
+.sub { font-size: 12px; color: var(--text-dim); margin-bottom: 20px; }
+label { display: block; font-size: 11px; color: var(--text-dim); margin: 12px 0 4px;
+        text-transform: uppercase; letter-spacing: 0.05em; }
+input { width: 100%; padding: 9px 10px; border-radius: 7px; border: 1px solid var(--border);
+        background: rgba(0,0,0,0.3); color: var(--text); font-size: 14px; }
+input:focus { outline: none; border-color: var(--accent); }
+button { width: 100%; margin-top: 18px; padding: 10px; border: none; border-radius: 7px;
+         background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+button:hover { filter: brightness(1.1); }
+.fout { margin-top: 12px; font-size: 12px; color: #e0635f; min-height: 1em; }
+.voet { margin-top: 18px; font-size: 11px; color: var(--text-muted); }
+.voet a { color: var(--text-dim); }
+code { background: rgba(0,0,0,0.35); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<form class="kaart" id="loginForm">
+  <h1>Propagandamodel</h1>
+  <div class="sub">Inloggen voor bijdragen — lezen kan zonder account.</div>
+  <label for="username">Gebruikersnaam</label>
+  <input id="username" autocomplete="username" autofocus>
+  <label for="password">Wachtwoord</label>
+  <input id="password" type="password" autocomplete="current-password">
+  <button type="submit">Inloggen</button>
+  <div class="fout" id="fout"></div>
+  <div class="voet">
+    Nog geen account of wachtwoord? Maak het aan met
+    <code>scripts/create_user.py</code>. Agents en Claude Code gebruiken een
+    Bearer-token (zie <a href="/account">accountpagina</a>).
+  </div>
+</form>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fout = document.getElementById('fout');
+  fout.textContent = '';
+  try {
+    const resp = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { fout.textContent = data.error || 'Inloggen mislukt'; return; }
+    window.location.href = '/';
+  } catch (err) { fout.textContent = 'Netwerkfout: ' + err.message; }
+});
+</script>
+</body>
+</html>

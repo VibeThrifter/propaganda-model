@@ -98,12 +98,25 @@ def export_data():
             members.setdefault(eid, []).append(rid)
         for e in emergent_effects:
             e['member_role_ids'] = members.get(e['id'], [])
+        # Tweede-orde-structuur: deel-effecten (apex-veld) + omgekeerde verwijzing
+        sub, parent = {}, {}
+        if cur.execute("SELECT name FROM sqlite_master WHERE type='table' "
+                       "AND name='emergent_effect_subeffects'").fetchone():
+            for pid, cid in cur.execute(
+                    "SELECT parent_effect_id, child_effect_id FROM emergent_effect_subeffects"):
+                sub.setdefault(pid, []).append(cid)
+                parent.setdefault(cid, []).append(pid)
+        for e in emergent_effects:
+            e['sub_effect_ids'] = sub.get(e['id'], [])
+            e['parent_effect_ids'] = parent.get(e['id'], [])
 
     # Arguments: volledige discussiebomen
     cur.execute("""
-        SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.parent_argument_id,
+        SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id,
+               a.emergent_effect_id, a.parent_argument_id,
                a.property, a.property_value,
-               a.stance, a.claim, a.title, a.reasoning, a.weight, a.status
+               a.stance, a.claim, a.title, a.reasoning, a.weight, a.status,
+               a.objection_type
         FROM arguments a
         ORDER BY a.parent_argument_id NULLS FIRST, a.id
     """)
@@ -156,14 +169,28 @@ def export_data():
         r['mechanism_themes'] = sorted(mech_themes.get(mid, []))
 
     # ── Afgeleide scores injecteren (uit scoring.compute_all_scores) ──
+    # Naast het kale cijfer ook het scoring-v2-detail (interval, onweersproken-,
+    # SPOF- en clustervlaggen) en de afgeleide invloed (M1.7).
     for r in relations:
         r['derived_certainty'] = scores['relations'].get(r['id'], r.get('certainty') or 0.0)
+        r['score_detail'] = scores['relations_detail'].get(r['id'])
+        r['derived_influence'] = scores['relations_influence'].get(r['id'], r.get('influence') or 0.0)
+        r['influence_detail'] = scores['relations_influence_detail'].get(r['id'])
     for e in entities:
         e['derived_certainty'] = scores['entities'].get(e['id'], 0.0)
+        e['score_detail'] = scores['entities_detail'].get(e['id'])
     for role in roles:
         role.update(scores['roles'].get(role['id'], {}))
     for m in mechanisms:
         m.update(scores['mechanisms'].get(m['id'], {}))
+    for eff in emergent_effects:
+        eff.update(scores.get('emergent_effects', {}).get(eff['id'], {}))
+    # Per argument τ (basiskracht) en σ (eindkracht na replies, M1.1)
+    for a in arguments:
+        sc = scores.get('argument_scores', {}).get(a['id'])
+        if sc:
+            a['tau'] = sc['tau']
+            a['sigma'] = sc['sigma']
 
     # ── Structurele invloed-centraliteit (topologie) ──
     # Twee varianten per node: de basisvelden (influence_*) komen uit de SCHONE dyadische graaf

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Account — Propagandamodel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: rgba(24,24,36,0.85); --border: rgba(255,255,255,0.12);
+  --text: #e8e8f0; --text-dim: #8888a0; --text-muted: #5a5a70; --accent: #6c8aff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+       background: var(--bg); color: var(--text);
+       font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+.kaart { width: 480px; background: var(--bg-card); border: 1px solid var(--border);
+         border-radius: 12px; padding: 28px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+h1 { font-size: 17px; margin: 0 0 16px; }
+h2 { font-size: 13px; margin: 22px 0 8px; color: var(--text-dim);
+     text-transform: uppercase; letter-spacing: 0.05em; }
+dl { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+dt { color: var(--text-dim); } dd { margin: 0; }
+button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 7px;
+         background: rgba(0,0,0,0.3); color: var(--text); font-size: 13px; cursor: pointer; }
+button.primair { background: var(--accent); border: none; color: #fff; font-weight: 600; }
+button:hover { filter: brightness(1.15); }
+.token { margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.4); border: 1px dashed var(--border);
+         border-radius: 7px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+         word-break: break-all; display: none; }
+.hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+.fout { color: #e0635f; font-size: 12px; margin-top: 8px; min-height: 1em; }
+.rij { display: flex; gap: 8px; margin-top: 10px; }
+a { color: var(--text-dim); }
+code { background: rgba(0,0,0,0.35); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="kaart" id="kaart">Laden…</div>
+<script>
+async function laad() {
+  const kaart = document.getElementById('kaart');
+  const resp = await fetch('/api/me');
+  if (resp.status === 401) { window.location.href = '/login'; return; }
+  const me = await resp.json();
+  kaart.innerHTML = `
+    <h1>Account</h1>
+    <dl>
+      <dt>Gebruikersnaam</dt><dd><b>${me.username}</b></dd>
+      <dt>Soort</dt><dd>${me.kind}</dd>
+      <dt>Rol</dt><dd>${me.role}</dd>
+      ${me.provenance ? `<dt>Provenance</dt><dd>${me.provenance}</dd>` : ''}
+      <dt>Laatste login</dt><dd>${me.last_login_at || '—'}</dd>
+      <dt>API-token</dt><dd>${me.heeft_token ? 'actief (alleen hash opgeslagen)' : 'geen'}</dd>
+    </dl>
+    <h2>API-token voor Claude Code &amp; agents</h2>
+    <div class="rij">
+      <button class="primair" id="tokenBtn">${me.heeft_token ? 'Token roteren' : 'Token genereren'}</button>
+      <button id="logoutBtn">Uitloggen</button>
+    </div>
+    <div class="token" id="tokenVak"></div>
+    <div class="hint">Het token wordt één keer getoond en nooit opgeslagen (alleen de
+      sha256-hash). Gebruik: <code>Authorization: Bearer &lt;token&gt;</code> — daarmee werkt
+      Claude Code als jou; bijdragen landen onder dit account.</div>
+    <div class="fout" id="fout"></div>
+    <div class="hint"><a href="/">← terug naar de visualisatie</a></div>`;
+
+  document.getElementById('tokenBtn').addEventListener('click', async () => {
+    const fout = document.getElementById('fout');
+    fout.textContent = '';
+    try {
+      const r = await fetch('/api/tokens', { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok) { fout.textContent = d.error || 'Token genereren mislukt'; return; }
+      const vak = document.getElementById('tokenVak');
+      vak.style.display = 'block';
+      vak.textContent = d.token;
+    } catch (e) { fout.textContent = 'Netwerkfout: ' + e.message; }
+  });
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+}
+laad();
+</script>
+</body>
+</html>
