@@ -197,7 +197,12 @@ CREATE TABLE entities (
     active_until TEXT,
     active BOOLEAN DEFAULT TRUE,
     -- M2.6: vervangen door opvolger(s); zie `lineage`.
-    vervangen BOOLEAN NOT NULL DEFAULT FALSE
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Moderatiewachtrij: een admin-creatie staat meteen 'goedgekeurd'; een
+    -- bijdrage van iemand anders is 'voorgesteld' (onzichtbaar in viz/scores)
+    -- tot een reviewer haar goedkeurt. Zie migrate_moderatie_wachtrij.py.
+    status TEXT NOT NULL DEFAULT 'goedgekeurd'
+        CHECK(status IN ('voorgesteld', 'goedgekeurd', 'afgewezen'))
 );
 
 -- Een entiteit kan meerdere rollen vervullen
@@ -263,7 +268,11 @@ CREATE TABLE relations (
     active_until TEXT,
     active BOOLEAN DEFAULT TRUE,
     -- M2.6: vervangen door opvolger(s); zie `lineage`.
-    vervangen BOOLEAN NOT NULL DEFAULT FALSE
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Moderatiewachtrij (zie entities.status): admin-creatie = direct
+    -- 'goedgekeurd', andere bijdragen 'voorgesteld' tot review.
+    status TEXT NOT NULL DEFAULT 'goedgekeurd'
+        CHECK(status IN ('voorgesteld', 'goedgekeurd', 'afgewezen'))
 );
 
 --------------------------------------------------------------
@@ -507,7 +516,8 @@ CREATE TABLE voorstellen (
                                  -- falsificatiecriterium, ≥1 instantiatie, ≥1 bron
         'splitsen',              -- M2.6: één element → meerdere opvolgers (+ hertriage-plan)
         'samenvoegen',           -- M2.6: meerdere elementen → één opvolger (+ herbevestiging)
-        'hernoemen'              -- M2.6: lichte variant, geen hertriage
+        'hernoemen',             -- M2.6: lichte variant, geen hertriage
+        'herformuleren'          -- titel/beschrijving bewerken via review (Wikipedia/OSS)
     )),
     titel TEXT NOT NULL,
     payload JSON NOT NULL,               -- sjabloonvelden + hertriage-/herbevestigingsplan
@@ -575,7 +585,7 @@ CREATE TABLE watchlists (
 
 CREATE TABLE lineage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    soort TEXT NOT NULL CHECK(soort IN ('splitsen', 'samenvoegen', 'hernoemen')),
+    soort TEXT NOT NULL CHECK(soort IN ('splitsen', 'samenvoegen', 'hernoemen', 'herformuleren')),
     element_type TEXT NOT NULL CHECK(element_type IN (
         'rol', 'mechanisme', 'entiteit', 'relatie', 'emergent_effect'
     )),

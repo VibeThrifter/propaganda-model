@@ -159,9 +159,19 @@ def main():
         "watchlist-feed vangt argumenten op het gevolgde doel")
     eis(c.get("/api/recent_changes").status_code == 200, "feed is open leesbaar")
 
-    print("6. M2.3 — theory-RfC: sjabloon + twee menselijke reviewers")
-    r = c.post("/api/roles", headers=kop["baas"], json={"name": "x"})
-    eis(r.status_code == 403, "directe theorie-POST is dicht (alleen nog RfC)")
+    print("6. M2.3 — theory-RfC: sjabloon + reviewers; maintainer-poort (opbouwfase)")
+    # Directe theorie-POST: dicht voor niet-maintainers ...
+    r = c.post("/api/roles", headers=kop["bij"],
+               json={"name": "x", "category": "overig", "description": "x"})
+    eis(r.status_code == 403, "directe theorie-POST is dicht voor niet-maintainers")
+    # ... maar een globale maintainer mag in de opbouwfase direct toevoegen (gevlagd).
+    r = c.post("/api/roles", headers=kop["baas"], json={
+        "naam": "f2_directe_rol", "categorie": "overig",
+        "definitie": "Direct toegevoegd in de opbouwfase."})
+    eis(r.status_code == 201 and r.get_json().get("direct_toegevoegd"),
+        "globale maintainer mag een rol direct toevoegen (opbouwfase)")
+    c.delete(f"/api/roles/{r.get_json()['id']}", headers=kop["baas"])
+
     r = c.post("/api/voorstellen", headers=kop["baas"], json={
         "soort": "nieuw_theorie_element", "titel": "Rol: testwaakhond",
         "payload": {"element_type": "rol", "naam": "testwaakhond"}})
@@ -172,6 +182,7 @@ def main():
            "afgrenzing": "Anders dan toezichthouder: geen formele bevoegdheid.",
            "falsificatiecriterium": "Geen aantoonbare doorlichtingscasussen.",
            "instantiaties": ["F2-Krant als casus"], "bronnen": ["F2-Bron"]}
+    # Gewone weg (indiener = maintainer maar reviewt niet zelf): twee reviewers.
     r = c.post("/api/voorstellen", headers=kop["baas"], json={
         "soort": "nieuw_theorie_element", "titel": "Rol: testwaakhond", "payload": rfc})
     eis(r.status_code == 201 and r.get_json()["benodigde_akkoorden"] == 2,
@@ -181,21 +192,82 @@ def main():
                json={"oordeel": "akkoord"})
     eis(r.status_code == 200 and r.get_json()["besluit"] == "open",
         "agent-akkoord telt nooit mee (advies)")
-    r = c.post(f"/api/voorstellen/{vid}/reviews", headers=kop["baas"],
-               json={"oordeel": "akkoord"})
-    eis(r.get_json()["besluit"] == "open", "indiener-akkoord telt niet op de theorielaag")
     r = c.post(f"/api/voorstellen/{vid}/reviews", headers=kop["r1"],
                json={"oordeel": "akkoord"})
     eis(r.get_json()["besluit"] == "open", "één menselijke reviewer is niet genoeg (1/2)")
     r = c.post(f"/api/voorstellen/{vid}/reviews", headers=kop["r2"],
                json={"oordeel": "akkoord"})
     j = r.get_json()
-    eis(j["besluit"] == "geaccepteerd", "tweede akkoord accepteert en voert uit")
+    eis(j["besluit"] == "geaccepteerd" and not j["resultaat"].get("maintainer_quorum"),
+        "tweede reviewer-akkoord accepteert via de gewone drempel")
     rol_id = j["resultaat"]["id"]
     conn = sqlite3.connect(tmp)
     eis(conn.execute("SELECT name FROM roles WHERE id = ?", (rol_id,)).fetchone()[0]
         == "testwaakhond", "rol bestaat na acceptatie")
     conn.close()
+
+    # 6b. Maintainer-quorum: één akkoord van een globale maintainer = volledig quorum.
+    rfc2 = dict(rfc, naam="testwaakhond2")
+    r = c.post("/api/voorstellen", headers=kop["r1"], json={
+        "soort": "nieuw_theorie_element", "titel": "Rol: testwaakhond2", "payload": rfc2})
+    vid2 = r.get_json()["id"]
+    r = c.post(f"/api/voorstellen/{vid2}/reviews", headers=kop["r1"],
+               json={"oordeel": "akkoord"})
+    eis(r.get_json()["besluit"] == "open",
+        "indiener-akkoord (niet-maintainer) telt niet op de theorielaag")
+    r = c.post(f"/api/voorstellen/{vid2}/reviews", headers=kop["baas"],
+               json={"oordeel": "akkoord"})
+    j = r.get_json()
+    eis(j["besluit"] == "geaccepteerd" and j["resultaat"]["maintainer_quorum"]
+        and not j["resultaat"]["self_merged"],
+        "maintainer-akkoord telt als volledig quorum (opbouwfase)")
+    c.delete(f"/api/roles/{j['resultaat']['id']}", headers=kop["baas"])
+
+    # 6c. Titel/beschrijving bewerken (Wikipedia/OSS): voorstel door iedereen,
+    #     directe bewerking alleen door maintainer.
+    herf = {"soort": "herformuleren", "titel": "Scherpere definitie testwaakhond",
+            "payload": {"element_type": "rol", "element_id": rol_id,
+                        "velden": {"description": "Aangescherpte definitie."},
+                        "motivatie": "Duidelijker geformuleerd."}}
+    r = c.post("/api/voorstellen", headers=kop["bij"], json=herf)  # bijdrager stelt voor
+    eis(r.status_code == 201, "bijdrager mag een herformulering voorstellen")
+    vid3 = r.get_json()["id"]
+    r = c.post(f"/api/voorstellen/{vid3}/reviews", headers=kop["baas"], json={"oordeel": "akkoord"})
+    eis(r.get_json()["besluit"] == "geaccepteerd", "maintainer-akkoord voert herformulering uit")
+    conn = sqlite3.connect(tmp)
+    eis(conn.execute("SELECT description FROM roles WHERE id = ?", (rol_id,)).fetchone()[0]
+        == "Aangescherpte definitie.", "beschrijving is via het voorstelpad gewijzigd")
+    conn.close()
+    r = c.patch(f"/api/roles/{rol_id}", headers=kop["bij"], json={"definitie": "x"})
+    eis(r.status_code == 403, "bijdrager mag niet direct bewerken (PATCH)")
+    r = c.patch(f"/api/roles/{rol_id}", headers=kop["baas"],
+                json={"definitie": "Direct bijgewerkt door maintainer.", "motivatie": "typo"})
+    eis(r.status_code == 200 and r.get_json().get("direct_bewerkt")
+        and r.get_json()["gewijzigd"] == ["description"],
+        "maintainer mag titel/beschrijving direct bewerken (gevlagd)")
+
+    # 6d. Moderatiewachtrij: admin-creatie meteen zichtbaar, andere bijdragen
+    #     'voorgesteld' tot een reviewer (niet de maker) ze goedkeurt.
+    r = c.post("/api/entities", headers=kop["bij"], json={"name": "F2 Spammer-node", "type": "bedrijf"})
+    eis(r.status_code == 201 and r.get_json()["status"] == "voorgesteld",
+        "bijdrager-entiteit wacht op goedkeuring (onzichtbaar)")
+    ent_v = r.get_json()["id"]
+    r = c.post("/api/entities", headers=kop["baas"], json={"name": "F2 Admin-node", "type": "bedrijf"})
+    eis(r.get_json()["status"] == "goedgekeurd", "admin-entiteit is meteen zichtbaar")
+    r = c.patch(f"/api/entities/{ent_v}/status", headers=kop["bot"], json={"status": "goedgekeurd"})
+    eis(r.status_code == 403, "agent mag niet modereren")
+    r = c.patch(f"/api/entities/{ent_v}/status", headers=kop["bij"], json={"status": "goedgekeurd"})
+    eis(r.status_code == 403, "bijdrager mag niet modereren")
+    r = c.patch(f"/api/entities/{ent_v}/status", headers=kop["r1"], json={"status": "goedgekeurd"})
+    eis(r.status_code == 200, "reviewer keurt de voorgestelde entiteit goed")
+    # Eigen werk goedkeuren kan niet, ook niet als reviewer.
+    r = c.post("/api/entities", headers=kop["r1"], json={"name": "F2 Reviewer-node", "type": "bedrijf"})
+    ent_own = r.get_json()["id"]
+    eis(r.get_json()["status"] == "voorgesteld", "reviewer is geen maintainer: entiteit wacht ook")
+    r = c.patch(f"/api/entities/{ent_own}/status", headers=kop["r1"], json={"status": "goedgekeurd"})
+    eis(r.status_code == 403, "eigen werk goedkeuren kan niet (M2.1)")
+    r = c.patch(f"/api/entities/{ent_own}/status", headers=kop["r2"], json={"status": "goedgekeurd"})
+    eis(r.status_code == 200, "een andere reviewer keurt wel goed")
 
     print("7. M2.6 — samenvoegen via het voorstelpad (herbevestiging, lineage)")
     samen = {"element_type": "mechanisme", "oud_ids": [1, 2],

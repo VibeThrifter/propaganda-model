@@ -727,22 +727,26 @@ def create_entity():
     contributed_by = g.user["username"]
 
     conn = get_db()
+    # Moderatiewachtrij: admin → meteen 'goedgekeurd'; ieder ander → 'voorgesteld'
+    # (onzichtbaar in viz/scores tot een reviewer goedkeurt).
+    status = "goedgekeurd" if heeft_rol(conn, g.user, "maintainer") else "voorgesteld"
     try:
         cur = conn.execute("""
-            INSERT INTO entities (name, type, primary_role_id, description, active_from, active_until)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (name, etype, primary_role_id, description, active_from, active_until))
+            INSERT INTO entities (name, type, primary_role_id, description, active_from, active_until, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (name, etype, primary_role_id, description, active_from, active_until, status))
         eid = cur.lastrowid
 
         conn.execute("""
             INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
             VALUES ('entities', ?, 'created', ?, ?, ?)
-        """, (eid, contributed_by, json.dumps({"name": name, "type": etype}),
-              "Nieuwe entiteit toegevoegd"))
+        """, (eid, contributed_by, json.dumps({"name": name, "type": etype, "status": status}),
+              "Nieuwe entiteit toegevoegd (admin: direct zichtbaar)" if status == "goedgekeurd"
+              else "Nieuwe entiteit voorgesteld (wacht op goedkeuring)"))
 
         conn.commit()
         row = conn.execute("""
-            SELECT e.id, e.name, e.type, e.description,
+            SELECT e.id, e.name, e.type, e.description, e.status,
                    e.active_from, e.active_until, e.active,
                    r.name as role_name, r.category as filter_category
             FROM entities e
@@ -805,26 +809,29 @@ def create_relation():
             conn.close()
             return jsonify({"error": f"{label}-entiteit bestaat niet"}), 400
 
+    status = "goedgekeurd" if heeft_rol(conn, g.user, "maintainer") else "voorgesteld"
     try:
         cur = conn.execute("""
             INSERT INTO relations
                 (source_id, target_id, relation_type, mechanism_id, description,
-                 certainty, influence, bidirectional, active_from, active_until)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 certainty, influence, bidirectional, active_from, active_until, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (source_id, target_id, rtype, mechanism_id, description,
-              certainty, influence, bidirectional, active_from, active_until))
+              certainty, influence, bidirectional, active_from, active_until, status))
         rid = cur.lastrowid
 
         conn.execute("""
             INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
             VALUES ('relations', ?, 'created', ?, ?, ?)
         """, (rid, contributed_by,
-              json.dumps({"source_id": source_id, "target_id": target_id, "relation_type": rtype}),
-              "Nieuwe relatie toegevoegd"))
+              json.dumps({"source_id": source_id, "target_id": target_id,
+                          "relation_type": rtype, "status": status}),
+              "Nieuwe relatie toegevoegd (admin: direct zichtbaar)" if status == "goedgekeurd"
+              else "Nieuwe relatie voorgesteld (wacht op goedkeuring)"))
 
         conn.commit()
         row = conn.execute("""
-            SELECT r.id, r.source_id, r.target_id, r.relation_type,
+            SELECT r.id, r.source_id, r.target_id, r.relation_type, r.status,
                    r.certainty, r.influence, r.bidirectional, r.description,
                    r.active_from, r.active_until, r.active,
                    e1.name as source_name, e2.name as target_name,
@@ -844,6 +851,60 @@ def create_relation():
         if "CHECK" in msg:
             return jsonify({"error": f"Ongeldig relatietype of waarde: '{rtype}'"}), 400
         return jsonify({"error": msg}), 400
+
+
+def _creator_van(conn, tabel, rid):
+    """De gebruiker die dit record aanmaakte (uit edit_log), voor de eigen-werk-poort."""
+    row = conn.execute(
+        "SELECT changed_by FROM edit_log WHERE table_name = ? AND record_id = ? "
+        "AND action = 'created' ORDER BY id LIMIT 1", (tabel, rid)).fetchone()
+    return row["changed_by"] if row else None
+
+
+def _modereer(tabel, rid):
+    """Moderatie van een 'voorgesteld' node/edge: reviewer+ keurt goed of af.
+    Niemand keurt eigen werk goed (M2.1)."""
+    data = request.json or {}
+    nieuw = data.get("status")
+    if nieuw not in ("goedgekeurd", "afgewezen"):
+        return jsonify({"error": "status moet 'goedgekeurd' of 'afgewezen' zijn"}), 400
+    conn = get_db()
+    rij = conn.execute(f"SELECT status FROM {tabel} WHERE id = ?", (rid,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": "Niet gevonden"}), 404
+    if not heeft_rol(conn, g.user, "reviewer"):
+        conn.close()
+        return jsonify({"error": "Modereren vereist reviewer of hoger"}), 403
+    if rij["status"] != "voorgesteld":
+        conn.close()
+        return jsonify({"error": f"Alleen een 'voorgesteld' item kan gemodereerd worden "
+                                 f"(huidige status: {rij['status']})"}), 400
+    if _creator_van(conn, tabel, rid) == g.user["username"]:
+        conn.close()
+        return jsonify({"error": "Niemand keurt eigen werk goed (M2.1): laat een "
+                                 "andere reviewer dit beoordelen"}), 403
+    conn.execute(f"UPDATE {tabel} SET status = ? WHERE id = ?", (nieuw, rid))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES (?, ?, 'updated', ?, ?, ?, ?)
+    """, (tabel, rid, g.user["username"], json.dumps({"status": "voorgesteld"}),
+          json.dumps({"status": nieuw}), (data.get("motivatie") or "").strip() or None))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": rid, "status": nieuw})
+
+
+@app.route("/api/entities/<int:eid>/status", methods=["PATCH"])
+@require_user()
+def moderate_entity(eid):
+    return _modereer("entities", eid)
+
+
+@app.route("/api/relations/<int:rid>/status", methods=["PATCH"])
+@require_user()
+def moderate_relation(rid):
+    return _modereer("relations", rid)
 
 
 def _collect_argument_tree(conn, root_ids):
@@ -975,10 +1036,51 @@ def delete_entity(eid):
 @app.route("/api/roles", methods=["POST"])
 @require_user()
 def create_role():
-    """M2.3: een nieuw theorie-element ontstaat alleen nog via een RfC."""
-    return jsonify({"error": "Theorie-elementen ontstaan alleen nog via een RfC (M2.3): "
-                             "POST /api/voorstellen met soort 'nieuw_theorie_element' "
-                             "(twee menselijke reviewers vereist)"}), 403
+    """M2.3: een nieuw theorie-element ontstaat normaal via een RfC. In de
+    opbouwfase mag een globale maintainer een rol (node) direct toevoegen,
+    langs de RfC heen — gevlagd en gelogd. Zo'n element heeft nog geen
+    discussieboom, krijgt dus een lage credibility en kan via tegenargumenten
+    en de zichtbaarheidsdrempel weer uit beeld raken."""
+    conn = get_db()
+    if not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "Theorie-elementen ontstaan via een RfC (M2.3): "
+                                 "POST /api/voorstellen met soort 'nieuw_theorie_element' "
+                                 "(twee menselijke reviewers). Een globale maintainer mag "
+                                 "in de opbouwfase direct toevoegen."}), 403
+    d = request.json or {}
+    velden = {
+        "naam": (d.get("naam") or d.get("name") or "").strip(),
+        "categorie": d.get("categorie") or d.get("category"),
+        "definitie": (d.get("definitie") or d.get("description") or "").strip(),
+        "voorbeelden": d.get("voorbeelden") or d.get("examples"),
+    }
+    fouten = []
+    if not velden["naam"]:
+        fouten.append("naam is verplicht")
+    elif voorstellen._naam_bestaat(conn, "rol", velden["naam"]):
+        fouten.append(f"er bestaat al een rol met de naam '{velden['naam']}'")
+    if velden["categorie"] not in voorstellen.ROL_CATEGORIEEN:
+        fouten.append(f"categorie moet een van {voorstellen.ROL_CATEGORIEEN} zijn")
+    if not velden["definitie"]:
+        fouten.append("definitie/description is verplicht")
+    if fouten:
+        conn.close()
+        return jsonify({"error": "Ongeldige rol", "fouten": fouten}), 400
+    try:
+        rid = voorstellen._maak_element(conn, "rol", velden)
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('roles', ?, 'created', ?, ?, ?)
+        """, (rid, g.user["username"], json.dumps({"name": velden["naam"]}),
+              "Direct toegevoegd door maintainer (opbouwfase, langs RfC heen) — betwistbaar"))
+        conn.commit()
+        conn.close()
+        return jsonify({"id": rid, "name": velden["naam"], "direct_toegevoegd": True}), 201
+    except sqlite3.Error as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/roles/<int:rid>", methods=["DELETE"])
@@ -1025,10 +1127,65 @@ def delete_role(rid):
 @app.route("/api/mechanisms", methods=["POST"])
 @require_user()
 def create_mechanism():
-    """M2.3: een nieuw theorie-element ontstaat alleen nog via een RfC."""
-    return jsonify({"error": "Theorie-elementen ontstaan alleen nog via een RfC (M2.3): "
-                             "POST /api/voorstellen met soort 'nieuw_theorie_element' "
-                             "(twee menselijke reviewers vereist)"}), 403
+    """M2.3: een nieuw theorie-element ontstaat normaal via een RfC. In de
+    opbouwfase mag een globale maintainer een mechanisme (edge) direct
+    toevoegen, langs de RfC heen — gevlagd en gelogd. Zonder discussieboom
+    blijft de credibility laag, dus het kan via de zichtbaarheidsdrempel en
+    tegenargumenten weer uit beeld raken."""
+    conn = get_db()
+    if not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "Theorie-elementen ontstaan via een RfC (M2.3): "
+                                 "POST /api/voorstellen met soort 'nieuw_theorie_element' "
+                                 "(twee menselijke reviewers). Een globale maintainer mag "
+                                 "in de opbouwfase direct toevoegen."}), 403
+    d = request.json or {}
+    velden = {
+        "naam": (d.get("naam") or d.get("name") or "").strip(),
+        "filter": d.get("filter"),
+        "mechanisme_type": d.get("mechanisme_type") or d.get("mechanism_type"),
+        "definitie": (d.get("definitie") or d.get("description") or "").strip(),
+        "effect": (d.get("effect") or "").strip(),
+        "aard": d.get("aard"),
+        "source_role_id": d.get("source_role_id"),
+        "target_role_id": d.get("target_role_id"),
+    }
+    fouten = []
+    if not velden["naam"]:
+        fouten.append("naam is verplicht")
+    elif voorstellen._naam_bestaat(conn, "mechanisme", velden["naam"]):
+        fouten.append(f"er bestaat al een mechanisme met de naam '{velden['naam']}'")
+    if velden["filter"] not in voorstellen.MECHANISME_FILTERS:
+        fouten.append(f"filter moet een van {voorstellen.MECHANISME_FILTERS} zijn")
+    if not velden["definitie"]:
+        fouten.append("definitie/description is verplicht")
+    if not velden["effect"]:
+        fouten.append("effect is verplicht")
+    if velden["aard"] not in voorstellen.AARD_KEUZES:
+        fouten.append(f"aard moet een van {voorstellen.AARD_KEUZES} zijn")
+    if fouten:
+        conn.close()
+        return jsonify({"error": "Ongeldig mechanisme", "fouten": fouten}), 400
+    try:
+        mid = voorstellen._maak_element(conn, "mechanisme", velden)
+        for f in d.get("extra_filters") or []:
+            conn.execute("INSERT OR IGNORE INTO mechanism_filters (mechanism_id, filter) "
+                         "VALUES (?, ?)", (mid, f))
+        for thema in d.get("themes") or d.get("themas") or []:
+            conn.execute("INSERT OR IGNORE INTO mechanism_themes (mechanism_id, theme) "
+                         "VALUES (?, ?)", (mid, thema))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('mechanisms', ?, 'created', ?, ?, ?)
+        """, (mid, g.user["username"], json.dumps({"name": velden["naam"]}),
+              "Direct toegevoegd door maintainer (opbouwfase, langs RfC heen) — betwistbaar"))
+        conn.commit()
+        conn.close()
+        return jsonify({"id": mid, "name": velden["naam"], "direct_toegevoegd": True}), 201
+    except sqlite3.Error as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/mechanisms/<int:mid>", methods=["DELETE"])
@@ -1067,6 +1224,100 @@ def delete_mechanism(mid):
         conn.rollback()
         conn.close()
         return jsonify({"error": str(e)}), 400
+
+
+# ── Titel/beschrijving bewerken (Wikipedia/open-source-model) ─
+# Iedereen kan een herformulering/hernoeming *voorstellen* via POST /api/voorstellen
+# (soort 'herformuleren' / 'hernoemen'), die langs de gewone reviewweg loopt (theorie
+# 2 mensen, praktijk 1, of maintainer-quorum). Een globale maintainer mag daarnaast
+# direct bewerken — gevlagd en gelogd, betwistbaar via de score/discussieboom.
+
+_NAAMBAAR = {"rol", "mechanisme", "entiteit", "emergent_effect"}  # relaties hebben geen naam
+
+
+def _maintainer_patch(element_type):
+    """Directe titel/tekst-bewerking door een globale maintainer (opbouwfase)."""
+    conn = get_db()
+    if not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "Direct bewerken vereist een globale maintainer. "
+                                 "Stel anders een wijziging voor via POST /api/voorstellen "
+                                 "(soort 'herformuleren' of 'hernoemen')."}), 403
+    tabel = voorstellen.TABEL[element_type]
+    eid = request.view_args[list(request.view_args)[0]]
+    rij = conn.execute(f"SELECT * FROM {tabel} WHERE id = ?", (eid,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": f"{element_type} niet gevonden"}), 404
+    d = request.json or {}
+    toegestaan = list(voorstellen.TEKSTVELDEN[element_type])
+    if element_type in _NAAMBAAR:
+        toegestaan.append("name")
+    diff = {}
+    for kol in toegestaan:
+        # accepteer NL-alias 'naam'/'definitie' naast de kolomnaam
+        waarde = d.get(kol)
+        if kol == "name" and waarde is None:
+            waarde = d.get("naam")
+        if kol == "description" and waarde is None:
+            waarde = d.get("definitie")
+        if waarde is None:
+            continue
+        nieuw = (waarde or "").strip()
+        if kol in ("name",) and not nieuw:
+            conn.close()
+            return jsonify({"error": "naam mag niet leeg zijn"}), 400
+        if nieuw != (rij[kol] or ""):
+            diff[kol] = {"oud": rij[kol], "nieuw": nieuw}
+    if not diff:
+        conn.close()
+        return jsonify({"error": f"geen gewijzigd veld (toegestaan: {toegestaan})"}), 400
+    if "name" in diff and voorstellen._naam_bestaat(conn, element_type, diff["name"]["nieuw"]):
+        conn.close()
+        return jsonify({"error": f"er bestaat al een {element_type} met die naam"}), 400
+    motivatie = (d.get("motivatie") or "").strip() or "direct bewerkt door maintainer"
+    try:
+        for kol, v in diff.items():
+            conn.execute(f"UPDATE {tabel} SET {kol} = ? WHERE id = ?", (v["nieuw"], eid))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES (?, ?, 'updated', ?, ?, ?, ?)
+        """, (tabel, eid, g.user["username"],
+              json.dumps({k: v["oud"] for k, v in diff.items()}, ensure_ascii=False),
+              json.dumps({k: v["nieuw"] for k, v in diff.items()}, ensure_ascii=False),
+              f"Direct bewerkt door maintainer (opbouwfase) — {motivatie}; betwistbaar"))
+        conn.commit()
+        conn.close()
+        return jsonify({"id": eid, "element_type": element_type,
+                        "gewijzigd": list(diff), "diff": diff, "direct_bewerkt": True})
+    except sqlite3.Error as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/roles/<int:rid>", methods=["PATCH"])
+@require_user()
+def patch_role(rid):
+    return _maintainer_patch("rol")
+
+
+@app.route("/api/mechanisms/<int:mid>", methods=["PATCH"])
+@require_user()
+def patch_mechanism(mid):
+    return _maintainer_patch("mechanisme")
+
+
+@app.route("/api/entities/<int:eid>", methods=["PATCH"])
+@require_user()
+def patch_entity(eid):
+    return _maintainer_patch("entiteit")
+
+
+@app.route("/api/relations/<int:rid>", methods=["PATCH"])
+@require_user()
+def patch_relation(rid):
+    return _maintainer_patch("relatie")
 
 
 # ── Instantiaties (klasse <-> instantie + exemplariteit) ─────
@@ -1287,6 +1538,8 @@ def review_voorstel(vid):
       - geldige akkoorden ≥ drempel (theorielaag 2, praktijk 1) → 'geaccepteerd'
         en het voorstel wordt direct uitgevoerd; faalt de uitvoering (bv.
         hertriage-restlijst niet leeg) dan blijft het voorstel open (409).
+    Opbouwfase: één akkoord van een globale maintainer telt als het volledige
+    quorum (ook van de indiener zelf); een afwijzing blokkeert dan nog steeds.
     """
     data = request.json or {}
     oordeel = data.get("oordeel")
@@ -1329,6 +1582,17 @@ def review_voorstel(vid):
     benodigd = voorstellen.benodigde_akkoorden(rij["soort"], payload)
     besluit = "open"
 
+    # Maintainer-quorum (opbouwfase): één akkoord van een globale maintainer telt
+    # als het volledige quorum (theorielaag 2, praktijk 1) — ook van de indiener
+    # zelf, langs de indiener-uitsluiting heen. Een openstaande afwijzing blokkeert
+    # nog steeds (zoals 2 akkoorden dat ook niet van een afwijzing winnen). Gevlagd
+    # en gelogd; via tegen-RfC/discussieboom en de zichtbaarheidsdrempel betwistbaar.
+    maintainer_quorum = conn.execute("""
+        SELECT 1 FROM voorstel_reviews vr JOIN users u ON u.username = vr.reviewer
+        WHERE vr.voorstel_id = ? AND vr.oordeel = 'akkoord'
+          AND u.kind = 'mens' AND u.role = 'maintainer' LIMIT 1""", (vid,)).fetchone() is not None
+    indiener_keurde_goed = oordeel == "akkoord" and g.user["username"] == rij["ingediend_door"]
+
     if t["afwijzingen"]:
         conn.execute("UPDATE voorstellen SET status = 'afgewezen', "
                      "besloten_at = CURRENT_TIMESTAMP WHERE id = ?", (vid,))
@@ -1339,19 +1603,26 @@ def review_voorstel(vid):
               f"Afgewezen door: {', '.join(t['afwijzingen'])}"))
         conn.commit()
         besluit = "afgewezen"
-    elif len(set(t["akkoorden"])) >= benodigd:
+    elif len(set(t["akkoorden"])) >= benodigd or maintainer_quorum:
         try:
             resultaat = voorstellen.voer_uit(conn, rij["soort"], payload, vid)
-            resultaat["self_merged"] = t["zelf_akkoord"]
+            via_maintainer = maintainer_quorum and len(set(t["akkoorden"])) < benodigd
+            resultaat["self_merged"] = t["zelf_akkoord"] or indiener_keurde_goed
+            resultaat["maintainer_quorum"] = via_maintainer
+            if via_maintainer:
+                reden = (f"maintainer-akkoord telt als volledig quorum ({benodigd}) "
+                         f"— {g.user['username']}; betwistbaar via tegen-RfC")
+            elif t["zelf_akkoord"]:
+                reden = "zelf-akkoord (n=1)"
+            else:
+                reden = f"Akkoord van: {', '.join(set(t['akkoorden']))}"
             conn.execute("""UPDATE voorstellen SET status = 'geaccepteerd', resultaat = ?,
                             besloten_at = CURRENT_TIMESTAMP WHERE id = ?""",
                          (json.dumps(resultaat, ensure_ascii=False), vid))
             conn.execute("""
                 INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
                 VALUES ('voorstellen', ?, 'merged', ?, ?, ?)
-            """, (vid, g.user["username"], json.dumps(resultaat),
-                  "zelf-akkoord (n=1)" if t["zelf_akkoord"] else
-                  f"Akkoord van: {', '.join(set(t['akkoorden']))}"))
+            """, (vid, g.user["username"], json.dumps(resultaat), reden))
             conn.commit()
             besluit = "geaccepteerd"
         except (ValueError, sqlite3.IntegrityError) as e:

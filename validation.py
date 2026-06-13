@@ -23,9 +23,12 @@ MAX_VOORBEELDEN = 8
 # Kolom-/FK-/indexpariteit blijft ook voor deze tabellen de strenge eis.
 BEKENDE_DDL_VERSCHILLEN = {
     "entities": "schema.sql staat LEGACY-types toe voor seed-replay; live is opgeschoond "
-                "(migrate_clean_entity_types.py)",
+                "(migrate_clean_entity_types.py). Ook de status-CHECK leeft alleen in "
+                "schema.sql; live kolom kwam via ALTER TABLE (migrate_moderatie_wachtrij.py)",
     "mechanisms": "aard-CHECK leeft alleen in schema.sql; live kolom kwam via ALTER TABLE "
                   "(zie CLAUDE.md)",
+    "relations": "status-CHECK (moderatiewachtrij) leeft alleen in schema.sql; live kolom "
+                 "kwam via ALTER TABLE (migrate_moderatie_wachtrij.py)",
     # 'sources' is sinds migrate_scoring_v2.py herbouwd uit schema.sql: geen drift meer.
 }
 
@@ -130,6 +133,44 @@ def check_bewijs(conn):
                    achterstand,
                    f"{onbeoordeeld} van {totaal} argumenten zijn niet 'geverifieerd'.",
                    aantal=onbeoordeeld),
+    ]
+
+
+# ── Invloed-as: schuldig tot bewezen (symmetrisch met de certainty-vloer) ──
+
+INVLOED_VLOER = 0.05  # gelijk aan scripts/migrate_unsourced_influence.py
+
+
+def check_invloed(conn):
+    """Relaties met een invloed-prior bóven de vloer maar zonder invloed-bewijs.
+
+    De invloed-as is "schuldig tot bewezen", net als de zekerheid-as: een
+    `influence` boven INVLOED_VLOER is alleen eerlijk als minstens één
+    niet-verworpen, niet-voorgesteld root-argument met property='influence' de
+    relatie onderbouwt (M1.7). Een hand-gezette invloed zonder zulk bewijs is
+    een initiële willekeurige score — precies wat het project niet wil.
+    """
+    rijen = [
+        f"relatie #{r['id']}: {r['src']} → {r['tgt']} (influence={r['influence']})"
+        for r in conn.execute(f"""
+            SELECT r.id, r.influence, e1.name AS src, e2.name AS tgt
+            FROM relations r
+            JOIN entities e1 ON r.source_id = e1.id
+            JOIN entities e2 ON r.target_id = e2.id
+            WHERE NOT r.vervangen AND r.influence > {INVLOED_VLOER}
+              AND NOT EXISTS (
+                  SELECT 1 FROM arguments a
+                  WHERE a.relation_id = r.id AND a.property = 'influence'
+                    AND a.parent_argument_id IS NULL
+                    AND a.status NOT IN ('verworpen', 'voorgesteld'))
+            ORDER BY r.id
+        """)]
+    return [
+        _bevinding("INVLOED-PRIOR", "Relaties met invloed-prior zonder bewijs", "fout",
+                   rijen,
+                   f"Een influence > {INVLOED_VLOER} hoort onderbouwd te zijn met een "
+                   "property='influence'-argument (M1.7); anders is het een willekeurige "
+                   "prior. Floor met scripts/migrate_unsourced_influence.py of voeg bewijs toe."),
     ]
 
 
@@ -632,6 +673,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen = []
     bevindingen += check_koppelingsplicht(conn)
     bevindingen += check_bewijs(conn)
+    bevindingen += check_invloed(conn)
     bevindingen += check_balans(conn)
     bevindingen += check_padclaims(conn)
     bevindingen += check_bronnen(conn, network=network)

@@ -88,10 +88,17 @@ def main():
         eis(r.status_code == 201, f"POST /api/entities 2e ({r.status_code})")
         ent_b = r.get_json()["id"]
 
-        # Theorielaag (M2.3): alleen nog via een RfC met twee menselijke reviewers
+        # Theorielaag: niet-maintainers kunnen niet direct creëren (alleen via RfC) ...
+        r = client.post("/api/roles", headers=kop_r1, json={
+            "name": "x_directe_rol", "category": "tegenmacht", "description": "x"})
+        eis(r.status_code == 403,
+            f"directe POST /api/roles dicht voor niet-maintainers ({r.status_code})")
+        # ... maar een maintainer mag in de opbouwfase wél direct (gevlagd); ruim 'm op.
         r = client.post("/api/roles", headers=kop, json={
-            "name": "verse_build_testrol", "category": "tegenmacht", "description": "x"})
-        eis(r.status_code == 403, f"directe POST /api/roles is dicht (M2.3) ({r.status_code})")
+            "naam": "verse_directe_rol", "categorie": "tegenmacht", "definitie": "Direct."})
+        eis(r.status_code == 201 and r.get_json().get("direct_toegevoegd"),
+            f"maintainer mag een rol direct toevoegen ({r.status_code})")
+        client.delete(f"/api/roles/{r.get_json()['id']}", headers=kop)
 
         def rfc(titel, payload):
             r = client.post("/api/voorstellen", headers=kop, json={

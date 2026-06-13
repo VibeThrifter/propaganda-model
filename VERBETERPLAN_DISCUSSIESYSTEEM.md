@@ -621,6 +621,11 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
         linkrot achter een `--network`-vlag (HEAD-requests)
   - [x] Check schema-pariteit: verse DB in-memory bouwen uit `schema.sql` en per tabel
         `PRAGMA table_info` + DDL diffen met de live DB (Z9)
+  - [x] Ratchet-baseline (`validatie_baseline.json`, ingecheckt): `--strict` faalt
+        alleen bóven de vastgelegde achterstand per foutcode — de CI-poort vangt
+        nieuwe regressies terwijl de achterstand wordt weggewerkt; aanscherpen via
+        `--update-baseline` (verlagen mag automatisch, verhogen alleen handmatig
+        en bewust) *(12 juni 2026)*
   - [x] **Klaar wanneer:** draait foutloos op de live DB, rapporteert de bekende
         achterstanden, en staat gedocumenteerd in CLAUDE.md *(12 juni 2026)*
 
@@ -791,9 +796,19 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
         zekerheids-balans
   - [x] Viz + DOCUMENTATIE.md: beide assen tonen hun bewijs (●-marker "verschoven
         door n invloed-argument(en)"; invloed-optie in het formulier)
+  - [x] Invloed-as schuldig tot bewezen (eigenaarsbesluit 13 juni 2026): de
+        handmatige invloed-priors (spreiding 0,15–0,9, nul onderbouwd) waren de
+        laatste *initiële willekeurige scores*. `migrate_unsourced_influence.py`
+        floort niet-onderbouwde invloed naar 0,05 (symmetrisch met de
+        certainty-vloer; 424 relaties); de invloed wordt voortaan alleen door
+        `property='influence'`-argumenten opgetild. Validator-check `INVLOED-PRIOR`
+        (fout, geratchet op 0) bewaakt het. Vloer bewust 0,05 i.p.v. 0 zodat
+        `influence.py` de topologie blijft meten; de invloedsgraaf bleef heel
+        (180 nodes, 35 rollen), mechanisme-sterkte collapste eerlijk naar ≤ 0,05.
   - [x] **Klaar wanneer:** een influence-argument verschuift de sterkte aantoonbaar
         in `/api/scores` *(golden-snapshot: prior 0,60 → 0,5605 door één
-        geverifieerd invloed-argument; het live corpus heeft nog geen invloed-args)*
+        geverifieerd invloed-argument; het live corpus start nu op de vloer en
+        wacht op de eerste invloed-argumenten van scout/red team)*
 
 - [ ] **M1.8 Monitor-agent** (→ §6.2) — *infrastructuur staat; ronde 1 + review open*
   - [x] Beslist + doorgevoerd: `objection_type` als kolom (taxonomie in de CHECK;

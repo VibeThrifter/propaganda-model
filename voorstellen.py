@@ -25,7 +25,8 @@ Alleen stdlib.
 """
 from __future__ import annotations
 
-SOORTEN = ("nieuw_theorie_element", "splitsen", "samenvoegen", "hernoemen")
+SOORTEN = ("nieuw_theorie_element", "splitsen", "samenvoegen", "hernoemen",
+           "herformuleren")
 
 TABEL = {
     "rol": "roles",
@@ -35,6 +36,15 @@ TABEL = {
     "emergent_effect": "emergent_effects",
 }
 THEORIE_TYPES = ("rol", "mechanisme", "emergent_effect")
+# Bewerkbare tekstvelden per element_type (voor 'herformuleren'). De naam loopt
+# via 'hernoemen'; hier gaat het om de omschrijvende velden.
+TEKSTVELDEN = {
+    "rol": ("description", "examples"),
+    "mechanisme": ("description", "effect"),
+    "entiteit": ("description",),
+    "relatie": ("description",),
+    "emergent_effect": ("description", "effect", "label"),
+}
 # element_type → argumentkolom (voor hertriage van de discussieboom)
 ARG_KOLOM = {
     "rol": "role_id", "mechanisme": "mechanism_id",
@@ -144,6 +154,29 @@ def valideer_payload(conn, soort, payload) -> list:
             fouten.append("nieuwe_naam is verplicht")
         elif _naam_bestaat(conn, et, nieuwe):
             fouten.append(f"er bestaat al een {et} met de naam '{nieuwe}'")
+        if not _tekst(payload, "motivatie"):
+            fouten.append("motivatie is verplicht (verschuift de betekenis wezenlijk, "
+                          "dan is het de facto vervangen → kies splitsen/samenvoegen)")
+
+    elif soort == "herformuleren":
+        if et not in TABEL:
+            return [f"element_type moet een van {tuple(TABEL)} zijn"]
+        rij = _element(conn, et, payload.get("element_id") or 0)
+        if rij is None:
+            fouten.append("element_id bestaat niet")
+        elif rij["vervangen"]:
+            fouten.append("element is al vervangen; herformuleer de opvolger")
+        velden = payload.get("velden") or {}
+        toegestaan = TEKSTVELDEN[et]
+        onbekend = [k for k in velden if k not in toegestaan]
+        if onbekend:
+            fouten.append(f"onbekende velden voor {et}: {onbekend} "
+                          f"(toegestaan: {toegestaan}; de naam loopt via hernoemen)")
+        gewijzigd = [k for k, v in velden.items()
+                     if k in toegestaan and (v or "").strip()
+                     and (rij is None or (v or "").strip() != (rij[k] or ""))]
+        if not gewijzigd:
+            fouten.append(f"geef ≥ 1 gewijzigd tekstveld op ({', '.join(toegestaan)})")
         if not _tekst(payload, "motivatie"):
             fouten.append("motivatie is verplicht (verschuift de betekenis wezenlijk, "
                           "dan is het de facto vervangen → kies splitsen/samenvoegen)")
@@ -383,6 +416,31 @@ def voer_uit(conn, soort, payload, voorstel_id) -> dict:
                      (et, payload["element_id"], payload["element_id"], voorstel_id,
                       f"oude naam: {oude_naam}"))
         return {"element_type": et, "id": payload["element_id"], "oude_naam": oude_naam}
+
+    if soort == "herformuleren":
+        et = payload["element_type"]
+        rij = _element(conn, et, payload["element_id"])
+        if rij is None:
+            raise ValueError("element bestaat niet meer")
+        velden = payload.get("velden") or {}
+        toegestaan = TEKSTVELDEN[et]
+        diff = {}
+        for kol in toegestaan:
+            if kol in velden and (velden[kol] or "").strip():
+                nieuw = velden[kol].strip()
+                if nieuw != (rij[kol] or ""):
+                    diff[kol] = {"oud": rij[kol], "nieuw": nieuw}
+                    conn.execute(f"UPDATE {TABEL[et]} SET {kol} = ? WHERE id = ?",
+                                 (nieuw, payload["element_id"]))
+        if not diff:
+            raise ValueError("geen gewijzigd tekstveld")
+        conn.execute("""INSERT INTO lineage (soort, element_type, oud_id, nieuw_id,
+                                             voorstel_id, reden)
+                        VALUES ('herformuleren', ?, ?, ?, ?, ?)""",
+                     (et, payload["element_id"], payload["element_id"], voorstel_id,
+                      payload.get("motivatie")))
+        return {"element_type": et, "id": payload["element_id"],
+                "gewijzigd": list(diff), "diff": diff}
 
     if soort == "samenvoegen":
         return _voer_samenvoegen_uit(conn, payload, voorstel_id)

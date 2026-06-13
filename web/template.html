@@ -487,6 +487,11 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .admin-btn.active {
   background: rgba(231,76,60,0.18); border-color: rgba(231,76,60,0.5); color: #e74c3c;
 }
+/* Anonieme uitnodiging om bij te dragen: lezen is vrij, dit lokt serieuze bijdragers. */
+.admin-btn.invite {
+  background: rgba(108,138,255,0.14); border-color: rgba(108,138,255,0.4); color: var(--accent);
+}
+.admin-btn.invite:hover { background: rgba(108,138,255,0.28); color: var(--accent); border-color: rgba(108,138,255,0.6); }
 .btn-danger {
   background: rgba(231,76,60,0.14); border: 1px solid rgba(231,76,60,0.45);
   color: #e74c3c; padding: 7px 14px; border-radius: 6px; cursor: pointer;
@@ -552,8 +557,8 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <span class="search-icon">&#x1F50D;</span>
     <input type="text" id="search" placeholder="Zoek..." autocomplete="off" spellcheck="false">
   </div>
-  <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen">+ Toevoegen</button>
-  <button id="adminToggle" class="admin-btn" title="Adminmodus aan/uit: toont verwijderknoppen">Admin</button>
+  <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen" style="display:none">+ Toevoegen</button>
+  <button id="adminToggle" class="admin-btn" title="Adminmodus aan/uit: toont verwijderknoppen" style="display:none">Admin</button>
   <a id="authChip" class="admin-btn" href="/login" style="display:none;text-decoration:none">Inloggen</a>
   <div class="stats" id="stats"></div>
 </header>
@@ -4060,19 +4065,42 @@ function authIndienHint() {
 }
 (async function initAuth() {
   const chip = document.getElementById('authChip');
+  const addBtn = document.getElementById('addBtn');
+  const adminToggle = document.getElementById('adminToggle');
   try {
     const resp = await fetch('/api/me');
     if (resp.ok) {
       authUser = await resp.json();
       chip.textContent = `${authUser.username} (${authUser.role})`;
       chip.href = '/account';
+      chip.classList.remove('invite');
       chip.title = 'Ingelogd — naar de accountpagina (token, uitloggen)';
+      // Bijdragen mag voor elke ingelogde gebruiker (alles loopt als voorstel).
+      addBtn.style.display = '';
+      // Admin (verwijderknoppen) alleen voor maintainers — DELETE vereist maintainer.
+      if (authUser.role === 'maintainer') {
+        adminToggle.style.display = '';
+      } else {
+        adminToggle.style.display = 'none';
+        setAdminMode(false);  // forceer uit als eerder via localStorage aangezet
+      }
     } else {
-      chip.textContent = 'Inloggen';
-      chip.title = 'Inloggen om bij te dragen; lezen kan zonder account';
+      // Anoniem: lezen is vrij, schrijfknoppen blijven verborgen; één uitnodigende CTA.
+      authUser = null;
+      addBtn.style.display = 'none';
+      adminToggle.style.display = 'none';
+      setAdminMode(false);
+      chip.textContent = '✎ Inloggen om bij te dragen';
+      chip.href = '/login';
+      chip.classList.add('invite');
+      chip.title = 'Lezen kan vrij, zonder account. Log in of maak een account om bij te dragen.';
     }
     chip.style.display = '';
-  } catch (e) { /* statische viz zonder server: geen chip */ }
+  } catch (e) {
+    // Statische viz zonder server: geen schrijfknoppen, geen chip.
+    addBtn.style.display = 'none';
+    adminToggle.style.display = 'none';
+  }
 })();
 // Namen op de directe pijlen: puur tekenen, geen invloed op physics of zichtbaarheidsset.
 document.getElementById('edgeLabelToggle').addEventListener('change', e => {

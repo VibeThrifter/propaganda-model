@@ -73,7 +73,14 @@ STATUS_FACTOR = {
 }
 DEFAULT_STATUS_FACTOR = 0.50
 
-DEFAULT_WEIGHT = 0.50      # argument zonder expliciet gewicht
+DEFAULT_WEIGHT = 0.50      # fallback in argument_force() als er geen gewicht meegegeven is
+# Zelf-gerapporteerd `weight` is geen objectieve maat: de invoerder zet zijn eigen
+# argumentgewicht (verbeterplan Z2). Daarom telt de opgeslagen weight-kolom NIET meer mee
+# in de score — de basiskracht τ rust alleen op verifieerbare factoren (status × bron).
+# Het gewicht valt dus uit de formule (neutraal = 1.0) tot een *bridged rating* (M2.5) het
+# objectief invult: meerdere beoordelaars samen i.p.v. de invoerder zelf. De kolom blijft
+# bestaan (niet gewist), maar drijft de score pas weer zodra bridging draait.
+NEUTRAL_WEIGHT = 1.0
 NO_CITATION_FACTOR = 0.30  # bronfactor-ondergrens als een argument geen citaties heeft
 
 K_INSTANCE = 1.0   # demping voor de afgeleide praktijkscore (laag B)
@@ -565,9 +572,11 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
             SELECT id, relation_id, entity_id, role_id, mechanism_id, emergent_effect_id,
                    parent_argument_id, property, stance, weight, status FROM arguments"""):
         cites = cites_by_arg.get(aid, [])
-        if bridged_weights and aid in bridged_weights:
-            weight = bridged_weights[aid]  # M2.5: bridged rating vervangt eigen gewicht
-        taus[aid] = argument_force(weight, status, [r for r, _ in cites])
+        # Zelf-gerapporteerd weight telt niet mee (Z2): neutraal gewicht, tenzij een
+        # bridged rating (M2.5) het objectief invult. De opgeslagen `weight`-kolom wordt
+        # bewust genegeerd — net als een niet-onderbouwde invloed-prior.
+        w = bridged_weights[aid] if (bridged_weights and aid in bridged_weights) else NEUTRAL_WEIGHT
+        taus[aid] = argument_force(w, status, [r for r, _ in cites])
         parents[aid] = parent_id
         stances[aid] = stance
         # Cluster van het argument: dat van zijn zwaarste échte citatie (gewicht > 0);
@@ -621,7 +630,7 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     # (vervangen elementen — M2.6 — doen in de hele keten niet meer mee)
     rel_rows = conn.execute(
         "SELECT id, source_id, target_id, certainty, influence FROM relations "
-        "WHERE NOT vervangen").fetchall()
+        "WHERE NOT vervangen AND status = 'goedgekeurd'").fetchall()
     rel_detail, rel_infl_detail = {}, {}
     ent_cert_acc, ent_infl_acc = {}, {}
     for rid, src, tgt, certainty, influence in rel_rows:
@@ -636,7 +645,8 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
 
     # Afgeleide geloofwaardigheid per entiteit (prior = gem. zekerheid van haar relaties)
     entity_detail = {}
-    for (eid,) in conn.execute("SELECT id FROM entities WHERE NOT vervangen"):
+    for (eid,) in conn.execute(
+            "SELECT id FROM entities WHERE NOT vervangen AND status = 'goedgekeurd'"):
         rel_cert = ent_cert_acc.get(eid)
         prior = (sum(rel_cert) / len(rel_cert)) if rel_cert else None
         entity_detail[eid] = instance_detail(by_entity.get(eid, []), prior_certainty=prior)

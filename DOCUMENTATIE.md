@@ -355,7 +355,7 @@ Elke relatie heeft twee onafhankelijke scores:
 
 Een relatie kan zeker bestaan maar weinig impact hebben (Vanguard→Shell: feit, maar passief). Of onzeker zijn maar potentieel groot effect hebben (zelfcensuur op redacties: moeilijk te bewijzen, maar systemisch).
 
-De handmatige `certainty` blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). `influence` blijft handmatig.
+Beide assen zijn **schuldig tot bewezen**: de handmatige kolom blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). Een prior zonder onderbouwing wordt naar een lage vloer (0,05) gezet en dient alleen als fallback — voor `certainty` via `migrate_unsourced_certainty.py`, voor `influence` via `migrate_unsourced_influence.py`. `influence` wordt vervolgens net als `certainty` uit bewijs opgetild: `property='influence'`-argumenten (M1.7) verschuiven hem, anders blijft hij op de vloer. Zo is er geen enkele *initiële willekeurige score*: de validator (`INVLOED-PRIOR`, een fout) bewaakt dat een invloed boven de vloer altijd onderbouwd is. De vloer is bewust 0,05 en niet 0, zodat de invloedsgraaf (`influence.py`) de *topologie* (positie) blijft meten terwijl de *magnitude* eerlijk minimaal blijft tot ze is bewezen.
 
 ### Aard: direct & systemisch
 
@@ -487,12 +487,18 @@ Een theoretisch element (rol/mechanisme) is een **klasse**; de concrete entiteit
 zijn *emergent*: ze bouwen op uit de bewijslast eronder. De berekening (in `scoring.py`, gedeeld door
 `generate_viz.py` en het `/api/scores`-endpoint) kent drie lagen.
 
-**Laag A — basiskracht τ per argument:** `weight × statusfactor × bronfactor`. De statusfactor schaalt
-op verificatiestatus (geverifieerd 1,0 → betwist 0,25 → verworpen 0,0); de bronfactor op de
+**Laag A — basiskracht τ per argument:** `weight × statusfactor × bronfactor`, met `weight`
+**geneutraliseerd**. Het zelf-gerapporteerde argumentgewicht is geen objectieve maat (de invoerder
+zet zijn eigen gewicht — Z2), dus de opgeslagen `weight`-kolom telt niet meer mee: in de praktijk is
+`weight = 1,0` (neutraal) en rust τ alleen op de verifieerbare factoren `statusfactor × bronfactor`.
+Een **bridged rating** (M2.5) vult het gewicht alsnog objectief in zodra de beoordelaarspool het
+toelaat — meerdere beoordelaars samen i.p.v. de invoerder. De statusfactor schaalt op
+verificatiestatus (geverifieerd 1,0 → betwist 0,25 → verworpen 0,0); de bronfactor op de
 betrouwbaarste citatie. Brongewichten: `academisch 1,0 · primair 0,95 · institutioneel 0,85 ·
 kwaliteitsjournalistiek 0,70 · regulier 0,50 · opinie 0,35 · grijs 0,20 · eigen_synthese 0,0 ·
 onbeoordeeld 0,15`. Projectmateriaal (`sources/AI/`, klasse `eigen_synthese`) weegt 0: vindplaats,
-nooit bewijs.
+nooit bewijs. Zo is geen enkele score-input meer zelf-gerapporteerd: zekerheid en invloed komen uit
+bewijs (priors gefloord op 0,05), en de argumentkracht uit status + bron + bridged oordeel.
 
 **Boomsemantiek (M1.1) — eindkracht σ per argument (DF-QuAD).** Replies dragen géén eigen doel
 (DB-CHECK + API): hun stance is relatief aan de *parent*. Kracht stroomt van blad naar wortel: de
@@ -503,12 +509,13 @@ steunende en aanvallende kinderen worden elk geaggregeerd met de probabilistisch
 golden-snapshot-test, `scripts/test_scoring.py`):
 
 ```
-A1 voor   (w 0,8 · geverifieerd · academische bron)            τ = 0,80
- └─ B1 ondergraving (w 0,5 · geverifieerd · geen bron)         τ = 0,5·1,0·0,3 = 0,15
-     └─ C1 versterkt B1 (w 0,6 · ongecontroleerd · geen bron)  τ = 0,6·0,5·0,3 = 0,09
-σ_B1 = 0,15 + (1−0,15)·0,09 = 0,2265        (B1 versterkt door C1)
-σ_A1 = 0,80 · (1 − 0,2265)  = 0,6188        (A1 gedempt door B1)
+A1 voor   (geverifieerd · academische bron)            τ = 1,0·1,0       = 1,00
+ └─ B1 ondergraving (geverifieerd · geen bron)         τ = 1,0·0,3       = 0,30
+     └─ C1 versterkt B1 (ongecontroleerd · geen bron)  τ = 0,5·0,3       = 0,15
+σ_B1 = 0,30 + (1−0,30)·0,15 = 0,405         (B1 versterkt door C1)
+σ_A1 = 1,00 · (1 − 0,405)   = 0,595         (A1 gedempt door B1)
 ```
+(weight telt niet mee — neutraal 1,0; alleen statusfactor × bronfactor)
 
 Alleen **root**-argumenten tellen voor het doel zelf; een ondergraving dempt dus alleen het argument
 dat ze aanvalt (een drogredelijk argument vóór een ware claim trekt de claim niet omlaag — het houdt
@@ -520,11 +527,11 @@ alleen op haar te stutten). Tegenbewijs voor het doel zelf is een **weerlegging*
 (zelfde auteur/uitgever/onderliggende data = zelfde cluster); binnen een (stance, cluster)-paar telt
 alleen de sterkste σ, en argumenten zonder echte citatie delen per doel één pseudocluster — tien
 citaten uit hetzelfde boek zijn geen tien bewijzen, en tien bronloze beweringen ook niet. In het
-voorbeeld: een tweede voor-argument (σ 0,60) uit hetzelfde broncluster als A1 voegt níéts toe
-(max, geen som); een weerlegging D1 (τ 0,6265, institutionele bron) wél:
-`score = 0,6188 / (0,6188 + 0,6265 + 1) = 0,2756`. Zonder argumenten valt de score terug op de
-handmatige `certainty` (prior); een entiteit zonder eigen argumenten erft het gemiddelde van haar
-relaties.
+voorbeeld: een tweede voor-argument (σ 1,0) uit hetzelfde broncluster als A1 telt als de sterkste
+van het cluster (max, geen som → steun 1,0); een weerlegging D1 (τ 0,895, institutionele bron) staat
+daar tegenover: `score = 1,0 / (1,0 + 0,895 + 1) = 0,3454`. Zonder argumenten valt de score terug op
+de handmatige `certainty` (prior, gefloord op 0,05 zonder bron); een entiteit zonder eigen argumenten
+erft het gemiddelde van haar relaties.
 
 **Laag C — theoriescore per rol/mechanisme**, uit twee onafhankelijke bewijslijnen:
 - **Praktijk (bottom-up):** geloofwaardigheid-gewogen aggregatie over de gekoppelde instanties, met
@@ -548,11 +555,14 @@ leden (analoog aan padclaims). Zonder compositieclaim is de veldscore gemaximeer
   contradicting-argument mét echte citatie op het doel — is de geloofwaardigheid gemaximeerd op
   **0,70** en draagt het element het label **onweersproken**. Het plafond geldt óók voor priors.
 - **SPOF-vlag (M1.2):** drijft alle steun op één broncluster, dan vlagt de score "1 broncluster".
-- **Invloed-as bewijsbaar (M1.7):** aspect-argumenten met `property='influence'` verschuiven de
-  afgeleide invloed van een relatie (of de sterkte van een mechanisme/halo): de handmatige kolom
-  blijft de prior en de bewijsbalans trekt hem naar zich toe met gewicht `massa/(massa+k)`.
-  Aspect-argumenten (influence, padclaims, compositie) tellen nooit mee in de zekerheids-balans:
-  twee assen, één bewijsstandaard.
+- **Invloed-as bewijsbaar & schuldig tot bewezen (M1.7):** aspect-argumenten met
+  `property='influence'` verschuiven de afgeleide invloed van een relatie (of de sterkte van een
+  mechanisme/halo): de handmatige kolom blijft de prior en de bewijsbalans trekt hem naar zich toe
+  met gewicht `massa/(massa+k)`. Een niet-onderbouwde invloed-prior staat op de vloer 0,05
+  (`migrate_unsourced_influence.py`), symmetrisch met de certainty-vloer; de validator-check
+  `INVLOED-PRIOR` (fout) bewaakt dat een invloed boven de vloer altijd bewijs heeft — geen
+  initiële willekeurige scores. Aspect-argumenten (influence, padclaims, compositie) tellen nooit
+  mee in de zekerheids-balans: twee assen, één bewijsstandaard.
 
 In het theoriemodel codeert de node-grootte/lijndikte de **sterkte**; het detailpaneel toont beide
 scores met interval, opsplitsing literatuur ⊕ praktijk en de vlaggen. Alle constanten staan boven in

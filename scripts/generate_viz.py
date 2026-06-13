@@ -49,7 +49,7 @@ def export_data():
                r.name as role_name, r.category as filter_category
         FROM entities e
         LEFT JOIN roles r ON e.primary_role_id = r.id
-        WHERE NOT e.vervangen
+        WHERE NOT e.vervangen AND e.status = 'goedgekeurd'
     """)
     entities = [dict(row) for row in cur.fetchall()]
 
@@ -80,7 +80,7 @@ def export_data():
         JOIN entities e1 ON r.source_id = e1.id
         JOIN entities e2 ON r.target_id = e2.id
         LEFT JOIN mechanisms m ON r.mechanism_id = m.id
-        WHERE NOT r.vervangen
+        WHERE NOT r.vervangen AND r.status = 'goedgekeurd'
     """)
     relations = [dict(row) for row in cur.fetchall()]
 

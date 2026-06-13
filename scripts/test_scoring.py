@@ -67,24 +67,27 @@ def fixture_db():
             conn.execute("INSERT INTO citations (argument_id, source_id) VALUES (?, ?)",
                          (aid, cite))
 
-    # Discussieboom op R1 (zie DOCUMENTATIE.md voor de doorrekening):
-    #   A1 (voor, τ=0,80) ← B1 (ondergraving, τ=0,15) ← C1 (versterking van B1, τ=0,09)
-    #   A2 (voor, τ=0,60; zelfde broncluster als A1 → telt niet op)
-    #   D1 (weerlegging mét bron, τ=0,6265 → overwogen tegenspraak, geen plafond)
-    arg(1, "supporting", 0.8, "geverifieerd", rel=1, cite=1)         # τ = 0,8·1,0·1,0
-    arg(2, "contradicting", 0.5, "geverifieerd", parent=1)           # τ = 0,5·1,0·0,3 = 0,15
-    arg(3, "supporting", 0.6, "ongecontroleerd", parent=2)           # τ = 0,6·0,5·0,3 = 0,09
-    arg(4, "supporting", 0.6, "geverifieerd", rel=1, cite=3)         # τ = 0,6 (cluster chomsky)
-    arg(5, "contradicting", 0.7, "geverifieerd", rel=1, cite=2)      # τ = 0,7·0,895 = 0,6265
+    # Discussieboom op R1 (zie DOCUMENTATIE.md voor de doorrekening). De opgeslagen
+    # `weight` telt sinds de neutralisatie NIET mee: τ = statusfactor · bronfactor
+    # (neutraal gewicht 1,0). De weight-argumenten hieronder zijn dus illustratief —
+    # ze beïnvloeden de score niet meer (tot bridging ze objectief invult).
+    #   A1 (voor, τ=1,0·1,0=1,0) ← B1 (ondergraving, τ=1,0·0,3=0,30) ← C1 (versterking, τ=0,5·0,3=0,15)
+    #   A2 (voor, τ=1,0; zelfde broncluster als A1 → telt niet op)
+    #   D1 (weerlegging mét bron, τ=0,895 → overwogen tegenspraak, geen plafond)
+    arg(1, "supporting", 0.8, "geverifieerd", rel=1, cite=1)         # τ = 1,0·1,0 = 1,0
+    arg(2, "contradicting", 0.5, "geverifieerd", parent=1)           # τ = 1,0·0,3 = 0,30
+    arg(3, "supporting", 0.6, "ongecontroleerd", parent=2)           # τ = 0,5·0,3 = 0,15
+    arg(4, "supporting", 0.6, "geverifieerd", rel=1, cite=3)         # τ = 1,0 (cluster chomsky)
+    arg(5, "contradicting", 0.7, "geverifieerd", rel=1, cite=2)      # τ = 1,0·0,895 = 0,895
     # Invloed-as (M1.7): bewijs dat de invloed sterk is
     arg(6, "supporting", 1.0, "geverifieerd", rel=1, prop="influence", cite=2)  # τ = 0,895
     # Literatuurlijn mechanisme 1 (eigendomsconcentratie)
-    arg(7, "supporting", 0.9, "geverifieerd", mech=1, cite=1)        # lit = 0,9/1,9
+    arg(7, "supporting", 0.9, "geverifieerd", mech=1, cite=1)        # lit = 1,0/2,0 = 0,5
     # Emergent veld met literatuur- én compositielijn (M1.5)
     conn.execute("""INSERT INTO emergent_effects (id, name, label, description, effect)
                     VALUES (1, 'test_veld', 'Testveld', 'd', 'e')""")
-    arg(8, "supporting", 0.8, "geverifieerd", eff=1, cite=2)               # lit: τ = 0,716
-    arg(9, "supporting", 0.7, "geverifieerd", eff=1, prop="compositie", cite=1)  # comp: τ = 0,7
+    arg(8, "supporting", 0.8, "geverifieerd", eff=1, cite=2)               # lit: τ = 0,895
+    arg(9, "supporting", 0.7, "geverifieerd", eff=1, prop="compositie", cite=1)  # comp: τ = 1,0
 
     conn.commit()
     return conn
@@ -215,16 +218,16 @@ class TestGoldenSnapshot(unittest.TestCase):
 
     def test_sigma_propagatie(self):
         a = self.scores["argument_scores"]
-        self.assertAlmostEqual(a[1]["tau"], 0.8)
-        self.assertAlmostEqual(a[1]["sigma"], 0.6188)   # gedempt door ondergraving B1
-        self.assertAlmostEqual(a[2]["sigma"], 0.2265)   # B1 versterkt door C1
-        self.assertAlmostEqual(a[5]["sigma"], 0.6265)   # weerlegging D1, blad
+        self.assertAlmostEqual(a[1]["tau"], 1.0)        # weight genegeerd: τ = status·bron
+        self.assertAlmostEqual(a[1]["sigma"], 0.595)    # 1,0·(1−0,405), gedempt door B1
+        self.assertAlmostEqual(a[2]["sigma"], 0.405)    # 0,30 + (1−0,30)·0,15, versterkt door C1
+        self.assertAlmostEqual(a[5]["sigma"], 0.895)    # weerlegging D1, blad
 
     def test_relatie_1(self):
         d = self.scores["relations_detail"][1]
-        # steun: max(0,6188; 0,6) = 0,6188 (zelfde cluster!); tegen: 0,6265
-        # score = 0,6188 / (0,6188 + 0,6265 + 1) = 0,2756
-        self.assertAlmostEqual(d["score"], 0.2756, places=4)
+        # steun: max(0,595; 1,0) = 1,0 (zelfde cluster chomsky!); tegen: 0,895
+        # score = 1,0 / (1,0 + 0,895 + 1) = 0,3454
+        self.assertAlmostEqual(d["score"], 0.3454, places=4)
         self.assertEqual(d["bron"], "bewijs")
         self.assertEqual(d["n_steun_clusters"], 1)
         self.assertTrue(d["spof"])
@@ -242,18 +245,20 @@ class TestGoldenSnapshot(unittest.TestCase):
 
     def test_mechanisme_1(self):
         m = self.scores["mechanisms"][1]
-        self.assertAlmostEqual(m["literatuur_geloofw"], 0.4737, places=4)   # 0,9/1,9
-        self.assertAlmostEqual(m["praktijk_geloofw"], 0.038, places=3)      # 0,2756·0,8/5,8
-        self.assertAlmostEqual(m["geloofwaardigheid"], 0.4937, places=4)    # noisy-OR
+        self.assertAlmostEqual(m["literatuur_geloofw"], 0.5, places=4)      # 1,0/2,0
+        self.assertAlmostEqual(m["praktijk_geloofw"], 0.0476, places=3)     # 0,3454·0,8/5,8
+        self.assertAlmostEqual(m["geloofwaardigheid"], 0.5238, places=4)    # noisy-OR
         self.assertAlmostEqual(m["sterkte"], 0.5605, places=4)              # afgeleide invloed R1
         self.assertTrue(m["onweersproken"])
         self.assertTrue(m["spof"])
 
     def test_emergent_veld(self):
         e = self.scores["emergent_effects"][1]
-        self.assertAlmostEqual(e["literatuur_geloofw"], 0.4172, places=4)   # 0,716/1,716
-        self.assertAlmostEqual(e["compositie_geloofw"], 0.4118, places=4)   # 0,7/1,7
-        self.assertAlmostEqual(e["geloofwaardigheid"], 0.6572, places=4)    # noisy-OR
+        self.assertAlmostEqual(e["literatuur_geloofw"], 0.4723, places=4)   # 0,895/1,895
+        self.assertAlmostEqual(e["compositie_geloofw"], 0.5, places=4)      # 1,0/2,0
+        # noisy-OR(0,4723; 0,5) = 0,7362 > plafond 0,70 zonder tegenspraak (M1.4) → gecapt
+        self.assertAlmostEqual(e["geloofwaardigheid"], scoring.CAP_ONWEERSPROKEN, places=4)
+        self.assertTrue(e["capped"] and e["onweersproken"])
         self.assertFalse(e["zonder_compositieclaim"])
 
     def test_compositieplafond(self):
@@ -263,6 +268,16 @@ class TestGoldenSnapshot(unittest.TestCase):
               "status": "geverifieerd"}], [])
         self.assertTrue(e["zonder_compositieclaim"])
         self.assertLessEqual(e["geloofwaardigheid"], scoring.CAP_ZONDER_COMPOSITIE)
+
+    def test_weight_genegeerd_bridging_overschrijft(self):
+        # Zelf-gerapporteerd weight telt niet mee (τ = status·bron, neutraal gewicht 1,0).
+        # Een bridged rating (M2.5) vult het gewicht alsnog objectief in: hier zakt
+        # arg1 van τ=1,0 naar 0,25·1,0·1,0 = 0,25.
+        conn = fixture_db()
+        s = scoring.compute_all_scores(conn, bridged_weights={1: 0.25})
+        self.assertAlmostEqual(s["argument_scores"][1]["tau"], 0.25)
+        self.assertAlmostEqual(s["argument_scores"][4]["tau"], 1.0)   # geen rating → neutraal
+        conn.close()
 
     def test_reply_check_weigert_eigen_doel(self):
         # Doelregel (M1.1) als DB-CHECK: een reply met eigen doel is ongeldig
