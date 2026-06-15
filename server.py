@@ -183,6 +183,13 @@ def account_page():
     return send_file(WEB_PATH / "account.html")
 
 
+@app.route("/overleg")
+def overleg_page():
+    """Overlegpagina (Wikipedia-stijl 'Overleg'): alle discussiedraden én open
+    voorstellen/RfC's op een eigen volledige pagina, los van de netwerkviz."""
+    return send_file(WEB_PATH / "overleg.html")
+
+
 @app.route("/api/login", methods=["POST"])
 def api_login():
     data = request.json or {}
@@ -320,8 +327,93 @@ def get_arguments():
                 "reliability": row["reliability"],
             })
 
+    # Ratings (M2.5) per argument: tellingen + de eigen stem van de ingelogde
+    # gebruiker, zodat de viz de duim-toggle kan tonen (un-voten = nogmaals op je
+    # eigen stem klikken). Lezen is open, dus de gebruiker kan ontbreken.
+    user = _zoek_user(conn)
+    mij = user["username"] if user else None
+    for a in args_map.values():
+        a["ratings"] = {"mens": {"nuttig": 0, "niet_nuttig": 0},
+                        "agent": {"nuttig": 0, "niet_nuttig": 0}}
+        a["mijn_oordeel"] = None
+    if args_map:
+        qs = ",".join("?" * len(args_map))
+        for r in conn.execute(f"""
+            SELECT ar.argument_id, ar.rater, ar.oordeel, u.kind
+            FROM argument_ratings ar JOIN users u ON u.username = ar.rater
+            WHERE ar.argument_id IN ({qs})
+        """, list(args_map.keys())).fetchall():
+            a = args_map[r["argument_id"]]
+            a["ratings"][r["kind"]][r["oordeel"]] += 1
+            if mij and r["rater"] == mij:
+                a["mijn_oordeel"] = r["oordeel"]
+
     conn.close()
     return jsonify(list(args_map.values()))
+
+
+@app.route("/api/discussion_index")
+def discussion_index():
+    """Index van alle discussiethreads voor de full-page discussie-UI: elk doel
+    (relatie/entiteit/rol/mechanisme/emergent veld) met minstens één root-argument,
+    gegroepeerd per soort, met tellingen (totaal + nog 'voorgesteld'). Lezen is
+    open. Replies dragen geen doel (M1.1), dus dit telt root-claims per doel."""
+    conn = get_db()
+
+    def groepeer(sql):
+        return [dict(r) for r in conn.execute(sql).fetchall()]
+
+    relaties = groepeer("""
+        SELECT r.id,
+               e1.name || ' → ' || e2.name || ' (' || r.relation_type || ')' AS label,
+               COALESCE(m.filter, '') AS filter,
+               COUNT(*) AS n,
+               SUM(CASE WHEN a.status = 'voorgesteld' THEN 1 ELSE 0 END) AS n_open
+        FROM arguments a
+        JOIN relations r ON a.relation_id = r.id
+        JOIN entities e1 ON r.source_id = e1.id
+        JOIN entities e2 ON r.target_id = e2.id
+        LEFT JOIN mechanisms m ON r.mechanism_id = m.id
+        GROUP BY r.id ORDER BY label
+    """)
+
+    mechanismen = groepeer("""
+        SELECT t.id, t.name AS label, COALESCE(t.filter, '') AS filter, COUNT(*) AS n,
+               SUM(CASE WHEN a.status = 'voorgesteld' THEN 1 ELSE 0 END) AS n_open
+        FROM arguments a JOIN mechanisms t ON a.mechanism_id = t.id
+        GROUP BY t.id ORDER BY label
+    """)
+
+    def simpel(tabel, kol):
+        return groepeer(f"""
+            SELECT t.id, t.name AS label, COUNT(*) AS n,
+                   SUM(CASE WHEN a.status = 'voorgesteld' THEN 1 ELSE 0 END) AS n_open
+            FROM arguments a JOIN {tabel} t ON a.{kol} = t.id
+            GROUP BY t.id ORDER BY n DESC, label
+        """)
+
+    emergente_velden = groepeer("""
+        SELECT t.id, COALESCE(t.label, t.name) AS label, COUNT(*) AS n,
+               SUM(CASE WHEN a.status = 'voorgesteld' THEN 1 ELSE 0 END) AS n_open
+        FROM arguments a JOIN emergent_effects t ON a.emergent_effect_id = t.id
+        GROUP BY t.id ORDER BY n DESC, label
+    """)
+
+    uit = {
+        "relaties": relaties,
+        "entiteiten": simpel("entities", "entity_id"),
+        "rollen": simpel("roles", "role_id"),
+        "mechanismen": mechanismen,
+        "emergente_velden": emergente_velden,
+    }
+    conn.close()
+    return jsonify(uit)
+
+
+# Filter-enum voor classificatie-aspect 'filter' (unie van de roles- en
+# mechanisms-CHECK in schema.sql); property_value moet hier een van zijn.
+FILTERS = {"eigendom", "advertentie", "sourcing", "flak", "ideologie",
+           "cross_filter", "systeemactor", "tegenmacht", "overig"}
 
 
 @app.route("/api/arguments", methods=["POST"])
@@ -363,6 +455,23 @@ def create_argument():
     if prop == "compositie" and not emergent_effect_id:
         return jsonify({"error": "property 'compositie' hoort bij een emergent veld "
                                  "(emergent_effect_id)"}), 400
+    # Classificatiedebat (telt als aspect, niet in de zekerheids-balans):
+    #   'filter'    — bij welke propagandafilter hoort dit mechanisme/deze rol?
+    #   'mechanism' — bij welk mechanisme hoort deze relatie? (waarde = mechanisme-ID)
+    if prop == "filter":
+        if not (mechanism_id or role_id):
+            return jsonify({"error": "property 'filter' hoort bij een mechanisme of rol "
+                                     "(mechanism_id of role_id)"}), 400
+        if prop_value not in FILTERS:
+            return jsonify({"error": "Ongeldige filter. Kies uit: "
+                                     + ", ".join(sorted(FILTERS))}), 400
+    if prop == "mechanism":
+        if not relation_id:
+            return jsonify({"error": "property 'mechanism' hoort bij een relatie "
+                                     "(relation_id) — welk mechanisme hoort erbij?"}), 400
+        if not (str(prop_value or "").isdigit()):
+            return jsonify({"error": "property_value voor 'mechanism' moet een "
+                                     "mechanisme-ID zijn (rename-vast)"}), 400
     if prop and parent_id is not None:
         return jsonify({"error": "Een reactie draagt geen property: aspect-argumenten "
                                  "richten zich als root-argument op het doel zelf"}), 400
@@ -375,6 +484,12 @@ def create_argument():
                                  "(ondergraving van de parent)"}), 400
 
     reasoning = (data.get("reasoning") or "").strip() or None
+    # Een geflagde ondergraving (drogreden/foute logica) is geen kaal label: ze moet
+    # de aangevochten redeneerstap benoemen, anders is het zelf een loze aanklacht.
+    if objection_type and not reasoning:
+        return jsonify({"error": "Een ondergraving met een objection_type vereist een "
+                                 "onderbouwing: benoem in 'reasoning' de aangevochten "
+                                 "redeneerstap"}), 400
     weight = data.get("weight")
     contributed_by = g.user["username"]  # attributie volgt de ingelogde gebruiker
 
@@ -408,6 +523,12 @@ def create_argument():
         if not conn.execute("SELECT 1 FROM sources WHERE id = ?", (c["source_id"],)).fetchone():
             conn.close()
             return jsonify({"error": f"Bron {c['source_id']} bestaat niet"}), 400
+
+    # Classificatie-aspect 'mechanism': de voorgestelde mechanisme-ID moet bestaan.
+    if prop == "mechanism" and not conn.execute(
+            "SELECT 1 FROM mechanisms WHERE id = ?", (int(prop_value),)).fetchone():
+        conn.close()
+        return jsonify({"error": f"Mechanisme {prop_value} bestaat niet"}), 400
 
     # Duplicaatdetectie (M2.4): vergelijk de claim met bestaande root-argumenten op
     # hetzelfde doel (stdlib-tekstgelijkenis; bewust geen externe embeddings).
@@ -647,6 +768,81 @@ def get_sources():
     rows = conn.execute("SELECT id, title, author, source_type, reliability FROM sources ORDER BY author").fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+SOURCE_TYPES = {"boek", "academisch_artikel", "rapport", "nieuwsartikel",
+                "transcript", "interview", "dataset", "wetgeving",
+                "persbericht", "website", "overig"}
+LOCATION_TYPES = {"url", "file", "doi", "isbn", "arxiv", "handle", "archive_url"}
+
+
+@app.route("/api/sources", methods=["POST"])
+@require_user()
+def create_source():
+    """Nieuwe bron registreren vanuit de UI (voor inline citaat-selectie).
+
+    De cluster_key (M1.2) wordt afgeleid uit auteur/uitgever — dezelfde regel als
+    register_source.py — tenzij expliciet meegegeven. De bron is bibliografische
+    referentie (geen claim), dus hij landt meteen; het argument dat hem gebruikt
+    blijft 'voorgesteld' tot een reviewer merget. Een bestaande titel wordt
+    hergebruikt i.p.v. gedupliceerd (clusterhygiëne)."""
+    data = request.json or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "Titel is verplicht"}), 400
+    source_type = (data.get("source_type") or "").strip()
+    if source_type not in SOURCE_TYPES:
+        return jsonify({"error": "Ongeldig brontype. Kies uit: "
+                                 + ", ".join(sorted(SOURCE_TYPES))}), 400
+    author = (data.get("author") or "").strip() or None
+    publisher = (data.get("publisher") or "").strip() or None
+    date_published = (data.get("date_published") or "").strip() or None
+    cluster_key = (data.get("cluster_key") or "").strip() or None
+    if cluster_key is None:
+        import sys as _sys
+        scripts_dir = str(Path(__file__).parent / "scripts")
+        if scripts_dir not in _sys.path:
+            _sys.path.insert(0, scripts_dir)
+        from migrate_scoring_v2 import cluster_key_voor
+        cluster_key = cluster_key_voor(author, publisher)
+
+    loc = data.get("location") or {}
+    loc_type = (loc.get("type") or "").strip() or None
+    loc_value = (loc.get("value") or "").strip() or None
+    if loc_type and loc_type not in LOCATION_TYPES:
+        return jsonify({"error": "Ongeldig locatietype. Kies uit: "
+                                 + ", ".join(sorted(LOCATION_TYPES))}), 400
+
+    conn = get_db()
+    bestaand = conn.execute("SELECT id, title, author, source_type, reliability "
+                            "FROM sources WHERE title = ?", (title,)).fetchone()
+    if bestaand:
+        conn.close()
+        return jsonify({**dict(bestaand), "hergebruikt": True}), 200
+    try:
+        cur = conn.execute(
+            """INSERT INTO sources (title, author, source_type, publisher, date_published, cluster_key)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (title, author, source_type, publisher, date_published, cluster_key))
+        sid = cur.lastrowid
+        if loc_type and loc_value:
+            conn.execute(
+                "INSERT INTO source_locations (source_id, location_type, location) VALUES (?, ?, ?)",
+                (sid, loc_type, loc_value))
+        conn.execute(
+            """INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+               VALUES ('sources', ?, 'created', ?, ?, ?)""",
+            (sid, g.user["username"],
+             json.dumps({"title": title, "source_type": source_type, "cluster_key": cluster_key}),
+             "Nieuwe bron geregistreerd via de UI (citaat-selectie)"))
+        conn.commit()
+        row = conn.execute("SELECT id, title, author, source_type, reliability "
+                           "FROM sources WHERE id = ?", (sid,)).fetchone()
+        conn.close()
+        return jsonify(dict(row)), 201
+    except sqlite3.IntegrityError as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/citations", methods=["POST"])
@@ -1770,6 +1966,27 @@ def create_rating(arg_id):
     return jsonify({"argument_id": arg_id, "rater": g.user["username"],
                     "oordeel": oordeel, "kind": g.user["kind"],
                     "advies": g.user["kind"] == "agent"}), 201
+
+
+@app.route("/api/arguments/<int:arg_id>/ratings", methods=["DELETE"])
+@require_user()
+def delete_rating(arg_id):
+    """Eigen rating intrekken (un-vote): verwijdert uitsluitend de stem van de
+    ingelogde gebruiker op dit argument. Idempotent — geen stem = niets te doen."""
+    conn = get_db()
+    cur = conn.execute(
+        "DELETE FROM argument_ratings WHERE argument_id = ? AND rater = ?",
+        (arg_id, g.user["username"]))
+    verwijderd = cur.rowcount > 0
+    if verwijderd:
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by)
+            VALUES ('argument_ratings', ?, 'deleted', ?)
+        """, (arg_id, g.user["username"]))
+        conn.commit()
+    conn.close()
+    return jsonify({"argument_id": arg_id, "rater": g.user["username"],
+                    "verwijderd": verwijderd})
 
 
 # ── Recent changes & watchlists (M2.4) ───────────────────────

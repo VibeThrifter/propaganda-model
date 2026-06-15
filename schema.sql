@@ -389,7 +389,15 @@ CREATE TABLE arguments (
         'relation_type',     -- klopt het type relatie?
         'description',       -- klopt de beschrijving?
         'type',              -- klopt het entiteittype?
-        'role',              -- klopt de toegewezen rol?
+        'role',              -- klopt de toegewezen rol? (praktijk→theorie: entiteit→rol;
+                             -- property_value = rol-ID, rename-vast sinds de classificatie-migratie)
+        'mechanism',         -- klopt het toegewezen mechanisme? (praktijk→theorie: relatie→mechanisme;
+                             -- property_value = mechanisme-ID). Classificatiedebat, telt niet in de
+                             -- zekerheids-balans (scoring.py ASPECT_PROPERTIES) — het bestaan van de
+                             -- relatie staat los van bij welk mechanisme ze hoort.
+        'filter',            -- bij welke propagandafilter hoort dit theorie-element? (mechanisme/rol;
+                             -- property_value = filter-enum: eigendom/advertentie/sourcing/flak/
+                             -- ideologie/cross_filter/systeemactor/tegenmacht/overig). Idem aspect.
         'indirecte_invloed_op', -- padclaim: rol heeft samengestelde invloed op de rol wiens ID
                              -- in property_value staat (rol-ID sinds M2.6; voorheen rolnaam —
                              -- naam brak stil bij hernoemen/splitsen/samenvoegen)

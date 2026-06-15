@@ -97,8 +97,13 @@ BOOTSTRAP_N = 200             # M1.3: aantal bootstrap-replicaties (laag C)
 ZONDER_BRON_CLUSTER = "_zonder_bron"
 
 # Aspect-properties die NIET over het bestaan van het doel gaan en dus buiten de
-# zekerheids-balans blijven: invloedsbewijs (M1.7), padclaims, compositieclaims (M1.5).
-ASPECT_PROPERTIES = ("influence", "indirecte_invloed_op", "compositie")
+# zekerheids-balans blijven: invloedsbewijs (M1.7), padclaims, compositieclaims (M1.5)
+# en classificatiedebatten ('mechanism' = bij welk mechanisme hoort deze relatie,
+# 'filter' = bij welke propagandafilter hoort dit) — bij welk theorie-element iets
+# hoort staat los van de vraag óf het bestaat. Deze worden (nog) door niets afgeleid
+# geconsumeerd; ze leggen het debat vast (ik stel voor, jij beslist).
+ASPECT_PROPERTIES = ("influence", "indirecte_invloed_op", "compositie",
+                     "mechanism", "filter")
 
 
 # ── Laag A: basiskracht τ per argument ───────────────────────
@@ -702,10 +707,11 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     for mid, src_role, tgt_role, flt, aard in conn.execute(
             "SELECT id, source_role_id, target_role_id, filter, aard FROM mechanisms "
             "WHERE NOT vervangen"):
-        if flt == "tegenmacht":     # tegenkracht: geen pro-elite invloedskanaal
-            continue
+        # Tegenmacht telt óók mee, maar NEGATIEF (counter-power duwt tegen de stroom in;
+        # besluit juni 2026). De 'direct'-maat wordt zo getekend; de grootte gebruikt |invloed|.
+        sign = -1 if flt == "tegenmacht" else 1
         mech_edges.append((src_role, tgt_role,
-                           mechs.get(mid, {}).get("sterkte", 0.0), aard or "direct"))
+                           mechs.get(mid, {}).get("sterkte", 0.0), aard or "direct", sign))
 
     def _role_ids(*role_names):
         ids = set()

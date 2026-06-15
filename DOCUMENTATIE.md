@@ -226,8 +226,12 @@ Argumenten vormen een boomstructuur:
 Lezen is open; **elke schrijfactie vereist een account** (`users`, beheer via
 `scripts/create_user.py`; inloggen op `/login`, token genereren/roteren op `/account`).
 Mensen loggen in met een wachtwoord (sessie); agents en Claude Code sturen
-`Authorization: Bearer <token>` mee — met het token van een méns werkt Claude Code
-als die mens (de mens blijft de bijdrager). De attributie (`contributed_by`,
+`Authorization: Bearer <token>` mee — **elk onder een eigen agent-account**
+(`bijdrager`, eigen token in `data/tokens/`), nooit met het account of token van
+een mens: anders zou de attributie liegen én zou de AI de poorten omzeilen.
+Mergen/verifiëren (reviewer+), verwijderen (maintainer) en tellende reviewer-akkoorden
+blijven mensenwerk; wat de AI indient blijft `voorgesteld` tot een mens het beoordeelt
+(de AI stelt voor, de mens beslist). De attributie (`contributed_by`,
 `changed_by`) volgt altijd de ingelogde gebruiker; payload-velden worden genegeerd.
 Rollen: `bijdrager` (inhoud toevoegen) < `reviewer` (ook statussen beoordelen) <
 `maintainer` (ook DELETEs). Sinds M2.1 bestaan daarnaast **filterrollen**
@@ -882,11 +886,11 @@ Inhoud gaat sinds M0.6 uitsluitend via het bijdragepad (REST-API met een ingelog
 gebruiker of Bearer-token), nooit via directe SQL:
 
 ```bash
-TOKEN=$(cat data/tokens/maxime.token)
+TOKEN=$(cat data/tokens/claude-code.token)   # eigen agent-account, nooit maxime.token
 # Root-argument mét citatie in één call (citatiepoort tevreden)
 curl -s -X POST localhost:5000/api/arguments \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"relation_id": 42, "stance": "contradicting", "weight": 0.4,
+  -d '{"relation_id": 42, "stance": "contradicting",
        "claim": "De Volkskrant publiceerde kritisch Shell-dossier",
        "reasoning": "Als zelfcensuur dominant was, was dit dossier niet gepubliceerd.",
        "citations": [{"source_id": 3, "quote": "Het onderzoeksteam werkte zes maanden aan het dossier", "page": "pp. 12-15"}]}'
@@ -895,12 +899,14 @@ curl -s -X POST localhost:5000/api/arguments \
 ### Reactie op een bestaand argument (discussieboom)
 
 Een reply draagt géén eigen doel en geen property (M1.1); een contradicting-reply is
-een ondergraving en mag bronloos, met optioneel `objection_type` (M1.8):
+een ondergraving en mag bronloos, met optioneel `objection_type` (M1.8). Zet je een
+`objection_type`, dan is `reasoning` **verplicht** (benoem de aangevochten redeneerstap):
+een kaal drogreden-label is zelf een loze aanklacht en wordt geweigerd (400).
 
 ```bash
 curl -s -X POST localhost:5000/api/arguments \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"parent_argument_id": 15, "stance": "contradicting", "weight": 0.55,
+  -d '{"parent_argument_id": 15, "stance": "contradicting",
        "claim": "Eén casus draagt geen algemene regel",
        "reasoning": "Aangevochten stap: uit het ene Shell-dossier wordt een structurele conclusie getrokken.",
        "objection_type": "anekdote_als_regel"}'
@@ -912,7 +918,7 @@ curl -s -X POST localhost:5000/api/arguments \
 # Bewering over een entiteit
 curl -s -X POST localhost:5000/api/arguments \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"entity_id": 1, "stance": "supporting", "weight": 0.8,
+  -d '{"entity_id": 1, "stance": "supporting",
        "claim": "DPG bezit >60% van de online commerciële nieuwsmarkt",
        "citations": [{"source_id": 12}]}'
 

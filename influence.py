@@ -14,8 +14,10 @@ Richtingsregels per relatietype (zie ``DIRECTION``):
   - GERICHT  (bron beïnvloedt doel): eigendom, adverteerder, beinvloeding, draaideur,
     financiering, censuur, regulering, cooptatie, bestuurder, personeel, lidmaatschap.
   - SYMMETRISCH (wederzijds): alliantie.
-  - UITGESLOTEN: oppositie — dat is *tegenmacht*, een tegengestelde kracht, geen kanaal
-    waarlangs pro-elite-invloed propageert. (Telt elders als tegenmacht, niet hier.)
+  - Niets uitgesloten: ook oppositie/tegenmacht telt mee. Counter-power oefent eveneens
+    invloed uit op de rest van het netwerk (het duwt terug), dus het is een gericht kanaal
+    — niet langer op nul gezet. De maat meet zo *alle* gerichte invloed, niet alleen de
+    pro-elite-stroom (besluit juni 2026).
 
 Twee maten per entiteit:
   - ``direct``     : som van uitgaande influence-gewichten (rechtstreekse duwkracht).
@@ -36,7 +38,9 @@ from collections import defaultdict
 # ── Instelbare constanten ────────────────────────────────────
 
 SYMMETRIC_TYPES = frozenset({"alliantie"})
-EXCLUDED_TYPES = frozenset({"oppositie"})  # tegenmacht: geen invloedskanaal
+# Niets uitgesloten: tegenmacht/oppositie telt óók als invloedskanaal — counter-power duwt
+# terug op de rest van het netwerk en hoort dus mee te tellen (besluit juni 2026).
+EXCLUDED_TYPES = frozenset()
 
 # Aard van het mechanisme (kolom mechanisms.aard; relaties erven 'm). Bepaalt of een instantie
 # een echt dyadisch kanaal is of een emergente systeemeigenschap — en daarmee hoe ze in de
@@ -82,6 +86,16 @@ def edge_direction(relation_type: str) -> str:
     return "directed"
 
 
+# Tegenkracht-edges: counter-power duwt *tegen* de dominante stroom in en telt daarom NEGATIEF
+# in de directe duwkracht (signed). De cascade-maten (transitief/bereik) gebruiken de magnitude
+# — een teken laat zich niet schoon vermenigvuldigen langs een pad (− × − = +). Zo blijft de
+# asymmetrie zichtbaar in het directe getal, terwijl de node toch op grootte (|invloed|) telt.
+COUNTER_TYPES = frozenset({"oppositie"})  # tegenmacht in de instantielaag (relatietype)
+def edge_sign(relation_type: str, filter_: str | None) -> int:
+    """+1 voor pro-elite, −1 voor tegenkracht (filter 'tegenmacht' of een counter-relatietype)."""
+    return -1 if (filter_ == "tegenmacht" or relation_type in COUNTER_TYPES) else 1
+
+
 # ── Graafopbouw ──────────────────────────────────────────────
 
 def build_adjacency(relations, field_mode: str = "full"):
@@ -89,8 +103,8 @@ def build_adjacency(relations, field_mode: str = "full"):
 
     ``relations`` is een iterable van dicts/mappings met ten minste ``source_id``,
     ``target_id``, ``influence`` en ``relation_type``; optioneel ``aard`` en ``mechanism_id``
-    (ontbreken → 'direct'). Uitgesloten types (oppositie) worden overgeslagen; symmetrische
-    types krijgen een edge in beide richtingen.
+    (ontbreken → 'direct'). Niets wordt uitgesloten (ook tegenmacht/oppositie telt mee);
+    symmetrische types krijgen een edge in beide richtingen.
 
     ``field_mode`` (zie ``FIELD_MODES``) bepaalt hoe emergente veld-effecten meetellen:
       - 'full'     : aard genegeerd, alles op volle sterkte.
@@ -125,18 +139,23 @@ def build_adjacency(relations, field_mode: str = "full"):
         if aard == FIELD_INSTANTIATION:  # collapse: één diffuse bijdrage i.p.v. N
             k = fanout.get((r["source_id"], r.get("mechanism_id")), 1) or 1
             w = w / k
+        sign = edge_sign(rt, r.get("filter"))   # tegenkracht telt negatief in 'direct'
         s, t = r["source_id"], r["target_id"]
-        adj[s].append((t, w, rt))
+        adj[s].append((t, w, rt, sign))
         if direction == "symmetric":
-            adj[t].append((s, w, rt))
+            adj[t].append((s, w, rt, sign))
     return adj
 
 
 # ── Maten ────────────────────────────────────────────────────
 
 def direct_strength(adj, node) -> float:
-    """Som van de uitgaande influence-gewichten van één node (rechtstreekse duwkracht)."""
-    return sum(w for _, w, _ in adj.get(node, []))
+    """Getekende som van de uitgaande influence-gewichten (rechtstreekse net-duwkracht).
+
+    Pro-elite kanalen tellen positief, tegenkracht negatief — zo blijft de asymmetrie in het
+    getal staan. Voor node-grootte gebruikt de viz de magnitude (|direct|).
+    """
+    return sum(w * sign for _, w, _, sign in adj.get(node, []))
 
 
 def transitive_reach(adj, src, max_hops: int = MAX_HOPS, prune: float = PRUNE) -> dict:
@@ -150,7 +169,7 @@ def transitive_reach(adj, src, max_hops: int = MAX_HOPS, prune: float = PRUNE) -
     for _ in range(max_hops):
         nxt: dict = {}
         for node, acc in frontier:
-            for tgt, w, _ in adj.get(node, []):
+            for tgt, w, _, _ in adj.get(node, []):   # cascade op magnitude (teken negeren)
                 v = acc * w
                 if v > best.get(tgt, 0.0) and v > prune:
                     best[tgt] = v
@@ -185,7 +204,7 @@ def best_path(adj, src, dst, max_hops: int = MAX_HOPS):
             continue
         if hops[node] >= max_hops:
             continue
-        for tgt, w, rt in adj.get(node, []):
+        for tgt, w, rt, _ in adj.get(node, []):   # max-product op magnitude
             np_ = p * w
             if np_ > best_prod.get(tgt, 0.0):
                 best_prod[tgt] = np_
@@ -231,7 +250,7 @@ def _centrality(node_ids, adj, max_hops: int = MAX_HOPS, prune: float = PRUNE,
             rec[name] = round(s, 4)
         out[n] = rec
 
-    max_direct = max((v["direct"] for v in out.values()), default=0.0) or 1.0
+    max_direct = max((abs(v["direct"]) for v in out.values()), default=0.0) or 1.0
     max_trans = max((v["transitive"] for v in out.values()), default=0.0) or 1.0
     for v in out.values():
         v["direct_norm"] = round(v["direct"] / max_direct, 4)
@@ -275,10 +294,10 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
 
     relations = [
         {"source_id": s, "target_id": t, "influence": inf, "relation_type": rt,
-         "mechanism_id": mid, "aard": aard or "direct"}
-        for s, t, inf, rt, mid, aard in conn.execute(
+         "mechanism_id": mid, "aard": aard or "direct", "filter": flt}
+        for s, t, inf, rt, mid, aard, flt in conn.execute(
             "SELECT r.source_id, r.target_id, r.influence, r.relation_type, r.mechanism_id, "
-            "       COALESCE(m.aard, 'direct') "
+            "       COALESCE(m.aard, 'direct'), m.filter "
             "FROM relations r LEFT JOIN mechanisms m ON m.id = r.mechanism_id "
             "WHERE NOT r.vervangen AND r.status = 'goedgekeurd'")
     ]
@@ -314,6 +333,7 @@ def compute_role_influence(role_ids, mech_edges, target_role_sets=None,
     for edge in mech_edges:
         src, tgt, sterkte = edge[0], edge[1], edge[2]
         aard = edge[3] if len(edge) > 3 else "direct"
+        sign = edge[4] if len(edge) > 4 else 1   # tegenkracht = −1 (zie scoring.compute_all_scores)
         if src is None or tgt is None:
             continue
         if field_mode != "full":
@@ -322,7 +342,7 @@ def compute_role_influence(role_ids, mech_edges, target_role_sets=None,
             if aard == FIELD_INSTANTIATION and field_mode == "exclude":
                 continue
         w = THEORY_BASE + THEORY_SPAN * float(sterkte or 0.0)
-        adj[src].append((tgt, w, None))
+        adj[src].append((tgt, w, None, sign))
     target_sets = {name: {"ids": set(ids), "self": False}
                    for name, ids in (target_role_sets or {}).items() if ids}
     return _centrality(list(role_ids), adj, max_hops, prune, target_sets=target_sets)
