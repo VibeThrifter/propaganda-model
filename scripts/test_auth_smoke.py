@@ -116,9 +116,14 @@ def main():
     r = c.patch(f"/api/arguments/{arg_mens}/status", headers=kop,
                 json={"status": "geverifieerd"})
     eis(r.status_code == 200, "andermans argument verifiëren mag wel")
+    # Afwijzen vergt sinds Fase B een motivatie (zonder feedback kan de auteur niet
+    # verbeteren); zonder motivatie nu 400.
     r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
                 json={"status": "verworpen"})
-    eis(r.status_code == 200, "status 'verworpen' wordt geaccepteerd")
+    eis(r.status_code == 400, "afwijzen zonder motivatie wordt geweigerd (400)")
+    r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
+                json={"status": "verworpen", "motivatie": "niet onderbouwd"})
+    eis(r.status_code == 200, "status 'verworpen' mét motivatie wordt geaccepteerd")
 
     print("6. Tokenrotatie")
     r = c.post("/api/tokens", headers=kop)

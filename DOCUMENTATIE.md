@@ -32,6 +32,12 @@ De echte entiteiten en relaties in Nederland:
 
 Elke entiteit is gekoppeld aan een of meer rollen uit het theoretisch model. Elke relatie is optioneel gekoppeld aan een mechanisme.
 
+#### Afgeleide primaire rol (emergent, niet toegekend)
+
+In de geest van het model — bias is een *emergente* eigenschap — wordt de **primaire rol/filter van een entiteit afgeleid, niet toegekend**. Per filter telt `scoring.py` de som van *afgeleide zekerheid × afgeleide invloed* over de relaties **waarvan de entiteit de bron is** (het filter dat ze zélf uitoefent; bij een bidirectionele relatie tellen beide kanten). Het filter met de grootste som is de primaire rol (`compute_all_scores` → `entity_primary_filter`/`entity_filter_scores`). Zo classificeert het bewijs een actor, niet de invoerder: PAX komt bijvoorbeeld als `sourcing` (geco-opteerde bron) bovendrijven zodra haar media-relaties de tegenmacht-relatie overstemmen.
+
+De kolom `entities.primary_role_id` is daarmee nog slechts **fallback/override**: ze geldt alleen voor entiteiten zonder (goedgekeurde) bron-relatie, en `influence.py` gebruikt haar nog om doelgroepen (`publiek`, `politicus`) te vinden. De viz en `/api/scores` kleuren/categoriseren op de afgeleide rol (`filter_category`, met `filter_category_bron` = `afgeleid`/`toegekend`/`geen`). Anders dan in de invloedsgraaf telt tegenmacht hier op *magnitude* mee (positief): classificatie meet welke functie een actor het sterkst vervult, niet de netto-duw op het systeem.
+
 ---
 
 ## De vijf filters + uitbreidingen
@@ -198,7 +204,7 @@ Zie "Scores: van discussieboom naar theorie".
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `sources` | Academische bronnen (boeken, artikelen, rapporten) | title, author, source_type, publisher, date_published, language, summary, reliability (`primair`/`academisch`/`institutioneel`/…), processed |
+| `sources` | Academische bronnen (boeken, artikelen, rapporten) | title, author, source_type, publisher, date_published, language, summary, reliability (rigueur: `primair`/`academisch`/`institutioneel`/…), onderwerp (relevantie-as: `nl_systeem`/`algemeen`/`buitenlands`/`onbepaald`), processed |
 | `source_locations` | Meerdere toegangspunten per bron | source_id, location_type (url/file/doi/isbn/arxiv/handle/archive_url), location, accessed_at, notes |
 
 ### Argumenten & citaties (discussieboom)
@@ -265,7 +271,33 @@ freeze-test (mechanismen), afgrenzing, falsificatiecriterium, ≥ 1 instantiatie
 reviewers** (de indiener telt niet mee; agent-oordelen zijn zichtbaar advies en
 tellen nooit — alle LLM's gelden als één gecorreleerde familie); de praktijklaag
 vergt één akkoord (zelf-akkoord gevlagd). Eén gemotiveerde menselijke afwijzing
-sluit het voorstel (`afgewezen`); de indiener kan herzien en opnieuw indienen.
+sluit het voorstel (`afgewezen`); de indiener kan herzien en opnieuw indienen via
+`POST /api/voorstellen/<id>/herzien` — een nieuw, voorgevuld open voorstel met
+`payload.vorige_voorstel_id` naar het origineel (de ontvangen reviewfeedback blijft
+herleidbaar). Een afgewezen praktijkelement gaat dezelfde weg via
+`POST /api/{entities,relations}/<id>/heraanmelden` (auteur bewerkt → terug op
+`voorgesteld`).
+
+**Argument-revisie-lus (verbeter-pad voor de discussieboom).** Argumenten zijn niet
+meer onveranderlijk. Een nog-`voorgesteld` argument schaaft de auteur in-place bij
+(`PATCH /api/arguments/<id>` — het telt nog nergens in mee). Een al *gemerged*
+argument bevries je en verbeter je via een **revisie**: `POST
+/api/arguments/<id>/revisie` maakt een nieuw `voorgesteld` argument; mergt een
+reviewer dat, dan **vervangt** het het oude (oud → `verouderd` + `vervangen = 1`,
+overgeslagen door `scoring.py`/`influence.py`/viz, herleidbaar via de self-pointer
+`reviseert_id`). Iedereen mag een revisie voorstellen, ook van andermans argument —
+*ik stel voor, jij beslist*. Een reviewer kan een gemerged argument na een slechte
+rating of een drogreden-ondergraving **terug ter herkeuring** zetten (`status
+'betwist'` + verplichte motivatie); het verschijnt dan in `review_queue.herkeuring`.
+Afwijzen van een argument vergt nu net als bij RfC's/praktijk een motivatie, zodat de
+auteur weet wat te verbeteren. De pagina **`/werkbank`** toont elke gebruiker het
+eigen ingediende werk per status met de ontvangen feedback en knoppen om te bewerken,
+reviseren of opnieuw in te dienen.
+
+> *Waarom geen `lineage`-tabel voor argumenten?* `lineage.voorstel_id` is `NOT NULL`
+> en argument-merges lopen bewust niet via `voorstellen` (de lichte mergeweg, M2.2).
+> Argumenten dragen hun opvolging daarom zelf (`reviseert_id` + `vervangen`),
+> symmetrisch met de `vervangen`-vlag op de theorie-/praktijktabellen.
 
 **Anti-misbruik (M2.4).** Rate limit per account (30/60/120 schrijfacties per
 minuut voor bijdrager/reviewer/maintainer); duplicaatdetectie bij indienen
@@ -273,14 +305,19 @@ minuut voor bijdrager/reviewer/maintainer); duplicaatdetectie bij indienen
 kandidaten, override via `negeer_duplicaten`); recent-changes-feed
 (`/api/recent_changes`, open) + persoonlijke watchlist (`/api/watchlist`).
 
-**Ratings & bridging (M2.5).** `POST /api/arguments/<id>/ratings`
-(`nuttig`/`niet_nuttig` + gestructureerde reden): je beoordeelt onderbouwing,
-relevantie en eerlijkheid — nooit waarheid, en nooit eigen werk. Agent-ratings
-zijn advies; hun gewicht wordt verdiend via kalibratie
-(`scripts/kalibratie_agents.py`, gecapt) en agent×agent telt nooit. Zodra de
-menselijke pool groot genoeg is, vervangt bridging (matrixfactorisatie,
-`scripts/bridging.py` → `data/bridging.json`) het zelfgekozen argumentgewicht in
-laag A; tot die tijd gelden de noodregels.
+**Ratings & bridging (M2.5, review-verdict v2).** Het verdict op een argument is
+**"Logica klopt"** (een lichte endorsement, `nuttig`-rating — telt niet als bewijs)
+of **"Logica klopt niet"** (een onderbouwde ondergraving met verplichte reden +
+resolutielus; zie "Resolutielus op een ondergraving" onder *Scores*). De kale 👎 als
+losse score-laag bestaat niet meer. Bridging (matrixfactorisatie,
+`scripts/bridging.py` → `data/bridging.json`) leidt hieruit een gezindheids-
+onafhankelijk argumentgewicht af: **+1** = endorsement, **−1** = een gehandhaafde
+ondergraving. Je beoordeelt onderbouwing, relevantie en eerlijkheid — nooit waarheid,
+en nooit eigen werk; agent-oordelen zijn advies (gewicht via
+`scripts/kalibratie_agents.py`, gecapt; agent×agent telt nooit). Het gewicht **krimpt**
+naar het neutrale 1,0 met vertrouwen α = n/(n+k) — geen drempel-klif, alleen een
+identificeerbaarheidsvloer (≥3 beoordelaars, ≥6 oordelen) — dus het schuift vloeiend in
+naarmate de pool groeit.
 
 **Splitsen & samenvoegen (M2.6).** Granulariteit is score-relevant; de knip loopt
 daarom via voorstellen (soorten `splitsen`/`samenvoegen`/`hernoemen`). Twee
@@ -495,10 +532,20 @@ zijn *emergent*: ze bouwen op uit de bewijslast eronder. De berekening (in `scor
 **geneutraliseerd**. Het zelf-gerapporteerde argumentgewicht is geen objectieve maat (de invoerder
 zet zijn eigen gewicht — Z2), dus de opgeslagen `weight`-kolom telt niet meer mee: in de praktijk is
 `weight = 1,0` (neutraal) en rust τ alleen op de verifieerbare factoren `statusfactor × bronfactor`.
-Een **bridged rating** (M2.5) vult het gewicht alsnog objectief in zodra de beoordelaarspool het
-toelaat — meerdere beoordelaars samen i.p.v. de invoerder. De statusfactor schaalt op
-verificatiestatus (geverifieerd 1,0 → betwist 0,25 → verworpen 0,0); de bronfactor op de
-betrouwbaarste citatie. Brongewichten: `academisch 1,0 · primair 0,95 · institutioneel 0,85 ·
+Een **bridged rating** (M2.5, review-verdict v2) vult het gewicht alsnog objectief in zodra de
+beoordelaarspool het toelaat: **+1** = een 'Logica klopt'-endorsement, **−1** = een gehandhaafde
+(niet-'opgelost') ondergraving — de beredeneerde vervanger van de oude 👎. `scripts/bridging.py`
+krimpt het oordeel naar het neutrale 1,0 met vertrouwen α = n/(n+k) (k=5): **geen drempel-klif meer**,
+alleen een kleine identificeerbaarheidsvloer (≥3 beoordelaars, ≥6 oordelen) waaronder de gezindheidsas
+niet te schatten is — bridging schuift dus vloeiend in naarmate de pool groeit. De statusfactor
+schaalt op verificatiestatus (geverifieerd 1,0 → betwist 0,25 → verworpen 0,0); de **bronfactor =
+rigueur × relevantie**: het reliabilitygewicht van de betrouwbaarste citatie × een relevantiefactor
+uit `sources.onderwerp` (`nl_systeem` ×1,15 · `algemeen`/`onbepaald` ×1,0 · `buitenlands` ×0,85,
+gecapt op 1,0) — zo weegt een bron over het Nederlandse mediasysteem zwaarder dan een buitenlandse van
+gelijke rigueur, zónder ooit een rigueur-gat te overrulen. Classificeren (reliability + onderwerp) is
+**reviewer-werk** (`PATCH /api/sources/<id>/classificatie`), bewaakt door `validation.klasse_consistentie`
+(de klasse past bij het brontype; een hoge klasse vereist een vindplaats) en geaudit door de
+`BRON-KLASSE`-check. Reliabilitygewichten: `academisch 1,0 · primair 0,95 · institutioneel 0,85 ·
 kwaliteitsjournalistiek 0,70 · regulier 0,50 · opinie 0,35 · grijs 0,20 · eigen_synthese 0,0 ·
 onbeoordeeld 0,15`. Projectmateriaal (`sources/AI/`, klasse `eigen_synthese`) weegt 0: vindplaats,
 nooit bewijs. Zo is geen enkele score-input meer zelf-gerapporteerd: zekerheid en invloed komen uit
@@ -525,6 +572,16 @@ Alleen **root**-argumenten tellen voor het doel zelf; een ondergraving dempt dus
 dat ze aanvalt (een drogredelijk argument vóór een ware claim trekt de claim niet omlaag — het houdt
 alleen op haar te stutten). Tegenbewijs voor het doel zelf is een **weerlegging**: een contradicting
 *root*-argument mét bron.
+
+**Resolutielus op een ondergraving (review-verdict v2).** "Logica klopt niet" is geen kale downvote:
+elke ondergraving vereist een `reasoning` (benoem wat er niet deugt) en draagt een stand
+`bezwaar_resolutie` ∈ {`open`, `herzien`, `blijft`, `opgelost`}. Open/herzien/blijft dempen de σ van
+de parent; alleen **`opgelost`** heft de demping op. De lus: de auteur van het aangevochten argument
+verbetert en zet `herzien`; de bezwaarmaker herbeoordeelt (`opgelost` of `blijft staan`); een reviewer
+mag een bezwaar pas **overrulen** naar `opgelost` ná `herzien` (zodat een afwezige bezwaarmaker het
+argument niet eeuwig bevriest). Het effect is omkeerbaar: lost de auteur het op, dan veert de σ terug
+naar haar onaangevochten basiskracht. De 👍/👎-duim als losse score-laag bestaat niet meer — "Logica
+klopt" is een lichte endorsement (voedt hooguit bridging), "Logica klopt niet" is deze ondergraving.
 
 **Laag B — afgeleide praktijkscore per relatie/entiteit:** `steun / (steun + tegen + k)` over de
 σ's van de root-argumenten, met **clusteraggregatie (M1.2)**: elke bron heeft een `cluster_key`

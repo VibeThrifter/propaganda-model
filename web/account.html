@@ -62,7 +62,24 @@ async function laad() {
       sha256-hash). Gebruik: <code>Authorization: Bearer &lt;token&gt;</code> — daarmee werkt
       Claude Code als jou; bijdragen landen onder dit account.</div>
     <div class="fout" id="fout"></div>
-    <div class="hint"><a href="/">← terug naar de visualisatie</a></div>`;
+
+    ${me.kind === 'mens' ? `
+    <h2>Wachtwoord wijzigen</h2>
+    <form id="pwForm">
+      <input type="password" id="pwHuidig" placeholder="Huidig wachtwoord" autocomplete="current-password"
+             style="width:100%;margin-bottom:8px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:13px">
+      <input type="password" id="pwNieuw" placeholder="Nieuw wachtwoord (min. 8 tekens)" autocomplete="new-password"
+             style="width:100%;margin-bottom:8px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:13px">
+      <button class="primair" type="submit">Wachtwoord wijzigen</button>
+      <span id="pwMelding" class="hint" style="margin-left:10px"></span>
+    </form>` : ''}
+
+    ${me.role === 'maintainer' ? `
+    <h2>Beheer</h2>
+    <div class="hint"><a href="/beheer">→ Accountbeheer</a> — rollen, filterrollen en
+      accounts beheren (alleen maintainers).</div>` : ''}
+
+    <div class="hint" style="margin-top:14px"><a href="/">← terug naar de visualisatie</a></div>`;
 
   document.getElementById('tokenBtn').addEventListener('click', async () => {
     const fout = document.getElementById('fout');
@@ -79,6 +96,26 @@ async function laad() {
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' });
     window.location.href = '/login';
+  });
+
+  const pwForm = document.getElementById('pwForm');
+  if (pwForm) pwForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const melding = document.getElementById('pwMelding');
+    melding.textContent = ''; melding.style.color = 'var(--text-muted)';
+    try {
+      const r = await fetch('/api/account/password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          huidig: document.getElementById('pwHuidig').value,
+          nieuw: document.getElementById('pwNieuw').value,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) { melding.style.color = '#e0635f'; melding.textContent = d.error || 'Mislukt'; return; }
+      melding.style.color = '#5fbf7f'; melding.textContent = 'Wachtwoord gewijzigd.';
+      pwForm.reset();
+    } catch (err) { melding.style.color = '#e0635f'; melding.textContent = 'Netwerkfout: ' + err.message; }
   });
 }
 laad();

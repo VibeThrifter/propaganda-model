@@ -56,7 +56,8 @@ def check_koppelingsplicht(conn):
             FROM relations r
             JOIN entities e1 ON r.source_id = e1.id
             JOIN entities e2 ON r.target_id = e2.id
-            WHERE r.mechanism_id IS NULL AND NOT r.vervangen ORDER BY r.id
+            WHERE r.mechanism_id IS NULL AND NOT r.vervangen
+              AND r.status = 'goedgekeurd' ORDER BY r.id
         """)]
 
     rel_zonder_inst = [
@@ -69,16 +70,23 @@ def check_koppelingsplicht(conn):
             JOIN mechanisms m ON r.mechanism_id = m.id
             WHERE NOT EXISTS (SELECT 1 FROM instantiations i
                               WHERE i.relation_id = r.id AND i.mechanism_id = r.mechanism_id)
-              AND NOT r.vervangen AND NOT m.vervangen
+              AND NOT r.vervangen AND NOT m.vervangen AND r.status = 'goedgekeurd'
             ORDER BY r.id
         """)]
 
+    # Een entiteit "zonder rol" is pas een fout als ze ook geen *afleidbare* rol heeft:
+    # met de afgeleide primaire rol (scoring.py) volstaat een goedgekeurde bron-relatie
+    # met mechanisme. Voorgestelde entiteiten tellen nog niet mee (telt-in-niets).
     ent_zonder_rol = [
         f"entiteit #{e['id']}: {e['name']} ({e['type']})"
         for e in conn.execute("""
             SELECT e.id, e.name, e.type FROM entities e
             WHERE e.primary_role_id IS NULL AND NOT e.vervangen
+              AND e.status = 'goedgekeurd'
               AND NOT EXISTS (SELECT 1 FROM entity_roles er WHERE er.entity_id = e.id)
+              AND NOT EXISTS (SELECT 1 FROM relations r WHERE r.source_id = e.id
+                              AND r.status = 'goedgekeurd' AND NOT r.vervangen
+                              AND r.mechanism_id IS NOT NULL)
             ORDER BY e.id
         """)]
 
@@ -87,7 +95,7 @@ def check_koppelingsplicht(conn):
         for e in conn.execute("""
             SELECT e.id, e.name, e.type FROM entities e
             WHERE NOT EXISTS (SELECT 1 FROM instantiations i WHERE i.entity_id = e.id)
-              AND NOT e.vervangen
+              AND NOT e.vervangen AND e.status = 'goedgekeurd'
             ORDER BY e.id
         """)]
 
@@ -98,10 +106,78 @@ def check_koppelingsplicht(conn):
                    "fout", rel_zonder_inst,
                    "Zonder instantiatie telt de relatie stilletjes niet mee in de theoriescore (laag C)."),
         _bevinding("KOPPEL-ENT-ROL", "Entiteiten zonder rol", "fout", ent_zonder_rol,
-                   "Geen primary_role_id en geen entity_roles-rij."),
+                   "Geen primary_role_id, geen entity_roles-rij én geen afleidbare rol "
+                   "(goedgekeurde bron-relatie met mechanisme)."),
         _bevinding("KOPPEL-ENT-INST", "Entiteiten zonder rol-instantiatie", "waarschuwing",
                    ent_zonder_inst,
                    "Wel of geen rol, maar geen instantiations-rij: onzichtbaar voor de rolscore."),
+    ]
+
+
+# ── Zichtbaarheid & volledigheid (wat staat wel in de DB, niet in de viz?) ──
+
+def check_zichtbaarheid(conn):
+    """De viz tekent alleen 'goedgekeurd'; voorgesteld werk is onzichtbaar tot een
+    mens het goedkeurt (M2.2). Deze check maakt 'onzichtbaar/onaf' expliciet, zodat
+    ingediend werk niet ogenschijnlijk 'verdwijnt' — één plek voor "wat mist er nog"."""
+    voorgestelde_ent = [
+        f"entiteit #{e['id']}: {e['name']} ({e['type']})"
+        for e in conn.execute("""
+            SELECT id, name, type FROM entities
+            WHERE status = 'voorgesteld' AND NOT vervangen ORDER BY id""")]
+
+    voorgestelde_rel = [
+        f"relatie #{r['id']}: {r['src']} → {r['tgt']}"
+        for r in conn.execute("""
+            SELECT r.id, e1.name AS src, e2.name AS tgt FROM relations r
+            JOIN entities e1 ON e1.id = r.source_id
+            JOIN entities e2 ON e2.id = r.target_id
+            WHERE r.status = 'voorgesteld' AND NOT r.vervangen ORDER BY r.id""")]
+
+    # Goedgekeurde edge waarvan minstens één knoop nog niet goedgekeurd is: de viz
+    # heeft dan geen knoop om de edge aan te hangen en tekent haar niet (dangling).
+    dangling = [
+        f"relatie #{r['id']}: {r['src']} ({r['ss']}) → {r['tgt']} ({r['ts']})"
+        for r in conn.execute("""
+            SELECT r.id, e1.name AS src, e2.name AS tgt,
+                   e1.status AS ss, e2.status AS ts FROM relations r
+            JOIN entities e1 ON e1.id = r.source_id
+            JOIN entities e2 ON e2.id = r.target_id
+            WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
+              AND (e1.status != 'goedgekeurd' OR e2.status != 'goedgekeurd')
+            ORDER BY r.id""")]
+
+    # Zichtbaar, maar de score drijft nog op de prior-vloer: alle root-argumenten
+    # van een goedgekeurde relatie staan nog op 'voorgesteld' (tellen-in-niets).
+    prior_only = [
+        f"relatie #{r['id']}: {r['src']} → {r['tgt']}"
+        for r in conn.execute("""
+            SELECT r.id, e1.name AS src, e2.name AS tgt FROM relations r
+            JOIN entities e1 ON e1.id = r.source_id
+            JOIN entities e2 ON e2.id = r.target_id
+            WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
+              AND EXISTS (SELECT 1 FROM arguments a WHERE a.relation_id = r.id
+                          AND a.parent_argument_id IS NULL)
+              AND NOT EXISTS (SELECT 1 FROM arguments a WHERE a.relation_id = r.id
+                              AND a.parent_argument_id IS NULL AND a.status != 'voorgesteld')
+            ORDER BY r.id""")]
+
+    return [
+        _bevinding("ZICHTBAAR-ENT", "Voorgestelde entiteiten (onzichtbaar in de viz)", "info",
+                   voorgestelde_ent,
+                   "In review: de viz tekent alleen 'goedgekeurd'. Keur goed via "
+                   "PATCH /api/entities/<id>/status of /overleg — dan verschijnen ze."),
+        _bevinding("ZICHTBAAR-REL", "Voorgestelde relaties (onzichtbaar in de viz)", "info",
+                   voorgestelde_rel,
+                   "Idem: koppelingen in review verschijnen pas na goedkeuring."),
+        _bevinding("ZICHTBAAR-DANGEL", "Goedgekeurde relaties met een niet-goedgekeurd eindpunt",
+                   "waarschuwing", dangling,
+                   "De edge is goedgekeurd maar minstens één knoop staat nog in review; "
+                   "de viz kan de edge dan niet tekenen. Keur ook het eindpunt goed."),
+        _bevinding("ZICHTBAAR-PRIOR", "Goedgekeurde relaties met alleen voorgestelde argumenten",
+                   "info", prior_only,
+                   "Zichtbaar, maar de score drijft op de prior-vloer tot de argumenten "
+                   "gemerged zijn (telt-in-niets tot merge, M2.2)."),
     ]
 
 
@@ -113,6 +189,7 @@ def check_bewijs(conn):
         for a in conn.execute("""
             SELECT a.id, a.stance, a.claim FROM arguments a
             WHERE a.stance IN ('supporting', 'contradicting')
+              AND a.status != 'voorgesteld'
               AND NOT EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
             ORDER BY a.id
         """)]
@@ -299,6 +376,32 @@ def check_padclaims(conn):
 
 # ── Bronnen (locaties, archief, linkrot) ─────────────────────
 
+# Classificatie-integriteit (controleerbaarheid van de bron-classificatie): welke
+# brontypes mogen een hoge betrouwbaarheidsklasse dragen, en welke klassen vereisen een
+# vindplaats. Gedeeld door de validator (audit over de hele DB) én de classificatie-poort
+# in server.py (PATCH /api/sources/<id>/classificatie), zodat de regel op één plek staat.
+HOGE_KLASSEN = {"academisch", "primair", "institutioneel"}
+TYPE_PER_KLASSE = {
+    "academisch": {"academisch_artikel", "boek"},
+    "primair": {"dataset", "wetgeving", "transcript", "interview", "persbericht", "overig"},
+    "institutioneel": {"rapport", "dataset", "wetgeving", "boek", "website", "overig"},
+}
+
+
+def klasse_consistentie(source_type, reliability, heeft_locator) -> list:
+    """Problemen met een bron-classificatie (leeg = consistent). De reliability-klasse
+    stuurt de score, dus juist die moet bij het brontype passen én controleerbaar zijn."""
+    problemen = []
+    toegestaan = TYPE_PER_KLASSE.get(reliability)
+    if toegestaan is not None and source_type not in toegestaan:
+        problemen.append(f"reliability '{reliability}' past niet bij brontype "
+                         f"'{source_type}' (verwacht een van: {', '.join(sorted(toegestaan))})")
+    if reliability in HOGE_KLASSEN and not heeft_locator:
+        problemen.append(f"klasse '{reliability}' vereist een vindplaats (locator) zodat "
+                         "ze door derden te controleren is")
+    return problemen
+
+
 def check_bronnen(conn, network=False):
     zonder_locatie = [
         f"bron #{s['id']}: {s['title']} ({s['source_type']})"
@@ -318,6 +421,14 @@ def check_bronnen(conn, network=False):
             ORDER BY s.id
         """)]
 
+    inconsistent = []
+    for s in conn.execute("""
+            SELECT s.id, s.title, s.source_type, s.reliability,
+                   EXISTS(SELECT 1 FROM source_locations l WHERE l.source_id = s.id) AS heeft_loc
+            FROM sources s ORDER BY s.id"""):
+        for prob in klasse_consistentie(s["source_type"], s["reliability"], s["heeft_loc"]):
+            inconsistent.append(f"bron #{s['id']} ({s['title']}): {prob}")
+
     bevindingen = [
         _bevinding("BRON-LOCATIE", "Bronnen zonder vindplaats (source_locations)",
                    "waarschuwing", zonder_locatie,
@@ -325,6 +436,10 @@ def check_bronnen(conn, network=False):
         _bevinding("BRON-ARCHIEF", "URL-bronnen zonder archive_url", "waarschuwing",
                    zonder_archief,
                    "Webpagina's verdwijnen; een Wayback-snapshot houdt het bewijs controleerbaar."),
+        _bevinding("BRON-KLASSE", "Bron-classificaties die niet bij het brontype passen "
+                   "of een vindplaats missen", "waarschuwing", inconsistent,
+                   "De reliability-klasse stuurt de score; ze hoort bij het brontype te "
+                   "passen en (voor hoge klassen) door een vindplaats controleerbaar te zijn."),
     ]
 
     if network:
@@ -672,6 +787,7 @@ def check_fase3(conn):
 def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen = []
     bevindingen += check_koppelingsplicht(conn)
+    bevindingen += check_zichtbaarheid(conn)
     bevindingen += check_bewijs(conn)
     bevindingen += check_invloed(conn)
     bevindingen += check_balans(conn)

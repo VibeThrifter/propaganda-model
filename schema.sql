@@ -338,6 +338,16 @@ CREATE TABLE sources (
         'eigen_synthese',    -- projectmateriaal (sources/AI/*.md): vindplaats, nooit bewijs — gewicht 0 (M1.2)
         'onbeoordeeld'       -- nog niet geclassificeerd
     )),
+    -- Relevantie-as (los van reliability/rigueur): hoe specifiek gaat de bron over het
+    -- ONDERWERP van dit model — het Nederlandse mediasysteem? Stuurt de relevantiefactor
+    -- in scoring.py (nl_systeem weegt iets zwaarder, buitenlands iets lichter; algemeen/
+    -- onbepaald neutraal). Classificatie is reviewer-werk (PATCH /api/sources/<id>/classificatie).
+    onderwerp TEXT NOT NULL DEFAULT 'onbepaald' CHECK(onderwerp IN (
+        'nl_systeem',        -- over het Nederlandse mediasysteem
+        'algemeen',          -- landneutraal raamwerk/theorie (bv. Manufacturing Consent)
+        'buitenlands',       -- over een buitenlands mediasysteem (VS, VK, …)
+        'onbepaald'          -- nog niet bepaald
+    )),
     -- Broncluster (M1.2): bronnen met dezelfde auteur/uitgever/onderliggende data zijn
     -- géén onafhankelijke bewijslijnen. Binnen een cluster telt alleen het sterkste
     -- argument; combineren gebeurt over clusters (scoring.py). NULL = eigen cluster.
@@ -439,10 +449,26 @@ CREATE TABLE arguments (
         'vals_dilemma', 'ad_hominem', 'autoriteit_buiten_domein', 'anekdote_als_regel',
         'cherry_picking', 'equivocatie', 'citaat_dekking', 'overig'
     )),
+    -- Resolutielus van een ONDERGRAVING (contradicting reply): "logica klopt niet" met
+    -- verplichte reden → auteur verbetert ('herzien') → bezwaarmaker herbeoordeelt
+    -- ('opgelost'/'blijft'). Een 'opgelost' bezwaar dempt de σ van zijn parent NIET meer
+    -- (scoring.py); open/herzien/blijft dempen wél. NULL = geen ondergraving.
+    bezwaar_resolutie TEXT CHECK(bezwaar_resolutie IN (
+        'open', 'herzien', 'blijft', 'opgelost'
+    )),
     -- M2.1: attributie is een FK naar users (historische tags kregen een inactief
     -- legacy-account; NULL bestaat alleen nog in seed-replay, nooit via de API).
     contributed_by TEXT REFERENCES users(username),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Argument-revisie (supersede via self-pointer, zie migrate_argument_revisie.py):
+    -- de `lineage`-tabel is hier niet bruikbaar (voorstel_id NOT NULL, argument-merges
+    -- lopen niet via voorstellen), dus argumenten dragen de opvolging zelf.
+    --   vervangen    = opgevolgd door een revisie; scoring.py/influence.py/viz slaan
+    --                  het over (factor 0), net als bij vervangen elementen (M2.6).
+    --   reviseert_id = een nog-voorgestelde revisie wijst naar het argument dat het
+    --                  vervangt; bij merge wordt het oude 'verouderd' + vervangen = 1.
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE,
+    reviseert_id INTEGER REFERENCES arguments(id),
     -- Doelregel (M1.1, boomsemantiek): een ROOT-argument draagt minstens één doel
     -- (praktijk: relatie/entiteit; theorie: rol/mechanisme/emergent veld); een REPLY
     -- (parent_argument_id gevuld) draagt GÉÉN eigen doel — zijn stance is relatief aan

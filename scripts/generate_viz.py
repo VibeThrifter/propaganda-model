@@ -15,6 +15,7 @@ import scoring  # noqa: E402  (repo-root module met de scoringsketen)
 DB_PATH = Path(__file__).parent.parent / "data" / "propaganda_model.db"
 OUT_PATH = Path(__file__).parent.parent / "web" / "index.html"
 TEMPLATE_PATH = Path(__file__).parent.parent / "web" / "template.html"
+SHARED_VOCAB_PATH = Path(__file__).parent.parent / "web" / "shared_vocab.js"
 RELEASES_DIR = Path(__file__).parent.parent / "releases"
 
 
@@ -43,13 +44,16 @@ def export_data():
     # Entities with role info + temporal data.
     # Vervangen elementen (M2.6) blijven overal buiten beeld: de viz toont het
     # levende model; opvolging is opvraagbaar via /api/lineage.
+    # 'voorgesteld' wordt méégegeven (getagd met status) zodat de viz het als
+    # gestippelde 'in review'-ghost kan tonen achter een toggle; default blijft de
+    # viz het goedgekeurde model tonen. Vervangen (M2.6) blijft altijd buiten beeld.
     cur.execute("""
-        SELECT e.id, e.name, e.type, e.description,
+        SELECT e.id, e.name, e.type, e.description, e.status,
                e.active_from, e.active_until, e.active,
                r.name as role_name, r.category as filter_category
         FROM entities e
         LEFT JOIN roles r ON e.primary_role_id = r.id
-        WHERE NOT e.vervangen AND e.status = 'goedgekeurd'
+        WHERE NOT e.vervangen AND e.status IN ('goedgekeurd', 'voorgesteld')
     """)
     entities = [dict(row) for row in cur.fetchall()]
 
@@ -71,7 +75,7 @@ def export_data():
     cur.execute("""
         SELECT r.id, r.source_id, r.target_id, r.relation_type,
                r.certainty, r.influence, r.bidirectional,
-               r.description, r.mechanism_id,
+               r.description, r.mechanism_id, r.status,
                r.active_from, r.active_until, r.active,
                e1.name as source_name, e2.name as target_name,
                m.name as mechanism_name, m.filter as mechanism_filter,
@@ -80,7 +84,7 @@ def export_data():
         JOIN entities e1 ON r.source_id = e1.id
         JOIN entities e2 ON r.target_id = e2.id
         LEFT JOIN mechanisms m ON r.mechanism_id = m.id
-        WHERE NOT r.vervangen AND r.status = 'goedgekeurd'
+        WHERE NOT r.vervangen AND r.status IN ('goedgekeurd', 'voorgesteld')
     """)
     relations = [dict(row) for row in cur.fetchall()]
 
@@ -149,14 +153,31 @@ def export_data():
     """)
     arguments = [dict(row) for row in cur.fetchall()]
 
-    # Citations per argument
+    # Citations per argument (incl. klikbare vindplaats/archief uit source_locations)
     cur.execute("""
         SELECT c.id, c.argument_id, c.quote, c.page, c.section, c.context,
-               s.title as source_title, s.author as source_author
+               c.source_id, s.title as source_title, s.author as source_author
         FROM citations c
         JOIN sources s ON c.source_id = s.id
     """)
     citations = [dict(row) for row in cur.fetchall()]
+    bron_locs = {}
+    for sid, lt, lv in cur.execute("SELECT source_id, location_type, location FROM source_locations"):
+        bron_locs.setdefault(sid, []).append((lt, lv))
+
+    def _link(lt, lv):
+        if lt in ("url", "archive_url"):
+            return lv
+        if lt == "doi":
+            return f"https://doi.org/{lv}"
+        if lt == "handle":
+            return f"https://hdl.handle.net/{lv}"
+        return None
+    for c in citations:
+        sl = bron_locs.get(c.get("source_id"), [])
+        c["url"] = next((_link(t, v) for t, v in sl if _link(t, v)), None)
+        c["archive_url"] = next((v for t, v in sl if t == "archive_url"), None)
+        c["has_locator"] = bool(sl)
 
     # Instantiations: expliciete klasse<->instantie-koppeling + exemplariteit
     cur.execute("SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity FROM instantiations")
@@ -194,9 +215,12 @@ def export_data():
 
     conn.close()
 
-    # Compute degree for node sizing
+    # Compute degree for node sizing — alleen op het goedgekeurde model; ghosts
+    # (voorgesteld) tellen niet mee, anders zou node-grootte van review-werk afhangen.
     degree = {}
     for r in relations:
+        if r.get('status') != 'goedgekeurd':
+            continue
         degree[r['source_id']] = degree.get(r['source_id'], 0) + 1
         degree[r['target_id']] = degree.get(r['target_id'], 0) + 1
 
@@ -223,6 +247,19 @@ def export_data():
     for e in entities:
         e['derived_certainty'] = scores['entities'].get(e['id'], 0.0)
         e['score_detail'] = scores['entities_detail'].get(e['id'])
+        # Afgeleide primaire rol = bron van waarheid voor kleur/categorie: het filter
+        # met de grootste Σ(zekerheid×invloed) over de relaties van de entiteit. De
+        # toegekende primary_role-categorie (uit de SQL hierboven) blijft als fallback
+        # voor entiteiten die nog geen (goedgekeurde) relaties hebben.
+        e['filter_scores'] = scores.get('entity_filter_scores', {}).get(e['id'], {})
+        afgeleid = scores.get('entity_primary_filter', {}).get(e['id'])
+        if afgeleid:
+            e['toegekend_filter_category'] = e.get('filter_category')
+            e['filter_category'] = afgeleid
+            e['filter_category_bron'] = 'afgeleid'
+        else:
+            e['filter_category_bron'] = 'toegekend' if e.get('filter_category') else 'geen'
+            e['filter_category'] = e.get('filter_category') or 'overig'
     for role in roles:
         role.update(scores['roles'].get(role['id'], {}))
     for m in mechanisms:
@@ -279,7 +316,13 @@ def export_data():
 def generate():
     data = export_data()
     template = TEMPLATE_PATH.read_text(encoding='utf-8')
-    html = template.replace('"%%DATA%%"', json.dumps(data, ensure_ascii=False, indent=2))
+    # Gedeelde filter-woordenschat inlinen (web/shared_vocab.js) zodat index.html
+    # standalone blijft en niet uiteenloopt met de overlegpagina (zelfde bronbestand).
+    vocab = SHARED_VOCAB_PATH.read_text(encoding='utf-8')
+    if '/*%%SHARED_VOCAB%%*/' not in template:
+        raise SystemExit("template.html mist de /*%%SHARED_VOCAB%%*/ placeholder")
+    html = template.replace('/*%%SHARED_VOCAB%%*/', vocab)
+    html = html.replace('"%%DATA%%"', json.dumps(data, ensure_ascii=False, indent=2))
     OUT_PATH.write_text(html, encoding='utf-8')
     print(f"Visualisatie gegenereerd: {OUT_PATH}")
     print(f"  {len(data['entities'])} entiteiten, {len(data['relations'])} relaties")

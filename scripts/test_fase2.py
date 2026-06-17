@@ -366,6 +366,76 @@ def main():
     server.RATE_LIMITS.update(oud)
     server._rate_emmers.clear()
 
+    print("10. Fase A–E — bewerk/revisie, supersede, herkeuren, herzien, werkbank")
+    # a. auteur bewerkt eigen voorgesteld argument; een ander mag dat niet
+    aid = c.post("/api/arguments", headers=kop["bij"], json={
+        "relation_id": 1, "stance": "supporting", "claim": "Revisie-test claim.",
+        "citations": [{"source_id": 1, "quote": "q"}]}).get_json()["id"]
+    r = c.patch(f"/api/arguments/{aid}", headers=kop["bij"], json={"claim": "Revisie-test claim (verbeterd)."})
+    eis(r.status_code == 200 and r.get_json()["claim"].endswith("(verbeterd)."),
+        "auteur bewerkt eigen voorgesteld argument in-place")
+    eis(c.patch(f"/api/arguments/{aid}", headers=kop["r1"], json={"claim": "x"}).status_code == 403,
+        "niet-auteur kan een voorstel niet bewerken")
+    # b. na merge niet meer in-place bewerkbaar
+    eis(c.post(f"/api/arguments/{aid}/merge", headers=kop["r1"]).get_json()["status"] == "ongecontroleerd",
+        "merge → ongecontroleerd")
+    eis(c.patch(f"/api/arguments/{aid}", headers=kop["bij"], json={"claim": "y"}).status_code == 400,
+        "gemerged argument is niet meer in-place bewerkbaar (revisie i.p.v. edit)")
+    # c. revisie → nieuw voorgesteld met reviseert_id; merge supersedet het origineel
+    rev = c.post(f"/api/arguments/{aid}/revisie", headers=kop["bij"],
+                 json={"claim": "Revisie-test (revisie)."}).get_json()
+    eis(rev["reviseert_id"] == aid and rev["status"] == "voorgesteld",
+        "revisie aangemaakt met reviseert_id")
+    eis(c.post(f"/api/arguments/{rev['id']}/merge", headers=kop["r1"]).get_json().get("vervangt") == aid,
+        "merge van de revisie supersedet het origineel")
+    con = sqlite3.connect(tmp)
+    st = con.execute("SELECT status, vervangen FROM arguments WHERE id = ?", (aid,)).fetchone()
+    con.close()
+    eis(st == ("verouderd", 1), f"origineel = verouderd + vervangen ({st})")
+    # d. afwijzen vereist een motivatie
+    a2 = c.post("/api/arguments", headers=kop["bij"], json={
+        "relation_id": 1, "stance": "contextual", "claim": "Losse context voor afwijzing."}).get_json()["id"]
+    c.post(f"/api/arguments/{a2}/merge", headers=kop["r1"])
+    eis(c.patch(f"/api/arguments/{a2}/status", headers=kop["r1"], json={"status": "verworpen"}).status_code == 400,
+        "afwijzen zonder motivatie → 400")
+    eis(c.patch(f"/api/arguments/{a2}/status", headers=kop["r1"],
+                json={"status": "verworpen", "motivatie": "niet relevant"}).status_code == 200,
+        "afwijzen mét motivatie → ok")
+    # e. herkeuren (betwist) + herkeuring-lijst + thread-anker in review_queue
+    a3 = c.post("/api/arguments", headers=kop["bij"], json={
+        "relation_id": 1, "stance": "supporting", "claim": "Derde claim voor herkeuring.",
+        "citations": [{"source_id": 1, "quote": "q"}]}).get_json()["id"]
+    c.post(f"/api/arguments/{a3}/merge", headers=kop["r1"])
+    eis(c.patch(f"/api/arguments/{a3}/status", headers=kop["r1"],
+                json={"status": "betwist", "motivatie": "drogreden"}).status_code == 200,
+        "herkeuren → betwist mét motivatie")
+    q = c.get("/api/review_queue").get_json()
+    eis(any(x["id"] == a3 for x in q.get("herkeuring", [])), "betwist argument in de herkeuring-lijst")
+    eis(all("thread_param" in x for x in q["argumenten"] + q["herkeuring"]),
+        "review_queue draagt het thread-anker (ook voor replies)")
+    # f. werkbank toont eigen werk + feedback
+    mb = c.get("/api/mijn/bijdragen", headers=kop["bij"]).get_json()
+    eis(len(mb["argumenten"]) >= 3 and any(x["id"] == a3 and x.get("feedback") for x in mb["argumenten"]),
+        "werkbank toont eigen argumenten met ontvangen feedback")
+    # g. RfC afwijzen → herzien → nieuw open voorstel met herkomst
+    rfc = {"soort": "nieuw_theorie_element", "titel": "Herzien-test", "payload": {
+        "element_type": "mechanisme", "naam": "herzien_mech", "definitie": "d", "filter": "eigendom",
+        "effect": "e", "aard": "direct", "afgrenzing": "a", "falsificatiecriterium": "f", "freeze_test": "ft",
+        "instantiaties": [{"relation_id": 1, "toelichting": "t"}], "bronnen": [{"titel": "b"}]}}
+    vid = c.post("/api/voorstellen", headers=kop["bij"], json=rfc).get_json()["id"]
+    eis(c.post(f"/api/voorstellen/{vid}/reviews", headers=kop["r1"],
+               json={"oordeel": "afwijzen", "motivatie": "nee"}).get_json()["besluit"] == "afgewezen",
+        "RfC afgewezen")
+    hz = c.post(f"/api/voorstellen/{vid}/herzien", headers=kop["bij"], json={}).get_json()
+    eis(hz["status"] == "open" and hz["payload"].get("vorige_voorstel_id") == vid,
+        "herzien → nieuw open voorstel met vorige_voorstel_id")
+    # h. praktijk-resubmit: afgewezen entiteit opnieuw indienen
+    eid = c.post("/api/entities", headers=kop["bij"], json={"name": "WerkbankBedrijf", "type": "bedrijf"}).get_json()["id"]
+    c.patch(f"/api/entities/{eid}/status", headers=kop["r1"], json={"status": "afgewezen", "motivatie": "dubbel"})
+    eis(c.post(f"/api/entities/{eid}/heraanmelden", headers=kop["bij"],
+               json={"description": "nu toegelicht"}).get_json()["status"] == "voorgesteld",
+        "afgewezen entiteit opnieuw ingediend (→ voorgesteld)")
+
     print("Fase 2: alles groen.")
 
 

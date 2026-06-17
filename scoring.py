@@ -61,6 +61,24 @@ RELIABILITY_WEIGHT = {
 }
 DEFAULT_RELIABILITY = "onbeoordeeld"
 
+# Relevantie-as (los van rigueur): hoe specifiek gaat de bron over het ONDERWERP van dit
+# model — het Nederlandse mediasysteem? Een bron over NL weegt iets zwaarder, een bron
+# over een buitenlands systeem iets lichter; het landneutrale raamwerk (Manufacturing
+# Consent) en het onbepaalde blijven neutraal. Bescheiden: het nudge't, en overrulet
+# nooit een rigueur-gat (een buitenlands academisch artikel verslaat een NL-blog ruim).
+RELEVANTIE_FACTOR = {
+    "nl_systeem": 1.15,    # over het Nederlandse mediasysteem (lichte bonus, gecapt op 1,0)
+    "algemeen": 1.00,      # landneutraal raamwerk/theorie (Manufacturing Consent)
+    "buitenlands": 0.85,   # over een buitenlands mediasysteem (VS, VK, …) — minder relevant
+    "onbepaald": 1.00,     # nog niet bepaald — neutraal, geen straf
+}
+DEFAULT_RELEVANTIE = 1.00
+
+
+def relevance_factor(onderwerp: str | None) -> float:
+    """Relevantiefactor van een bron voor dit (NL-)model; onbekend/NULL = neutraal 1,0."""
+    return RELEVANTIE_FACTOR.get(onderwerp or "onbepaald", DEFAULT_RELEVANTIE)
+
 # Verificatiestatus van een argument schaalt zijn bewijskracht.
 STATUS_FACTOR = {
     "geverifieerd": 1.00,
@@ -113,24 +131,33 @@ def reliability_weight(reliability: str | None) -> float:
     return RELIABILITY_WEIGHT.get(reliability or DEFAULT_RELIABILITY, RELIABILITY_WEIGHT[DEFAULT_RELIABILITY])
 
 
-def source_factor(citation_reliabilities) -> float:
+def source_factor(citations) -> float:
     """Bronfactor van een argument op basis van zijn sterkste citaat.
 
-    Geen citaties -> NO_CITATION_FACTOR. Anders 0.3 + 0.7 * (beste reliabilitygewicht),
-    zodat een goed gestaafd argument richting 1.0 gaat en een ongestaafd toch een beetje
-    meetelt. Een 'eigen_synthese'-citaat weegt 0 en telt dus als ongestaafd.
+    ``citations`` is een lijst (reliability, onderwerp)-paren — of, voor terugwaartse
+    compatibiliteit, kale reliability-strings (dan geldt onderwerp=onbepaald).
+
+    Geen citaties -> NO_CITATION_FACTOR. Anders 0.3 + 0.7 * (beste effectieve gewicht),
+    waarbij effectief gewicht = reliabilitygewicht × relevantiefactor (gecapt op 1,0).
+    Zo gaat een goed gestaafd, NL-relevant argument richting 1.0; 'eigen_synthese' weegt 0.
     """
-    weights = [reliability_weight(r) for r in (citation_reliabilities or [])]
+    weights = []
+    for c in (citations or []):
+        reliability, onderwerp = c if isinstance(c, (tuple, list)) else (c, None)
+        weights.append(min(1.0, reliability_weight(reliability) * relevance_factor(onderwerp)))
     if not weights:
         return NO_CITATION_FACTOR
     return NO_CITATION_FACTOR + (1.0 - NO_CITATION_FACTOR) * max(weights)
 
 
-def argument_force(weight, status, citation_reliabilities=None) -> float:
-    """Basiskracht τ van één argument: weight x statusfactor x bronfactor."""
+def argument_force(weight, status, citations=None) -> float:
+    """Basiskracht τ van één argument: weight x statusfactor x bronfactor.
+
+    ``citations``: (reliability, onderwerp)-paren (zie source_factor); kale strings mogen ook.
+    """
     w = DEFAULT_WEIGHT if weight is None else float(weight)
     s = STATUS_FACTOR.get(status, DEFAULT_STATUS_FACTOR)
-    return w * s * source_factor(citation_reliabilities)
+    return w * s * source_factor(citations)
 
 
 # ── Boomsemantiek (M1.1): DF-QuAD-propagatie van blad naar wortel ──
@@ -157,14 +184,20 @@ def dfquad_strength(tau: float, support_sigmas, attack_sigmas) -> float:
     return tau
 
 
-def propagate_sigma(taus: dict, parents: dict, stances: dict) -> dict:
+def propagate_sigma(taus: dict, parents: dict, stances: dict, geneutraliseerd=None) -> dict:
     """σ voor alle argumenten: kinderen eerst (post-order), dan de parent.
 
-    taus    : {arg_id: τ}
-    parents : {arg_id: parent_id of None}
-    stances : {arg_id: stance} — de stance van een reply is relatief aan zijn parent:
-              supporting versterkt, contradicting ondergraaft, contextual doet niets.
+    taus           : {arg_id: τ}
+    parents        : {arg_id: parent_id of None}
+    stances        : {arg_id: stance} — de stance van een reply is relatief aan zijn
+                     parent: supporting versterkt, contradicting ondergraaft, contextual
+                     doet niets.
+    geneutraliseerd: set arg_ids van ONDERGRAVINGEN waarvan de resolutielus op 'opgelost'
+                     staat — die dempen hun parent niet meer (review-verdict v2). Hun σ
+                     wordt nog wél berekend (zichtbaar in de boom), maar telt niet als
+                     aanval. Open/herzien/blijft dempen gewoon.
     """
+    geneutraliseerd = geneutraliseerd or set()
     children = {}
     for aid, pid in parents.items():
         if pid is not None:
@@ -183,7 +216,7 @@ def propagate_sigma(taus: dict, parents: dict, stances: dict) -> dict:
             ks = rekenen(kind, gezien)
             if stances.get(kind) == "supporting":
                 sup.append(ks)
-            elif stances.get(kind) == "contradicting":
+            elif stances.get(kind) == "contradicting" and kind not in geneutraliseerd:
                 att.append(ks)
         sigma[aid] = dfquad_strength(taus[aid], sup, att)
         return sigma[aid]
@@ -540,6 +573,9 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     Retourneert (gekeyd op id):
       relations / entities                : kale afgeleide zekerheid (compat met de viz)
       relations_detail / entities_detail  : score + interval + vlaggen (M1.2–M1.4)
+      entity_primary_filter / _filter_scores : afgeleide primaire rol per entiteit —
+                                            argmax-filter over Σ(zekerheid×invloed) van
+                                            haar relaties (primary_role_id = fallback)
       relations_influence(_detail)        : afgeleide invloed per relatie (M1.7)
       roles / mechanisms                  : theoriescores (laag C) + interval + vlaggen
       emergent_effects                    : hyperedge-scores (M1.5)
@@ -560,40 +596,45 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     Gedeeld door scripts/generate_viz.py (statische snapshot) en de /api/scores-endpoint
     (live herberekening), zodat de aggregatielogica op één plek staat.
     """
-    # Citaties per argument: (reliability, cluster). NULL-cluster = eigen cluster per bron.
+    # Citaties per argument: (reliability, cluster, onderwerp). NULL-cluster = eigen cluster.
     cites_by_arg = {}
-    for arg_id, reliability, cluster, source_id in conn.execute("""
-            SELECT c.argument_id, s.reliability, s.cluster_key, s.id
+    for arg_id, reliability, cluster, source_id, onderwerp in conn.execute("""
+            SELECT c.argument_id, s.reliability, s.cluster_key, s.id, s.onderwerp
             FROM citations c JOIN sources s ON c.source_id = s.id"""):
         key = cluster or f"bron{source_id}"
         if exclude_cluster is not None and key == exclude_cluster:
             continue
-        cites_by_arg.setdefault(arg_id, []).append((reliability, key))
+        cites_by_arg.setdefault(arg_id, []).append((reliability, key, onderwerp))
 
     # Alle argumenten: τ berekenen en de boom opzetten (M1.1)
     taus, parents, stances, meta = {}, {}, {}, {}
+    geneutraliseerd = set()   # ondergravingen met resolutielus 'opgelost' (dempen niet)
     for (aid, rel_id, ent_id, role_id, mech_id, eff_id, parent_id,
-         prop, stance, weight, status) in conn.execute("""
+         prop, stance, weight, status, bezwaar_resolutie) in conn.execute("""
             SELECT id, relation_id, entity_id, role_id, mechanism_id, emergent_effect_id,
-                   parent_argument_id, property, stance, weight, status FROM arguments"""):
+                   parent_argument_id, property, stance, weight, status, bezwaar_resolutie
+            FROM arguments
+            WHERE NOT vervangen"""):
+        if bezwaar_resolutie == "opgelost":
+            geneutraliseerd.add(aid)
         cites = cites_by_arg.get(aid, [])
         # Zelf-gerapporteerd weight telt niet mee (Z2): neutraal gewicht, tenzij een
         # bridged rating (M2.5) het objectief invult. De opgeslagen `weight`-kolom wordt
         # bewust genegeerd — net als een niet-onderbouwde invloed-prior.
         w = bridged_weights[aid] if (bridged_weights and aid in bridged_weights) else NEUTRAL_WEIGHT
-        taus[aid] = argument_force(w, status, [r for r, _ in cites])
+        taus[aid] = argument_force(w, status, [(r, o) for r, _, o in cites])
         parents[aid] = parent_id
         stances[aid] = stance
         # Cluster van het argument: dat van zijn zwaarste échte citatie (gewicht > 0);
         # zonder echte citatie deelt het het pseudocluster (M1.2).
-        echte = [(reliability_weight(r), cl) for r, cl in cites if reliability_weight(r) > 0]
+        echte = [(reliability_weight(r), cl) for r, cl, o in cites if reliability_weight(r) > 0]
         cluster = max(echte)[1] if echte else ZONDER_BRON_CLUSTER
         meta[aid] = {"relation_id": rel_id, "entity_id": ent_id, "role_id": role_id,
                      "mechanism_id": mech_id, "emergent_effect_id": eff_id,
                      "property": prop, "stance": stance, "status": status,
                      "cluster": cluster, "n_citaties": len(echte)}
 
-    sigma = propagate_sigma(taus, parents, stances)
+    sigma = propagate_sigma(taus, parents, stances, geneutraliseerd)
     argument_scores = {aid: {"tau": round(taus[aid], 4), "sigma": round(sigma[aid], 4)}
                        for aid in taus}
 
@@ -634,11 +675,23 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     # Laag B: afgeleide praktijkscore + afgeleide invloed per relatie
     # (vervangen elementen — M2.6 — doen in de hele keten niet meer mee)
     rel_rows = conn.execute(
-        "SELECT id, source_id, target_id, certainty, influence FROM relations "
-        "WHERE NOT vervangen AND status = 'goedgekeurd'").fetchall()
+        "SELECT r.id, r.source_id, r.target_id, r.certainty, r.influence, "
+        "       r.bidirectional, m.filter "
+        "FROM relations r LEFT JOIN mechanisms m ON r.mechanism_id = m.id AND NOT m.vervangen "
+        "WHERE NOT r.vervangen AND r.status = 'goedgekeurd'").fetchall()
     rel_detail, rel_infl_detail = {}, {}
     ent_cert_acc, ent_infl_acc = {}, {}
-    for rid, src, tgt, certainty, influence in rel_rows:
+    # Afgeleide primaire rol (model-breed, bron van waarheid): per filter de som van
+    # afgeleide zekerheid × afgeleide invloed over de relaties waarvan de entiteit de
+    # BRON is — het filter dat ze zélf uitoefent, niet de krachten die op haar
+    # inwerken (zo blijft een media-eigenaar 'eigendom' i.p.v. 'advertentie'). Bij een
+    # bidirectionele relatie oefenen beide kanten uit. Het filter met de grootste som
+    # wint; `entities.primary_role_id` is nog slechts fallback/override (zie
+    # generate_viz.py / server.py). Classificatie meet dominante functie, niet
+    # netto-duw: tegenmacht telt hier op magnitude mee (positief), anders dan in de
+    # invloedsgraaf hieronder.
+    ent_filter_acc = {}
+    for rid, src, tgt, certainty, influence, bidir, flt in rel_rows:
         detail = instance_detail(by_relation.get(rid, []), prior_certainty=certainty)
         rel_detail[rid] = detail
         infl = derived_influence(influence, by_rel_influence.get(rid, []))
@@ -646,7 +699,17 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
         for eid in (src, tgt):
             ent_cert_acc.setdefault(eid, []).append(detail["score"])
             ent_infl_acc.setdefault(eid, []).append(infl["score"])
+        if flt:
+            bijdrage = detail["score"] * infl["score"]
+            for eid in ((src, tgt) if bidir else (src,)):
+                acc = ent_filter_acc.setdefault(eid, {})
+                acc[flt] = acc.get(flt, 0.0) + bijdrage
     ent_infl = {eid: (sum(v) / len(v) if v else 0.0) for eid, v in ent_infl_acc.items()}
+    entity_filter_scores = {eid: {f: round(s, 4) for f, s in fs.items()}
+                            for eid, fs in ent_filter_acc.items()}
+    entity_primary_filter = {
+        eid: max(fs.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        for eid, fs in ent_filter_acc.items() if fs}
 
     # Afgeleide geloofwaardigheid per entiteit (prior = gem. zekerheid van haar relaties)
     entity_detail = {}
@@ -739,6 +802,8 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
         "relations_influence_detail": rel_infl_detail,
         "entities": {eid: d["score"] for eid, d in entity_detail.items()},
         "entities_detail": entity_detail,
+        "entity_filter_scores": entity_filter_scores,
+        "entity_primary_filter": entity_primary_filter,
         "entity_influence": entity_influence,
         "entity_influence_clean": entity_influence_clean,
         "role_influence": role_influence,

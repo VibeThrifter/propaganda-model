@@ -67,6 +67,7 @@ body {
   border: 1px solid var(--border);
   overflow: hidden;
   margin-left: 16px;
+  flex-shrink: 0;   /* nooit inklappen/afknippen: 'Theoretisch Model' blijft heel */
 }
 .model-toggle button {
   padding: 6px 14px;
@@ -82,7 +83,7 @@ body {
 }
 .model-toggle button:hover:not(.active) { background: var(--bg-hover); color: var(--text-dim); }
 
-.search-box { flex: 0 1 260px; position: relative; margin-left: auto; }
+.search-box { flex: 0 1 170px; position: relative; margin-left: auto; }
 .search-box input {
   width: 100%; background: rgba(255,255,255,0.05);
   border: 1px solid var(--border); border-radius: 8px;
@@ -231,6 +232,10 @@ body {
 .detail-header { margin-bottom: 20px; padding-right: 36px; }
 .detail-header .entity-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
 .detail-header h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.3; }
+.detail-header h2 a.titel-overleg { color: inherit; text-decoration: none; cursor: pointer; }
+.detail-header h2 a.titel-overleg:hover { color: var(--accent); }
+.detail-header h2 a.titel-overleg .pijl { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 7px; vertical-align: middle; }
+.detail-header h2 a.titel-overleg:hover .pijl { color: var(--accent); }
 .detail-description { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin-bottom: 16px; }
 .detail-section { margin-bottom: 16px; }
 .detail-section h4 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; }
@@ -387,7 +392,11 @@ details.detail-section > .sec-body { margin-top: 8px; }
   font-size: 10px; color: var(--text-muted); margin-bottom: 4px; line-height: 1.4;
 }
 .arg-citation .cite-source { color: var(--text-dim); font-weight: 500; }
+.arg-citation .cite-source a { color: var(--accent); text-decoration: none; }
+.arg-citation .cite-source a:hover { text-decoration: underline; }
+.arg-citation .cite-arch { color: var(--text-muted); text-decoration: none; }
 .arg-citation .cite-quote { font-style: italic; color: var(--text-dim); }
+.arg-citation .cite-klasse { font-size: 9px; padding: 0 5px; border-radius: 3px; background: rgba(108,138,255,0.10); color: var(--text-muted); white-space: nowrap; }
 
 .arg-children { margin-top: 4px; }
 
@@ -568,8 +577,6 @@ details.detail-section > .sec-body { margin-top: 8px; }
 <header id="topbar">
   <h1>Propagandamodel</h1>
   <span class="subtitle">NL Politiek &amp; Media</span>
-  <span class="subtitle" id="releaseTag" style="display:none;border:1px solid var(--border);border-radius:10px;padding:1px 8px"
-        title="Nieuwste modelrelease (M3.1): gescoorde snapshot + changelog in releases/"></span>
   <div class="model-toggle" id="modelToggle">
     <button data-model="instance">Praktijk Model</button>
     <button class="active" data-model="theory">Theoretisch Model</button>
@@ -580,7 +587,6 @@ details.detail-section > .sec-body { margin-top: 8px; }
   </div>
   <button type="button" id="discussieBtn" class="admin-btn" title="Open de overlegpagina — alle discussiedraden én open voorstellen, op een eigen pagina">Overleg</button>
   <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen" style="display:none">+ Toevoegen</button>
-  <button id="adminToggle" class="admin-btn" title="Adminmodus aan/uit: toont verwijderknoppen" style="display:none">Admin</button>
   <a id="authChip" class="admin-btn" href="/login" style="display:none;text-decoration:none">Inloggen</a>
   <div class="stats" id="stats"></div>
 </header>
@@ -691,6 +697,12 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <span>Bruggen: gedeeld bezit/geld</span>
       <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
     </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="voorgesteldRow"
+           title="Toon entiteiten en relaties die nog 'voorgesteld' zijn (in review, nog niet goedgekeurd) — gestippeld/amber. Default uit: de viz toont het goedgekeurde model. Alleen relevant in het praktijkmodel.">
+      <input type="checkbox" id="voorgesteldToggle">
+      <span>Toon voorgesteld (in review)</span>
+      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+    </label>
   </div>
   <div class="panel-section" id="layoutSection">
     <h3 id="layoutHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
@@ -796,13 +808,10 @@ details.detail-section > .sec-body { margin-top: 8px; }
 // ============================================================
 const DATA = "%%DATA%%";
 
-const FILTER_COLORS = {
-  eigendom: '#e74c3c', advertentie: '#f0a030', sourcing: '#3498db',
-  flak: '#9b59b6', ideologie: '#2ecc71',
-  systeemactor: '#e8c547', cross_filter: '#fd79a8',
-  tegenmacht: '#1abc9c',
-  overig: '#7f8c9a',
-};
+// FILTER_COLORS + FILTER_LABELS komen uit de gedeelde model-woordenschat
+// (web/shared_vocab.js), hier ingelined door scripts/generate_viz.py. Eén bron van
+// waarheid, gedeeld met de overlegpagina. Niet hier opnieuw definiëren.
+/*%%SHARED_VOCAB%%*/
 // Kleuren per STRUCTURELE entiteitsvorm (kleurmodus "type"). Personen vormen één
 // categorie; hun functie in het model kleurt via de kleurmodus "filter".
 // Volgorde is bewust thematisch gegroepeerd; de legenda volgt deze volgorde.
@@ -842,12 +851,7 @@ const RELATION_LABELS = {
   // Algoritmisch
   algoritmische_filtering: 'Algoritmische filtering',
 };
-const FILTER_LABELS = {
-  eigendom: '1. Eigendom', advertentie: '2. Advertentie', sourcing: '3. Sourcing',
-  flak: '4. Flak', ideologie: '5. Ideologie',
-  systeemactor: 'Systeemactor', tegenmacht: 'Tegenmacht', cross_filter: 'Cross-filter',
-  overig: 'Overig',
-};
+// (FILTER_LABELS staat in de gedeelde woordenschat hierboven, web/shared_vocab.js.)
 
 // Thema's = dwarsliggende verbanden die meerdere filters overspannen (eigen selectie-as).
 const THEME_LABELS = {
@@ -876,6 +880,7 @@ const pathClaims = {};      // 'bronRolId>doelRolId' → [root arguments]: eindc
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
 let SOURCES_CACHE = null;   // [{id,title,author,...}] — lui geladen via /api/sources
+let bridgingStatus = null;  // M2.5: wanneer telt een rating mee in de score? (lui via /api/bridging)
 const SOURCE_TYPES = ['boek','academisch_artikel','rapport','nieuwsartikel','transcript',
                       'interview','dataset','wetgeving','persbericht','website','overig'];
 const roleIdByName = {};
@@ -991,6 +996,30 @@ function countStances(args) {
   return { sup, con, ctx, total: sup + con + ctx };
 }
 
+// Eerlijk over rating-latentie (M2.5): een duim is zichtbaar advies en beweegt de score
+// pas zodra de beoordelaarspool de bridging-drempel haalt én scripts/bridging.py opnieuw draait.
+function bridgingHint() {
+  const b = bridgingStatus;
+  if (!b) return '';
+  const v = b.vloer || {}, live = b.live || {};
+  let tekst;
+  if (b.actief) {
+    const pct = Math.round((b.gem_vertrouwen || 0) * 100);
+    tekst = `Bridging weegt mee in het argumentgewicht: 'Logica klopt' (+) en gehandhaafde `
+      + `ondergravingen (−) bepalen het gezindheids-onafhankelijke gewicht. Vertrouwen groeit `
+      + `vloeiend met het aantal oordelen (nu gemiddeld ~${pct}%), geen harde grens.`;
+    if (b.verouderd) tekst += ' Nieuwe oordelen tellen mee na de eerstvolgende bridging-run.';
+  } else {
+    tekst = `Bridging schuift vloeiend in zodra er meer oordelen zijn — nu nog te weinig om `
+      + `gezindheid te schatten (${live.n_raters || 0} beoordelaars, ${live.n_ratings || 0} oordelen; `
+      + `fit-vloer ≥${v.min_raters}/≥${v.min_ratings}). Tot dan: neutraal gewicht 1,0, geen klif.`;
+  }
+  return `<div style="font-size:10px;color:var(--text-muted);background:rgba(255,255,255,.03);`
+    + `border:1px solid ${b.verouderd ? 'color-mix(in srgb,#e0a23a 30%,transparent)' : 'var(--border)'};`
+    + `border-radius:6px;padding:5px 8px;margin:0 0 8px;line-height:1.5"`
+    + ` title="Bridging (M2.5): het gewicht van een argument groeit/daalt met gezindheids-onafhankelijke oordelen — endorsement (+) en onderbouwde ondergraving (−). Geen drempel-klif: krimp naar neutraal 1,0.">${tekst}</div>`;
+}
+
 function renderArgTree(args) {
   if (!args || !args.length) return '';
   const counts = countStances(args);
@@ -1001,6 +1030,7 @@ function renderArgTree(args) {
     <span><span class="count con">${counts.con}</span> tegen</span>
     <span><span class="count ctx">${counts.ctx}</span> context</span>
   </div>`;
+  html += bridgingHint();
   html += '<div class="arg-tree">';
   args.forEach(a => { html += renderArgNode(a, 0); });
   html += '</div>';
@@ -1054,12 +1084,19 @@ function renderArgNode(arg, depth) {
   // M2.5: ratings — je beoordeelt onderbouwing/relevantie/eerlijkheid, nooit waarheid;
   // eigen werk raten weigert de server; agent-ratings zijn zichtbaar advies.
   html += `<div id="ratings-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingRegel(arg)}</div>`;
+  html += bezwaarRegel(arg);
 
   if (cites.length) {
     html += '<div class="arg-citations">';
     cites.forEach(c => {
       html += `<div class="arg-citation">`;
-      html += `<span class="cite-source">${c.source_author || ''} — ${c.source_title || ''}</span>`;
+      const naam = `${c.source_author ? c.source_author + ' — ' : ''}${c.source_title || 'bron'}`;
+      html += `<span class="cite-source">${c.url ? `<a href="${c.url}" target="_blank" rel="noopener">${naam}</a>` : naam}</span>`;
+      // Bronklasse (rigueur) · onderwerp (relevantie voor het NL-mediasysteem): sturen samen de bronfactor.
+      const ondwLabel = { nl_systeem: 'NL', buitenlands: 'buitenlands', algemeen: 'algemeen' };
+      const klasseDelen = [c.reliability, (c.onderwerp && c.onderwerp !== 'onbepaald') ? (ondwLabel[c.onderwerp] || c.onderwerp) : null].filter(Boolean);
+      if (klasseDelen.length) html += ` <span class="cite-klasse" title="bronklasse (rigueur) · onderwerp (relevantie voor het NL-mediasysteem) — sturen samen de bronfactor">${klasseDelen.join(' · ')}</span>`;
+      if (c.archive_url) html += ` <a class="cite-arch" href="${c.archive_url}" target="_blank" rel="noopener" title="webarchief">[archief]</a>`;
       if (c.page) html += ` <span>(${c.page})</span>`;
       if (c.quote) html += `<br><span class="cite-quote">"${c.quote}"</span>`;
       html += `</div>`;
@@ -1095,18 +1132,50 @@ function ratingTekst(rt) {
 // De duim-regel: tellingen + twee toggle-links. Je eigen stem krijgt een vinkje +
 // accentkleur; nogmaals erop klikken trekt 'm in (un-vote). `telling` overschrijft
 // arg.ratings na een verse fetch.
+// Review-verdict v2: 'Logica klopt' = lichte endorsement (nuttig-rating; telt niet als
+// bewijs of in de score, voedt hooguit later bridging). 'Logica klopt niet' = een
+// onderbouwd bezwaar = een ondergraving (opent het bezwaarformulier) die de score van
+// dit argument dempt tot ze is opgelost. De kale, redenloze downvote bestaat niet meer.
 function ratingRegel(arg, telling) {
-  const mij = arg.mijn_oordeel || null;
-  const link = (oordeel, label, tip) => {
-    const actief = mij === oordeel;
-    const stijl = actief ? ' style="font-weight:700;color:var(--accent)"' : '';
-    const titel = actief ? 'Nogmaals klikken trekt je stem in' : tip;
-    return `<a href="#"${stijl} onclick="rateArgument(${arg.id},'${oordeel}');return false" title="${titel}">${actief ? '✓ ' : ''}${label}</a>`;
+  const rt = telling || arg.ratings;
+  const nuttig = rt ? (rt.mens.nuttig + (rt.agent.nuttig ? `+${rt.agent.nuttig}` : '')) : 0;
+  const eigen = authUser && arg.contributed_by === authUser.username;
+  const actief = (arg.mijn_oordeel === 'nuttig');
+  const klopt = eigen
+    ? `<span style="color:var(--text-muted)" title="je beoordeelt eigen werk niet">✓ Logica klopt${nuttig ? ` (${nuttig})` : ''}</span>`
+    : `<a href="#" style="color:#2ecc71${actief ? ';font-weight:700' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">${actief ? '✓ ' : ''}Logica klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
+  const kloptNiet = `<a href="#" style="color:#e74c3c" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM de logica/het argument niet deugt. Wordt een ondergraving die de score van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</a>`;
+  return `${klopt} <span style="color:var(--text-muted)">·</span> ${kloptNiet}`;
+}
+
+// De resolutielus van een ONDERGRAVING: badge + overgangsknoppen. Auteur van het
+// aangevochten argument zet 'herzien' ('ik heb het aangepast'); de bezwaarmaker
+// beoordeelt opnieuw ('opgelost' of 'blijft staan'); een reviewer mag overrulen ná
+// 'herzien'. De server bewaakt wie wat mag — deze knoppen volgen alleen de identiteit.
+function bezwaarRegel(arg) {
+  if (!arg.parent_argument_id || arg.stance !== 'contradicting' || !arg.bezwaar_resolutie) return '';
+  const st = arg.bezwaar_resolutie;
+  const BADGE = {
+    open:     ['⏳ bezwaar open',           '#e67e22'],
+    herzien:  ['↻ herzien — herbeoordeel',  '#3498db'],
+    blijft:   ['● blijft staan',            '#e74c3c'],
+    opgelost: ['✓ opgelost (dempt niet)',   '#2ecc71'],
   };
-  return ratingTekst(telling || arg.ratings)
-    + link('nuttig', 'nuttig', 'Goed onderbouwd, relevant en eerlijk (beoordeelt het argument, niet de waarheid)')
-    + ' · '
-    + link('niet_nuttig', 'niet nuttig', 'Bijv. citaat dekt de claim niet, duplicaat, onheldere claim');
+  const [label, kleur] = BADGE[st] || [st, 'var(--text-muted)'];
+  let h = `<div style="font-size:10px;margin-top:2px"><span style="color:${kleur};font-weight:600" title="Stand van de resolutielus van dit bezwaar">${label}</span>`;
+  if (authUser) {
+    const me = authUser.username;
+    const parent = argsById.get(arg.parent_argument_id) || {};
+    const benAuteur = parent.contributed_by === me;       // auteur van het aangevochten argument
+    const benBezwaarmaker = arg.contributed_by === me;    // wie het bezwaar plaatste
+    const benReviewer = ['reviewer', 'maintainer'].includes(authUser.role);
+    const knop = (actie, tekst) => ` <a href="#" style="color:var(--accent)" onclick="bezwaarActie(${arg.id},'${actie}');return false">${tekst}</a>`;
+    if (st !== 'opgelost' && (benAuteur || benReviewer)) h += knop('herzien', 'ik heb dit aangepast');
+    if (benBezwaarmaker) { h += knop('opgelost', 'opgelost'); h += knop('blijft', 'blijft staan'); }
+    else if (benReviewer && st === 'herzien') h += knop('opgelost', 'sluiten (overrule)');
+  }
+  h += '</div>';
+  return h;
 }
 
 async function rateArgument(argId, oordeel) {
@@ -1294,7 +1363,11 @@ function renderArgForm(opts) {
   // kan een machineleesbaar objection_type meekrijgen (M1.8).
   const formId = 'arg-form-' + Math.random().toString(36).slice(2, 8);
   const isReply = !!opts.parent_argument_id;
-  const parentLabel = isReply ? 'Reageer op argument' : 'Nieuw argument';
+  // Bezwaar-modus: het 'logica klopt niet'-verdict. Vast op contradicting, onderbouwing
+  // verplicht — dit is de ondergraving die de score van het argument hierboven dempt.
+  const isBezwaar = opts.verdict === 'bezwaar';
+  const parentLabel = isBezwaar ? '✗ Logica klopt niet — onderbouw je bezwaar'
+                    : isReply ? 'Reageer op argument' : 'Nieuw argument';
   const sel = v => opts.property === v ? ' selected' : '';
 
   const stanceHint = isReply
@@ -1344,20 +1417,27 @@ function renderArgForm(opts) {
       <h5>${parentLabel}</h5>
       <div class="form-row">
         <label>Positie</label>
-        <div class="stance-picker" id="${formId}-stance">
-          <button type="button" onclick="pickStance('${formId}','supporting',this)" title="Ondersteunend">+ Voor</button>
-          <button type="button" onclick="pickStance('${formId}','contradicting',this)" title="Weerleggend">− Tegen</button>
-          <button type="button" onclick="pickStance('${formId}','contextual',this)" title="Nuancerend">~ Context</button>
-        </div>
-        <div class="field-hint">${stanceHint}</div>
+        ${isBezwaar
+          ? `<div class="stance-picker" id="${formId}-stance" data-stance="contradicting">
+               <button type="button" class="selected-con" disabled>− Tegen (ondergraving)</button>
+             </div>
+             <div class="field-hint">Je geeft aan dat de redenering of het argument niet
+               deugt. Dit dempt de kracht van het argument hierboven tot het bezwaar is
+               <b>opgelost</b>. De auteur kan verbeteren; daarna beoordeel jij opnieuw.</div>`
+          : `<div class="stance-picker" id="${formId}-stance">
+               <button type="button" onclick="pickStance('${formId}','supporting',this)" title="Ondersteunend">+ Voor</button>
+               ${isReply ? '' : `<button type="button" onclick="pickStance('${formId}','contradicting',this)" title="Weerleggend">− Tegen</button>`}
+               <button type="button" onclick="pickStance('${formId}','contextual',this)" title="Nuancerend">~ Context</button>
+             </div>
+             <div class="field-hint">${isReply ? 'Een reactie hier <b>steunt</b> of <b>nuanceert</b> het argument. Oneens met de logica? Gebruik <b>✗ Logica klopt niet</b> — dat wordt een onderbouwd bezwaar.' : stanceHint}</div>`}
       </div>
       <div class="form-row">
         <label>Bewering *</label>
-        <input type="text" id="${formId}-claim" placeholder="${isReply ? 'Wat klopt er wel/niet aan het argument hierboven?' : 'De kernbewering, kort en bondig'}">
+        <input type="text" id="${formId}-claim" placeholder="${isBezwaar ? 'Korte samenvatting van je bezwaar' : isReply ? 'Wat klopt er wel/niet aan het argument hierboven?' : 'De kernbewering, kort en bondig'}">
       </div>
       <div class="form-row">
-        <label>Onderbouwing</label>
-        <textarea id="${formId}-reasoning" placeholder="${isReply ? 'Benoem exact de aangevochten redeneerstap (verplicht bij ondergraving)' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
+        <label>Onderbouwing${isBezwaar ? ' *' : ''}</label>
+        <textarea id="${formId}-reasoning" placeholder="${isBezwaar ? 'Verplicht: benoem precies wat er niet deugt aan de redenering of het argument' : isReply ? 'Benoem exact de aangevochten redeneerstap (verplicht bij ondergraving)' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
       </div>
       ${propertyRows}
       ${citationFieldsHtml(formId)}
@@ -1367,7 +1447,7 @@ function renderArgForm(opts) {
       </div>
       <div class="field-hint">${authIndienHint()}</div>
       <button class="btn-submit" onclick="submitArgument('${formId}', ${JSON.stringify(opts).replace(/"/g, '&quot;')})">
-        Argument toevoegen
+        ${isBezwaar ? 'Bezwaar indienen' : 'Argument toevoegen'}
       </button>
       <button class="btn-cancel" onclick="document.getElementById('${formId}').remove()">Annuleren</button>
       <div id="${formId}-msg"></div>
@@ -1399,7 +1479,9 @@ async function submitArgument(formId, opts) {
 
   if (!stance) { msgEl.innerHTML = '<div class="form-message error">Kies een positie (voor/tegen/context)</div>'; return; }
   if (!claim) { msgEl.innerHTML = '<div class="form-message error">Bewering is verplicht</div>'; return; }
-  if (objection && !reasoning) { msgEl.innerHTML = '<div class="form-message error">Een ondergraving citeert verplicht de aangevochten redeneerstap (veld Onderbouwing)</div>'; return; }
+  // Een ondergraving ('logica klopt niet') vereist altijd onderbouwing — een kaal
+  // 'oneens' is de goedkope downvote die we niet willen (server dwingt dit ook af).
+  if (isReply && stance === 'contradicting' && !reasoning) { msgEl.innerHTML = '<div class="form-message error">‘Logica klopt niet’ vereist onderbouwing: benoem in het veld Onderbouwing precies wat er niet deugt aan de redenering of het argument.</div>'; return; }
 
   const weight = weightRaw ? Math.min(100, Math.max(0, parseInt(weightRaw))) / 100 : null;
 
@@ -1560,7 +1642,7 @@ function buildTreeFromApi(args) {
   return roots;
 }
 
-function showReplyForm(argId) {
+function showReplyForm(argId, verdict) {
   const container = document.getElementById('reply-slot-' + argId);
   if (!container) return;
   // Een reactie erft de doelen van haar parent — ook theorie-doelen (rol,
@@ -1573,7 +1655,31 @@ function showReplyForm(argId) {
     mechanism_id: parent.mechanism_id || null,
     emergent_effect_id: parent.emergent_effect_id || null,
     parent_argument_id: argId,
+    verdict: verdict || null,
   });
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 'Logica klopt niet' → het bezwaarformulier (vast op contradicting, reden verplicht).
+function showBezwaarForm(argId) {
+  if (!authUser) { alert('Log in om een bezwaar in te dienen.'); return; }
+  showReplyForm(argId, 'bezwaar');
+}
+
+// Resolutielus op een ondergraving: auteur 'herzien' → bezwaarmaker 'opgelost'/'blijft'
+// (of reviewer-overrule ná 'herzien'). Server bewaakt wie wat mag.
+async function bezwaarActie(argId, actie) {
+  try {
+    const resp = await fetch(`/api/arguments/${argId}/bezwaar`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actie }),
+    });
+    const j = await resp.json();
+    if (!resp.ok) { alert(j.error || 'Fout'); return; }
+    const t = findArgTargets(argId);
+    await refreshScores();
+    reloadDiscussion(t);
+  } catch (e) { alert('Netwerkfout: ' + e.message); }
 }
 
 // Centrale herlaad-dispatch: kiest op basis van het doel de juiste discussie-reload.
@@ -1714,6 +1820,7 @@ let state = {
   showFilterMix: false,        // node-vulkleur = gewogen mix van alle filters die op de node werken (i.p.v. primaire kleur)? Default uit.
   showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
+  showVoorgesteld: false,      // voorgestelde (in review, nog niet goedgekeurde) entiteiten/relaties als gestippelde ghost tonen? Default uit: de viz toont het goedgekeurde model.
   showBruggenAffiliatie: false, // ego-graf: neutrale stippelbruggen via gedeelde lidmaatschappen/bestuur/draaideur? Default uit (schone start).
   showBruggenBezit: false,     // ego-graf: stippelbruggen via gedeeld bezit/geld (eigenaar, adverteerder, investeerder)? Default uit — kwadratische wolk via grote hubs.
   showBruggenGlobaal: true,    // bruggen óók zonder selectie tonen (globaal over de zichtbare graaf)? Default aan: een brugtype dat je aanzet verschijnt meteen netwerk-breed.
@@ -2191,9 +2298,11 @@ function joinNodes(nodesArr) {
     .attr('class', 'node-circle')
     .attr('r', d => getRadius(d))
     .attr('fill', d => getNodeColor(d))
-    .attr('stroke', d => d3.color(getNodeColor(d)).brighter(0.6))
-    .attr('stroke-width', isTheory ? 2 : 1.5)
-    .attr('stroke-opacity', 0.4)
+    // Ghost (voorgesteld/in review): gestippelde amber rand i.p.v. de gewone lichte rand.
+    .attr('stroke', d => isVoorgesteld(d) ? GHOST_COLOR : d3.color(getNodeColor(d)).brighter(0.6))
+    .attr('stroke-width', d => isVoorgesteld(d) ? (isTheory ? 2.5 : 2) : (isTheory ? 2 : 1.5))
+    .attr('stroke-dasharray', d => isVoorgesteld(d) ? '3,3' : null)
+    .attr('stroke-opacity', d => isVoorgesteld(d) ? 0.95 : 0.4)
     .style('cursor', 'pointer');
 
   enter.append('text')
@@ -2254,6 +2363,7 @@ function joinLinks(linksArr) {
     .attr('fill', 'none')
     .attr('stroke', d => getLinkColor(d, isTheory))
     .attr('stroke-width', d => isTheory ? (1.5 + (d.sterkte != null ? d.sterkte : 0.4) * 4) : 1 + (d.influence || 0.5) * 2.5)
+    .attr('stroke-dasharray', d => isVoorgesteld(d) ? '5,4' : null)  // ghost (in review) = gestippelde edge
     .attr('stroke-opacity', 0)
     .attr('d', linkArc);
   linkElements = enter.merge(linkElements);
@@ -2331,6 +2441,7 @@ function joinLinks(linksArr) {
 // met een eigen toggle (state.showHalos; de emergente velden hangen onder state.showFieldEffects):
 //   veld_eigenschap   — geen echte bron (zelfcensuur); getekend als halo om de node.
 const FIELD_COLOR = '#9b8cc4';  // gedempt violet: "diffuus/systemisch", los van de filter-kleuren (halo's)
+const GHOST_COLOR = '#e6b800';  // amber: "voorgesteld / in review" (gestippelde ghost-rand & -edge)
 
 // ── Emergente effecten (hyperedge over een GROEP rollen) ──
 // Een systeemeigenschap die uit het samenspel van meerdere rollen voortkomt en niet in een
@@ -2480,6 +2591,16 @@ function renderEmergentScore(eff) {
     ${scoreVlaggen(eff)}`, { open: true, meta: `${pct(eff.geloofwaardigheid)}%` });
 }
 
+// Titel-link vanuit de detailbalk naar de overlegpagina (discussiedraad) van dít element —
+// het tegenstuk van de "↗ bekijk in de graaf"-knop op /overleg (round-trip).
+function overlegTitel(param, id, inner) {
+  // Naam meegeven via ?label= zodat de overlegkop ook klopt voor elementen die nog
+  // geen draad (dus geen index-vermelding) hebben — m.n. entiteiten.
+  const href = `/overleg?label=${encodeURIComponent(inner)}#${param}=${id}`;
+  return `<a class="titel-overleg" href="${href}" `
+    + `title="Open de overlegpagina (discussiedraad) van dit element">${inner}<span class="pijl">↗</span></a>`;
+}
+
 function selectEmergent(eff) {
   state.selectedNode = null;
   state.selectedRelation = null;
@@ -2495,7 +2616,7 @@ function selectEmergent(eff) {
   let html = `
     <div class="detail-header">
       <div class="entity-type" style="color:${EMERGENCE_COLOR}">Emergent effect · systeemniveau</div>
-      <h2>${eff.label}</h2>
+      <h2>${overlegTitel('emergent_effect_id', eff.id, eff.label)}</h2>
       ${tijd}
       ${parents.length ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px">Deel-effect van ${parents.map(emergentChip).join(' ')}</div>` : ''}
     </div>
@@ -2909,7 +3030,7 @@ function selectRelation(r) {
   let html = `
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${RELATION_LABELS[r.relation_type] || r.relation_type}${r.mechanism_name ? ' · ' + r.mechanism_name : ''}</div>
-      <h2>${srcName} → ${tgtName}</h2>
+      <h2>${overlegTitel('relation_id', r.id, srcName + ' → ' + tgtName)}</h2>
       ${r.mechanism_name ? renderTagBadges(r.mechanism_filters, r.mechanism_themes) : ''}
     </div>
     ${r.description ? `<div class="detail-description">${r.description}</div>` : ''}
@@ -2982,7 +3103,7 @@ function showMechanismDetail(m, content) {
   const color = FILTER_COLORS[m.filter] || 'var(--text)';
   let html = `<div class="detail-header">
     <div class="entity-type" style="color:${color}">${FILTER_LABELS[m.filter] || m.filter}${m.mechanism_type ? ' · ' + m.mechanism_type : ''}</div>
-    <h2>${m.name}</h2>
+    <h2>${overlegTitel('mechanism_id', m.id, m.name)}</h2>
     <div style="font-size:11px;color:var(--text-dim);margin-top:4px">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
     ${renderTagBadges(m.filters, m.themes)}
   </div>`;
@@ -3986,7 +4107,7 @@ function showTheoryDetail(d, content, color) {
   let html = `
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">Rol</div>
-      <h2>${d.name}</h2>
+      <h2>${overlegTitel('role_id', d.id, d.name)}</h2>
     </div>
     <div class="detail-description">${d.description || ''}</div>
   `;
@@ -4293,7 +4414,7 @@ function showInstanceDetail(d, content, color) {
   let html = `
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${d.type}</div>
-      <h2>${d.name}</h2>
+      <h2>${overlegTitel('entity_id', d.id, d.name)}</h2>
       ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
     </div>
   `;
@@ -4436,6 +4557,10 @@ function axisPass(axisKey, edge, isTheory) {
 // passeert (filter EN thema). Een node valt daardoor vanzelf weg zodra hij geen enkele
 // zichtbare edge meer heeft (zie applyFilters stap 3). De node-toets bevat dus alleen
 // legenda/zoek/tijd — bewust géén categorie.
+// Een node/edge is 'voorgesteld' (in review) als hij een status draagt die niet
+// 'goedgekeurd' is. Rollen/mechanismen (theoriemodel) dragen geen status → nooit ghost.
+function isVoorgesteld(d) { return !!(d && d.status && d.status !== 'goedgekeurd'); }
+
 function computeVisibleLinks() {
   const isTheory = state.model === 'theory';
   const cf = state.certMin;
@@ -4450,13 +4575,17 @@ function computeVisibleLinks() {
     const matchSearch = !search || n.name.toLowerCase().includes(search)
       || (n.description && n.description.toLowerCase().includes(search));
     const matchTime = isActiveAt(n, year);
-    nodePassesFilter.set(n.id, matchLegend && matchSearch && matchTime);
+    // Voorgestelde nodes (in review) alleen tonen als de toggle aanstaat.
+    const matchStatus = state.showVoorgesteld || !isVoorgesteld(n);
+    nodePassesFilter.set(n.id, matchLegend && matchSearch && matchTime && matchStatus);
   });
 
   const visibleLinkSet = new Set();
   currentLinks.forEach((l, i) => {
     // Veld-eigenschap (niveau 2) is een node-eigenschap (halo), nooit een zichtbare edge.
     if (isFieldProperty(l)) return;
+    // Voorgestelde edges (in review) alleen tonen als de toggle aanstaat.
+    if (!state.showVoorgesteld && isVoorgesteld(l)) return;
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
@@ -4601,13 +4730,6 @@ function applyFilters() {
 // ============================================================
 // UI WIRING
 // ============================================================
-
-// Releasetag (M3.1): nieuwste release uit releases/, geïnjecteerd door generate_viz.py.
-if (DATA.release && DATA.release.versie) {
-  const el = document.getElementById('releaseTag');
-  el.textContent = `model v${DATA.release.versie} · ${(DATA.release.gegenereerd || '').slice(0, 7)}`;
-  el.style.display = '';
-}
 
 // Model toggle
 document.querySelectorAll('#modelToggle button').forEach(btn => {
@@ -4755,6 +4877,12 @@ document.getElementById('directToggle').addEventListener('change', e => {
   applyFilters();
   if (state.selectedNode) selectNode(state.selectedNode);
 });
+// Voorgesteld (in review) tonen/verbergen: gestippelde amber ghosts in het praktijkmodel.
+document.getElementById('voorgesteldToggle').addEventListener('change', e => {
+  state.showVoorgesteld = e.target.checked;
+  applyFilters();
+  if (state.selectedNode) selectNode(state.selectedNode);
+});
 // Bruggen (gedeelde lidmaatschappen / bezit): alleen zichtbaar bij een actieve node-selectie
 // in het praktijkmodel; herselecteren tekent ze opnieuw, anders gewoon wissen.
 ['brugAffToggle', 'brugBezitToggle'].forEach(id => {
@@ -4858,9 +4986,19 @@ document.getElementById('healthHeader').addEventListener('click', () => {
 document.getElementById('healthRefresh').addEventListener('click', loadHealth);
 
 // ── Overleg-knop ─────────────────────────────────────────────
-// De discussiedraden én de review-wachtrij wonen nu op een eigen, rustige pagina
-// (/overleg). De topbar-knop navigeert er simpelweg heen.
-document.getElementById('discussieBtn').addEventListener('click', () => { window.location.href = '/overleg'; });
+// De discussiedraden én de review-wachtrij wonen op een eigen, rustige pagina
+// (/overleg). De knop neemt het geselecteerde element mee als deeplink, zodat je
+// vanuit de graaf rechtstreeks in de juiste draad belandt (round-trip met ↗-terugknop).
+function overlegHashVoorSelectie() {
+  if (state.emergentActive != null) return `#emergent_effect_id=${state.emergentActive}`;
+  const isTheory = state.model === 'theory';
+  if (state.selectedRelation) return `#${isTheory ? 'mechanism_id' : 'relation_id'}=${state.selectedRelation.id}`;
+  if (state.selectedNode) return `#${isTheory ? 'role_id' : 'entity_id'}=${state.selectedNode.id}`;
+  return '';
+}
+document.getElementById('discussieBtn').addEventListener('click', () => {
+  window.location.href = '/overleg' + overlegHashVoorSelectie();
+});
 
 // ── Identiteit (M0.6) ────────────────────────────────────────
 // De vrije "jouw naam"-velden zijn vervallen: attributie volgt server-side de
@@ -4876,7 +5014,6 @@ loadSources();  // warm de bronnencache voor de citaat-keuzemenu's
 (async function initAuth() {
   const chip = document.getElementById('authChip');
   const addBtn = document.getElementById('addBtn');
-  const adminToggle = document.getElementById('adminToggle');
   try {
     const resp = await fetch('/api/me');
     if (resp.ok) {
@@ -4887,19 +5024,10 @@ loadSources();  // warm de bronnencache voor de citaat-keuzemenu's
       chip.title = 'Ingelogd — naar de accountpagina (token, uitloggen)';
       // Bijdragen mag voor elke ingelogde gebruiker (alles loopt als voorstel).
       addBtn.style.display = '';
-      // Admin (verwijderknoppen) alleen voor maintainers — DELETE vereist maintainer.
-      if (authUser.role === 'maintainer') {
-        adminToggle.style.display = '';
-      } else {
-        adminToggle.style.display = 'none';
-        setAdminMode(false);  // forceer uit als eerder via localStorage aangezet
-      }
     } else {
       // Anoniem: lezen is vrij, schrijfknoppen blijven verborgen; één uitnodigende CTA.
       authUser = null;
       addBtn.style.display = 'none';
-      adminToggle.style.display = 'none';
-      setAdminMode(false);
       chip.textContent = '✎ Inloggen om bij te dragen';
       chip.href = '/login';
       chip.classList.add('invite');
@@ -4909,7 +5037,6 @@ loadSources();  // warm de bronnencache voor de citaat-keuzemenu's
   } catch (e) {
     // Statische viz zonder server: geen schrijfknoppen, geen chip.
     addBtn.style.display = 'none';
-    adminToggle.style.display = 'none';
   }
 })();
 // Namen op de directe pijlen: puur tekenen, geen invloed op physics of zichtbaarheidsset.
@@ -5662,8 +5789,6 @@ async function submitRelation() {
 }
 
 document.getElementById('addBtn').addEventListener('click', () => openAddModal());
-document.getElementById('adminToggle').addEventListener('click', () => setAdminMode(!state.adminMode));
-try { setAdminMode(localStorage.getItem('pm-admin') === '1'); } catch (e) {}
 document.getElementById('addModalClose').addEventListener('click', closeAddModal);
 document.getElementById('addModal').addEventListener('click', (e) => {
   if (e.target.id === 'addModal') closeAddModal();
@@ -5672,6 +5797,8 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 // ============================================================
 // INIT
 // ============================================================
+// Bridging-status lui ophalen voor de rating-latentie-hint in de discussieboom.
+fetch('/api/bridging').then(r => r.json()).then(j => { bridgingStatus = j; }).catch(() => {});
 initTimeline();
 populateSizeMetricOptions();
 // Model-afhankelijke UI op de startstand zetten (zelfde regels als de modelwissel-handler).
@@ -5682,6 +5809,26 @@ document.getElementById('fieldToggleRow').style.display = initTheory ? '' : 'non
 document.getElementById('edgeLabelRow').style.display = initTheory ? 'flex' : 'none';
 buildGraph();
 renderLegend();
+
+// Deeplink vanuit /overleg: /#sel=relation:42 (of entity/role/mechanism/emergent) selecteert
+// het element — round-trip met de "↗ bekijk in de graaf"-knop op de overlegpagina.
+function selectFromHash() {
+  const m = (location.hash || '').match(/^#sel=(relation|entity|role|mechanism|emergent):(\d+)$/);
+  if (!m) return;
+  const type = m[1], id = parseInt(m[2], 10);
+  const doelModel = (type === 'relation' || type === 'entity') ? 'instance' : 'theory';
+  if (state.model !== doelModel) {
+    const btn = document.querySelector(`#modelToggle button[data-model="${doelModel}"]`);
+    if (btn) btn.click();   // herbouwt de graaf voor het juiste model
+  }
+  if (type === 'relation') { const r = DATA.relations.find(x => x.id === id); if (r) selectRelation(r); }
+  else if (type === 'entity') { const e = entityMap.get(id); if (e) selectNode(e); }
+  else if (type === 'role') { const r = roleById[id]; if (r) selectNode(r); }
+  else if (type === 'mechanism') { const mm = mechById[id]; if (mm) selectRelation(mm); }
+  else if (type === 'emergent') { selectEmergentById(id); }
+}
+selectFromHash();
+window.addEventListener('hashchange', selectFromHash);
 
 </script>
 </body>

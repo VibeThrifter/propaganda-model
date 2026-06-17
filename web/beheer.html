@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Accountbeheer — Propagandamodel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: rgba(24,24,36,0.85); --border: rgba(255,255,255,0.12);
+  --text: #e8e8f0; --text-dim: #8888a0; --text-muted: #5a5a70; --accent: #6c8aff;
+  --groen: #5fbf7f; --rood: #e0635f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+       font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; padding: 28px; }
+.wrap { max-width: 1040px; margin: 0 auto; }
+h1 { font-size: 19px; margin: 0 0 2px; }
+.sub { font-size: 12px; color: var(--text-dim); margin-bottom: 22px; }
+h2 { font-size: 13px; margin: 26px 0 10px; color: var(--text-dim);
+     text-transform: uppercase; letter-spacing: 0.05em; }
+.kaart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+         padding: 18px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 6px 10px;
+     border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase;
+     letter-spacing: 0.04em; }
+td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
+tr.inactief td { opacity: 0.45; }
+tr.zelf { background: rgba(108,138,255,0.06); }
+.naam { font-weight: 600; }
+.meta { font-size: 11px; color: var(--text-muted); }
+select, input { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
+        background: rgba(0,0,0,0.3); color: var(--text); font-size: 12px; }
+button { padding: 6px 11px; border: 1px solid var(--border); border-radius: 6px;
+         background: rgba(0,0,0,0.3); color: var(--text); font-size: 12px; cursor: pointer; }
+button.primair { background: var(--accent); border: none; color: #fff; font-weight: 600; }
+button:hover { filter: brightness(1.15); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.chip { display: inline-block; background: rgba(108,138,255,0.15); border: 1px solid var(--border);
+        border-radius: 12px; padding: 2px 8px; margin: 0 4px 4px 0; font-size: 11px; }
+.chip b { color: var(--accent); }
+.chip .x { cursor: pointer; color: var(--rood); margin-left: 6px; font-weight: 700; }
+.frrij { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.badge { font-size: 10px; padding: 1px 6px; border-radius: 5px; background: rgba(0,0,0,0.35);
+         color: var(--text-dim); }
+.badge.rol-maintainer { color: #ffb86c; } .badge.rol-reviewer { color: var(--accent); }
+.fout { color: var(--rood); font-size: 12px; min-height: 1em; margin-top: 8px; }
+.ok { color: var(--groen); }
+.token { margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.4); border: 1px dashed var(--border);
+         border-radius: 7px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+         word-break: break-all; }
+a { color: var(--text-dim); }
+.nieuw { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+         align-items: end; }
+.nieuw label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+.nieuw input, .nieuw select { width: 100%; }
+code { background: rgba(0,0,0,0.35); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">Laden…</div>
+<script>
+const ROLLEN = ['bijdrager', 'reviewer', 'maintainer'];
+let FILTERS = [];
+let TOON_INACTIEF = false;
+const esc = s => (s ?? '').toString().replace(/[&<>"]/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function api(url, method, body) {
+  const opt = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(url, opt);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || (method + ' ' + url + ' → ' + r.status));
+  return d;
+}
+
+function fout(msg) { document.getElementById('fout').textContent = msg; }
+
+async function laad() {
+  const wrap = document.getElementById('wrap');
+  let me;
+  try { me = await (await fetch('/api/me')).json(); } catch { me = null; }
+  if (!me || me.error) { window.location.href = '/login'; return; }
+  if (me.role !== 'maintainer') {
+    wrap.innerHTML = `<h1>Accountbeheer</h1>
+      <p style="color:var(--rood)">Geen toegang — deze pagina is voor maintainers.
+      Je bent <b>${esc(me.role)}</b>.</p>
+      <p><a href="/account">← naar je account</a></p>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <h1>Accountbeheer</h1>
+    <div class="sub">Rollen, filterrollen en accounts beheren — ingelogd als
+      <b>${esc(me.username)}</b> (maintainer). <a href="/account">account</a> ·
+      <a href="/">visualisatie</a></div>
+    <div class="fout" id="fout"></div>
+
+    <h2>Nieuwe gebruiker</h2>
+    <div class="kaart">
+      <form class="nieuw" id="nieuwForm">
+        <div><label>Gebruikersnaam</label><input id="nUser" placeholder="kebab-case" autocomplete="off"></div>
+        <div><label>Soort</label>
+          <select id="nKind">
+            <option value="mens">mens</option>
+            <option value="agent">agent</option>
+          </select></div>
+        <div><label>Rol</label>
+          <select id="nRol">${ROLLEN.map(r => `<option value="${r}">${r}</option>`).join('')}</select></div>
+        <div id="nMensVeld"><label>Initieel wachtwoord</label>
+          <input id="nPw" type="password" placeholder="min. 8 tekens" autocomplete="new-password"></div>
+        <div id="nAgentVeld" style="display:none"><label>Provenance (model + versie)</label>
+          <input id="nProv" placeholder="bv. claude-opus-4-8"></div>
+        <div><button class="primair" type="submit">Aanmaken</button></div>
+      </form>
+      <div id="nResultaat"></div>
+    </div>
+
+    <h2>Accounts</h2>
+    <div class="kaart"><div id="tabel">Laden…</div></div>`;
+
+  document.getElementById('nKind').addEventListener('change', e => {
+    const agent = e.target.value === 'agent';
+    document.getElementById('nMensVeld').style.display = agent ? 'none' : '';
+    document.getElementById('nAgentVeld').style.display = agent ? '' : 'none';
+  });
+  document.getElementById('nieuwForm').addEventListener('submit', maakNieuw);
+  await tekenTabel();
+}
+
+async function tekenTabel() {
+  fout('');
+  let data;
+  try { data = await api('/api/users', 'GET'); } catch (e) { fout(e.message); return; }
+  FILTERS = data.filters || [];
+  const inactiefN = data.users.filter(u => !u.active).length;
+  const zichtbaar = data.users.filter(u => u.active || TOON_INACTIEF);
+  const rijen = zichtbaar.map(u => {
+    const frChips = Object.entries(u.filterrollen).map(([f, r]) =>
+      `<span class="chip"><b>${esc(f)}</b>=${esc(r)}<span class="x"
+         onclick="zetFilterrol(${u.id}, '${esc(f)}', '')" title="intrekken">✕</span></span>`).join('') || '<span class="meta">—</span>';
+    const rolSel = `<select onchange="zetRol(${u.id}, this.value)" ${u.is_zelf ? 'disabled' : ''}>
+      ${ROLLEN.map(r => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${r}</option>`).join('')}</select>`;
+    const actBtn = u.is_zelf
+      ? `<span class="meta">jij</span>`
+      : `<button onclick="zetActief(${u.id}, ${u.active ? 'false' : 'true'})">${u.active ? 'deactiveren' : 'activeren'}</button>`;
+    const status = [
+      u.kind === 'mens' ? (u.heeft_wachtwoord ? 'wachtwoord' : 'géén wachtwoord') : null,
+      u.heeft_token ? 'token' : null,
+    ].filter(Boolean).join(' · ') || '—';
+    return `<tr class="${u.active ? '' : 'inactief'} ${u.is_zelf ? 'zelf' : ''}">
+      <td><span class="naam">${esc(u.username)}</span>
+          <div class="meta">${esc(u.kind)}${u.provenance ? ' · ' + esc(u.provenance) : ''}</div>
+          <div class="meta">laatste login: ${esc(u.last_login_at || '—')}</div></td>
+      <td>${rolSel}</td>
+      <td>${actBtn}<div class="meta">${u.active ? 'actief' : 'inactief'}</div></td>
+      <td>${frChips}
+        <div class="frrij">
+          <select id="fr-f-${u.id}">${FILTERS.map(f => `<option>${f}</option>`).join('')}</select>
+          <select id="fr-r-${u.id}"><option value="reviewer">reviewer</option><option value="maintainer">maintainer</option></select>
+          <button onclick="zetFilterrolUit(${u.id})">+ toekennen</button>
+        </div></td>
+      <td><div class="meta">${esc(status)}</div></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tabel').innerHTML = `
+    <table>
+      <tr><th>Gebruiker</th><th>Globale rol</th><th>Actief</th><th>Filterrollen</th><th>Auth</th></tr>
+      ${rijen}
+    </table>
+    <div class="meta" style="margin-top:10px">
+      ${inactiefN ? `<a href="#" onclick="event.preventDefault(); TOON_INACTIEF=!TOON_INACTIEF; tekenTabel()">${TOON_INACTIEF ? '− verberg' : '+ toon'} ${inactiefN} inactieve account(s)</a> · ` : ''}Effectieve rol binnen een filter =
+      max(globale rol, filterrol). Je eigen rol/status wijzig je hier niet (lockout-risico).</div>`;
+}
+
+async function zetRol(uid, rol) {
+  try { await api('/api/users/' + uid, 'PATCH', { role: rol }); await tekenTabel(); }
+  catch (e) { await tekenTabel(); fout(e.message); }  // re-render eerst (dropdown terug), dán melden
+}
+async function zetActief(uid, actief) {
+  try { await api('/api/users/' + uid, 'PATCH', { active: actief }); await tekenTabel(); }
+  catch (e) { fout(e.message); }
+}
+async function zetFilterrol(uid, filter, rol) {
+  try { await api('/api/users/' + uid + '/filterrol', 'POST', { filter, rol }); await tekenTabel(); }
+  catch (e) { fout(e.message); }
+}
+function zetFilterrolUit(uid) {
+  const f = document.getElementById('fr-f-' + uid).value;
+  const r = document.getElementById('fr-r-' + uid).value;
+  zetFilterrol(uid, f, r);
+}
+
+async function maakNieuw(e) {
+  e.preventDefault();
+  const res = document.getElementById('nResultaat');
+  res.innerHTML = '';
+  const kind = document.getElementById('nKind').value;
+  const body = {
+    username: document.getElementById('nUser').value.trim(),
+    kind, role: document.getElementById('nRol').value,
+  };
+  if (kind === 'agent') body.provenance = document.getElementById('nProv').value.trim();
+  else body.wachtwoord = document.getElementById('nPw').value;
+  try {
+    const d = await api('/api/users', 'POST', body);
+    document.getElementById('nieuwForm').reset();
+    document.getElementById('nMensVeld').style.display = '';
+    document.getElementById('nAgentVeld').style.display = 'none';
+    res.innerHTML = `<div class="ok" style="margin-top:10px">Account <b>${esc(d.username)}</b> aangemaakt (${esc(d.role)}).</div>`
+      + (d.token ? `<div class="token">${esc(d.token)}</div>
+          <div class="meta">${esc(d.let_op || '')} Gebruik: <code>Authorization: Bearer &lt;token&gt;</code></div>` : '');
+    await tekenTabel();
+  } catch (err) { res.innerHTML = `<div class="fout">${esc(err.message)}</div>`; }
+}
+
+laad();
+</script>
+</body>
+</html>

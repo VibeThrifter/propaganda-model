@@ -49,6 +49,8 @@ def main():
     parser.add_argument("--set-password", action="store_true",
                         help="zet interactief een wachtwoord (alleen mensen)")
     parser.add_argument("--deactivate", action="store_true", help="zet het account op inactief")
+    parser.add_argument("--activate", action="store_true",
+                        help="zet een inactief account weer actief")
     parser.add_argument("--filter-rol", action="append", metavar="FILTER=ROL",
                         help="M2.1: filterrol toekennen, bv. --filter-rol sourcing=reviewer "
                              "(herhaalbaar; ROL leeg laten = intrekken: sourcing=)")
@@ -103,6 +105,11 @@ def main():
         conn.execute("UPDATE users SET active = FALSE WHERE username = ?", (naam,))
         conn.commit()
         print(f"Account gedeactiveerd: {naam}")
+
+    if args.activate:
+        conn.execute("UPDATE users SET active = TRUE WHERE username = ?", (naam,))
+        conn.commit()
+        print(f"Account geactiveerd: {naam}")
 
     if args.filter_rol:
         uid = conn.execute("SELECT id FROM users WHERE username = ?", (naam,)).fetchone()[0]

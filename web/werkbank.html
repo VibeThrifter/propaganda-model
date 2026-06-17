@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Mijn werkbank — Propagandamodel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: rgba(24,24,36,0.85); --bg-hover: rgba(40,40,60,0.6);
+  --border: rgba(255,255,255,0.10); --text: #e8e8f0; --text-dim: #8888a0;
+  --text-muted: #5a5a70; --accent: #6c8aff; --goud: #e3b341;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+       font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+         border-bottom: 1px solid var(--border); }
+header h1 { font-size: 16px; margin: 0; }
+.spacer { margin-left: auto; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.chip { font-size: 12px; color: var(--text-dim); border: 1px solid var(--border);
+        border-radius: 10px; padding: 3px 10px; }
+main { max-width: 1180px; margin: 0 auto; padding: 18px 22px 40px; }
+h2.sectie { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim);
+            margin: 26px 0 12px; }
+.kaart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+         padding: 14px 18px; margin-bottom: 12px; }
+.kaart h3 { font-size: 14px; margin: 2px 0 6px; }
+.meta { font-size: 12px; color: var(--text-dim); margin: 4px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.statusbadge { font-size: 10px; padding: 1px 7px; border-radius: 8px; vertical-align: middle;
+  background: rgba(255,255,255,.07); color: var(--text-muted); }
+.statusbadge.voorgesteld { background: color-mix(in srgb, var(--goud) 20%, transparent); color: var(--goud); }
+.statusbadge.betwist, .statusbadge.verworpen, .statusbadge.afgewezen { background: rgba(224,99,95,.16); color: #e0635f; }
+.statusbadge.geverifieerd, .statusbadge.goedgekeurd { background: rgba(61,220,132,.14); color: #3ddc84; }
+.statusbadge.bronvermelding_nodig, .statusbadge.verouderd { background: rgba(224,162,58,.14); color: #e0a23a; }
+.statusbadge.ingetrokken, .statusbadge.vervangen { color: var(--text-muted); }
+.feedback-box { font-size: 12px; color: var(--text-dim); background: rgba(224,99,95,.08);
+  border: 1px solid color-mix(in srgb, #e0635f 28%, transparent); border-radius: 8px;
+  padding: 7px 10px; margin: 8px 0; white-space: pre-wrap; }
+.feedback-box .van { color: var(--text-muted); font-size: 11px; }
+.acties { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 7px;
+         background: rgba(0,0,0,.3); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+button:hover { filter: brightness(1.15); }
+button.prim { background: var(--accent); border: none; color: #fff; }
+button.gevaar { background: #7a2f2f; border: none; color: #fff; }
+.uitslag { font-size: 12px; }
+.leeg { color: var(--text-muted); font-size: 13px; padding: 6px 2px; }
+.form { background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 10px;
+        padding: 12px 14px; margin-top: 10px; }
+.form label { display: block; font-size: 11px; color: var(--text-dim); margin: 8px 0 3px;
+              text-transform: uppercase; letter-spacing: .03em; }
+.form input, .form textarea { width: 100%; padding: 7px 9px; border-radius: 7px;
+        border: 1px solid var(--border); background: rgba(0,0,0,.3); color: var(--text); font: inherit; font-size: 13px; }
+.form textarea { min-height: 52px; resize: vertical; }
+.melding { font-size: 12px; margin-top: 8px; min-height: 1em; }
+.banner { background: rgba(108,138,255,.10); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+          border-radius: 9px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+code { background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+.tel { font-size: 12px; color: var(--text-muted); }
+.banner details { margin-top: 6px; }
+.banner summary { cursor: pointer; color: var(--accent); font-size: 12px; list-style: none; }
+.banner summary::-webkit-details-marker { display: none; }
+.banner summary::before { content: '▸ '; }
+.banner details[open] summary::before { content: '▾ '; }
+.banner.hot { background: rgba(227,179,65,.10);
+  border-color: color-mix(in srgb, var(--goud) 40%, transparent); }
+/* Tabbladen: één groep tegelijk, plakt bovenaan bij scrollen */
+.tabs { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 7px;
+  background: var(--bg); padding: 10px 0 11px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.tab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 9px;
+  border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text-dim);
+  font: inherit; font-size: 13px; cursor: pointer; }
+.tab:hover { color: var(--text); filter: brightness(1.1); }
+.tab.actief { background: var(--accent); border-color: transparent; color: #fff; }
+.tab.leeg:not(.actief) { opacity: .45; }
+.tab.hot:not(.actief) { border-color: color-mix(in srgb, var(--goud) 55%, transparent); color: var(--goud); }
+.tab .telb { font-size: 11px; min-width: 19px; text-align: center; padding: 1px 6px; border-radius: 8px;
+  background: rgba(255,255,255,.12); color: inherit; }
+.tab.actief .telb { background: rgba(255,255,255,.28); }
+section[data-pane] { display: none; }
+section[data-pane].actief { display: block; }
+.hint { font-size: 12.5px; color: var(--text-dim); margin: 0 0 14px; max-width: 70ch; }
+.hint b { color: var(--text); font-weight: 600; }
+/* Kaarten naast elkaar i.p.v. één lange kolom */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 12px; align-items: start; }
+.grid .kaart { margin-bottom: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mijn werkbank</h1>
+  <a href="/overleg" title="Naar het overleg">← Overleg</a>
+  <a href="/" title="Naar de netwerkvisualisatie">Netwerk</a>
+  <span class="spacer"></span>
+  <a href="/account" class="chip" id="authChip">…</a>
+</header>
+<main id="main">Laden…</main>
+
+<script>
+const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+let ME = null, BRONNEN = [];
+const STANCE = { supporting: ['+', '#3ddc84'], contradicting: ['−', '#e0635f'], contextual: ['~', '#8888a0'] };
+const PARAM_LABEL = { relation_id: 'relatie', entity_id: 'entiteit', role_id: 'rol',
+  mechanism_id: 'mechanisme', emergent_effect_id: 'veld' };
+
+async function init() {
+  try { ME = await (await fetch('/api/me')).json(); } catch (e) { ME = null; }
+  if (!ME || ME.error) { window.location.href = '/login'; return; }
+  document.getElementById('authChip').textContent = `${ME.username} (${ME.role})`;
+  try { BRONNEN = await (await fetch('/api/sources')).json(); } catch (e) { BRONNEN = []; }
+  laad();
+}
+
+function badge(status) { return `<span class="statusbadge ${esc(status)}">${esc(status)}</span>`; }
+function feedbackBox(f, prefix) {
+  if (!f || !f.reason) return '';
+  return `<div class="feedback-box">${prefix ? esc(prefix) + ' ' : ''}${esc(f.reason)}` +
+    `<div class="van">— ${esc(f.changed_by || f.reviewer || '')}${f.created_at ? ' · ' + esc((f.created_at || '').slice(0, 16)) : ''}</div></div>`;
+}
+function threadLink(a) {
+  if (!a.thread_param || !a.thread_id) return '';
+  return ` <a href="/overleg#${a.thread_param}=${a.thread_id}" title="Bekijk in de discussiedraad">↗ in de draad</a>`;
+}
+function bronOpties() {
+  return '<option value="">— geen bron —</option>' +
+    BRONNEN.map(b => `<option value="${b.id}">${esc((b.author ? b.author + ' — ' : '') + (b.title || 'bron #' + b.id)).slice(0, 70)}</option>`).join('');
+}
+
+const kort = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+
+const grid = html => `<div class="grid">${html}</div>`;
+const leeg = txt => `<div class="leeg">${esc(txt)}</div>`;
+
+function banner() {
+  return `<div class="banner">Hier staat <b>jouw</b> ingediende werk met de ontvangen feedback.` +
+    `<details><summary>Hoe werkt de werkbank?</summary>` +
+    `Een <b>voorgesteld</b> argument bewerk je vrij (telt nog nergens); een al gemerged, afgewezen of betwist ` +
+    `argument verbeter je via een <b>revisie</b> die het oude vervangt na merge — een mens beslist. ` +
+    `Een nog-voorgesteld concept dat je niet meer wilt, kun je zelf <b>verwijderen</b>. ` +
+    `Afgewezen voorstellen en praktijkelementen dien je opnieuw in.</details></div>`;
+}
+
+// Wissel van tabblad en onthoud de keuze (laad() herstelt 'm na een actie).
+function kiesTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('actief', t.dataset.tab === id));
+  document.querySelectorAll('section[data-pane]').forEach(s => s.classList.toggle('actief', s.dataset.pane === id));
+  try { localStorage.setItem('werkbank-tab', id); } catch (e) { /* private mode */ }
+}
+
+async function laad() {
+  const m = document.getElementById('main');
+  m.innerHTML = '<div class="leeg">Laden…</div>';
+  const reviewer = ME && (ME.role === 'reviewer' || ME.role === 'maintainer');
+  let d, inter, inbox = null;
+  try {
+    [d, inter] = await Promise.all([
+      fetch('/api/mijn/bijdragen').then(r => r.json()),
+      fetch('/api/mijn/interacties').then(r => r.json()),
+    ]);
+    if (reviewer) inbox = await fetch('/api/mijn/herbeoordelen').then(r => r.json());
+  } catch (e) { m.innerHTML = `<div class="banner">Kon je werk niet laden (${esc(e.message)}).</div>`; return; }
+
+  const nInter = (inter.replies?.length || 0) + (inter.ratings?.length || 0);
+  const panes = [];
+
+  // 0) Reviewer-inbox: kwam terug na mijn review (alleen reviewer+)
+  if (inbox) {
+    const nInbox = inbox.argumenten.length + inbox.voorstellen.length + inbox.entiteiten.length + inbox.relaties.length;
+    const cards = inbox.argumenten.map(rendInboxArg).join('') + inbox.voorstellen.map(rendInboxVoorstel).join('') +
+      inbox.entiteiten.map(e => rendInboxPraktijk('entiteit', e, esc(e.name))).join('') +
+      inbox.relaties.map(r => rendInboxPraktijk('relatie', r, esc(r.source_name) + ' → ' + esc(r.target_name))).join('');
+    panes.push({ id: 'inbox', label: 'Te herbeoordelen', n: nInbox, hot: true, html: nInbox
+      ? `<div class="banner hot">Dingen die <b>jij</b> eerder afwees of terugstuurde en die de auteur verbeterd ` +
+        `opnieuw indiende — beoordeel ze opnieuw.</div>` + grid(cards)
+      : leeg('Niets gekomen na jouw reviews.') });
+  }
+
+  // 1) Mijn werk, opgesplitst per soort
+  panes.push({ id: 'arg', label: 'Argumenten', n: d.argumenten.length,
+    hint: 'Jouw bijdragen aan de discussieboom: onderbouwingen, bezwaren en reacties.',
+    html: d.argumenten.length ? grid(d.argumenten.map(rendArg).join('')) : leeg('Nog geen argumenten ingediend.') });
+  panes.push({ id: 'voorstel', label: 'Voorstellen', n: d.voorstellen.length,
+    hint: 'Jouw RfC’s. Nieuwe <b>theorie</b>-elementen (rollen, mechanismen, velden) lopen óók hierlangs — daarom is er geen apart “theorie”-tabblad.',
+    html: d.voorstellen.length ? grid(d.voorstellen.map(rendVoorstel).join('')) : leeg('Nog geen voorstellen ingediend.') });
+  const praktijk = d.entiteiten.map(rendEntiteit).join('') + d.relaties.map(rendRelatie).join('');
+  panes.push({ id: 'praktijk', label: 'Praktijk', n: d.entiteiten.length + d.relaties.length,
+    hint: 'De concrete entiteiten (mensen, bedrijven) en relaties die jij aan het model toevoegde — de <b>praktijklaag</b>. Eenmaal opgenomen heeft een item geen bewerkknop meer; klik door naar de graaf of het overleg.',
+    html: praktijk ? grid(praktijk) : leeg('Nog geen entiteiten/relaties ingediend.') });
+
+  // 2) Reacties & beoordelingen op mijn werk
+  panes.push({ id: 'reacties', label: 'Reacties', n: nInter,
+    hint: 'Wat anderen op jouw werk reageerden of beoordeelden.',
+    html: nInter
+    ? grid((inter.replies || []).map(rendReply).join('') + (inter.ratings || []).map(rendRating).join(''))
+    : leeg('Nog geen reacties of beoordelingen van anderen.') });
+
+  // Actieve tab: onthouden keuze, anders eerst de 'hete' inbox, anders de eerste gevulde.
+  let actief = null;
+  try { actief = localStorage.getItem('werkbank-tab'); } catch (e) { /* private mode */ }
+  if (!panes.some(p => p.id === actief)) actief = null;
+  if (!actief) actief = (panes.find(p => p.hot && p.n) || panes.find(p => p.n) || panes[0]).id;
+
+  const tabs = panes.map(p =>
+    `<button class="tab${p.hot ? ' hot' : ''}${p.n ? '' : ' leeg'}${p.id === actief ? ' actief' : ''}" ` +
+    `data-tab="${p.id}" onclick="kiesTab('${p.id}')">${esc(p.label)} <span class="telb">${p.n}</span></button>`).join('');
+  const secties = panes.map(p =>
+    `<section data-pane="${p.id}"${p.id === actief ? ' class="actief"' : ''}>` +
+    `${p.hint ? `<p class="hint">${p.hint}</p>` : ''}${p.html}</section>`).join('');
+
+  m.innerHTML = banner() + `<nav class="tabs">${tabs}</nav>${secties}`;
+}
+
+// ── Reviewer-inbox: kwam terug na mijn review ────────────────
+function rendInboxArg(a) {
+  const [sym, kleur] = STANCE[a.stance] || ['•', '#888'];
+  const link = a.thread_param ? `<a href="/overleg#${a.thread_param}=${a.thread_id}">↗ beoordeel in de draad</a>` : '';
+  return `<div class="kaart"><div class="meta"><span><span style="color:${kleur}">${sym}</span> revisie · argument #${a.id}</span>` +
+    `<span>van ${esc(a.contributed_by || '')}</span></div>` +
+    `<h3>${esc(a.claim || '')}</h3>` + feedbackBox(a.mijn_review, 'Jij stuurde de vorige terug:') +
+    `<div class="acties">${link}</div></div>`;
+}
+function rendInboxVoorstel(v) {
+  return `<div class="kaart"><div class="meta"><span>herzien voorstel · #${v.id}</span><span>${esc(v.soort)}</span></div>` +
+    `<h3>${esc(v.titel)}</h3>` + feedbackBox(v.mijn_review, 'Jij wees de vorige af:') +
+    `<div class="acties"><a href="/overleg/voorstel/${v.id}">↗ beoordeel RfC</a></div></div>`;
+}
+function rendInboxPraktijk(soort, item, titel) {
+  return `<div class="kaart"><div class="meta"><span>${soort} · #${item.id}</span><span>opnieuw ingediend</span></div>` +
+    `<h3>${titel}</h3>` + feedbackBox(item.mijn_review, 'Jij wees dit eerder af:') +
+    `<div class="acties"><a href="/overleg">↗ beoordeel in het overleg</a></div></div>`;
+}
+
+// ── Reacties & beoordelingen op mijn werk ────────────────────
+function rendReply(r) {
+  const [sym, kleur] = STANCE[r.stance] || ['•', '#888'];
+  const link = r.thread_param ? `<a href="/overleg#${r.thread_param}=${r.thread_id}">↗ in de draad</a>` : '';
+  return `<div class="kaart"><div class="meta"><span><span style="color:${kleur}">${sym}</span> reactie · #${r.id}</span>` +
+    `<span>van ${esc(r.contributed_by || '')}</span>${r.objection_type ? `<span>drogreden: ${esc(r.objection_type)}</span>` : ''}</div>` +
+    `<div class="tel">op jouw argument: “${esc(kort(r.op_claim, 90))}”</div>` +
+    `<h3>${esc(r.claim || '')}</h3><div class="acties">${link}</div></div>`;
+}
+function rendRating(r) {
+  const [icoon, woord, kleur] = r.oordeel === 'nuttig' ? ['👍', 'nuttig', '#3ddc84'] : ['👎', 'niet nuttig', '#e0635f'];
+  const wie = r.kind === 'agent' ? `${esc(r.rater)} (agent-advies)` : esc(r.rater);
+  return `<div class="kaart"><div class="meta"><span style="color:${kleur}">${icoon} ${woord}</span>` +
+    `<span>van ${wie}</span>${r.reden ? `<span>reden: ${esc(r.reden)}</span>` : ''}</div>` +
+    `<div class="tel">op jouw argument: “${esc(kort(r.op_claim, 90))}”</div>` +
+    (r.motivatie ? `<div class="feedback-box">${esc(r.motivatie)}</div>` : '') + `</div>`;
+}
+
+function rendArg(a) {
+  const [sym, kleur] = STANCE[a.stance] || ['•', '#888'];
+  const doel = a.thread_param ? `${PARAM_LABEL[a.thread_param] || a.thread_param} #${a.thread_id}`
+    : (a.parent_argument_id ? `reactie op #${a.parent_argument_id}` : '—');
+  let acties = '';
+  if (a.vervangen) {
+    acties = `<span class="tel">vervangen door een revisie — herleidbaar bewaard</span>`;
+  } else if (a.status === 'voorgesteld') {
+    acties = `<button class="prim" onclick="toonForm('a${a.id}','edit',${a.id})">Bewerk</button>` +
+      ` <button class="gevaar" onclick="verwijderEigen('arguments',${a.id})">Verwijderen</button>`;
+  } else {
+    acties = `<button class="prim" onclick="toonForm('a${a.id}','revisie',${a.id})">Reviseer</button>`;
+  }
+  return `<div class="kaart"><div class="meta"><span><span style="color:${kleur}">${sym}</span> ${badge(a.status)}</span>` +
+    `<span>argument #${a.id}</span><span>doel: ${esc(doel)}${threadLink(a)}</span></div>` +
+    `<h3>${esc(a.claim || '')}</h3>` +
+    (a.reviseert_id ? `<div class="meta">↻ revisie van #${a.reviseert_id}</div>` : '') +
+    feedbackBox(a.feedback, a.status === 'betwist' ? 'Ter herkeuring:' : 'Reden:') +
+    `<div class="acties">${acties}<span class="uitslag" id="a${a.id}-uit"></span></div>` +
+    `<div id="a${a.id}-form"></div></div>`;
+}
+
+// Compact bewerk-/reviseer-formulier (zelfde endpoints als de overlegdraad).
+function toonForm(slot, modus, argId) {
+  const el = document.getElementById(slot + '-form');
+  if (el.firstChild) { el.innerHTML = ''; return; }
+  // huidige waarden ophalen uit de DOM-kaart is omslachtig; we laten claim leeg ⇒
+  // server vult bij revisie het origineel aan, bij edit overschrijft alleen wat je typt.
+  el.innerHTML = `<div class="form">
+    <label>Bewering ${modus === 'revisie' ? '(leeg = origineel)' : '*'}</label>
+    <input type="text" id="${slot}-claim" placeholder="${modus === 'revisie' ? 'verbeterde bewering' : 'nieuwe bewering'}">
+    <label>Onderbouwing</label><textarea id="${slot}-reason"></textarea>
+    <label>Bron vervangen (optioneel)</label>
+    <select id="${slot}-src" style="width:100%;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text)">${bronOpties()}</select>
+    <input type="text" id="${slot}-quote" placeholder="Citaat (optioneel)" style="margin-top:6px">
+    <div class="acties"><button class="prim" onclick="verstuurForm('${slot}','${modus}',${argId})">${modus === 'revisie' ? 'Revisie indienen' : 'Opslaan'}</button>
+      <button onclick="document.getElementById('${slot}-form').innerHTML=''">Annuleren</button></div>
+    <div class="melding" id="${slot}-msg"></div></div>`;
+}
+async function verstuurForm(slot, modus, argId) {
+  const claim = document.getElementById(slot + '-claim').value.trim();
+  const reason = document.getElementById(slot + '-reason').value.trim();
+  const src = document.getElementById(slot + '-src').value;
+  const quote = document.getElementById(slot + '-quote').value.trim();
+  const msg = document.getElementById(slot + '-msg');
+  if (modus === 'edit' && !claim && !reason && !src) { msg.innerHTML = '<span style="color:#e0635f">Niets gewijzigd.</span>'; return; }
+  const body = {};
+  if (claim) body.claim = claim;
+  if (reason) body.reasoning = reason;
+  if (src) body.citations = [{ source_id: parseInt(src, 10), quote: quote || null }];
+  const url = modus === 'revisie' ? `/api/arguments/${argId}/revisie` : `/api/arguments/${argId}`;
+  const method = modus === 'revisie' ? 'POST' : 'PATCH';
+  msg.textContent = 'Bezig…';
+  try {
+    const resp = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await resp.json();
+    if (!resp.ok) { msg.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
+    msg.innerHTML = `<span style="color:#3ddc84">${modus === 'revisie' ? 'Revisie ingediend — telt na merge.' : 'Opgeslagen.'}</span>`;
+    setTimeout(laad, 800);
+  } catch (e) { msg.innerHTML = `<span style="color:#e0635f">Netwerkfout: ${esc(e.message)}</span>`; }
+}
+
+function rendVoorstel(v) {
+  const fb = (v.reviews || []).filter(r => r.motivatie);
+  const fbHtml = fb.map(r => feedbackBox({ reason: r.motivatie, reviewer: r.reviewer, created_at: r.created_at },
+    r.oordeel === 'afwijzen' ? '✕ afwijzing:' : '✓ akkoord:')).join('');
+  let acties = '';
+  if (v.status === 'open') {
+    acties = `<button class="gevaar" onclick="intrekken(${v.id})">Intrekken</button>` +
+      ` <a href="/overleg/voorstel/${v.id}">↗ bekijk RfC</a>`;
+  } else if (v.status === 'afgewezen' || v.status === 'ingetrokken') {
+    acties = `<button class="prim" onclick="herzien(${v.id})">Verbeteren &amp; opnieuw indienen</button>` +
+      ` <a href="/overleg/voorstel/${v.id}">↗ origineel</a>`;
+  } else {
+    acties = `<a href="/overleg/voorstel/${v.id}">↗ bekijk</a>`;
+  }
+  return `<div class="kaart"><div class="meta"><span>${badge(v.status)}</span><span>${esc(v.soort)} · #${v.id}</span>` +
+    `<span>${esc((v.created_at || '').slice(0, 16))}</span></div>` +
+    `<h3>${esc(v.titel)}</h3>` + fbHtml +
+    `<div class="acties">${acties}<span class="uitslag" id="v${v.id}-uit"></span></div></div>`;
+}
+async function intrekken(vid) {
+  if (!confirm('Dit voorstel intrekken?')) return;
+  const uit = document.getElementById(`v${vid}-uit`); uit.textContent = 'Bezig…';
+  try {
+    const r = await fetch(`/api/voorstellen/${vid}/intrekken`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) { uit.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
+    setTimeout(laad, 600);
+  } catch (e) { uit.textContent = 'Netwerkfout: ' + e.message; }
+}
+async function herzien(vid) {
+  const uit = document.getElementById(`v${vid}-uit`); uit.textContent = 'Bezig…';
+  try {
+    const r = await fetch(`/api/voorstellen/${vid}/herzien`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const j = await r.json();
+    if (!r.ok) { uit.innerHTML = `<span style="color:#e0635f">${esc(j.error || (j.fouten || []).join('; '))}</span>`; return; }
+    uit.innerHTML = `<span style="color:#3ddc84">Nieuw open voorstel #${j.id} — <a href="/overleg/voorstel/${j.id}">bekijk en vul aan</a></span>`;
+    setTimeout(laad, 1200);
+  } catch (e) { uit.textContent = 'Netwerkfout: ' + e.message; }
+}
+
+function praktijkActies(soort, item) {
+  if (item.status === 'afgewezen')
+    return `<button class="prim" onclick="heraanmeld('${soort}',${item.id})">Verbeteren &amp; opnieuw indienen</button>`;
+  if (item.status === 'voorgesteld')
+    return `<button class="gevaar" onclick="verwijderEigen('${soort}',${item.id})">Verwijderen</button>` +
+      ` <span class="tel">wacht op moderatie</span>`;
+  // Opgenomen in het model: geen bewerkactie meer, wél doorklikken naar de context.
+  const sel = soort === 'entities' ? 'entity' : 'relation';
+  const param = soort === 'entities' ? 'entity_id' : 'relation_id';
+  return `<a href="/#sel=${sel}:${item.id}" title="Selecteer dit element in de netwerkvisualisatie">↗ in de graaf</a>` +
+    ` <a href="/overleg#${param}=${item.id}" title="Open de discussiedraad">↗ in het overleg</a>`;
+}
+function rendEntiteit(e) {
+  return `<div class="kaart"><div class="meta"><span>${badge(e.status)}</span><span>entiteit #${e.id}${e.type ? ' · ' + esc(e.type) : ''}</span></div>` +
+    `<h3>${esc(e.name)}</h3>` + feedbackBox(e.feedback, 'Reden:') +
+    `<div class="acties">${praktijkActies('entities', e)}<span class="uitslag" id="ent${e.id}-uit"></span></div></div>`;
+}
+function rendRelatie(r) {
+  return `<div class="kaart"><div class="meta"><span>${badge(r.status)}</span><span>relatie #${r.id} · ${esc(r.relation_type)}</span></div>` +
+    `<h3>${esc(r.source_name)} → ${esc(r.target_name)}</h3>` + feedbackBox(r.feedback, 'Reden:') +
+    `<div class="acties">${praktijkActies('relations', r)}<span class="uitslag" id="rel${r.id}-uit"></span></div></div>`;
+}
+// Eigen, nog-VOORGESTELD concept definitief verwijderen (telt nergens mee; audit blijft).
+const VERWIJDER_SLOT = { arguments: id => `a${id}`, entities: id => `ent${id}`, relations: id => `rel${id}` };
+async function verwijderEigen(soort, id) {
+  if (!confirm('Dit concept definitief verwijderen? Het is nog niet beoordeeld en telt nergens mee — ' +
+               'deze actie kun je niet ongedaan maken.')) return;
+  const uit = document.getElementById(VERWIJDER_SLOT[soort](id) + '-uit');
+  if (uit) uit.textContent = 'Bezig…';
+  try {
+    const r = await fetch(`/api/${soort}/${id}/intrekken`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) { if (uit) uit.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
+    if (uit) uit.innerHTML = '<span style="color:#3ddc84">Verwijderd.</span>';
+    setTimeout(laad, 700);
+  } catch (e) { if (uit) uit.textContent = 'Netwerkfout: ' + e.message; }
+}
+async function heraanmeld(tabel, id) {
+  const veld = tabel === 'relations' ? 'description' : 'description';
+  const toel = prompt('Pas eventueel de beschrijving aan (leeg = ongewijzigd opnieuw indienen):');
+  if (toel === null) return;
+  const slot = (tabel === 'entities' ? 'ent' : 'rel') + id;
+  const uit = document.getElementById(`${slot}-uit`); uit.textContent = 'Bezig…';
+  const body = toel.trim() ? { [veld]: toel.trim() } : {};
+  try {
+    const r = await fetch(`/api/${tabel}/${id}/heraanmelden`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) { uit.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
+    uit.innerHTML = '<span style="color:#3ddc84">Opnieuw ingediend (voorgesteld) — wacht op moderatie.</span>';
+    setTimeout(laad, 900);
+  } catch (e) { uit.textContent = 'Netwerkfout: ' + e.message; }
+}
+
+init();
+</script>
+</body>
+</html>
