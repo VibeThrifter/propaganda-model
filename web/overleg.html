@@ -76,7 +76,11 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .filter-chips.toolbar { padding-top: 2px; border-bottom: 1px solid var(--border); margin-bottom: 8px; padding-bottom: 10px; }
 #oDetail { flex: 1; overflow-y: auto; padding: 20px 26px; min-width: 0; }
 /* argumentboom */
-.arg { border-left: 2px solid var(--border); padding: 6px 0 6px 12px; margin: 6px 0; }
+.arg { position: relative; border-left: 2px solid var(--border); padding: 6px 0 6px 14px; margin: 6px 0; }
+/* tak-connector: verbindt de verticale ruggengraat van de ouder met elke reactie eronder,
+   zodat de boomstructuur leesbaar wordt (een reageer-knop bouwt zichtbaar een tak). */
+.arg .arg::before { content: ''; position: absolute; left: -16px; top: 15px; width: 14px; height: 2px;
+  background: var(--border); }
 .arg-kop { font-size: 13.5px; }
 .stance { font-weight: 700; }
 .arg-reden { font-size: 12.5px; color: var(--text-dim); margin: 3px 0; white-space: pre-wrap; }
@@ -94,6 +98,22 @@ button.prim { background: var(--accent); border: none; color: #fff; }
              padding: 6px 10px; margin: 2px 0 10px; }
 .bronbadge code { background: rgba(0,0,0,.3); padding: 1px 4px; border-radius: 4px; }
 .reageer-link { font-size: 11px; color: var(--accent); cursor: pointer; margin-left: 8px; }
+/* oordeel-paar: ✓ Logica klopt / ✗ Logica klopt niet — gebalanceerd, samen, even zwaar */
+.oordeel-rij { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11.5px; flex-wrap: wrap; }
+.oordeel { padding: 2px 10px; border-radius: 9px; border: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.oordeel.knop { cursor: pointer; }
+.oordeel.eens { color: #3ddc84; border-color: color-mix(in srgb, #3ddc84 32%, transparent); }
+.oordeel.eens.knop:hover, .oordeel.eens.aan { background: color-mix(in srgb, #3ddc84 14%, transparent); }
+.oordeel.oneens { color: #e0635f; border-color: color-mix(in srgb, #e0635f 32%, transparent); }
+.oordeel.oneens.knop:hover { background: color-mix(in srgb, #e0635f 14%, transparent); }
+.oordeel.stat { opacity: .7; }
+/* reageer-knop: één neutrale, accent-getinte actie, los van het oordeel-paar */
+.reageer-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; flex-wrap: wrap; }
+.reageer-knop { font-size: 11px; cursor: pointer; padding: 2px 10px; border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); user-select: none; }
+.reageer-knop:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.reply-kruimel { font-size: 11px; color: var(--text-muted); margin: 2px 0 8px; line-height: 1.4; }
+.reply-kruimel b { color: var(--text-dim); font-weight: 600; }
 /* statusbadge + inline acties (Fase A–C): poort & revisie zichtbaar in de draad */
 .statusbadge { font-size: 10px; padding: 0 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle;
   background: rgba(255,255,255,.07); color: var(--text-muted); }
@@ -147,6 +167,15 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .stance-kies button.sel-ctx { background: #4a4a66; border: none; color: #fff; }
 .rij2 { display: flex; gap: 10px; }
 .rij2 > div { flex: 1; }
+.bronkies { position: relative; }
+.bron-resultaten { position: absolute; z-index: 30; left: 0; right: 0; margin-top: 2px;
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: 7px;
+        max-height: 220px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.bron-optie { padding: 7px 9px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.bron-optie:last-child { border-bottom: none; }
+.bron-optie:hover { background: rgba(255,255,255,.07); }
+.bron-optie.nieuw { color: var(--goud); font-weight: 600; }
+.bron-leeg { padding: 7px 9px; font-size: 12px; color: var(--text-muted); }
 .melding { font-size: 12px; margin-top: 8px; min-height: 1em; }
 /* — Voorstellen (review) — */
 #tab-voorstellen { flex: 1; overflow-y: auto; }
@@ -221,7 +250,6 @@ code { background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px; font-s
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 let ME = null;
-let BRONNEN = [];
 let ROLLEN = [];          // lichte rollenlijst (GET /api/roles) voor de rol-keuze bij entiteit-goedkeuring
 let BRIDGING = null;      // bridging-status (M2.5): wanneer telt een rating mee in de score?
 let indexData = null;
@@ -367,7 +395,6 @@ async function init() {
       + (ME.role === 'maintainer' ? ` · <a href="/beheer" title="Accountbeheer: rollen &amp; accounts">Beheer</a>` : '')
       + ` · <a href="/account">${esc(ME.username)} (${esc(ME.role)})</a>`
     : `<a href="/login">Inloggen</a>`;
-  try { BRONNEN = await (await fetch('/api/sources')).json(); } catch (e) { BRONNEN = []; }
   try { ROLLEN = await (await fetch('/api/roles')).json(); } catch (e) { ROLLEN = []; }
   try { BRIDGING = await (await fetch('/api/bridging')).json(); } catch (e) { BRIDGING = null; }
   laadVoorstellenBadge();
@@ -556,7 +583,6 @@ function rendNode(a) {
   let h = `<div class="arg${a.vervangen ? ' vervangen-arg' : ''}">`;
   h += `<div class="arg-kop"><span class="stance" style="color:${kleur}">${sym}</span> <b>${esc(a.claim || '')}</b>`;
   h += statusBadge(a);
-  if (ME && !a.vervangen) h += `<span class="reageer-link" onclick="toonReply(${a.id})">reageer</span>`;
   h += `</div>`;
   if (a.reasoning) h += `<div class="arg-reden">${esc(a.reasoning)}</div>`;
   const m = [esc(a.contributed_by || ''), '#' + a.id];
@@ -566,6 +592,7 @@ function rendNode(a) {
   h += `<div class="arg-meta">${m.filter(Boolean).join(' · ')}</div>`;
   h += (a.citations || []).map(citeHtml).join('');
   h += ratingRegel(a);
+  h += reageerBar(a);
   h += bezwaarRegelO(a);
   h += argActies(a);
   h += `<div id="reply-${a.id}"></div>`;
@@ -579,18 +606,31 @@ function rendNode(a) {
 // score, voedt hooguit later bridging). 'Logica klopt niet' = onderbouwd bezwaar = een
 // ondergraving (opent het bezwaarformulier) die de score van dit argument dempt tot ze
 // is opgelost. De kale, redenloze downvote bestaat niet meer.
+// Het oordeel-paar: één gebalanceerd duo dat de SOUNDNESS van het argument beoordeelt.
+// '✓ Logica klopt' = lichte endorsement (rating, geen knoop, voedt hooguit bridging).
+// '✗ Logica klopt niet' = onderbouwd bezwaar → opent dezelfde reageer-composer met '− Tegen'
+// voorgekozen (een ondergraving die de kracht dempt tot ze is opgelost). De twee horen visueel
+// bij elkaar (apart van 'reageren') en wegen even zwaar — geen schreeuwend rood naast grijs.
 function ratingRegel(a) {
   const r = a.ratings || { mens: { nuttig: 0 }, agent: { nuttig: 0 } };
   const tel = r.mens.nuttig + (r.agent.nuttig ? `+${r.agent.nuttig}` : '');
   const eigen = ME && a.contributed_by === ME.username;
   const actief = a.mijn_oordeel === 'nuttig';
-  const klopt = (!ME || eigen)
-    ? `<span class="rate-tel" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Logica klopt ${tel}</span>`
-    : `<span class="rate-knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief})" title="De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Logica klopt ${tel}</span>`;
-  const kloptNiet = ME
-    ? `<span class="rate-knop" style="color:#e0635f" onclick="toonBezwaar(${a.id})" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een ondergraving die de score dempt tot ze is opgelost.">✗ Logica klopt niet</span>`
+  const eens = (!ME || eigen)
+    ? `<span class="oordeel eens stat" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Logica klopt ${tel}</span>`
+    : `<span class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief})" title="De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Logica klopt ${tel}</span>`;
+  const oneens = (ME && !a.vervangen)
+    ? `<span class="oordeel oneens knop" onclick="toonReply(${a.id},'contradicting')" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</span>`
     : '';
-  return `<div class="ratings">${klopt}${kloptNiet}</div>`;
+  return `<div class="oordeel-rij">${eens}${oneens}</div>`;
+}
+// Eén neutrale 'Reageer'-knop: opent de composer met de standaard positiekeuze
+// (Voor/Tegen/Context). Apart van het oordeel-paar hierboven. Inloggen vereist.
+function reageerBar(a) {
+  if (!ME || a.vervangen) return '';
+  return `<div class="reageer-bar">
+    <span class="reageer-knop" onclick="toonReply(${a.id},'supporting')" title="Reageer op dit argument — kies Voor, Tegen of Context">↩ Reageer</span>
+  </div>`;
 }
 // Resolutielus-badge + overgangsknoppen op een ondergraving (server bewaakt de rechten).
 function bezwaarRegelO(a) {
@@ -675,42 +715,76 @@ async function toonThread(param, id, label) {
 }
 
 // ── Toevoegformulier (root of reply) ──
-function bronOpties(metNieuw) {
-  return '<option value="">— geen bron —</option>' +
-    BRONNEN.map(b => `<option value="${b.id}">${esc((b.author ? b.author + ' — ' : '') + (b.title || 'bron #' + b.id)).slice(0, 70)}</option>`).join('') +
-    (metNieuw ? '<option value="__new__">+ nieuwe bron toevoegen…</option>' : '');
-}
 const SOURCE_TYPE_OPTS = ['boek', 'academisch_artikel', 'rapport', 'nieuwsartikel', 'transcript',
   'interview', 'dataset', 'wetgeving', 'persbericht', 'website', 'overig'];
-// Toon de nieuwe-bron-velden zodra "+ nieuwe bron toevoegen…" gekozen is.
-function toggleNieuweBron(fid) {
-  const sel = document.getElementById(fid + '-src');
+// Bron-typeahead: i.p.v. één dropdown met álle bronnen (schaalt niet naar duizenden)
+// zoeken we serverzijdig op titel/auteur. Het verborgen veld `${fid}-src` houdt de keuze
+// ('' / '__new__' / id) zodat verstuur() ongewijzigd blijft. "+ nieuwe bron" staat bovenaan.
+const _bronZoekTimer = {};
+function zoekBron(fid) {
+  const inp = document.getElementById(fid + '-bronzoek');
+  const lijst = document.getElementById(fid + '-bronlijst');
+  if (!inp || !lijst) return;
+  document.getElementById(fid + '-src').value = '';      // tekst wijzigen = keuze loslaten
+  const metNieuw = inp.closest('.bronkies')?.dataset.metnieuw !== '0';
   const blok = document.getElementById(fid + '-nieuwbron');
-  if (blok) blok.style.display = (sel && sel.value === '__new__') ? '' : 'none';
+  if (blok) blok.style.display = 'none';
+  const term = inp.value.trim();
+  clearTimeout(_bronZoekTimer[fid]);
+  _bronZoekTimer[fid] = setTimeout(async () => {
+    let bronnen = [];
+    if (term.length >= 2) {
+      try { bronnen = await (await fetch('/api/sources?limit=15&q=' + encodeURIComponent(term))).json(); }
+      catch (e) { bronnen = []; }
+    }
+    let h = metNieuw ? `<div class="bron-optie nieuw" onclick="kiesBron('${fid}','__new__')">+ nieuwe bron toevoegen…</div>` : '';
+    if (term.length < 2) h += `<div class="bron-leeg">Typ minstens 2 letters om te zoeken…</div>`;
+    else if (!bronnen.length) h += `<div class="bron-leeg">Geen bron gevonden${metNieuw ? ' — voeg er een toe.' : '.'}</div>`;
+    else h += bronnen.map(b => {
+      const label = esc((b.author ? b.author + ' — ' : '') + (b.title || 'bron #' + b.id));
+      return `<div class="bron-optie" data-label="${label}" onclick="kiesBron('${fid}',${b.id},this.dataset.label)">${label}</div>`;
+    }).join('');
+    lijst.innerHTML = h;
+    lijst.style.display = '';
+  }, 200);
 }
+function kiesBron(fid, val, label) {
+  document.getElementById(fid + '-src').value = val;
+  const inp = document.getElementById(fid + '-bronzoek');
+  const lijst = document.getElementById(fid + '-bronlijst');
+  const blok = document.getElementById(fid + '-nieuwbron');
+  if (val === '__new__') { if (inp) inp.value = ''; if (blok) blok.style.display = ''; }
+  else { if (inp) inp.value = label || ''; if (blok) blok.style.display = 'none'; }
+  if (lijst) { lijst.style.display = 'none'; lijst.innerHTML = ''; }
+}
+// Klik buiten het zoekveld sluit de resultatenlijst.
+document.addEventListener('click', e => {
+  if (e.target.closest('.bronkies')) return;
+  document.querySelectorAll('.bron-resultaten').forEach(l => { l.style.display = 'none'; });
+});
 function formHtml(opts) {
   const fid = 'f' + Math.random().toString(36).slice(2, 8);
   const reply = !!opts.parent_argument_id;
-  // Bezwaar-modus = het 'logica klopt niet'-verdict: vast op contradicting, onderbouwing
-  // verplicht. Dit wordt een ondergraving die de score van het argument hierboven dempt.
-  const bezwaar = opts.verdict === 'bezwaar';
+  // Kruimelpad: maakt de plek in de boom expliciet — je hangt een tak onder dít argument.
+  const parentArg = reply ? (ARG_BY_ID.get(opts.parent_argument_id) || {}) : null;
+  const kruimel = parentArg ? `<div class="reply-kruimel">↳ je reageert op <b>«${esc((parentArg.claim || '').slice(0, 100))}${(parentArg.claim || '').length > 100 ? '…' : ''}»</b></div>` : '';
+  // Eén consistente positiekeuze (Voor/Tegen/Context), root én reply. Bij een reply staat de
+  // positie voorgekozen uit de knop waarmee je hier kwam (Reageer→Voor, '✗ Logica klopt niet'
+  // →Tegen) en kun je nog wisselen; − Tegen is de ondergraving en vereist onderbouwing.
+  const pre = reply ? (opts.stance || 'supporting') : null;
+  const stKnop = (st, cls, lbl) => `<button type="button" class="${pre === st ? cls : ''}" onclick="kiesStance('${fid}','${st}',this)">${lbl}</button>`;
   return `<div class="form" id="${fid}" data-target='${JSON.stringify(opts).replace(/'/g, "&#39;")}'>
-    <h4>${bezwaar ? '✗ Logica klopt niet — onderbouw je bezwaar' : reply ? 'Reageer op dit argument' : 'Nieuw argument'}</h4>
-    ${bezwaar
-      ? `<div class="stance-kies" id="${fid}-st" data-stance="contradicting">
-           <button type="button" class="sel-con" disabled>− Tegen (ondergraving)</button>
-         </div>
-         <div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px">Dempt de kracht van
-           het argument hierboven tot het bezwaar is <b>opgelost</b>. De auteur kan verbeteren;
-           daarna beoordeel jij opnieuw.</div>`
-      : `<div class="stance-kies" id="${fid}-st">
-           <button type="button" onclick="kiesStance('${fid}','supporting',this)">+ Voor</button>
-           <button type="button" onclick="kiesStance('${fid}','contradicting',this)">− Tegen</button>
-           <button type="button" onclick="kiesStance('${fid}','contextual',this)">~ Context</button>
-         </div>`}
+    <h4>${reply ? 'Reageer op dit argument' : 'Nieuw argument'}</h4>
+    ${kruimel}
+    <div class="stance-kies" id="${fid}-st"${pre ? ` data-stance="${pre}"` : ''}>
+      ${stKnop('supporting', 'sel-sup', '+ Voor')}
+      ${stKnop('contradicting', 'sel-con', '− Tegen')}
+      ${stKnop('contextual', 'sel-ctx', '~ Context')}
+    </div>
+    ${reply ? `<div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px"><b>− Tegen</b> = ‘logica klopt niet’: een onderbouwd bezwaar dat de kracht van dit argument dempt tot het is <b>opgelost</b>.</div>` : ''}
     <label>Bewering *</label>
-    <input type="text" id="${fid}-claim" placeholder="${bezwaar ? 'Korte samenvatting van je bezwaar' : reply ? 'Wat klopt er wel/niet aan het argument hierboven?' : 'De kernbewering, kort en bondig'}">
-    <label>Onderbouwing${bezwaar ? ' * (benoem precies wat er niet deugt)' : reply ? ' (bij − Tegen verplicht: benoem de aangevochten stap)' : ''}</label>
+    <input type="text" id="${fid}-claim" placeholder="${reply ? 'De kern van je reactie, kort en bondig' : 'De kernbewering, kort en bondig'}">
+    <label>Onderbouwing${reply ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht bij − Tegen)</span>' : ''}</label>
     <textarea id="${fid}-reason" placeholder="Redenering of toelichting"></textarea>
     ${reply ? '' : `<div class="rij2">
       <div><label>Eigenschap (optioneel)</label>
@@ -725,7 +799,13 @@ function formHtml(opts) {
         <input type="text" id="${fid}-propval" placeholder="bv. 0.1"></div>
     </div>`}
     <div class="rij2">
-      <div><label>Bron (citaat)</label><select id="${fid}-src" onchange="toggleNieuweBron('${fid}')">${bronOpties(true)}</select></div>
+      <div><label>Bron (citaat)</label>
+        <div class="bronkies" data-metnieuw="1">
+          <input type="hidden" id="${fid}-src" value="">
+          <input type="text" id="${fid}-bronzoek" autocomplete="off" placeholder="Zoek op titel of auteur, of voeg een bron toe…"
+                 oninput="zoekBron('${fid}')" onfocus="zoekBron('${fid}')">
+          <div class="bron-resultaten" id="${fid}-bronlijst" style="display:none"></div>
+        </div></div>
       <div><label>Citaat</label><input type="text" id="${fid}-quote" placeholder="Letterlijk citaat uit de bron"></div>
     </div>
     <div id="${fid}-nieuwbron" style="display:none;border:1px dashed var(--border);border-radius:6px;padding:8px;margin-top:6px">
@@ -733,25 +813,24 @@ function formHtml(opts) {
         <div><label>Titel nieuwe bron *</label><input type="text" id="${fid}-ntitel" placeholder="bv. WRR — Aandacht voor media"></div>
         <div><label>Brontype</label><select id="${fid}-ntype">${SOURCE_TYPE_OPTS.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">De bron landt meteen als bibliografische referentie; een reviewer classificeert betrouwbaarheid/onderwerp later (tab <b>Bronnen</b>). Vindplaats toevoegen kan daarna.</div>
+      <div style="margin-top:6px"><label>URL / vindplaats (optioneel)</label><input type="text" id="${fid}-nurl" placeholder="https://… — maakt de bron klikbaar en verifieerbaar"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">De bron landt meteen als bibliografische referentie; een reviewer classificeert betrouwbaarheid/onderwerp later (tab <b>Bronnen</b>). Een vindplaats (URL) maakt het citaat meteen verifieerbaar; toevoegen kan ook later.</div>
     </div>
-    <div style="margin-top:12px"><button class="prim" onclick="verstuur('${fid}')">${bezwaar ? 'Bezwaar indienen' : 'Indienen als voorstel'}</button>
+    <div style="margin-top:12px"><button class="prim" onclick="verstuur('${fid}')">Indienen als voorstel</button>
       ${reply ? `<button onclick="document.getElementById('${fid}').remove()">Annuleren</button>` : ''}</div>
     <div class="melding" id="${fid}-msg"></div>
   </div>`;
 }
-function toonReply(argId, verdict) {
+// Open/wissel/sluit de reageer-composer in de reply-slot. Zelfde positie nogmaals = sluiten;
+// een andere positie (bv. via '✗ Logica klopt niet' → contradicting) = wisselen. Eén composer,
+// altijd dezelfde Voor/Tegen/Context-keuze — alleen de voorgekozen positie verschilt.
+function toonReply(argId, stance) {
   const slot = document.getElementById('reply-' + argId);
   if (!slot) return;
-  if (slot.firstChild) { slot.innerHTML = ''; return; }
-  slot.innerHTML = formHtml({ parent_argument_id: argId, verdict: verdict || null });
-}
-// 'Logica klopt niet' → het bezwaarformulier (vast op contradicting, reden verplicht).
-function toonBezwaar(argId) {
-  if (!ME) { alert('Log in om een bezwaar in te dienen.'); return; }
-  const slot = document.getElementById('reply-' + argId);
-  if (slot && slot.firstChild) { slot.innerHTML = ''; return; }
-  if (slot) slot.innerHTML = formHtml({ parent_argument_id: argId, verdict: 'bezwaar' });
+  stance = stance || 'supporting';
+  if (slot.firstChild && slot.dataset.stance === stance) { slot.innerHTML = ''; slot.dataset.stance = ''; return; }
+  slot.dataset.stance = stance;
+  slot.innerHTML = formHtml({ parent_argument_id: argId, stance });
 }
 // Resolutielus op een ondergraving (server bewaakt wie wat mag).
 async function bezwaarActieO(id, actie) {
@@ -781,7 +860,13 @@ function formBewerk(argId, modus) {
     <label>Onderbouwing</label>
     <textarea id="${fid}-reason">${esc(a.reasoning || '')}</textarea>
     <div class="rij2">
-      <div><label>Bron vervangen (optioneel)</label><select id="${fid}-src">${bronOpties()}</select></div>
+      <div><label>Bron vervangen (optioneel)</label>
+        <div class="bronkies" data-metnieuw="0">
+          <input type="hidden" id="${fid}-src" value="">
+          <input type="text" id="${fid}-bronzoek" autocomplete="off" placeholder="Zoek een bron om te vervangen…"
+                 oninput="zoekBron('${fid}')" onfocus="zoekBron('${fid}')">
+          <div class="bron-resultaten" id="${fid}-bronlijst" style="display:none"></div>
+        </div></div>
       <div><label>Citaat</label><input type="text" id="${fid}-quote" placeholder="laat leeg = citaten ongewijzigd"></div>
     </div>
     <div style="margin-top:10px">
@@ -867,15 +952,17 @@ async function verstuur(fid) {
     // Nieuwe bron eerst aanmaken (landt meteen als referentie; classificeren is later reviewer-werk).
     const ntitel = (document.getElementById(fid + '-ntitel')?.value || '').trim();
     const ntype = document.getElementById(fid + '-ntype')?.value || 'overig';
+    const nurl = (document.getElementById(fid + '-nurl')?.value || '').trim();
     if (!ntitel) { msg.innerHTML = '<span style="color:#e0635f">Titel van de nieuwe bron is verplicht.</span>'; return; }
+    const nbody = { title: ntitel, source_type: ntype };
+    if (nurl) nbody.location = { type: 'url', value: nurl };
     msg.textContent = 'Bron aanmaken…';
     try {
       const br = await fetch('/api/sources', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: ntitel, source_type: ntype }) });
+        body: JSON.stringify(nbody) });
       const bj = await br.json().catch(() => ({}));
       if (!br.ok) { msg.innerHTML = `<span style="color:#e0635f">${esc(bj.error || 'bron aanmaken mislukt')}</span>`; return; }
       citations = [{ source_id: bj.id, quote: quote || null }];
-      try { BRONNEN = await (await fetch('/api/sources')).json(); } catch (e) {}  // cache verversen
     } catch (e) { msg.innerHTML = `<span style="color:#e0635f">Netwerkfout: ${esc(e.message)}</span>`; return; }
   } else if (src) {
     citations = [{ source_id: parseInt(src, 10), quote: quote || null }];
@@ -1132,14 +1219,26 @@ function tekenVoorstellen() {
 function rendModEntiteit(e) {
   // Rol-keuze bij goedkeuren: voorkomt het "goedgekeurd zonder rol"-gat (KOPPEL-ENT-ROL).
   // Optioneel; het zetten zelf vereist maintainer (PATCH /api/entities/<id>).
-  const opties = ['<option value="">— rol toekennen (optioneel) —</option>']
-    .concat((ROLLEN || []).map(r => `<option value="${r.id}">${esc(r.name)} · ${esc(r.category)}</option>`)).join('');
+  // Heeft de entiteit al een rol (bv. vooraf gezet), dan tonen we die en betekent het
+  // lege item "ongewijzigd laten" i.p.v. "geen rol". De primaire FILTER tonen we hier
+  // bewust niet: die is afgeleid/dynamisch (argmax over de relaties), niet statisch.
+  const huidige = e.primary_role_id || null;
+  const leegLabel = huidige ? '— rol ongewijzigd laten —' : '— rol toekennen (optioneel) —';
+  // Alleen de rolnaam — bewust GÉÉN rol-categorie ('· sourcing' e.d.). De propagandafilter
+  // van een entiteit is afgeleid/dynamisch (argmax Σ certainty×influence over haar bron-
+  // relaties), niet vastgepind door de rol. De rol is enkel een handvat/fallback.
+  const opties = [`<option value="">${leegLabel}</option>`]
+    .concat((ROLLEN || []).map(r => `<option value="${r.id}">${esc(r.name)}</option>`)).join('');
+  const huidigeTekst = huidige
+    ? `<div style="font-size:12px;color:var(--text-dim);margin:2px 0">huidige rol: <b>${esc(e.role_name || ('#' + huidige))}</b></div>`
+    : '';
   return `<div class="kaart"><div class="soort">entiteit · #${e.id}${e.type ? ' · ' + esc(e.type) : ''}</div>` +
     `<h3 style="font-size:14px">${esc(e.name)}</h3>` +
     (e.description ? `<div class="vwaarde" style="margin:4px 0">${esc(e.description)}</div>` : '') +
     `<div class="meta"><span>door <b>${esc(e.ingediend_door || '?')}</b></span><span>${esc((e.created_at || '').slice(0, 16))}</span></div>` +
+    huidigeTekst +
     `<div style="margin:6px 0"><label style="font-size:12px;color:var(--text-dim)">Rol: ` +
-    `<select id="rol-${e.id}" style="font-size:12px;padding:2px 4px;max-width:230px">${opties}</select></label></div>` +
+    `<select id="rol-${e.id}" data-huidig="${huidige || ''}" style="font-size:12px;padding:2px 4px;max-width:230px">${opties}</select></label></div>` +
     `<div class="acties"><button class="akkoord" onclick="modereerEntiteit(${e.id})">Goedkeuren</button>` +
     `<button class="afwijzen" onclick="modereer('entities',${e.id},'afgewezen')">Afwijzen</button>` +
     `<span class="uitslag" id="mod-entities-${e.id}-uit"></span></div></div>`;
@@ -1179,9 +1278,13 @@ async function modereerEntiteit(id) {
   const uit = document.getElementById(`mod-entities-${id}-uit`);
   const sel = document.getElementById(`rol-${id}`);
   const rolId = sel && sel.value ? parseInt(sel.value, 10) : null;
+  const huidig = sel ? sel.getAttribute('data-huidig') : '';
+  // Alleen PATCHen als de rol echt verandert; een no-op zou 400 "geen gewijzigd veld"
+  // geven en het goedkeuren onterecht afbreken.
+  const rolWijzigt = rolId && String(rolId) !== huidig;
   uit.textContent = 'Bezig…';
   try {
-    if (rolId) {
+    if (rolWijzigt) {
       const rr = await fetch(`/api/entities/${id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ primary_role_id: rolId }),
@@ -1197,7 +1300,7 @@ async function modereerEntiteit(id) {
     });
     const j = await resp.json();
     if (!resp.ok) { uit.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
-    uit.innerHTML = `<span style="color:#3ddc84">goedgekeurd${rolId ? ' + rol gezet' : ''}. Ververs de viz (knop in de topbar).</span>`;
+    uit.innerHTML = `<span style="color:#3ddc84">goedgekeurd${rolWijzigt ? ' + rol gezet' : ''}. Ververs de viz (knop in de topbar).</span>`;
     setTimeout(() => { laadVoorstellen(); laadVoorstellenBadge(); }, 1000);
   } catch (e) { uit.textContent = 'Netwerkfout: ' + e.message; }
 }

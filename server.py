@@ -823,6 +823,28 @@ def create_argument():
             conn.close()
             return jsonify({"error": f"Bron {c['source_id']} bestaat niet"}), 400
 
+    # Bronplicht (HARDE poort): een EVIDENTIEEL ondersteunend/weerleggend ROOT-argument
+    # vereist bij creatie minstens één ECHTE bron — een citaat met quote, óf een bron met
+    # vindplaats (source_locations). Een kale titel-stub telt niet. Vroeger was dit een zachte
+    # poort bij merge (→ bronvermelding_nodig, score-straf); nu blokkeert de API onbronnde
+    # claims zodat ze het model niet eens binnenkomen.
+    #   Wél bron nodig: gewoon bewijs (geen property) en invloed-bewijs (property='influence').
+    #   Vrijgesteld (interpretatie/structuur, geen extern bewijs): classificatie-aspecten
+    #   (property='filter'/'mechanism'), compositie- en padclaims ('compositie'/'indirecte_invloed_op'),
+    #   contextual-roots, en replies/ondergravingen ('logica klopt niet' — parent_id gezet).
+    evidentieel = prop in (None, "influence")
+    if parent_id is None and stance in ("supporting", "contradicting") and evidentieel:
+        heeft_echte_bron = any(
+            bool((c.get("quote") or "").strip()) or conn.execute(
+                "SELECT 1 FROM source_locations WHERE source_id = ?", (c["source_id"],)).fetchone()
+            for c in citaties)
+        if not heeft_echte_bron:
+            conn.close()
+            return jsonify({"error": "Bron verplicht: een ondersteunend of weerleggend "
+                                     "root-argument vereist minstens één echte bron — een citaat "
+                                     "met quote, óf een bron met vindplaats (locator). Geef die mee "
+                                     "in 'citations' (source_id + quote, of een bron met url/doi/…)."}), 400
+
     # Classificatie-aspect 'mechanism': de voorgestelde mechanisme-ID moet bestaan.
     if prop == "mechanism" and not conn.execute(
             "SELECT 1 FROM mechanisms WHERE id = ?", (int(prop_value),)).fetchone():
@@ -1343,11 +1365,30 @@ def argument_score_diff(arg_id):
 
 @app.route("/api/sources")
 def get_sources():
-    """Lijst van alle bronnen (voor citaat-selectie)."""
-    conn = get_db()
-    rows = conn.execute("""SELECT s.id, s.title, s.author, s.source_type, s.reliability, s.onderwerp,
+    """Lijst van bronnen (voor citaat-selectie).
+
+    Optioneel ``?q=`` filtert op titel/auteur en ``?limit=`` kapt de uitvoer af —
+    samen vormen ze de typeahead-zoekopdracht, zodat het bron-kiesveld nooit
+    duizenden opties hoeft te renderen. Zonder ``q`` blijft het de volledige lijst
+    (de Bronnen-tab heeft die nog nodig)."""
+    q = (request.args.get("q") or "").strip()
+    try:
+        limit = int(request.args.get("limit", 0))
+    except ValueError:
+        limit = 0
+    sql = ["""SELECT s.id, s.title, s.author, s.source_type, s.reliability, s.onderwerp,
         EXISTS(SELECT 1 FROM source_locations l WHERE l.source_id = s.id) AS heeft_locator
-        FROM sources s ORDER BY s.author""").fetchall()
+        FROM sources s"""]
+    params = []
+    if q:
+        sql.append("WHERE s.title LIKE ? OR s.author LIKE ?")
+        params += [f"%{q}%", f"%{q}%"]
+    sql.append("ORDER BY s.author")
+    if limit > 0:
+        sql.append("LIMIT ?")
+        params.append(limit)
+    conn = get_db()
+    rows = conn.execute(" ".join(sql), params).fetchall()
     conn.close()
     uit = []
     for r in rows:
@@ -1722,6 +1763,12 @@ def create_relation():
 
     certainty = clamp01(data.get("certainty"))
     influence = clamp01(data.get("influence"))
+    # Guilty-until-proven: een relatie zonder opgegeven influence krijgt de
+    # "magnitude-onbekend"-vloer (0.05), niet NULL. NULL gaf derived_influence 0 →
+    # gewicht 0 in scoring én de tijdbewuste kleur. De vloer houdt de topologie meetbaar;
+    # boven de vloer komen vereist een property='influence'-argument (INVLOED-PRIOR).
+    if influence is None:
+        influence = 0.05
 
     conn = get_db()
     for label, eid in (("Bron", source_id), ("Doel", target_id)):
@@ -2475,9 +2522,22 @@ def _maintainer_patch(element_type):
                 return jsonify({"error": f"rol {nieuw_rid} is vervangen; kies de opvolger"}), 400
         if nieuw_rid != rij["primary_role_id"]:
             diff["primary_role_id"] = {"oud": rij["primary_role_id"], "nieuw": nieuw_rid}
+    # Temporele velden (active_from/active_until) mag een maintainer (her)zetten op
+    # elementen die ze dragen (entiteit/relatie/rol/mechanisme). Zonder dit pad is er
+    # géén manier om een bestaande band te dateren — terwijl de timeline-/tijdbewuste
+    # kleur dat juist nodig heeft. NULL/"" = datum wissen; vrije tekst (jaar of datum),
+    # consistent met de bestaande seed-data.
+    if element_type in ("entiteit", "relatie", "rol", "mechanisme"):
+        for kol in ("active_from", "active_until"):
+            if kol in d:
+                raw = d.get(kol)
+                nieuw = None if raw in (None, "", 0, "0") else str(raw).strip()
+                if nieuw != (rij[kol] if rij[kol] not in ("",) else None):
+                    diff[kol] = {"oud": rij[kol], "nieuw": nieuw}
     if not diff:
         conn.close()
-        velden_hint = toegestaan + (["primary_role_id"] if element_type == "entiteit" else [])
+        velden_hint = toegestaan + (["primary_role_id"] if element_type == "entiteit" else []) \
+            + (["active_from", "active_until"] if element_type in ("entiteit", "relatie", "rol", "mechanisme") else [])
         return jsonify({"error": f"geen gewijzigd veld (toegestaan: {velden_hint})"}), 400
     if "name" in diff and voorstellen._naam_bestaat(conn, element_type, diff["name"]["nieuw"]):
         conn.close()
@@ -3020,8 +3080,11 @@ def review_queue():
     # te tonen zou een reviewer ze nergens kunnen vinden. Goedkeuren/afwijzen loopt via
     # /api/entities|relations/<id>/status (zie _modereer).
     entiteiten = []
-    for e in conn.execute("""SELECT id, name, type, description, created_at
-                             FROM entities WHERE status = 'voorgesteld' ORDER BY id"""):
+    for e in conn.execute("""SELECT e.id, e.name, e.type, e.description, e.created_at,
+                                    e.primary_role_id, ro.name AS role_name
+                             FROM entities e
+                             LEFT JOIN roles ro ON ro.id = e.primary_role_id
+                             WHERE e.status = 'voorgesteld' ORDER BY e.id"""):
         e = dict(e)
         e["ingediend_door"] = _creator_van(conn, "entities", e["id"])
         entiteiten.append(e)

@@ -360,6 +360,13 @@ details.detail-section > .sec-body { margin-top: 8px; }
 }
 .arg-node.root { margin-left: 0; border-left: none; }
 .arg-node.depth-0 { border-left: none; margin-left: 0; }
+/* Boomstructuur: de reacties van één argument delen één verticale ruggengraat (op de
+   .arg-children-container) met een tak-connector per reactie — zo leest de discussie als
+   een boom en is zichtbaar dat 'reageren' een tak toevoegt. */
+.arg-children { margin-top: 4px; margin-left: 7px; border-left: 2px solid var(--border); }
+.arg-children > .arg-node { margin-left: 10px; border-left: none; }
+.arg-children > .arg-node::before { content: ''; position: absolute; left: -10px; top: 15px;
+  width: 9px; height: 2px; background: var(--border); }
 
 .arg-node .arg-header {
   /* flex-start + wrap: een lang property-chipje duwt de claim naar een eigen
@@ -398,8 +405,6 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .arg-citation .cite-quote { font-style: italic; color: var(--text-dim); }
 .arg-citation .cite-klasse { font-size: 9px; padding: 0 5px; border-radius: 3px; background: rgba(108,138,255,0.10); color: var(--text-muted); white-space: nowrap; }
 
-.arg-children { margin-top: 4px; }
-
 .arg-toggle {
   background: none; border: none; color: var(--text-muted); cursor: pointer;
   font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 4px;
@@ -437,6 +442,20 @@ details.detail-section > .sec-body { margin-top: 8px; }
 }
 .arg-form textarea { resize: vertical; min-height: 50px; }
 .arg-form select { appearance: auto; }
+.arg-form .bronkies { position: relative; }
+.arg-form .bron-resultaten {
+  position: absolute; z-index: 50; left: 0; right: 0; margin-top: 2px;
+  background: #1a1a28; border: 1px solid var(--border-light); border-radius: 6px;
+  max-height: 220px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+}
+.arg-form .bron-optie {
+  padding: 7px 10px; font-size: 12px; cursor: pointer; color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.arg-form .bron-optie:last-child { border-bottom: none; }
+.arg-form .bron-optie:hover { background: rgba(255,255,255,0.08); }
+.arg-form .bron-optie.nieuw { color: var(--accent); font-weight: 600; }
+.arg-form .bron-leeg { padding: 7px 10px; font-size: 11px; color: var(--text-muted); }
 .arg-form .field-hint {
   font-size: 10px; color: var(--text-muted); margin-top: 3px;
   text-transform: none; letter-spacing: 0; font-weight: 400; line-height: 1.3;
@@ -478,6 +497,25 @@ details.detail-section > .sec-body { margin-top: 8px; }
   font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 2px;
 }
 .reply-btn:hover { background: var(--bg-hover); color: var(--accent); }
+/* oordeel-paar: ✓ Logica klopt / ✗ Logica klopt niet — gebalanceerd, samen, even zwaar */
+.oordeel-rij { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.oordeel { font-size: 10px; padding: 1px 8px; border-radius: 9px; border: 1px solid var(--border);
+  text-decoration: none; white-space: nowrap; }
+.oordeel.knop { cursor: pointer; }
+.oordeel.eens { color: #2ecc71; border-color: rgba(46,204,113,0.32); }
+.oordeel.eens.knop:hover, .oordeel.eens.aan { background: rgba(46,204,113,0.14); }
+.oordeel.oneens { color: #e74c3c; border-color: rgba(231,76,60,0.32); }
+.oordeel.oneens.knop:hover { background: rgba(231,76,60,0.14); }
+.oordeel.stat { opacity: 0.7; }
+/* reageer-knop: één neutrale, accent-getinte actie, los van het oordeel-paar */
+.reageer-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.reageer-knop { background: none; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent); cursor: pointer; font-size: 10px; padding: 2px 10px; border-radius: 9px; }
+.reageer-knop:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.reageer-knop.bron { border-color: var(--border); color: var(--text-muted); }
+.reageer-knop.bron:hover { background: var(--bg-hover); color: var(--text); }
+.reply-kruimel { font-size: 10px; color: var(--text-muted); margin: 2px 0 8px; line-height: 1.4; }
+.reply-kruimel b { color: var(--text-dim); font-weight: 600; }
 
 .form-message {
   font-size: 11px; padding: 6px 8px; border-radius: 4px; margin-top: 6px;
@@ -879,7 +917,6 @@ const pathClaims = {};      // 'bronRolId>doelRolId' → [root arguments]: eindc
                             // afgeleide pijl als geheel onderbouwen (property 'indirecte_invloed_op')
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
-let SOURCES_CACHE = null;   // [{id,title,author,...}] — lui geladen via /api/sources
 let bridgingStatus = null;  // M2.5: wanneer telt een rating mee in de score? (lui via /api/bridging)
 const SOURCE_TYPES = ['boek','academisch_artikel','rapport','nieuwsartikel','transcript',
                       'interview','dataset','wetgeving','persbericht','website','overig'];
@@ -1104,9 +1141,14 @@ function renderArgNode(arg, depth) {
     html += '</div>';
   }
 
-  // Reageer-knop en slot (het reply-formulier erft de doelen van de parent via argsById)
-  html += `<button class="reply-btn" onclick="showReplyForm(${arg.id})">↩ Reageer</button>`;
-  html += `<button class="reply-btn" onclick="showCitationForm(${arg.id})" title="Een bron/citaat aan dit argument hangen (ook bij andermans argument)">+ bron</button>`;
+  // Reageer-balk: drie expliciete 'moves' i.p.v. één vage 'Reageer'-knop. Elke reactie is
+  // een TAK in de boom — aanvullen (+) en nuanceren (~) bouwen voort op het argument,
+  // weerleggen (✗) is de ondergraving die de kracht dempt tot ze is opgelost. Het reply-
+  // formulier erft de doelen van de parent via argsById.
+  html += `<div class="reageer-bar">
+    <button class="reageer-knop" onclick="showReplyForm(${arg.id}, 'supporting')" title="Reageer op dit argument — kies Voor, Tegen of Context">↩ Reageer</button>
+    <button class="reageer-knop bron" onclick="showCitationForm(${arg.id})" title="Een bron/citaat aan dit argument hangen (ook bij andermans argument)">+ bron</button>
+  </div>`;
   html += `<div id="cite-slot-${arg.id}"></div>`;
   html += `<div id="reply-slot-${arg.id}"></div>`;
 
@@ -1141,11 +1183,14 @@ function ratingRegel(arg, telling) {
   const nuttig = rt ? (rt.mens.nuttig + (rt.agent.nuttig ? `+${rt.agent.nuttig}` : '')) : 0;
   const eigen = authUser && arg.contributed_by === authUser.username;
   const actief = (arg.mijn_oordeel === 'nuttig');
-  const klopt = eigen
-    ? `<span style="color:var(--text-muted)" title="je beoordeelt eigen werk niet">✓ Logica klopt${nuttig ? ` (${nuttig})` : ''}</span>`
-    : `<a href="#" style="color:#2ecc71${actief ? ';font-weight:700' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">${actief ? '✓ ' : ''}Logica klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
-  const kloptNiet = `<a href="#" style="color:#e74c3c" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM de logica/het argument niet deugt. Wordt een ondergraving die de score van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</a>`;
-  return `${klopt} <span style="color:var(--text-muted)">·</span> ${kloptNiet}`;
+  // Gebalanceerd oordeel-paar (samen, even zwaar): ✓ = lichte endorsement (rating);
+  // ✗ = onderbouwd bezwaar → opent dezelfde reageer-composer met '− Tegen' voorgekozen
+  // (een ondergraving die de kracht dempt tot ze is opgelost).
+  const eens = eigen
+    ? `<span class="oordeel eens stat" title="je beoordeelt eigen werk niet">✓ Logica klopt${nuttig ? ` (${nuttig})` : ''}</span>`
+    : `<a href="#" class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">✓ Logica klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
+  const oneens = `<a href="#" class="oordeel oneens knop" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</a>`;
+  return `<span class="oordeel-rij">${eens}${oneens}</span>`;
 }
 
 // De resolutielus van een ONDERGRAVING: badge + overgangsknoppen. Auteur van het
@@ -1211,26 +1256,54 @@ async function rateArgument(argId, oordeel) {
 // ============================================================
 
 // ── Bronnen & citaten ───────────────────────────────────────
-// De bronnenlijst wordt lui geladen en gecached; na het aanmaken van een nieuwe
-// bron schuift die er meteen bij, zodat open keuzemenu's kloppen.
-async function loadSources(force) {
-  if (SOURCES_CACHE && !force) return SOURCES_CACHE;
-  try {
-    const resp = await fetch('/api/sources');
-    SOURCES_CACHE = resp.ok ? await resp.json() : [];
-  } catch (e) { SOURCES_CACHE = SOURCES_CACHE || []; }
-  return SOURCES_CACHE;
-}
 
 function escAttr(s) { return String(s == null ? '' : s).replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
-function sourceOptionsHtml(selectedId) {
-  const opts = (SOURCES_CACHE || []).map(s => {
-    const label = `${s.author ? s.author + ' — ' : ''}${s.title}`;
-    return `<option value="${s.id}"${String(s.id) === String(selectedId) ? ' selected' : ''}>${escAttr(label)}</option>`;
-  }).join('');
-  return `<option value="">— geen bron —</option>${opts}<option value="__new__">— nieuwe bron —</option>`;
+// Bron-typeahead: i.p.v. één dropdown met álle bronnen (schaalt niet naar duizenden)
+// zoeken we serverzijdig op titel/auteur via /api/sources?q=. Het verborgen veld
+// `${formId}-source` houdt de keuze ('' / '__new__' / id) zodat resolveSourceId
+// ongewijzigd blijft. "+ nieuwe bron toevoegen" staat altijd bovenaan.
+const _bronZoekTimer = {};
+function zoekBron(formId) {
+  const inp = document.getElementById(formId + '-source-zoek');
+  const lijst = document.getElementById(formId + '-source-lijst');
+  if (!inp || !lijst) return;
+  document.getElementById(formId + '-source').value = '';   // tekst wijzigen = keuze loslaten
+  const nw = document.getElementById(formId + '-newsource');
+  if (nw) nw.style.display = 'none';
+  const term = inp.value.trim();
+  clearTimeout(_bronZoekTimer[formId]);
+  _bronZoekTimer[formId] = setTimeout(async () => {
+    let bronnen = [];
+    if (term.length >= 2) {
+      try { bronnen = await (await fetch('/api/sources?limit=15&q=' + encodeURIComponent(term))).json(); }
+      catch (e) { bronnen = []; }
+    }
+    let h = `<div class="bron-optie nieuw" onclick="kiesBron('${formId}','__new__')">+ nieuwe bron toevoegen…</div>`;
+    if (term.length < 2) h += `<div class="bron-leeg">Typ minstens 2 letters om te zoeken…</div>`;
+    else if (!bronnen.length) h += `<div class="bron-leeg">Geen bron gevonden — voeg er een toe.</div>`;
+    else h += bronnen.map(s => {
+      const label = escAttr(`${s.author ? s.author + ' — ' : ''}${s.title}`);
+      return `<div class="bron-optie" data-label="${label}" onclick="kiesBron('${formId}',${s.id},this.dataset.label)">${label}</div>`;
+    }).join('');
+    lijst.innerHTML = h;
+    lijst.style.display = '';
+  }, 200);
 }
+function kiesBron(formId, val, label) {
+  document.getElementById(formId + '-source').value = val;
+  const inp = document.getElementById(formId + '-source-zoek');
+  const lijst = document.getElementById(formId + '-source-lijst');
+  const nw = document.getElementById(formId + '-newsource');
+  if (val === '__new__') { if (inp) inp.value = ''; if (nw) nw.style.display = ''; }
+  else { if (inp) inp.value = label || ''; if (nw) nw.style.display = 'none'; }
+  if (lijst) { lijst.style.display = 'none'; lijst.innerHTML = ''; }
+}
+// Klik buiten een bron-zoekveld sluit de resultatenlijst.
+document.addEventListener('click', e => {
+  if (e.target.closest('.bronkies')) return;
+  document.querySelectorAll('.bron-resultaten').forEach(l => { l.style.display = 'none'; });
+});
 
 // Het citaat-blok dat in elk argument-/citatieformulier hangt: kies een bestaande
 // bron of voer ter plekke een nieuwe in, plus citaat + pagina.
@@ -1239,7 +1312,13 @@ function citationFieldsHtml(formId) {
   return `
     <div class="form-row">
       <label>Bron (citaat)</label>
-      <select id="${formId}-source" onfocus="ensureSourceOptions('${formId}')" onchange="onSourceSelectChange('${formId}')">${sourceOptionsHtml('')}</select>
+      <div class="bronkies">
+        <input type="hidden" id="${formId}-source" value="">
+        <input type="text" id="${formId}-source-zoek" autocomplete="off"
+               placeholder="Zoek op titel of auteur, of voeg een bron toe…"
+               oninput="zoekBron('${formId}')" onfocus="zoekBron('${formId}')">
+        <div class="bron-resultaten" id="${formId}-source-lijst" style="display:none"></div>
+      </div>
     </div>
     <div id="${formId}-newsource" style="display:none;border-left:2px solid var(--accent);padding-left:8px;margin-bottom:6px">
       <div class="form-row"><label>Titel nieuwe bron *</label>
@@ -1256,6 +1335,8 @@ function citationFieldsHtml(formId) {
         <div style="flex:1"><label>Datum</label>
           <input type="text" id="${formId}-src-date" placeholder="2018-01-01"></div>
       </div>
+      <div class="form-row"><label>URL / vindplaats (optioneel)</label>
+        <input type="text" id="${formId}-src-url" placeholder="https://… — maakt de bron klikbaar en verifieerbaar"></div>
     </div>
     <div class="form-row" style="display:flex;gap:8px" id="${formId}-citemeta">
       <div style="flex:3"><label>Citaat (quote)</label>
@@ -1263,22 +1344,6 @@ function citationFieldsHtml(formId) {
       <div style="flex:1"><label>Pagina</label>
         <input type="text" id="${formId}-page" placeholder="bijv. 12"></div>
     </div>`;
-}
-
-function onSourceSelectChange(formId) {
-  const sel = document.getElementById(formId + '-source');
-  const nw = document.getElementById(formId + '-newsource');
-  if (nw) nw.style.display = sel && sel.value === '__new__' ? '' : 'none';
-}
-
-// Zelfhelend: als de cache pas ná het renderen geladen werd, herbouw de opties bij focus.
-async function ensureSourceOptions(formId) {
-  const warm = SOURCES_CACHE != null;
-  await loadSources();
-  if (!warm) {
-    const sel = document.getElementById(formId + '-source');
-    if (sel) { const cur = sel.value; sel.innerHTML = sourceOptionsHtml(cur); }
-  }
 }
 
 // Lost de bron-keuze op naar een source_id: maakt zo nodig eerst een nieuwe bron aan.
@@ -1296,13 +1361,14 @@ async function resolveSourceId(formId, msgEl) {
     publisher: (document.getElementById(formId + '-src-publisher').value || '').trim() || null,
     date_published: (document.getElementById(formId + '-src-date').value || '').trim() || null,
   };
+  const url = (document.getElementById(formId + '-src-url').value || '').trim();
+  if (url) body.location = { type: 'url', value: url };
   try {
     const resp = await fetch('/api/sources', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const j = await resp.json();
     if (!resp.ok) { msgEl.innerHTML = `<div class="form-message error">${j.error || 'Bron aanmaken mislukt'}</div>`; return false; }
-    await loadSources(true);  // ververs de cache zodat de bron voortaan kiesbaar is
     return { id: j.id };
   } catch (e) {
     msgEl.innerHTML = `<div class="form-message error">Netwerkfout bij bron: ${e.message}</div>`;
@@ -1363,25 +1429,37 @@ function renderArgForm(opts) {
   // kan een machineleesbaar objection_type meekrijgen (M1.8).
   const formId = 'arg-form-' + Math.random().toString(36).slice(2, 8);
   const isReply = !!opts.parent_argument_id;
-  // Bezwaar-modus: het 'logica klopt niet'-verdict. Vast op contradicting, onderbouwing
-  // verplicht — dit is de ondergraving die de score van het argument hierboven dempt.
-  const isBezwaar = opts.verdict === 'bezwaar';
-  const parentLabel = isBezwaar ? '✗ Logica klopt niet — onderbouw je bezwaar'
-                    : isReply ? 'Reageer op argument' : 'Nieuw argument';
+  const parentLabel = isReply ? 'Reageer op argument' : 'Nieuw argument';
   const sel = v => opts.property === v ? ' selected' : '';
+  // Kruimelpad: maakt de plek in de boom expliciet — je hangt een tak onder dít argument.
+  const parentArg = isReply ? (argsById.get(opts.parent_argument_id) || {}) : null;
+  const parentClaim = parentArg ? (parentArg.claim || '') : '';
+  const kruimel = parentArg
+    ? `<div class="reply-kruimel">↳ je reageert op <b>«${parentClaim.slice(0, 100)}${parentClaim.length > 100 ? '…' : ''}»</b></div>`
+    : '';
+  // Eén consistente positiekeuze (Voor/Tegen/Context), root én reply. Bij een reply staat de
+  // positie voorgekozen uit de knop waarmee je hier kwam (↩ Reageer→Voor, '✗ Logica klopt niet'
+  // →Tegen) en kun je nog wisselen; − Tegen is de ondergraving en vereist onderbouwing.
+  const replyStance = opts.stance || 'supporting';
 
-  const stanceHint = isReply
-    ? `<b>+ Voor</b> versterkt het argument hierboven; <b>− Tegen</b> ondergraaft het
-       (“de redenering deugt niet” — een logisch gat aanwijzen volstaat, een tegenbron
-       hoeft niet). Tegenbewijs voor de relatie/het element zelf hoort als nieuw
-       root-argument, niet als reactie.`
-    : `Elk argument landt als <b>voorstel</b> (M2.2) en telt pas mee nadat een
+  const stanceHint = `Elk argument landt als <b>voorstel</b> (M2.2) en telt pas mee nadat een
        reviewer het merget. Voeg een citaat toe (alleen context mag bronloos):
        zonder bron telt het na de merge nauwelijks mee.`;
 
+  // Eén picker voor alles. Bij een reply staat de positie voorgekozen.
+  const pickBtn = (st, cls, lbl, tip) => `<button type="button"${isReply && replyStance === st ? ` class="${cls}"` : ''} onclick="pickStance('${formId}','${st}',this)" title="${tip}">${lbl}</button>`;
+  const stancePicker = `<div class="stance-picker" id="${formId}-stance"${isReply ? ` data-stance="${replyStance}"` : ''}>
+          ${pickBtn('supporting', 'selected-sup', '+ Voor', 'Ondersteunend')}
+          ${pickBtn('contradicting', 'selected-con', '− Tegen', 'Weerleggend — ‘logica klopt niet’')}
+          ${pickBtn('contextual', 'selected-ctx', '~ Context', 'Nuancerend')}
+        </div>
+        <div class="field-hint">${isReply ? '<b>− Tegen</b> = ‘logica klopt niet’: een onderbouwd bezwaar dat de kracht van dit argument dempt tot het is <b>opgelost</b>.' : stanceHint}</div>`;
+
+  // Reply → een (verberg-/toonbaar) type-ondergravingveld, alleen zinvol bij − Tegen.
+  // Root → het eigenschap/waarde-paar.
   const propertyRows = isReply ? `
-      <div class="form-row">
-        <label>Type ondergraving (bij − Tegen, optioneel)</label>
+      <div class="form-row" id="${formId}-objrow" style="display:${replyStance === 'contradicting' ? '' : 'none'}">
+        <label>Type ondergraving (optioneel, bij − Tegen)</label>
         <select id="${formId}-objection">
           <option value="">— geen / n.v.t. —</option>
           ${Object.entries(OBJECTION_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
@@ -1415,29 +1493,18 @@ function renderArgForm(opts) {
   return `
     <div class="arg-form" id="${formId}">
       <h5>${parentLabel}</h5>
+      ${kruimel}
       <div class="form-row">
         <label>Positie</label>
-        ${isBezwaar
-          ? `<div class="stance-picker" id="${formId}-stance" data-stance="contradicting">
-               <button type="button" class="selected-con" disabled>− Tegen (ondergraving)</button>
-             </div>
-             <div class="field-hint">Je geeft aan dat de redenering of het argument niet
-               deugt. Dit dempt de kracht van het argument hierboven tot het bezwaar is
-               <b>opgelost</b>. De auteur kan verbeteren; daarna beoordeel jij opnieuw.</div>`
-          : `<div class="stance-picker" id="${formId}-stance">
-               <button type="button" onclick="pickStance('${formId}','supporting',this)" title="Ondersteunend">+ Voor</button>
-               ${isReply ? '' : `<button type="button" onclick="pickStance('${formId}','contradicting',this)" title="Weerleggend">− Tegen</button>`}
-               <button type="button" onclick="pickStance('${formId}','contextual',this)" title="Nuancerend">~ Context</button>
-             </div>
-             <div class="field-hint">${isReply ? 'Een reactie hier <b>steunt</b> of <b>nuanceert</b> het argument. Oneens met de logica? Gebruik <b>✗ Logica klopt niet</b> — dat wordt een onderbouwd bezwaar.' : stanceHint}</div>`}
+        ${stancePicker}
       </div>
       <div class="form-row">
         <label>Bewering *</label>
-        <input type="text" id="${formId}-claim" placeholder="${isBezwaar ? 'Korte samenvatting van je bezwaar' : isReply ? 'Wat klopt er wel/niet aan het argument hierboven?' : 'De kernbewering, kort en bondig'}">
+        <input type="text" id="${formId}-claim" placeholder="${isReply ? 'De kern van je reactie, kort en bondig' : 'De kernbewering, kort en bondig'}">
       </div>
       <div class="form-row">
-        <label>Onderbouwing${isBezwaar ? ' *' : ''}</label>
-        <textarea id="${formId}-reasoning" placeholder="${isBezwaar ? 'Verplicht: benoem precies wat er niet deugt aan de redenering of het argument' : isReply ? 'Benoem exact de aangevochten redeneerstap (verplicht bij ondergraving)' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
+        <label>Onderbouwing${isReply ? ' (verplicht bij − Tegen)' : ''}</label>
+        <textarea id="${formId}-reasoning" placeholder="${isReply ? 'Redenering of toelichting — verplicht bij − Tegen' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
       </div>
       ${propertyRows}
       ${citationFieldsHtml(formId)}
@@ -1447,7 +1514,7 @@ function renderArgForm(opts) {
       </div>
       <div class="field-hint">${authIndienHint()}</div>
       <button class="btn-submit" onclick="submitArgument('${formId}', ${JSON.stringify(opts).replace(/"/g, '&quot;')})">
-        ${isBezwaar ? 'Bezwaar indienen' : 'Argument toevoegen'}
+        Argument toevoegen
       </button>
       <button class="btn-cancel" onclick="document.getElementById('${formId}').remove()">Annuleren</button>
       <div id="${formId}-msg"></div>
@@ -1460,6 +1527,9 @@ function pickStance(formId, stance, btn) {
   const cls = stance === 'supporting' ? 'selected-sup' : stance === 'contradicting' ? 'selected-con' : 'selected-ctx';
   btn.className = cls;
   picker.dataset.stance = stance;
+  // Het type-ondergravingveld is alleen zinvol bij − Tegen (de ondergraving).
+  const objRow = document.getElementById(formId + '-objrow');
+  if (objRow) objRow.style.display = (stance === 'contradicting') ? '' : 'none';
 }
 
 async function submitArgument(formId, opts) {
@@ -1642,9 +1712,15 @@ function buildTreeFromApi(args) {
   return roots;
 }
 
-function showReplyForm(argId, verdict) {
+// Open/wissel/sluit de reageer-composer. Zelfde positie nogmaals = sluiten; een andere
+// positie (bv. via '✗ Logica klopt niet' → contradicting) = wisselen. Eén composer, altijd
+// dezelfde Voor/Tegen/Context-keuze — alleen de voorgekozen positie verschilt.
+function showReplyForm(argId, stance) {
   const container = document.getElementById('reply-slot-' + argId);
   if (!container) return;
+  stance = stance || 'supporting';
+  if (container.firstChild && container.dataset.stance === stance) { container.innerHTML = ''; container.dataset.stance = ''; return; }
+  container.dataset.stance = stance;
   // Een reactie erft de doelen van haar parent — ook theorie-doelen (rol,
   // mechanisme, emergent veld), anders weigert de server het argument.
   const parent = argsById.get(argId) || {};
@@ -1655,15 +1731,15 @@ function showReplyForm(argId, verdict) {
     mechanism_id: parent.mechanism_id || null,
     emergent_effect_id: parent.emergent_effect_id || null,
     parent_argument_id: argId,
-    verdict: verdict || null,
+    stance,
   });
   container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// 'Logica klopt niet' → het bezwaarformulier (vast op contradicting, reden verplicht).
+// '✗ Logica klopt niet' → de reageer-composer met '− Tegen' voorgekozen (onderbouwing verplicht).
 function showBezwaarForm(argId) {
   if (!authUser) { alert('Log in om een bezwaar in te dienen.'); return; }
-  showReplyForm(argId, 'bezwaar');
+  showReplyForm(argId, 'contradicting');
 }
 
 // Resolutielus op een ondergraving: auteur 'herzien' → bezwaarmaker 'opgelost'/'blijft'
@@ -1891,6 +1967,7 @@ function initTimeline() {
     // Halo-intensiteiten volgen het jaar (veld-eigenschap-mechanismen kunnen gedateerd zijn)
     state.fieldPropertyMap = computeFieldPropertyMap();
     applyFilters();
+    recolorNodes();   // node-kleur is tijdbewust: draaideur-figuren verkleuren mee met het jaar
     // Ververs een open detailpaneel zodat de relatielijst het jaar volgt
     if (state.selectedNode) showDetail(state.selectedNode);
   });
@@ -2855,14 +2932,50 @@ function applySizeMetric() {
   if (state.selectedNode) selectNode(state.selectedNode);  // herstel cascade-highlight
 }
 
+// Tijdbewuste primaire filter (kleur) van een entiteit: spiegelt scoring.py
+// (argmax filter over Σ derived_certainty × derived_influence van de BRON-relaties —
+// beide kanten alleen bij een bidirectionele band), maar beperkt tot de relaties die
+// ACTIEF zijn in het gekozen timeline-jaar. Zo verkleurt een draaideur-figuur
+// (politicus → lobby → …) als je door de tijd scrubt: zijn rol/filter is geen vaste
+// eigenschap maar volgt uit zijn dan-actieve banden. Geeft null terug als er in dat
+// jaar geen actieve bron-relatie met filter is → dan valt de kleur terug op de timeloze
+// bakwaarde (d.filterCat). De credibility-scores blijven timeloos; alleen de KLEUR
+// volgt de tijd ('hoe-bewezen' is timeloos, 'welke-rol-nu' is tijdsafhankelijk).
+function timeAwarePrimaryFilter(d, year) {
+  const acc = {};
+  (DATA.relations || []).forEach(r => {
+    if (r.status && r.status !== 'goedgekeurd') return;  // voorgesteld telt in niets (als scoring.py)
+    const isSrc = r.source_id === d.id;
+    const isBidirTgt = (r.bidirectional === 1 || r.bidirectional === true) && r.target_id === d.id;
+    if (!isSrc && !isBidirTgt) return;
+    const f = r.mechanism_filter;
+    if (!f) return;                       // band zonder mechanisme draagt geen filter (als scoring.py)
+    if (!isActiveAt(r, year)) return;
+    acc[f] = (acc[f] || 0) + (r.derived_certainty || 0) * (r.derived_influence || 0);
+  });
+  let best = null, bestVal = -1;
+  Object.entries(acc).forEach(([f, v]) => {
+    // argmax op waarde; bij gelijkspel de lexicografisch grootste filternaam (als scoring.py)
+    if (v > bestVal || (v === bestVal && (best === null || f > best))) { best = f; bestVal = v; }
+  });
+  return bestVal > 0 ? best : null;
+}
+
 function getNodeColor(d) {
   if (state.model === 'theory') {
     return state.showFilterMix ? mixedFilterColor(d, d.category)
                                : (FILTER_COLORS[d.category] || FILTER_COLORS.overig);
   }
   if (state.colorMode === 'filter') {
-    return state.showFilterMix ? mixedFilterColor(d, d.filterCat)
-                               : (FILTER_COLORS[d.filterCat] || FILTER_COLORS.overig);
+    // Kleur is tijdsafhankelijk: in een gekozen jaar beslist de dan-actieve set
+    // bron-relaties; bij 'alle jaren' (of geen actieve band) de timeloze bakwaarde.
+    let cat = d.filterCat;
+    if (state.timelineYear !== null) {
+      const tf = timeAwarePrimaryFilter(d, state.timelineYear);
+      if (tf) cat = tf;
+    }
+    return state.showFilterMix ? mixedFilterColor(d, cat)
+                               : (FILTER_COLORS[cat] || FILTER_COLORS.overig);
   }
   return TYPE_COLORS[d.type] || '#7f8c8f';
 }
@@ -3047,16 +3160,13 @@ function selectRelation(r) {
     ${renderTimespanSection(r, 'relation_id', r.id)}
   `;
 
-  // Discussieboom — de kern van een relatie-selectie, dus standaard open.
+  // Discussieboom — de kern van een relatie-selectie, dus standaard open. Het
+  // toevoeg-formulier hoort BINNEN deze sectie (onder de boom), niet eronder.
   const relArgs = argsByRelation[r.id];
   const nRelArgs = relArgs && relArgs.length ? countStances(relArgs).total : 0;
-  html += collapsibleSection('Discussie',
-    nRelArgs ? renderArgTree(relArgs)
-             : `<div style="font-size:11px;color:var(--text-muted);padding:2px 0">Nog geen argumenten voor deze relatie.</div>`,
-    { meta: nRelArgs ? `${nRelArgs} arg.` : 'geen' });
-
-  // Formulier voor nieuw root-argument
-  html += `<div class="detail-section">
+  const relDiscTree = nRelArgs ? renderArgTree(relArgs)
+    : `<div style="font-size:11px;color:var(--text-muted);padding:2px 0">Nog geen argumenten voor deze relatie.</div>`;
+  const relDiscForm = `<div class="detail-section" style="margin-top:8px">
     <button class="arg-toggle" id="new-arg-toggle-rel" onclick="
       let slot=document.getElementById('new-arg-slot-rel');
       if(slot.children.length===0){
@@ -3069,6 +3179,8 @@ function selectRelation(r) {
     ">+ Argument toevoegen ▸</button>
     <div id="new-arg-slot-rel"></div>
   </div>`;
+  html += collapsibleSection('Discussie', relDiscTree + relDiscForm,
+    { meta: nRelArgs ? `${nRelArgs} arg.` : 'geen', open: true });
 
   // Terug-knop naar entiteit
   if (src) {
@@ -4448,15 +4560,13 @@ function showInstanceDetail(d, content, color) {
   }
   html += renderBruggenSection(d);
 
-  // Discussieboom voor deze entiteit
+  // Discussieboom voor deze entiteit — het toevoeg-formulier hoort BINNEN de sectie
+  // (onder de boom), niet eronder; sectie altijd tonen, ook zonder argumenten.
   const entityArgs = argsByEntity[d.id];
-  if (entityArgs && entityArgs.length) {
-    html += collapsibleSection('Discussie', renderArgTree(entityArgs),
-      { meta: `${countStances(entityArgs).total} arg.` });
-  }
-
-  // Formulier voor nieuw argument over deze entiteit
-  html += `<div class="detail-section">
+  const nEntArgs = entityArgs && entityArgs.length ? countStances(entityArgs).total : 0;
+  const entDiscTree = nEntArgs ? renderArgTree(entityArgs)
+    : `<div style="font-size:11px;color:var(--text-muted);padding:2px 0">Nog geen argumenten over deze entiteit.</div>`;
+  const entDiscForm = `<div class="detail-section" style="margin-top:8px">
     <button class="arg-toggle" id="new-arg-toggle-ent" onclick="
       let slot=document.getElementById('new-arg-slot-ent');
       if(slot.children.length===0){
@@ -4469,6 +4579,8 @@ function showInstanceDetail(d, content, color) {
     ">+ Argument toevoegen ▸</button>
     <div id="new-arg-slot-ent"></div>
   </div>`;
+  html += collapsibleSection('Discussie', entDiscTree + entDiscForm,
+    { meta: nEntArgs ? `${nEntArgs} arg.` : 'geen', open: true });
 
   // Adminmodus: verwijderen
   if (state.adminMode) {
@@ -5010,7 +5122,6 @@ function authIndienHint() {
     ? `Ingediend als <b>${authUser.username}</b> (${authUser.role})`
     : 'Niet ingelogd — bijdragen vereist een account (<a href="/login">inloggen</a>).';
 }
-loadSources();  // warm de bronnencache voor de citaat-keuzemenu's
 (async function initAuth() {
   const chip = document.getElementById('authChip');
   const addBtn = document.getElementById('addBtn');
