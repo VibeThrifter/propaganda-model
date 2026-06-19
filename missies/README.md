@@ -11,7 +11,8 @@ naar een door mensen controleerbare bron, nooit directe statuswijzigingen.
 
 1. Open een Claude Code sessie (of background agent) in deze repo.
 2. Geef als opdracht: *"Voer de missie uit in `missies/monitor_brief.md`
-   (of `scout_brief.md`), als agent-account `monitor-agent`/`scout-agent`."*
+   (of `scout_brief.md` / `verbinder_brief.md`), als agent-account
+   `monitor-agent`/`scout-agent`/`verbinder-agent`."*
 3. De agent logt zijn ronde in `missies/logs/` (zie hieronder) en dient alle
    bevindingen in via de API; een mens reviewt daarna.
 
@@ -38,3 +39,4 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `monitor-agent` | bijdrager | `monitor_brief.md` | statussen zetten; alleen bevindingen indienen |
 | `scout-agent` | bijdrager | `scout_brief.md` | rechtstreeks de score in; alles wacht op review |
 | `redteam-agent` | bijdrager | `redteam_brief.md` | stromannen; statussen zetten; alles wacht op review |
+| `verbinder-agent` | bijdrager | `verbinder_brief.md` | theorielaag schrijven; verbanden zonder bron; statussen zetten |

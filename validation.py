@@ -29,7 +29,9 @@ BEKENDE_DDL_VERSCHILLEN = {
                   "(zie CLAUDE.md)",
     "relations": "status-CHECK (moderatiewachtrij) leeft alleen in schema.sql; live kolom "
                  "kwam via ALTER TABLE (migrate_moderatie_wachtrij.py)",
-    # 'sources' is sinds migrate_scoring_v2.py herbouwd uit schema.sql: geen drift meer.
+    "sources": "CHECK op reliability_voorgesteld/onderwerp_voorgesteld leeft alleen in "
+               "schema.sql; live kolommen kwamen via ALTER TABLE "
+               "(migrate_classificatie_voorstel.py)",
 }
 
 

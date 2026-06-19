@@ -352,6 +352,18 @@ CREATE TABLE sources (
     -- géén onafhankelijke bewijslijnen. Binnen een cluster telt alleen het sterkste
     -- argument; combineren gebeurt over clusters (scoring.py). NULL = eigen cluster.
     cluster_key TEXT,
+    -- Voorgestelde classificatie (ik stel voor, jij beslist): een bijdrager (mens of
+    -- agent) mag een classificatie vóórstellen; die telt NIET in de score. Pas wanneer
+    -- een reviewer haar bevestigt (PATCH /api/sources/<id>/classificatie) verhuist ze
+    -- naar de gezaghebbende reliability/onderwerp hierboven. NULL = geen voorstel.
+    reliability_voorgesteld TEXT CHECK(reliability_voorgesteld IS NULL OR reliability_voorgesteld IN (
+        'primair', 'academisch', 'institutioneel', 'kwaliteitsjournalistiek',
+        'regulier', 'opinie', 'grijs', 'eigen_synthese', 'onbeoordeeld'
+    )),
+    onderwerp_voorgesteld TEXT CHECK(onderwerp_voorgesteld IS NULL OR onderwerp_voorgesteld IN (
+        'nl_systeem', 'algemeen', 'buitenlands', 'onbepaald'
+    )),
+    classificatie_voorgesteld_door TEXT,   -- gebruikersnaam die het voorstel deed
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

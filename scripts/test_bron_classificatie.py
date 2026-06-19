@@ -7,7 +7,10 @@ Dekt:
     reliability past, of een hoge klasse zonder vindplaats (validation.klasse_consistentie);
   - de relevantie-as: een NL-bron weegt zwaarder dan een buitenlandse van dezelfde rigueur,
     maar overrulet nooit een rigueur-gat;
-  - de validator vlagt een inconsistente classificatie (BRON-KLASSE).
+  - de validator vlagt een inconsistente classificatie (BRON-KLASSE);
+  - voorgestelde classificatie (ik stel voor, jij beslist): een bijdrager mag een
+    classificatie vóórstellen (telt niet in de score), een reviewer bevestigt haar
+    en het voorstel wordt geconsumeerd.
 
 Gebruik: python3 scripts/test_bron_classificatie.py   (exit-code 0 = alles groen)
 """
@@ -40,6 +43,9 @@ def fixture(pad):
     conn.execute("INSERT INTO sources (id, title, source_type) VALUES (2, 'Boek', 'boek')")
     # Bron 3: website (mag nooit academisch worden — typemismatch).
     conn.execute("INSERT INTO sources (id, title, source_type) VALUES (3, 'Blog', 'website')")
+    # Bron 4: rapport mét vindplaats — voor de voorstel→bevestig-lus.
+    conn.execute("INSERT INTO sources (id, title, source_type) VALUES (4, 'OCW-rapport', 'rapport')")
+    conn.execute("INSERT INTO source_locations (source_id, location_type, location) VALUES (4, 'url', 'https://example.org/r')")
     toks = {}
     for naam, rol in (("bij", "bijdrager"), ("rev", "reviewer")):
         toks[naam] = auth.new_token()
@@ -104,6 +110,31 @@ def main():
     conn.close()
     eis("BRON-KLASSE" in bevs and bevs["BRON-KLASSE"]["aantal"] >= 1,
         f"BRON-KLASSE vlagt de website-als-institutioneel ({bevs['BRON-KLASSE']['aantal']})")
+
+    print("6. voorgestelde classificatie: bijdrager stelt voor, reviewer bevestigt & consumeert")
+    # Bijdrager mág voorstellen (anders dan classificeren, dat 403 gaf in stap 2).
+    r = c.patch("/api/sources/4/classificatie_voorstel", headers=kop["bij"],
+                json={"reliability_voorgesteld": "institutioneel", "onderwerp_voorgesteld": "nl_systeem"})
+    eis(r.status_code == 200, f"bijdrager mag classificatie vóórstellen ({r.status_code})")
+    conn = sqlite3.connect(tmp); conn.row_factory = sqlite3.Row
+    b = conn.execute("SELECT reliability, onderwerp, reliability_voorgesteld, onderwerp_voorgesteld, "
+                     "classificatie_voorgesteld_door FROM sources WHERE id=4").fetchone()
+    conn.close()
+    eis(b["reliability"] == "onbeoordeeld" and b["onderwerp"] == "onbepaald",
+        "voorstel raakt de gezaghebbende klasse niet (telt niet in de score)")
+    eis(b["reliability_voorgesteld"] == "institutioneel" and b["classificatie_voorgesteld_door"] == "bij",
+        "voorstel + voorsteller zijn opgeslagen")
+    # Reviewer bevestigt → gezaghebbend gezet én het voorstel geconsumeerd (op NULL).
+    r = c.patch("/api/sources/4/classificatie", headers=kop["rev"],
+                json={"reliability": "institutioneel", "onderwerp": "nl_systeem"})
+    eis(r.status_code == 200, f"reviewer bevestigt de classificatie ({r.status_code})")
+    conn = sqlite3.connect(tmp); conn.row_factory = sqlite3.Row
+    b = conn.execute("SELECT reliability, reliability_voorgesteld, classificatie_voorgesteld_door "
+                     "FROM sources WHERE id=4").fetchone()
+    conn.close()
+    eis(b["reliability"] == "institutioneel" and b["reliability_voorgesteld"] is None
+        and b["classificatie_voorgesteld_door"] is None,
+        "bevestiging zet de gezaghebbende klasse en ruimt het voorstel op")
 
     print("\nBron-classificatie + relevantie-as: alles groen.")
 

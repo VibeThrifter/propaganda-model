@@ -33,10 +33,17 @@ neutraal en je leest de database verder niet vóór het zoeken.
 
 ## Indienen
 
-- Registreer de bron eerst (`scripts/register_source.py`, of vraag een maintainer)
-  met een eerlijke `reliability`-klasse en een `cluster_key` (zelfde auteur/uitgever/
-  onderliggende data = zelfde cluster, M1.2). Projectmateriaal (`sources/AI/`) is
-  `eigen_synthese`: vindplaats, nooit bewijs.
+- Registreer de bron eerst via `POST /api/sources` (met een inline `location` voor de
+  vindplaats), met een `cluster_key` (zelfde auteur/uitgever/onderliggende data = zelfde
+  cluster, M1.2). Projectmateriaal (`sources/AI/`) is `eigen_synthese`: vindplaats, nooit
+  bewijs.
+- **Stel een classificatie vóór** (ik stel voor, jij beslist): geef bij de bron een
+  eerlijke `reliability_voorgesteld` (rigueur) en `onderwerp_voorgesteld` (`nl_systeem`/
+  `algemeen`/`buitenlands` — relevantie voor het NL-mediasysteem) mee — bij registratie
+  in de `POST /api/sources`, of later via `PATCH /api/sources/<id>/classificatie_voorstel`.
+  Dit voorstel telt **niet** in de score; het vult alleen de dropdowns van de reviewer
+  voor, die het bevestigt of corrigeert. Classificeer dus nooit zélf de gezaghebbende
+  klasse (PATCH `.../classificatie` is reviewer-werk, 403 voor jou).
 - Dien argumenten in via `POST /api/arguments` met inline `citations` (citaat +
   pagina). Supporting/contradicting zonder citatie wordt automatisch
   `bronvermelding_nodig` — dat is een teken dat je iets vergeten bent.

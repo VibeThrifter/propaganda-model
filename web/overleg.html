@@ -344,16 +344,30 @@ function tekenBronnen() {
   h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
   h += '<tr style="text-align:left;color:var(--text-dim)"><th></th><th>Bron</th><th>Type</th><th>Reliability</th><th>Onderwerp</th>' + (reviewer ? '<th></th>' : '') + '</tr>';
   for (const b of rijen) {
-    const naam = esc((b.author ? b.author + ', ' : '') + (b.title || 'bron #' + b.id));
+    const jaar = (b.date_published || '').slice(0, 4);
+    const naamTxt = (b.author ? b.author + ', ' : '') + (b.title || 'bron #' + b.id) + (jaar ? ' (' + jaar + ')' : '');
+    const naam = b.url
+      ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(naamTxt)}</a>`
+      : esc(naamTxt);
+    const arch = b.archive_url ? ` <a class="arch" href="${esc(b.archive_url)}" target="_blank" rel="noopener" title="webarchief">[archief]</a>` : '';
     const vlag = (b.problemen || []).length
       ? `<span title="${esc(b.problemen.join('; '))}" style="color:#e0a23a;cursor:help">⚠</span>` : '';
-    h += `<tr style="border-top:1px solid var(--border)"><td>${vlag}</td><td style="padding:4px 6px 4px 0">${naam}</td><td>${esc(b.source_type)}</td>`;
+    // Voorgestelde classificatie (ik stel voor, jij beslist): telt niet in de score tot
+    // een reviewer haar bevestigt. Toon haar als hint en vul de dropdowns ermee voor.
+    const heeftRelV = b.reliability_voorgesteld && b.reliability === 'onbeoordeeld';
+    const heeftOndV = b.onderwerp_voorgesteld && b.onderwerp === 'onbepaald';
+    const voorstelHint = (heeftRelV || heeftOndV)
+      ? ` <span style="font-size:10px;color:var(--goud);white-space:nowrap" title="voorgesteld${b.classificatie_voorgesteld_door ? ' door ' + esc(b.classificatie_voorgesteld_door) : ''} — telt niet in de score tot je het bevestigt">💡 voorstel${b.classificatie_voorgesteld_door ? ' · ' + esc(b.classificatie_voorgesteld_door) : ''}</span>`
+      : '';
+    h += `<tr style="border-top:1px solid var(--border)"><td>${vlag}</td><td style="padding:4px 6px 4px 0">${naam}${arch}${voorstelHint}</td><td>${esc(b.source_type)}</td>`;
     if (reviewer) {
-      h += `<td>${sel('rel-' + b.id, RELIABILITY_OPTS, b.reliability)}</td>`;
-      h += `<td>${sel('ond-' + b.id, ONDERWERP_OPTS, b.onderwerp, ONDERWERP_LABEL)}</td>`;
+      h += `<td>${sel('rel-' + b.id, RELIABILITY_OPTS, heeftRelV ? b.reliability_voorgesteld : b.reliability)}</td>`;
+      h += `<td>${sel('ond-' + b.id, ONDERWERP_OPTS, heeftOndV ? b.onderwerp_voorgesteld : b.onderwerp, ONDERWERP_LABEL)}</td>`;
       h += `<td><button onclick="classificeerBron(${b.id})">bewaar</button> <span id="bmsg-${b.id}"></span></td>`;
     } else {
-      h += `<td>${esc(b.reliability)}</td><td>${esc(ONDERWERP_LABEL[b.onderwerp] || b.onderwerp)}</td>`;
+      const relTxt = heeftRelV ? `onbeoordeeld <span style="color:var(--goud)">→ ${esc(b.reliability_voorgesteld)}?</span>` : esc(b.reliability);
+      const ondTxt = heeftOndV ? `onbepaald <span style="color:var(--goud)">→ ${esc(ONDERWERP_LABEL[b.onderwerp_voorgesteld] || b.onderwerp_voorgesteld)}?</span>` : esc(ONDERWERP_LABEL[b.onderwerp] || b.onderwerp);
+      h += `<td>${relTxt}</td><td>${ondTxt}</td>`;
     }
     h += '</tr>';
   }
@@ -541,7 +555,8 @@ function buildTree(args) {
 }
 // Eén citaat: quote + bron als klikbare link (vindplaats) + archieflink + stub-waarschuwing.
 function citeHtml(c) {
-  const naam = esc((c.source_author ? c.source_author + ', ' : '') + (c.source_title || 'bron'));
+  const jaar = (c.source_date || '').slice(0, 4);
+  const naam = esc((c.source_author ? c.source_author + ', ' : '') + (c.source_title || 'bron') + (jaar ? ' (' + jaar + ')' : ''));
   const src = c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${naam}</a>` : naam;
   const arch = c.archive_url ? ` <a class="arch" href="${esc(c.archive_url)}" target="_blank" rel="noopener" title="webarchief">[archief]</a>` : '';
   const q = (c.quote && c.quote.trim()) ? `“${esc(c.quote)}” ` : '';

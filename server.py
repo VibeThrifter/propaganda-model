@@ -511,7 +511,7 @@ def _citaties_per_argument(conn, arg_ids):
     rows = conn.execute(f"""
         SELECT c.id, c.argument_id, c.quote, c.page, c.section, c.context,
                c.source_id, s.title AS source_title, s.author AS source_author,
-               s.reliability
+               s.reliability, s.onderwerp, s.date_published
         FROM citations c JOIN sources s ON c.source_id = s.id
         WHERE c.argument_id IN ({qs}) ORDER BY c.id""", arg_ids).fetchall()
     bron_ids = {r["source_id"] for r in rows}
@@ -533,6 +533,7 @@ def _citaties_per_argument(conn, arg_ids):
             "section": r["section"], "context": r["context"],
             "source_id": r["source_id"], "source_title": r["source_title"],
             "source_author": r["source_author"], "reliability": r["reliability"],
+            "onderwerp": r["onderwerp"], "source_date": r["date_published"],
             "url": link, "archive_url": archive, "has_locator": has_locator,
             "echt": bool((r["quote"] or "").strip()) or has_locator,
         })
@@ -1377,7 +1378,13 @@ def get_sources():
     except ValueError:
         limit = 0
     sql = ["""SELECT s.id, s.title, s.author, s.source_type, s.reliability, s.onderwerp,
-        EXISTS(SELECT 1 FROM source_locations l WHERE l.source_id = s.id) AS heeft_locator
+        s.date_published,
+        s.reliability_voorgesteld, s.onderwerp_voorgesteld, s.classificatie_voorgesteld_door,
+        EXISTS(SELECT 1 FROM source_locations l WHERE l.source_id = s.id) AS heeft_locator,
+        (SELECT l.location FROM source_locations l WHERE l.source_id = s.id
+            AND l.location_type = 'url' LIMIT 1) AS url,
+        (SELECT l.location FROM source_locations l WHERE l.source_id = s.id
+            AND l.location_type = 'archive_url' LIMIT 1) AS archive_url
         FROM sources s"""]
     params = []
     if q:
@@ -1445,6 +1452,18 @@ def create_source():
         return jsonify({"error": "Ongeldig locatietype. Kies uit: "
                                  + ", ".join(sorted(LOCATION_TYPES))}), 400
 
+    # Voorgestelde classificatie (adviserend, telt niet in de score — een reviewer
+    # bevestigt haar later via PATCH .../classificatie). Een bijdrager mag dit dus zetten.
+    rel_voorstel = (data.get("reliability_voorgesteld") or "").strip() or None
+    ond_voorstel = (data.get("onderwerp_voorgesteld") or "").strip() or None
+    if rel_voorstel and rel_voorstel not in RELIABILITY_KLASSEN:
+        return jsonify({"error": "Ongeldige reliability_voorgesteld. Kies uit: "
+                                 + ", ".join(sorted(RELIABILITY_KLASSEN))}), 400
+    if ond_voorstel and ond_voorstel not in ONDERWERPEN:
+        return jsonify({"error": "Ongeldig onderwerp_voorgesteld. Kies uit: "
+                                 + ", ".join(sorted(ONDERWERPEN))}), 400
+    voorsteller = g.user["username"] if (rel_voorstel or ond_voorstel) else None
+
     conn = get_db()
     bestaand = conn.execute("SELECT id, title, author, source_type, reliability "
                             "FROM sources WHERE title = ?", (title,)).fetchone()
@@ -1453,9 +1472,12 @@ def create_source():
         return jsonify({**dict(bestaand), "hergebruikt": True}), 200
     try:
         cur = conn.execute(
-            """INSERT INTO sources (title, author, source_type, publisher, date_published, cluster_key)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (title, author, source_type, publisher, date_published, cluster_key))
+            """INSERT INTO sources (title, author, source_type, publisher, date_published,
+               cluster_key, reliability_voorgesteld, onderwerp_voorgesteld,
+               classificatie_voorgesteld_door)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (title, author, source_type, publisher, date_published, cluster_key,
+             rel_voorstel, ond_voorstel, voorsteller))
         sid = cur.lastrowid
         if loc_type and loc_value:
             conn.execute(
@@ -1518,6 +1540,50 @@ def add_source_location(sid):
                     "location": loc_value}), 201
 
 
+@app.route("/api/sources/<int:sid>/classificatie_voorstel", methods=["PATCH"])
+@require_user()
+def stel_classificatie_voor(sid):
+    """Een classificatie VOORSTELLEN (bijdrager+, ook agents) — adviserend.
+
+    Spiegelt de voorgesteld→merged-lus van argumenten: dit voorstel telt NIET in de
+    score; het vult straks alleen de dropdowns van de reviewer voor. Pas wanneer een
+    reviewer het bevestigt (PATCH .../classificatie) verhuist het naar de gezaghebbende
+    reliability/onderwerp. Zo classificeert niemand zijn eigen werk de score in."""
+    data = request.json or {}
+    rel = (data.get("reliability_voorgesteld") or data.get("reliability") or "").strip() or None
+    ond = (data.get("onderwerp_voorgesteld") or data.get("onderwerp") or "").strip() or None
+    if not rel and not ond:
+        return jsonify({"error": "Geef minstens reliability_voorgesteld of onderwerp_voorgesteld"}), 400
+    if rel and rel not in RELIABILITY_KLASSEN:
+        return jsonify({"error": "Ongeldige reliability. Kies uit: "
+                                 + ", ".join(sorted(RELIABILITY_KLASSEN))}), 400
+    if ond and ond not in ONDERWERPEN:
+        return jsonify({"error": "Ongeldig onderwerp. Kies uit: "
+                                 + ", ".join(sorted(ONDERWERPEN))}), 400
+    conn = get_db()
+    bron = conn.execute("SELECT id, reliability_voorgesteld, onderwerp_voorgesteld "
+                        "FROM sources WHERE id = ?", (sid,)).fetchone()
+    if not bron:
+        conn.close()
+        return jsonify({"error": "Bron bestaat niet"}), 404
+    nieuwe_rel = rel if rel else bron["reliability_voorgesteld"]
+    nieuw_ond = ond if ond else bron["onderwerp_voorgesteld"]
+    conn.execute("UPDATE sources SET reliability_voorgesteld = ?, onderwerp_voorgesteld = ?, "
+                 "classificatie_voorgesteld_door = ? WHERE id = ?",
+                 (nieuwe_rel, nieuw_ond, g.user["username"], sid))
+    conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by,
+                    new_value, reason) VALUES ('sources', ?, 'updated', ?, ?, ?)""",
+                 (sid, g.user["username"],
+                  json.dumps({"reliability_voorgesteld": nieuwe_rel,
+                              "onderwerp_voorgesteld": nieuw_ond}),
+                  "classificatievoorstel: "
+                  + ((data.get("motivatie") or "").strip() or "(geen motivatie)")))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": sid, "reliability_voorgesteld": nieuwe_rel,
+                    "onderwerp_voorgesteld": nieuw_ond})
+
+
 @app.route("/api/sources/<int:sid>/classificatie", methods=["PATCH"])
 @require_user("reviewer")
 def classificeer_source(sid):
@@ -1555,7 +1621,10 @@ def classificeer_source(sid):
         return jsonify({"error": "Classificatie niet controleerbaar/consistent: "
                                  + "; ".join(problemen)}), 400
 
-    conn.execute("UPDATE sources SET reliability = ?, onderwerp = ? WHERE id = ?",
+    # Bevestiging consumeert een eventueel voorstel: het is nu beslist, ruim het op.
+    conn.execute("UPDATE sources SET reliability = ?, onderwerp = ?, "
+                 "reliability_voorgesteld = NULL, onderwerp_voorgesteld = NULL, "
+                 "classificatie_voorgesteld_door = NULL WHERE id = ?",
                  (nieuwe_rel, nieuw_ond, sid))
     conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by,
                     old_value, new_value, reason) VALUES ('sources', ?, 'updated', ?, ?, ?, ?)""",
