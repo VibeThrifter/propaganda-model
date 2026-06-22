@@ -37,7 +37,7 @@ button.akkoord { background: #1f7a44; border: none; color: #fff; }
 button.afwijzen { background: #7a2f2f; border: none; color: #fff; }
 button.prim { background: var(--accent); border: none; color: #fff; }
 #tab-overleg { flex: 1; display: flex; min-height: 0; }
-#tab-overleg.verborgen, #tab-voorstellen.verborgen { display: none; }
+#tab-overleg.verborgen, #tab-voorstellen.verborgen, #tab-bronnen.verborgen { display: none; }
 /* — Overleg (threads) — */
 #oIndex { width: 340px; flex-shrink: 0; border-right: 1px solid var(--border);
           display: flex; flex-direction: column; min-height: 0; }
@@ -99,22 +99,28 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .bronbadge code { background: rgba(0,0,0,.3); padding: 1px 4px; border-radius: 4px; }
 .reageer-link { font-size: 11px; color: var(--accent); cursor: pointer; margin-left: 8px; }
 /* oordeel-paar: ✓ Logica klopt / ✗ Logica klopt niet — gebalanceerd, samen, even zwaar */
-.oordeel-rij { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11.5px; flex-wrap: wrap; }
+.oordeel-rij { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11px; flex-wrap: wrap; }
 .oordeel { padding: 2px 10px; border-radius: 9px; border: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.oordeel-saldo { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .oordeel.knop { cursor: pointer; }
 .oordeel.eens { color: #3ddc84; border-color: color-mix(in srgb, #3ddc84 32%, transparent); }
 .oordeel.eens.knop:hover, .oordeel.eens.aan { background: color-mix(in srgb, #3ddc84 14%, transparent); }
 .oordeel.oneens { color: #e0635f; border-color: color-mix(in srgb, #e0635f 32%, transparent); }
 .oordeel.oneens.knop:hover { background: color-mix(in srgb, #e0635f 14%, transparent); }
 .oordeel.stat { opacity: .7; }
-/* reageer-knop: één neutrale, accent-getinte actie, los van het oordeel-paar */
+/* bewijs-bar: twee richtinggevende acties (vóór/tegen), los van het oordeel-paar.
+   De richting zit in label én kleur, niet in losse uitleg-tekst. */
 .reageer-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; flex-wrap: wrap; }
 .reageer-knop { font-size: 11px; cursor: pointer; padding: 2px 10px; border-radius: 9px;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); user-select: none; }
 .reageer-knop:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.reageer-knop.voor { border-color: color-mix(in srgb, #3ddc84 45%, transparent); color: #3ddc84; }
+.reageer-knop.voor:hover { background: color-mix(in srgb, #3ddc84 14%, transparent); }
+.reageer-knop.tegen { border-color: color-mix(in srgb, #e0635f 45%, transparent); color: #e0635f; }
+.reageer-knop.tegen:hover { background: color-mix(in srgb, #e0635f 14%, transparent); }
 .reply-kruimel { font-size: 11px; color: var(--text-muted); margin: 2px 0 8px; line-height: 1.4; }
 .reply-kruimel b { color: var(--text-dim); font-weight: 600; }
-/* statusbadge + inline acties (Fase A–C): poort & revisie zichtbaar in de draad */
+/* statusbadge + inline acties (Fase A–C): poort & revisie zichtbaar in de thread */
 .statusbadge { font-size: 10px; padding: 0 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle;
   background: rgba(255,255,255,.07); color: var(--text-muted); }
 .statusbadge.voorgesteld { background: color-mix(in srgb, var(--goud) 20%, transparent); color: var(--goud); }
@@ -128,9 +134,9 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .arg-acties span.gevaar { color: #e0635f; }
 .arg.vervangen-arg { opacity: .55; }
 .arg.dit-voorstel { background: color-mix(in srgb, var(--accent) 10%, transparent); border-left-color: var(--accent); }
-.reviewdraad { border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px; margin: 8px 0 4px;
+.reviewthread { border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px; margin: 8px 0 4px;
   background: rgba(0,0,0,.18); }
-.reviewdraad .kop { font-size: 11px; color: var(--text-muted); margin: 4px 0; }
+.reviewthread .kop { font-size: 11px; color: var(--text-muted); margin: 4px 0; }
 .revisie-noot { font-size: 12px; color: var(--accent); margin: 2px 0 6px; }
 .feedback-box { font-size: 12px; color: var(--text-dim); background: rgba(224,99,95,.08);
   border: 1px solid color-mix(in srgb, #e0635f 28%, transparent); border-radius: 8px;
@@ -165,6 +171,9 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .stance-kies button.sel-sup { background: #1f7a44; border: none; color: #fff; }
 .stance-kies button.sel-con { background: #7a2f2f; border: none; color: #fff; }
 .stance-kies button.sel-ctx { background: #4a4a66; border: none; color: #fff; }
+.stance-kies.vast { display: block; }
+.stance-vast { display: inline-block; background: #7a2f2f; color: #fff; font-size: 12px;
+  font-weight: 600; padding: 4px 12px; border-radius: 6px; }
 .rij2 { display: flex; gap: 10px; }
 .rij2 > div { flex: 1; }
 .bronkies { position: relative; }
@@ -178,7 +187,7 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .bron-leeg { padding: 7px 9px; font-size: 12px; color: var(--text-muted); }
 .melding { font-size: 12px; margin-top: 8px; min-height: 1em; }
 /* — Voorstellen (review) — */
-#tab-voorstellen { flex: 1; overflow-y: auto; }
+#tab-voorstellen, #tab-bronnen { flex: 1; overflow-y: auto; }
 .vsegment { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 16px; border-radius: 11px;
   background: rgba(0,0,0,.25); border: 1px solid var(--border); }
 .vpil { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim);
@@ -192,6 +201,17 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 main { max-width: 880px; margin: 0 auto; padding: 22px; }
 h2.sectie { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); margin: 22px 0 12px; }
 .kaart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
+/* Wachtrij-item + agent-advies ernaast (reviewbeoordelaar; los van het model, telt niet mee) */
+.kaart-rij { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; }
+.kaart-rij > .kaart { flex: 1 1 460px; min-width: 0; margin-bottom: 0; }
+.advies { flex: 0 1 300px; min-width: 230px; align-self: stretch; background: color-mix(in srgb, var(--bg-card) 80%, transparent);
+          border: 1px solid var(--border); border-left-width: 3px; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; }
+.advies-kop { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.advies-titel { font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.advies-detail { color: var(--text-dim); line-height: 1.5; white-space: pre-wrap; }
+.advies-broncheck { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border);
+                    font-size: 11.5px; color: var(--text-dim); }
+.advies-bron { margin-top: 9px; font-size: 10px; color: var(--text-muted); }
 .soort { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--goud); }
 .kaart h3 { font-size: 15px; margin: 4px 0 6px; }
 .meta { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
@@ -232,7 +252,7 @@ code { background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px; font-s
   </div>
   <div id="oDetail">
     <div style="color:var(--text-muted);font-size:13px;padding:24px 4px">
-      Kies links een relatie, entiteit, rol, mechanisme of emergent veld om de overlegdraad (argumentboom) rustig te lezen — of voeg er een argument aan toe.
+      Kies links een relatie, entiteit, rol, mechanisme of emergent veld om de thread (argumentboom) rustig te lezen — of voeg er een argument aan toe.
     </div>
   </div>
 </div>
@@ -249,14 +269,46 @@ code { background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px; font-s
 <script>
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// Escapet tekst veilig én maakt kale http(s)-URL's erin klikbaar (voor vrije-tekst bronnen).
+function linkify(s) {
+  s = String(s ?? '');
+  const re = /https?:\/\/[^\s<>"')\]]+/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(s))) {
+    out += esc(s.slice(last, m.index));
+    out += `<a href="${esc(m[0])}" target="_blank" rel="noopener">${esc(m[0])}</a>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(s.slice(last));
+}
 let ME = null;
 let ROLLEN = [];          // lichte rollenlijst (GET /api/roles) voor de rol-keuze bij entiteit-goedkeuring
+// Structurele entiteittypes (de niet-legacy set uit schema.sql) voor de bewerk-dropdown bij
+// heraanmelden; legacy-types blijven geldig maar tonen we niet als nieuwe keuze. De huidige
+// waarde wordt sowieso toegevoegd als ze hier ontbreekt (zie selectOpties).
+const ENTITEIT_TYPES = ['persoon', 'partij', 'mediaorganisatie', 'persbureau', 'bedrijf',
+  'lobbygroep', 'denktank', 'overheidsinstelling', 'toezichthouder', 'ngo', 'vakbond',
+  'omroep', 'elite_netwerk', 'vermogensbeheerder', 'pr_bureau', 'platform',
+  'rechterlijke_macht', 'onderwijsinstelling', 'burgerinitiatief', 'stichting'];
+const RELATIE_TYPES = ['eigendom', 'financiering', 'adverteerder', 'donor', 'investering',
+  'lidmaatschap', 'personeel', 'bestuurder', 'adviseur', 'woordvoerder_van', 'draaideur',
+  'bron_van', 'mediaplatform', 'framing', 'citeert', 'lobbyt', 'censuur', 'flak',
+  'intimidatie', 'regulering', 'zelfcensuur', 'alliantie', 'oppositie', 'beinvloeding',
+  'cooptatie', 'etikettering', 'algoritmische_filtering'];
+// Bouwt <option>s met `huidig` voorgeselecteerd; voegt een onbekende huidige waarde
+// (bv. een legacy-type) vooraan toe zodat het bewerkformulier haar nooit stilletjes wist.
+function selectOpties(lijst, huidig) {
+  const waarden = lijst.includes(huidig) || !huidig ? lijst.slice() : [huidig, ...lijst];
+  return waarden.map(v => `<option value="${esc(v)}"${v === huidig ? ' selected' : ''}>${esc(v)}</option>`).join('');
+}
 let BRIDGING = null;      // bridging-status (M2.5): wanneer telt een rating mee in de score?
 let indexData = null;
 let huidig = null;        // {param, id, label}
-let ARG_BY_ID = new Map();// argumenten van de geopende draad (voor bewerk/reviseer-formulieren)
+let ARG_BY_ID = new Map();// argumenten van de geopende thread (voor bewerk/reviseer-formulieren)
 let reviewGeladen = false;
 let reviewData = null;          // gecachete /api/review_queue zodat de segmented control niet herfetcht
+let adviesData = null;          // gecachet /api/review_advies — agent-advies naast elk item (reviewer+, los van het model)
+let afgewezenData = null;       // gecachet /api/afgewezen — afgewezen/ingetrokken inzendingen (reviewer+)
 let actiefVoorstelType = 'rfc'; // 'rfc' | 'argumenten' — welke lijst op het Voorstellen-tabblad
 let voorstelTypeGekozen = false;// heeft de gebruiker zelf gekozen? (anders auto-default op niet-leeg)
 // Toolbar-state: soort (groep), filter (de model-as), alleen-open, en welke
@@ -568,21 +620,24 @@ function citeHtml(c) {
   const klBadge = kl.length ? ` <span style="font-size:9px;padding:0 5px;border-radius:3px;background:rgba(108,138,255,.10);color:var(--text-muted);white-space:nowrap" title="bronklasse (rigueur) · onderwerp (relevantie voor het NL-mediasysteem) — sturen de bronfactor">${esc(kl.join(' · '))}</span>` : '';
   return `<div class="cite">${q}<span class="cite-src">— ${src}${c.page ? (', p.' + esc(c.page)) : ''}${arch}</span>${klBadge}${stub}</div>`;
 }
-// Statusbadge maakt de poortstand zichtbaar in de draad zelf (Fase A): een lezer ziet
+// Statusbadge maakt de poortstand zichtbaar in de thread zelf (Fase A): een lezer ziet
 // of een argument nog 'voorgesteld' is (telt nergens), betwist of geverifieerd.
 function statusBadge(a) {
   if (a.vervangen) return ` <span class="statusbadge vervangen" title="vervangen door een revisie">vervangen</span>`;
   const lab = a.status || '';
   return ` <span class="statusbadge ${esc(lab)}" title="verificatiestatus (de poort)">${esc(lab)}</span>`;
 }
-// Inline acties in de draad (Fase A–C): zo handel je vanuit de context zonder naar het
+// Inline acties in de thread (Fase A–C): zo handel je vanuit de context zonder naar het
 // Voorstellen-tabblad te springen. De server is de echte poort (gate); deze knoppen
 // volgen de globale rol als hint — een 403 wordt netjes gemeld.
 function argActies(a) {
   if (!ME || a.vervangen) return '';
   const r = [], isAuteur = a.contributed_by === ME.username, reviewer = ME.role !== 'bijdrager';
+  // Een mens herziet zijn eigen voorstel; een maintainer mag bot-werk bijschaven (een
+  // gewone gebruiker niet andermans werk).
+  const magBewerken = isAuteur || (ME.role === 'maintainer' && a.auteur_is_agent);
   if (a.status === 'voorgesteld') {
-    if (isAuteur) r.push(`<span onclick="bewerkArg(${a.id})" title="je voorstel bijschaven (telt nog nergens)">bewerk</span>`);
+    if (magBewerken) r.push(`<span onclick="bewerkArg(${a.id})" title="${isAuteur ? 'je voorstel bijschaven (telt nog nergens)' : 'agent-werk bijschaven (admin)'}">bewerk</span>`);
     if (reviewer) {
       r.push(`<span onclick="mergeArgT(${a.id})" title="toelaten — telt mee na merge">merge</span>`);
       r.push(`<span class="gevaar" onclick="afwijsArgT(${a.id})" title="afwijzen met motivatie">afwijzen</span>`);
@@ -606,8 +661,8 @@ function rendNode(a) {
   if (a.reviseert_id) m.push('revisie van #' + a.reviseert_id);
   h += `<div class="arg-meta">${m.filter(Boolean).join(' · ')}</div>`;
   h += (a.citations || []).map(citeHtml).join('');
-  h += ratingRegel(a);
   h += reageerBar(a);
+  h += ratingRegel(a);
   h += bezwaarRegelO(a);
   h += argActies(a);
   h += `<div id="reply-${a.id}"></div>`;
@@ -628,23 +683,32 @@ function rendNode(a) {
 // bij elkaar (apart van 'reageren') en wegen even zwaar — geen schreeuwend rood naast grijs.
 function ratingRegel(a) {
   const r = a.ratings || { mens: { nuttig: 0 }, agent: { nuttig: 0 } };
-  const tel = r.mens.nuttig + (r.agent.nuttig ? `+${r.agent.nuttig}` : '');
+  // Bridging-saldo: +1 per endorsement ('logica klopt'), −1 per gehandhaafde ondergraving
+  // (contradicting reply-kind dat niet 'opgelost' is en niet vervangen/verworpen).
+  const plus = (r.mens.nuttig || 0) + (r.agent.nuttig || 0);
+  const min = (a._kids || []).filter(k => k.stance === 'contradicting'
+    && k.bezwaar_resolutie && k.bezwaar_resolutie !== 'opgelost'
+    && !k.vervangen && k.status !== 'verworpen').length;
+  const net = plus - min;
+  const saldoTekst = net > 0 ? `+${net}` : (net < 0 ? `−${-net}` : '0');
+  const saldo = `<span class="oordeel-saldo" title="saldo: ${plus} × ‘logica klopt’ (endorsement) − ${min} gehandhaafde ondergraving(en)">${saldoTekst}</span>`;
   const eigen = ME && a.contributed_by === ME.username;
   const actief = a.mijn_oordeel === 'nuttig';
   const eens = (!ME || eigen)
-    ? `<span class="oordeel eens stat" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Logica klopt ${tel}</span>`
-    : `<span class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief})" title="De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Logica klopt ${tel}</span>`;
+    ? `<span class="oordeel eens stat" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Logica klopt</span>`
+    : `<span class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief})" title="De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Logica klopt</span>`;
   const oneens = (ME && !a.vervangen)
-    ? `<span class="oordeel oneens knop" onclick="toonReply(${a.id},'contradicting')" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</span>`
+    ? `<span class="oordeel oneens knop" onclick="toonReply(${a.id},'contradicting',true)" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</span>`
     : '';
-  return `<div class="oordeel-rij">${eens}${oneens}</div>`;
+  return `<div class="oordeel-rij">${eens}${oneens}${saldo}</div>`;
 }
 // Eén neutrale 'Reageer'-knop: opent de composer met de standaard positiekeuze
 // (Voor/Tegen/Context). Apart van het oordeel-paar hierboven. Inloggen vereist.
 function reageerBar(a) {
   if (!ME || a.vervangen) return '';
   return `<div class="reageer-bar">
-    <span class="reageer-knop" onclick="toonReply(${a.id},'supporting')" title="Reageer op dit argument — kies Voor, Tegen of Context">↩ Reageer</span>
+    <span class="reageer-knop voor" onclick="toonReply(${a.id},'supporting')" title="Draag bewijs of een argument aan dat dit argument ondersteunt.">＋ Bewijs vóór</span>
+    <span class="reageer-knop tegen" onclick="toonReply(${a.id},'contradicting')" title="Draag bewijs of een argument aan dat tegen dit argument in gaat.">－ Bewijs tegen</span>
   </div>`;
 }
 // Resolutielus-badge + overgangsknoppen op een ondergraving (server bewaakt de rechten).
@@ -703,7 +767,7 @@ const PARAM_SEL = { relation_id: 'relation', entity_id: 'entity', role_id: 'role
   mechanism_id: 'mechanism', emergent_effect_id: 'emergent' };
 async function toonThread(param, id, label) {
   huidig = { param, id, label };
-  // Adresseerbaar: de draad krijgt een permalink in de hash (#relation_id=42).
+  // Adresseerbaar: de thread krijgt een permalink in de hash (#relation_id=42).
   const ankerhash = `#${param}=${id}`;
   // Schoon de URL op naar enkel de permalink-hash (verwijdert o.a. de consumeerde ?label=).
   if (location.hash !== ankerhash || location.search) history.replaceState(null, '', location.pathname + ankerhash);
@@ -717,7 +781,7 @@ async function toonThread(param, id, label) {
     const sel = PARAM_SEL[param];
     let h = `<h2 style="font-size:16px;margin:0 0 4px">${esc(label)}</h2>` +
       (sel ? `<a class="graaf-link" href="/#sel=${sel}:${id}" title="Selecteer dit element in de netwerkvisualisatie">↗ bekijk in de graaf</a>` : '') +
-      `<div style="font-size:11px;color:var(--text-muted);margin-bottom:16px">${args.length} argument(en) in deze draad · doel: <code>${esc(param)}=${id}</code></div>`;
+      `<div style="font-size:11px;color:var(--text-muted);margin-bottom:16px">${args.length} argument(en) in deze thread · doel: <code>${esc(param)}=${id}</code></div>`;
     if (roots.length) h += bridgingHint();
     h += roots.length ? roots.map(rendNode).join('')
       : '<div class="leeg">Nog geen argumenten — voeg het eerste toe.</div>';
@@ -780,27 +844,36 @@ document.addEventListener('click', e => {
 function formHtml(opts) {
   const fid = 'f' + Math.random().toString(36).slice(2, 8);
   const reply = !!opts.parent_argument_id;
+  // Ondergraving-modus: binnengekomen via '✗ Logica klopt niet'. De stance ligt vast op
+  // − Tegen (geen Voor/Context), kop en onderbouwing zijn toegespitst op het bezwaar.
+  const ondergraving = !!opts.ondergraving;
   // Kruimelpad: maakt de plek in de boom expliciet — je hangt een tak onder dít argument.
   const parentArg = reply ? (ARG_BY_ID.get(opts.parent_argument_id) || {}) : null;
-  const kruimel = parentArg ? `<div class="reply-kruimel">↳ je reageert op <b>«${esc((parentArg.claim || '').slice(0, 100))}${(parentArg.claim || '').length > 100 ? '…' : ''}»</b></div>` : '';
+  const kruimel = parentArg ? `<div class="reply-kruimel">↳ je ${ondergraving ? 'ondergraaft' : 'reageert op'} <b>«${esc((parentArg.claim || '').slice(0, 100))}${(parentArg.claim || '').length > 100 ? '…' : ''}»</b></div>` : '';
   // Eén consistente positiekeuze (Voor/Tegen/Context), root én reply. Bij een reply staat de
   // positie voorgekozen uit de knop waarmee je hier kwam (Reageer→Voor, '✗ Logica klopt niet'
-  // →Tegen) en kun je nog wisselen; − Tegen is de ondergraving en vereist onderbouwing.
+  // →Tegen) en kun je nog wisselen; − Tegen is de ondergraving en vereist onderbouwing. In
+  // ondergraving-modus staat de keuze vast en tonen we een statisch label i.p.v. de drie tabs.
   const pre = reply ? (opts.stance || 'supporting') : null;
   const stKnop = (st, cls, lbl) => `<button type="button" class="${pre === st ? cls : ''}" onclick="kiesStance('${fid}','${st}',this)">${lbl}</button>`;
+  const stanceBlok = ondergraving
+    ? `<div class="stance-kies vast" id="${fid}-st" data-stance="contradicting"><span class="stance-vast">− Tegen — ‘logica klopt niet’</span></div>`
+    : `<div class="stance-kies" id="${fid}-st"${pre ? ` data-stance="${pre}"` : ''}>
+      ${stKnop('supporting', 'sel-sup', reply ? '＋ Bewijs vóór' : '+ Voor')}
+      ${stKnop('contradicting', 'sel-con', reply ? '－ Bewijs tegen' : '− Tegen')}
+    </div>`;
+  const stanceHint = ondergraving
+    ? `<div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px">Geen bron nodig — benoem de redeneerstap die niet deugt; dit dempt de kracht tot het bezwaar is <b>opgelost</b>.</div>`
+    : '';
   return `<div class="form" id="${fid}" data-target='${JSON.stringify(opts).replace(/'/g, "&#39;")}'>
-    <h4>${reply ? 'Reageer op dit argument' : 'Nieuw argument'}</h4>
+    <h4>${ondergraving ? 'Logica klopt niet — zeg waarom' : (reply ? 'Geef bewijs — vóór of tegen dit argument' : 'Nieuw argument')}</h4>
     ${kruimel}
-    <div class="stance-kies" id="${fid}-st"${pre ? ` data-stance="${pre}"` : ''}>
-      ${stKnop('supporting', 'sel-sup', '+ Voor')}
-      ${stKnop('contradicting', 'sel-con', '− Tegen')}
-      ${stKnop('contextual', 'sel-ctx', '~ Context')}
-    </div>
-    ${reply ? `<div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px"><b>− Tegen</b> = ‘logica klopt niet’: een onderbouwd bezwaar dat de kracht van dit argument dempt tot het is <b>opgelost</b>.</div>` : ''}
+    ${stanceBlok}
+    ${stanceHint}
     <label>Bewering *</label>
-    <input type="text" id="${fid}-claim" placeholder="${reply ? 'De kern van je reactie, kort en bondig' : 'De kernbewering, kort en bondig'}">
-    <label>Onderbouwing${reply ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht bij − Tegen)</span>' : ''}</label>
-    <textarea id="${fid}-reason" placeholder="Redenering of toelichting"></textarea>
+    <input type="text" id="${fid}-claim" placeholder="${ondergraving ? 'De kern van je bezwaar, kort en bondig' : (reply ? 'De kern van je reactie, kort en bondig' : 'De kernbewering, kort en bondig')}">
+    <label>Onderbouwing${ondergraving ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht — benoem de aangevochten stap)</span>' : (reply ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht bij Bewijs tegen)</span>' : '')}</label>
+    <textarea id="${fid}-reason" placeholder="${ondergraving ? 'Welke redeneerstap deugt niet, en waarom?' : 'Redenering of toelichting'}"></textarea>
     ${reply ? '' : `<div class="rij2">
       <div><label>Eigenschap (optioneel)</label>
         <select id="${fid}-prop">
@@ -837,15 +910,19 @@ function formHtml(opts) {
   </div>`;
 }
 // Open/wissel/sluit de reageer-composer in de reply-slot. Zelfde positie nogmaals = sluiten;
-// een andere positie (bv. via '✗ Logica klopt niet' → contradicting) = wisselen. Eén composer,
-// altijd dezelfde Voor/Tegen/Context-keuze — alleen de voorgekozen positie verschilt.
-function toonReply(argId, stance) {
+// een andere positie (bv. via '✗ Logica klopt niet' → contradicting) = wisselen. Twee ingangen,
+// één composer: '↩ Reageer' geeft de volledige Voor/Tegen/Context-keuze, '✗ Logica klopt niet'
+// (ondergraving=true) zet 'm vast op − Tegen en spitst kop/onderbouwing toe op de ondergraving.
+function toonReply(argId, stance, ondergraving) {
   const slot = document.getElementById('reply-' + argId);
   if (!slot) return;
   stance = stance || 'supporting';
-  if (slot.firstChild && slot.dataset.stance === stance) { slot.innerHTML = ''; slot.dataset.stance = ''; return; }
-  slot.dataset.stance = stance;
-  slot.innerHTML = formHtml({ parent_argument_id: argId, stance });
+  // Toggle-sleutel onderscheidt de twee ingangen, zodat 'Reageer→Tegen' en 'Logica klopt niet'
+  // elkaar niet voor 'al open' aanzien (en nogmaals klikken op dezelfde knop sluit).
+  const sleutel = ondergraving ? 'ondergraving' : stance;
+  if (slot.firstChild && slot.dataset.stance === sleutel) { slot.innerHTML = ''; slot.dataset.stance = ''; return; }
+  slot.dataset.stance = sleutel;
+  slot.innerHTML = formHtml({ parent_argument_id: argId, stance, ondergraving: !!ondergraving });
 }
 // Resolutielus op een ondergraving (server bewaakt wie wat mag).
 async function bezwaarActieO(id, actie) {
@@ -862,7 +939,7 @@ async function bezwaarActieO(id, actie) {
 // ── Bewerken / reviseren (Fase C) ──
 // Een nog-voorgesteld argument bewerk je in-place; een gemerged argument verbeter je
 // via een revisie die het oude vervangt na merge. Beide openen hetzelfde compacte
-// formulier in de reply-slot, voorgevuld uit de geopende draad (ARG_BY_ID).
+// formulier in de reply-slot, voorgevuld uit de geopende thread (ARG_BY_ID).
 function formBewerk(argId, modus) {
   const a = ARG_BY_ID.get(argId) || {};
   const fid = 'e' + Math.random().toString(36).slice(2, 8);
@@ -922,7 +999,7 @@ async function verstuurBewerk(fid, argId, modus) {
     setTimeout(() => { toonThread(huidig.param, huidig.id, huidig.label); laadVoorstellenBadge(); }, 700);
   } catch (e) { msg.innerHTML = `<span style="color:#e0635f">Netwerkfout: ${esc(e.message)}</span>`; }
 }
-// Inline poort-acties vanuit de draad (Fase A/B). De server is de echte poort.
+// Inline poort-acties vanuit de thread (Fase A/B). De server is de echte poort.
 async function argActie(url, method, body) {
   try {
     const resp = await fetch(url, { method,
@@ -1008,16 +1085,37 @@ async function verstuur(fid) {
 }
 
 // ── Voorstellen (review) ──
+// Derde element = uitleg-tooltip (ⓘ) voor de jargon-zware velden.
 const LANGEVELDEN = [
-  ['definitie', 'Definitie'], ['effect', 'Effect'], ['afgrenzing', 'Afgrenzing van bestaande elementen'],
-  ['falsificatiecriterium', 'Falsificatiecriterium'], ['freeze_test', 'Freeze-test (aard-keuze)'],
-  ['motivatie', 'Motivatie'], ['herbevestigingsplan', 'Herbevestigingsplan'], ['hertriage_plan', 'Hertriage-plan'],
+  ['definitie', 'Definitie'], ['effect', 'Effect'],
+  ['afgrenzing', 'Afgrenzing van bestaande elementen', 'Waarin verschilt dit van al bestaande rollen/mechanismen — waarom is het geen duplicaat van iets dat er al staat?'],
+  ['falsificatiecriterium', 'Falsificatiecriterium', 'Welke concrete waarneming zou dit element weerleggen? Een claim die nooit fout kan blijken, hoort niet in het model.'],
+  ['freeze_test', 'Freeze-test (waarom deze "aard"?)', 'De "aard" zegt hoe echt een verbinding is. Toets: als je de zender wegdenkt/bevriest, blijft het effect dan bestaan? → Ja, en het is een toestand van één knoop = veld_eigenschap (halo). → Eigenschap van een groep zonder één aanwijsbare zender = emergent veld. → Anders een gewone verbinding tussen twee knopen = direct.'],
+  ['motivatie', 'Motivatie'],
+  ['herbevestigingsplan', 'Herbevestigingsplan', 'Hoe en wanneer wordt dit element opnieuw tegen het licht gehouden, zodat het niet stilletjes verouderd blijft staan?'],
+  ['hertriage_plan', 'Hertriage-plan', 'Bij splitsen/samenvoegen/hernoemen: hoe worden de bestaande argumenten en instantiaties opnieuw onder de nieuwe elementen gehangen?'],
 ];
+// [key, label, tooltip] — de tooltip legt uit wát het veld betekent. bron-/doel-rol
+// renderen we apart als één richtings-tag (rolnamen i.p.v. id's).
 const METAVELDEN = [
-  ['element_type', 'type'], ['naam', 'naam'], ['nieuwe_naam', 'nieuwe naam'], ['filter', 'filter'],
-  ['aard', 'aard'], ['mechanisme_type', 'mechanisme-type'], ['categorie', 'categorie'],
-  ['source_role_id', 'bron-rol-id'], ['target_role_id', 'doel-rol-id'], ['element_id', 'element-id'],
+  ['element_type', 'type', 'Soort theorie-element: een rol (functie), een mechanisme (proces) of een emergent veld (groepseffect).'],
+  ['naam', 'naam', 'Voorgestelde interne naam van het nieuwe element.'],
+  ['nieuwe_naam', 'nieuwe naam', 'Voorgestelde nieuwe naam bij een hernoeming.'],
+  ['filter', 'filter', 'Onder welk van de vijf propagandafilters (of tegenmacht/overig) dit element primair valt.'],
+  ['aard', 'aard', 'Hoe "echt" de verbinding is — bepaalt of ze als pijl, halo of goud veld in de graaf wordt getekend (zie de freeze-test hieronder).'],
+  ['mechanisme_type', 'mechanisme-type', 'Subtype van het mechanisme.'],
+  ['categorie', 'categorie', 'Categorie/cluster waar het element bij hoort.'],
+  ['element_id', 'element-id', 'Verwijzing naar een bestaand element (bij splitsen, samenvoegen of hernoemen).'],
 ];
+// Leesbare labels + uitleg per 'aard'. De symbolen spiegelen hoe het in de graaf oogt.
+const AARD = {
+  direct:            ['→ direct effect (pijl)',       'Een gewone, getekende verbinding van bron → doel; zo verschijnt ze als pijl in de graaf.'],
+  veld_eigenschap:   ['◯ veld-eigenschap (halo)',     'Een staande toestand van één knoop zonder aanwijsbare live-zender (bv. zelfcensuur); getekend als ring om het doel, niet als pijl.'],
+  veld_instantiatie: ['veld-instantiatie (verouderd)','Verouderde aard — wordt nu als gewone directe pijl getekend.'],
+  indirect:          ['indirect (verouderd)',         'Verouderde aard — indirectheid hoort bij een pad, niet bij één pijl; wordt nu als directe pijl getekend.'],
+};
+const aardLabel = a => AARD[a] || [String(a ?? ''), ''];
+const rolNaam = id => { const r = (ROLLEN || []).find(x => String(x.id) === String(id)); return r ? r.name : `rol #${id}`; };
 async function laadVoorstellenBadge() {
   try {
     const q = await (await fetch('/api/review_queue')).json();
@@ -1029,14 +1127,19 @@ async function laadVoorstellenBadge() {
 }
 function rendBron(b) {
   // Bronnen komen in twee vormen voor: losse strings (oudere RfC's) of objecten
-  // met auteur/titel/jaar/uitgever/type + toelichting of relevantie.
-  if (typeof b === 'string') return esc(b);
+  // met auteur/titel/jaar/uitgever/type + toelichting of relevantie. Een URL (apart
+  // veld of een kale link in de tekst) wordt klikbaar gemaakt — net als bij citaties.
+  if (typeof b === 'string') return linkify(b);
   if (!b || typeof b !== 'object') return esc(String(b ?? 'bron'));
   const kop = [b.auteur, b.titel].filter(Boolean).map(esc).join(' — ') || 'bron';
+  const url = b.url || b.link || (b.doi ? `https://doi.org/${b.doi}` : '')
+    || (b.handle ? `https://hdl.handle.net/${b.handle}` : '');
+  const kopHtml = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${kop}</a>` : kop;
+  const arch = b.archive_url ? ` <a class="arch" href="${esc(b.archive_url)}" target="_blank" rel="noopener" title="webarchief">[archief]</a>` : '';
   const sub = [b.jaar, b.uitgever, b.type].filter(Boolean).map(esc).join(', ');
   const toel = b.toelichting || b.relevantie || '';
-  return kop + (sub ? ` <span class="cite-src">(${sub})</span>` : '') +
-    (toel ? `<div style="color:var(--text-muted);font-size:11.5px;margin-top:1px">${esc(toel)}</div>` : '');
+  return kopHtml + (sub ? ` <span class="cite-src">(${sub})</span>` : '') + arch +
+    (toel ? `<div style="color:var(--text-muted);font-size:11.5px;margin-top:1px">${linkify(toel)}</div>` : '');
 }
 function rendInstantiatie(i) {
   // Beoogde instantiaties komen in drie vormen voor: een platte string (oudere RfC's),
@@ -1058,13 +1161,25 @@ function rendInstantiatie(i) {
 }
 function rendVoorstel(v) {
   const t = v.telling, akk = new Set(t.akkoorden).size, p = v.payload || {};
-  let h = `<div class="kaart"><div class="soort">${esc(v.soort)} · <a class="permalink" href="/overleg/voorstel/${v.id}" title="Permalink naar deze RfC">#${v.id}</a></div><h3>${esc(v.titel)}</h3>`;
+  let h = `<div class="kaart"><div class="soort">${esc(v.soort)} · <a class="permalink" href="/overleg/voorstel/${v.id}" title="Permalink naar dit theorievoorstel (RfC)">#${v.id}</a></div><h3>${esc(v.titel)}</h3>`;
   h += `<div class="meta"><span>door <b>${esc(v.ingediend_door)}</b></span><span>${esc((v.created_at || '').slice(0, 16))}</span>` +
     `<span><b>${akk}/${v.benodigde_akkoorden}</b> akkoord</span>` +
     `<span>${v.theorielaag ? 'theorielaag — 2 menselijke reviewers' : 'praktijklaag — 1 reviewer'}</span></div>`;
-  const tags = METAVELDEN.filter(([k]) => p[k] != null && p[k] !== '').map(([k, l]) => `<span class="tag">${l}: ${esc(p[k])}</span>`);
+  const tagHtml = (label, value, tip) =>
+    `<span class="tag"${tip ? ` title="${esc(tip)}" style="cursor:help"` : ''}>${esc(label)}: ${esc(value)}${tip ? ' <span style="opacity:.45;font-weight:400">ⓘ</span>' : ''}</span>`;
+  const tags = METAVELDEN.filter(([k]) => p[k] != null && p[k] !== '').map(([k, l, tip]) => {
+    if (k === 'aard') { const [al, atip] = aardLabel(p[k]); return tagHtml(l, al, atip || tip); }
+    return tagHtml(l, p[k], tip);
+  });
+  // Verbinding bron → doel (rollen, op naam) als één duidelijke richtings-tag vooraan —
+  // zo is meteen zichtbaar tussen welke rollen de pijl loopt.
+  if (p.source_role_id || p.target_role_id) {
+    const bron = p.source_role_id ? rolNaam(p.source_role_id) : '—';
+    const doel = p.target_role_id ? rolNaam(p.target_role_id) : '—';
+    tags.unshift(`<span class="tag" title="De verbinding loopt van bron-rol naar doel-rol — de richting van de pijl" style="cursor:help">${esc(bron)} <b>→</b> ${esc(doel)} <span style="opacity:.45;font-weight:400">ⓘ</span></span>`);
+  }
   if (tags.length) h += `<div class="tags">${tags.join('')}</div>`;
-  LANGEVELDEN.forEach(([k, l]) => { if (p[k]) h += `<div class="veld"><div class="vlabel">${l}</div><div class="vwaarde">${esc(p[k])}</div></div>`; });
+  LANGEVELDEN.forEach(([k, l, help]) => { if (p[k]) h += `<div class="veld"><div class="vlabel"${help ? ` title="${esc(help)}" style="cursor:help"` : ''}>${l}${help ? ' <span style="color:var(--text-muted);font-weight:400">ⓘ</span>' : ''}</div><div class="vwaarde">${esc(p[k])}</div></div>`; });
   if (p.instantiaties?.length) h += `<div class="veld"><div class="vlabel">Beoogde instantiaties</div><ul class="lijst">` +
     p.instantiaties.map(i => `<li>${rendInstantiatie(i)}</li>`).join('') + `</ul></div>`;
   if (p.bronnen?.length) h += `<div class="veld"><div class="vlabel">Bronnen (${p.bronnen.length})</div><ul class="lijst">` +
@@ -1080,7 +1195,17 @@ function rendVoorstel(v) {
     if (t.akkoorden.length) r += `✓ akkoord: ${t.akkoorden.map(esc).join(', ')}\n`;
     if (t.afwijzingen.length) r += `✕ afwijzing: ${t.afwijzingen.map(esc).join(', ')}\n`;
     if (t.advies.length) r += `advies (telt niet): ${t.advies.map(a => esc(a.reviewer) + ' ' + esc(a.oordeel)).join(', ')}`;
-    h += `<div class="veld"><div class="vlabel">Reviews</div><div class="vwaarde">${r}</div></div>`;
+    h += `<div class="veld"><div class="vlabel">Reviews</div><div class="vwaarde">${r}</div>`;
+    // Toegelichte oordelen: toon de motivatie per review (vooral de afwijs-reden), zodat
+    // de indiener meteen ziet wát te verbeteren voordat hij herziet.
+    (v.reviews || []).filter(rv => rv.motivatie).forEach(rv => {
+      const kl = rv.oordeel === 'akkoord' ? '#3ddc84' : (rv.oordeel === 'afwijzen' ? '#e0635f' : '#888');
+      const sym = rv.oordeel === 'akkoord' ? '✓' : (rv.oordeel === 'afwijzen' ? '✕' : '•');
+      const advies = (rv.kind && rv.kind !== 'mens') ? ' (advies)' : '';
+      h += `<div style="font-size:12px;color:var(--text-dim);background:color-mix(in srgb,${kl} 9%,transparent);border-left:2px solid ${kl};padding:5px 8px;margin-top:5px;border-radius:3px">` +
+        `<b style="color:var(--text-muted);font-weight:600">${sym} ${esc(rv.reviewer)}${advies}</b> — ${esc(rv.motivatie)}</div>`;
+    });
+    h += `</div>`;
   }
   // Review-acties alleen op een nog open voorstel; een besloten RfC toont zijn uitkomst
   // (geen knoppen die gegarandeerd 4xx geven).
@@ -1091,18 +1216,40 @@ function rendVoorstel(v) {
   } else {
     const kleur = v.status === 'geaccepteerd' ? '#3ddc84' : '#e0635f';
     h += `<div class="acties"><span style="color:${kleur}">Besloten: <b>${esc(v.status)}</b>` +
-      `${v.besloten_at ? ' · ' + esc(v.besloten_at.slice(0, 16)) : ''}</span></div>`;
+      `${v.besloten_at ? ' · ' + esc(v.besloten_at.slice(0, 16)) : ''}</span>`;
+    // De indiener (of een maintainer) mag een afgewezen/ingetrokken voorstel verbeteren en
+    // opnieuw indienen: een nieuw 'open' voorstel, voorgevuld uit dit voorstel (herkomst bewaard).
+    const magHerzien = (v.status === 'afgewezen' || v.status === 'ingetrokken')
+      && ME && (ME.username === v.ingediend_door || (ME.role === 'maintainer' && v.auteur_is_agent));
+    if (magHerzien) h += ` <button class="akkoord" onclick="herzienVoorstel(${v.id})" ` +
+      `title="Maakt een nieuw open voorstel, voorgevuld uit dit voorstel — pas het aan op basis van de feedback hierboven">Verbeteren &amp; opnieuw indienen</button>`;
+    if ((v.status === 'afgewezen' || v.status === 'ingetrokken') && ME && ME.role === 'maintainer')
+      h += ` <button class="afwijzen" onclick="verwijderVoorstel(${v.id})" title="Hard verwijderen uit de database — onomkeerbaar, geen audit-spoor">Verwijderen</button>`;
+    h += `<span class="uitslag" id="vst-${v.id}-uit"></span>`;
+    h += `</div>`;
   }
   h += `</div>`;
   return h;
 }
+async function herzienVoorstel(vid) {
+  const uit = document.getElementById(`vst-${vid}-uit`);
+  if (uit) uit.textContent = ' bezig…';
+  try {
+    const r = await fetch(`/api/voorstellen/${vid}/herzien`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    const j = await r.json();
+    if (!r.ok) { if (uit) uit.innerHTML = ` <span style="color:#e0635f">${esc(j.error || 'Mislukt')}</span>`; return; }
+    location.href = `/overleg/voorstel/${j.id}`;  // open de nieuwe, voorgevulde RfC om aan te vullen
+  } catch (e) { if (uit) uit.innerHTML = ` <span style="color:#e0635f">Netwerkfout</span>`; }
+}
 function contextLink(a) {
-  // Draad-anker: root-argumenten dragen hun doel; reacties erven het van hun wortel
+  // Thread-anker: root-argumenten dragen hun doel; reacties erven het van hun wortel
   // (thread_param/thread_id komt uit /api/review_queue, dus ook replies krijgen een link).
   const param = a.thread_param, id = a.thread_id;
-  return (param && id) ? ` <a class="context-link" href="#${param}=${id}" title="Bekijk dit argument in zijn discussiedraad">↗ in context</a>` : '';
+  return (param && id) ? ` <a class="context-link" href="#${param}=${id}" title="Bekijk dit argument in zijn thread">↗ in context</a>` : '';
 }
-// Read-only draad-render voor de reviewkaart (Fase A): toon de hele draad in context,
+// Read-only thread-render voor de reviewkaart (Fase A): toon de hele thread in context,
 // markeer het te beoordelen argument, en laat de 👍/👎-stand (community-signaal) zien
 // vóór de poort-klik. Read-only → geen knoppen/ids die met de Threads-tab botsen.
 function ratingTellingRO(a) {
@@ -1129,19 +1276,19 @@ function rendNodeRO(a, hlId) {
   h += `</div>`;
   return h;
 }
-async function toonReviewDraad(slotId, param, id, hlId) {
+async function toonReviewThread(slotId, param, id, hlId) {
   const slot = document.getElementById(slotId);
   if (!slot) return;
   if (slot.dataset.open === '1') { slot.innerHTML = ''; slot.dataset.open = ''; return; }
   slot.dataset.open = '1';
-  slot.innerHTML = '<div class="reviewdraad"><div class="kop">Draad laden…</div></div>';
+  slot.innerHTML = '<div class="reviewthread"><div class="kop">Thread laden…</div></div>';
   try {
     const args = await (await fetch(`/api/arguments?${param}=${id}`)).json();
     const roots = buildTree(args);
-    slot.innerHTML = `<div class="reviewdraad"><div class="kop">De volledige draad — gemarkeerd is het argument dat je beoordeelt:</div>` +
-      (roots.length ? roots.map(r => rendNodeRO(r, hlId)).join('') : '<div class="leeg">Lege draad.</div>') + `</div>`;
+    slot.innerHTML = `<div class="reviewthread"><div class="kop">De volledige thread — gemarkeerd is het argument dat je beoordeelt:</div>` +
+      (roots.length ? roots.map(r => rendNodeRO(r, hlId)).join('') : '<div class="leeg">Lege thread.</div>') + `</div>`;
   } catch (e) {
-    slot.innerHTML = `<div class="reviewdraad"><div class="leeg">Kon de draad niet laden (${esc(e.message)}).</div></div>`;
+    slot.innerHTML = `<div class="reviewthread"><div class="leeg">Kon de thread niet laden (${esc(e.message)}).</div></div>`;
   }
 }
 function rendArg(a, modus) {
@@ -1155,22 +1302,204 @@ function rendArg(a, modus) {
     : '';
   const revnoot = a.reviseert_id
     ? `<div class="revisie-noot">↻ revisie van argument #${a.reviseert_id} — vervangt het oude na merge</div>` : '';
-  const draad = (a.thread_param && a.thread_id)
-    ? `<button onclick="toonReviewDraad('rvd-${a.id}','${a.thread_param}',${a.thread_id},${a.id})">Toon draad in context</button>` : '';
+  // De onderbouwing (reasoning) is essentieel om te kunnen reviewen — bij een ondergraving
+  // benoemt ze de exact betwiste stap. Voluit tonen.
+  const reden = a.reasoning ? `<div class="arg-reden">${esc(a.reasoning)}</div>` : '';
+  // Drogreden-label + resolutielus van een ondergraving (open/herzien/blijft/opgelost).
+  const dro = a.objection_type ? `<span class="statusbadge" title="aangevoerd drogreden-type (taxonomie)">⚑ ${esc(a.objection_type)}</span>` : '';
+  const BEZW = { open: ['bezwaar open', '#e67e22'], herzien: ['herzien — herbeoordeel', '#3aa0e0'], blijft: ['blijft staan', '#e0635f'], opgelost: ['opgelost', '#3ddc84'] };
+  const bezw = (a.bezwaar_resolutie && BEZW[a.bezwaar_resolutie])
+    ? `<span class="statusbadge" style="color:${BEZW[a.bezwaar_resolutie][1]}" title="resolutielus van deze ondergraving">↻ ${BEZW[a.bezwaar_resolutie][0]}</span>` : '';
+  const ondMeta = (dro || bezw) ? `<div style="margin:3px 0 1px">${dro}${bezw}</div>` : '';
+  const propval = a.property_value ? ' = ' + esc(a.property_value) : '';
+  const thread = (a.thread_param && a.thread_id)
+    ? `<button onclick="toonReviewThread('rvd-${a.id}','${a.thread_param}',${a.thread_id},${a.id})">Toon thread in context</button>` : '';
+  // Mag de maintainer de inhoud bewerken bij heropenen? Zelfde poort als PATCH /api/arguments:
+  // agent-werk of eigen werk wel, het argument van een ándere mens niet (dan alleen heropenen).
+  const magBewerkAfg = ME && ME.role === 'maintainer' && (a.auteur_is_agent || a.contributed_by === ME.username);
   const acties = (modus === 'herkeuring')
     ? `<button class="akkoord" onclick="herkeurGoed(${a.id})">Opnieuw goedkeuren</button>` +
       `<button class="afwijzen" onclick="afwijsArg(${a.id})">Afwijzen</button>`
+    : (modus === 'afgewezen')
+    ? ((ME && ME.role === 'maintainer')
+        // Kun je de inhoud bewerken (agent-/eigen werk) → één knop die verbetert én heropent.
+        // Andermans menswerk herschrijf je niet → alleen ongewijzigd heropenen, de auteur herziet zelf.
+        ? (magBewerkAfg
+            ? `<button class="akkoord" onclick="verbeterAfgArg(${a.id})" title="De inhoud aanpassen en daarna heropenen (verworpen → voorgesteld)">Verbeteren &amp; heropenen</button>`
+            : `<button onclick="heropenArg(${a.id})" title="Ongewijzigd terug de wachtrij in (verworpen → voorgesteld); andermans werk herschrijf je niet — de auteur herziet zelf">Heropenen</button>`) +
+          `<button class="afwijzen" onclick="verwijderArg(${a.id})" title="Hard verwijderen uit de database — onomkeerbaar, geen audit-spoor">Verwijderen</button>`
+        : '')
     : `<button onclick="scoreDiff(${a.id})">Score-diff</button>` +
       `<button class="akkoord" onclick="mergeArg(${a.id})">Merge</button>` +
       `<button class="afwijzen" onclick="afwijsArg(${a.id})">Afwijzen</button>`;
-  return `<div class="kaart"><div class="soort">argument #${a.id} · ${esc(a.stance)}${a.property ? ' · ' + esc(a.property) : ''}${modus === 'herkeuring' ? ' · betwist' : ''}</div>` +
-    `<h3 style="font-size:14px">${esc(a.claim || '')}</h3>` + revnoot +
-    `<div class="meta"><span>${esc(a.doel)}${contextLink(a)}</span><span>${esc(a.contributed_by)}</span><span>${bronmeta}</span></div>` +
-    badge +
+  const feedbk = (modus === 'afgewezen' && a.feedback && a.feedback.reason)
+    ? `<div style="font-size:12px;color:var(--text-dim);background:color-mix(in srgb,#e0635f 9%,transparent);border-left:2px solid #e0635f;padding:5px 8px;margin:6px 0;border-radius:3px">✕ afgewezen door <b>${esc(a.feedback.changed_by || '?')}</b>: ${esc(a.feedback.reason)}</div>` : '';
+  const suffix = modus === 'herkeuring' ? ' · betwist' : modus === 'afgewezen' ? ' · verworpen' : '';
+  return `<div class="kaart"><div class="soort">argument #${a.id} · ${esc(a.stance)}${a.property ? ' · ' + esc(a.property) + propval : ''}${suffix}</div>` +
+    `<h3 style="font-size:14px">${esc(a.claim || '')}</h3>` + reden + ondMeta + revnoot +
+    `<div class="meta"><span>${esc(a.doel)}${contextLink(a)}</span><span>${esc(a.contributed_by)}</span><span>${esc((a.created_at || '').slice(0, 16))}</span><span>${bronmeta}</span></div>` +
+    badge + feedbk +
     (cites ? `<div class="cites">${cites}</div>` : '') +
-    `<div class="acties">${draad}${acties}<span class="uitslag" id="arg-${a.id}-uit"></span></div>` +
+    `<div class="acties">${thread}${acties}<span class="uitslag" id="arg-${a.id}-uit"></span></div>` +
+    (modus === 'afgewezen' ? `<div id="afgform-${a.id}"></div>` : '') +
     `<div id="rvd-${a.id}"></div></div>`;
 }
+// Drogreden-taxonomie (gelijk aan monitor_brief.md) voor de objection_type-keuze bij replies.
+const OBJECTION_TYPES = ['cirkelredenering', 'stroman', 'non_sequitur', 'correlatie_als_causatie',
+  'vals_dilemma', 'ad_hominem', 'autoriteit_buiten_domein', 'anekdote_als_regel', 'cherry_picking',
+  'equivocatie', 'citaat_dekking', 'overig'];
+function _afgArgById(id) { return ((afgewezenData || {}).argumenten || []).find(a => a.id === id); }
+// Toggle: vouw een bewerkformulier uit op de afgewezen-argumentkaart (verbeteren + heropenen in één).
+function verbeterAfgArg(id) {
+  const s = document.getElementById('afgform-' + id);
+  if (!s) return;
+  if (s.firstChild) { s.innerHTML = ''; return; }
+  const a = _afgArgById(id) || {};
+  const fid = 'afgarg' + id;
+  const isReply = a.parent_argument_id != null;
+  const stOpt = (st, lbl) => `<option value="${st}"${a.stance === st ? ' selected' : ''}>${lbl}</option>`;
+  // Stance (alle drie), claim, onderbouwing; root mét property → property_value; reply → drogreden-type.
+  const extra = isReply
+    ? (`<label>Drogreden-type (optioneel)</label><select id="${fid}-objt"><option value="">— geen —</option>` +
+       OBJECTION_TYPES.map(o => `<option value="${o}"${a.objection_type === o ? ' selected' : ''}>${o}</option>`).join('') + `</select>`)
+    : (a.property
+       ? `<label>Property-waarde (${esc(a.property)})</label><input type="text" id="${fid}-propval" value="${esc(a.property_value || '')}">`
+       : '');
+  s.innerHTML = `<div class="form" id="${fid}">
+    <h4>Verbeter dit afgewezen argument</h4>
+    <label>Positie</label>
+    <select id="${fid}-stance">${stOpt('supporting', '＋ ondersteunend')}${stOpt('contradicting', '− weerleggend/ondergravend')}${stOpt('contextual', '· context')}</select>
+    <label>Bewering *</label>
+    <input type="text" id="${fid}-claim" value="${esc(a.claim || '')}">
+    <label>Onderbouwing${isReply ? ' (bij een ondergraving: de exact betwiste stap)' : ''}</label>
+    <textarea id="${fid}-reason">${esc(a.reasoning || '')}</textarea>
+    ${extra}
+    <div class="rij2">
+      <div><label>Bron vervangen (optioneel)</label>
+        <div class="bronkies" data-metnieuw="0">
+          <input type="hidden" id="${fid}-src" value="">
+          <input type="text" id="${fid}-bronzoek" autocomplete="off" placeholder="Zoek een bron om de citaten te vervangen…"
+                 oninput="zoekBron('${fid}')" onfocus="zoekBron('${fid}')">
+          <div class="bron-resultaten" id="${fid}-bronlijst" style="display:none"></div>
+        </div></div>
+      <div><label>Citaat</label><input type="text" id="${fid}-quote" placeholder="laat leeg = citaten ongewijzigd"></div>
+    </div>
+    <div style="margin-top:10px">
+      <button class="prim" onclick="verstuurAfgArg(${id})">Verbeteren &amp; heropenen</button>
+      <button onclick="verbeterAfgArg(${id})">Annuleren</button></div>
+    <div class="melding" id="${fid}-msg"></div>
+  </div>`;
+}
+async function verstuurAfgArg(id) {
+  const fid = 'afgarg' + id;
+  const g = (suf) => { const el = document.getElementById(fid + '-' + suf); return el ? el.value : undefined; };
+  const claim = (g('claim') || '').trim();
+  const msg = document.getElementById(fid + '-msg');
+  if (!claim) { if (msg) msg.innerHTML = '<span style="color:#e0635f">Bewering is verplicht.</span>'; return; }
+  const body = { claim, reasoning: (g('reason') || '').trim() || null, stance: g('stance') };
+  const pv = g('propval'); if (pv !== undefined) body.property_value = pv.trim() || null;
+  const ot = g('objt'); if (ot !== undefined) body.objection_type = ot || null;
+  const src = g('src'); const quote = (g('quote') || '').trim();
+  if (src) body.citations = [{ source_id: parseInt(src, 10), quote: quote || null }];
+  if (msg) msg.textContent = 'Bezig…';
+  _afgActie(`arg-${id}-uit`, `/api/arguments/${id}/heropenen`, 'POST', body);
+}
+// Compacte kaart voor een afgewezen praktijk-element (entiteit/relatie) in de Afgewezen-weergave.
+function rendAfgewezenPraktijk(soort, item) {
+  const id = item.id;
+  const titel = soort === 'relatie'
+    ? `${esc(item.source_name)} → ${esc(item.target_name)}` : esc(item.name);
+  const sub = soort === 'relatie'
+    ? `${esc(item.relation_type || '')}${item.mechanism_name ? ' · ' + esc(item.mechanism_name) : ' · (geen mechanisme)'}`
+    : esc(item.type || '');
+  const fb = (item.feedback && item.feedback.reason)
+    ? `<div style="font-size:12px;color:var(--text-dim);background:color-mix(in srgb,#e0635f 9%,transparent);border-left:2px solid #e0635f;padding:5px 8px;margin:6px 0;border-radius:3px">✕ afgewezen door <b>${esc(item.feedback.changed_by || '?')}</b>: ${esc(item.feedback.reason)}</div>` : '';
+  const heraanmeld = soort === 'relatie' ? `heraanmeldRelatie(${id})` : `heraanmeldEntiteit(${id})`;
+  const verwijder = soort === 'relatie' ? `verwijderRelatie(${id})` : `verwijderEntiteit(${id})`;
+  // Een mens meldt zijn eigen afgewezen werk zelf opnieuw aan; een maintainer mag dit voor
+  // agent-werk. Hard verwijderen is maintainer-only.
+  const magHeraanmeld = ME && (ME.username === item.ingediend_door || (ME.role === 'maintainer' && item.auteur_is_agent));
+  const magVerwijderen = ME && ME.role === 'maintainer';
+  // Bewerkformulier: wie mag heraanmelden mag de velden eerst corrigeren (het `_heraanmeld`-
+  // endpoint neemt ze in de body mee vóór het afgewezen → voorgesteld zet). Zo hoef je niet
+  // eerst ongewijzigd te heraanmelden en daarna in de Praktijk-tab te zoeken.
+  let formHtml = '', acties;
+  if (magHeraanmeld) {
+    const lbl = 'font-size:11px;color:var(--text-dim);display:block;margin:5px 0 1px';
+    const inp = 'width:100%;font-size:12px;padding:3px 5px;box-sizing:border-box';
+    if (soort === 'entiteit') {
+      formHtml =
+        `<label style="${lbl}">Naam</label><input id="afg-ent-naam-${id}" style="${inp}" value="${esc(item.name || '')}">` +
+        `<label style="${lbl}">Type</label><select id="afg-ent-type-${id}" style="${inp}">${selectOpties(ENTITEIT_TYPES, item.type || '')}</select>` +
+        `<label style="${lbl}">Rol</label><select id="afg-ent-rol-${id}" style="${inp}">` +
+          `<option value="">— geen rol —</option>` +
+          (ROLLEN || []).map(r => `<option value="${r.id}"${r.id === item.primary_role_id ? ' selected' : ''}>${esc(r.name)}</option>`).join('') +
+        `</select>` +
+        `<label style="${lbl}">Omschrijving</label><textarea id="afg-ent-omschr-${id}" rows="2" style="${inp}">${esc(item.description || '')}</textarea>`;
+    } else {
+      formHtml =
+        `<label style="${lbl}">Type relatie</label><select id="afg-rel-type-${id}" style="${inp}">${selectOpties(RELATIE_TYPES, item.relation_type || '')}</select>` +
+        `<label style="${lbl}">Omschrijving</label><textarea id="afg-rel-omschr-${id}" rows="2" style="${inp}">${esc(item.description || '')}</textarea>` +
+        `<label style="${lbl}">Zekerheid (0–1) · invloed (0–1)</label>` +
+        `<div style="display:flex;gap:6px"><input id="afg-rel-zek-${id}" type="number" min="0" max="1" step="0.05" style="${inp}" value="${item.certainty != null ? item.certainty : ''}">` +
+        `<input id="afg-rel-inv-${id}" type="number" min="0" max="1" step="0.05" style="${inp}" value="${item.influence != null ? item.influence : ''}"></div>`;
+    }
+    formHtml = `<div style="margin:6px 0;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:4px">${formHtml}</div>`;
+    acties = `<button class="akkoord" onclick="${heraanmeld}" title="Velden hierboven overnemen en terug de wachtrij in (afgewezen → voorgesteld)">Verbeteren &amp; heraanmelden</button>`;
+  } else {
+    acties = `<span style="font-size:12px;color:var(--text-muted)">de auteur meldt dit zelf opnieuw aan</span>`;
+  }
+  if (magVerwijderen) acties += `<button class="afwijzen" onclick="${verwijder}" title="Hard verwijderen uit de database — onomkeerbaar, geen audit-spoor">Verwijderen</button>`;
+  return `<div class="kaart"><div class="soort">${soort} · #${id}${sub ? ' · ' + sub : ''} · afgewezen</div>` +
+    `<h3 style="font-size:14px">${titel}</h3>` +
+    // De omschrijving staat al in het bewerkformulier; toon de read-only kopie alleen als er geen formulier is.
+    (!magHeraanmeld && item.description ? `<div class="vwaarde" style="margin:4px 0">${esc(item.description)}</div>` : '') +
+    `<div class="meta"><span>door <b>${esc(item.ingediend_door || '?')}</b></span><span>${esc((item.created_at || '').slice(0, 16))}</span></div>` +
+    fb + formHtml +
+    `<div class="acties">${acties}<span class="uitslag" id="afg-${soort}-${id}-uit"></span></div></div>`;
+}
+// Admin-acties op afgewezen items: terug de wachtrij in (verbeteren) of hard verwijderen.
+async function _afgActie(uitId, url, method, body) {
+  const uit = document.getElementById(uitId); if (uit) uit.textContent = ' bezig…';
+  const opts = { method };
+  if (method === 'POST') { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(body || {}); }
+  try {
+    const r = await fetch(url, opts);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { if (uit) uit.innerHTML = ` <span style="color:#e0635f">${esc(j.error || 'Mislukt')}</span>`; return; }
+    if (uit) uit.innerHTML = ' <span style="color:#3ddc84">gelukt</span>';
+    setTimeout(() => { laadVoorstellen(); laadVoorstellenBadge(); }, 700);
+  } catch (e) { if (uit) uit.innerHTML = ' <span style="color:#e0635f">Netwerkfout</span>'; }
+}
+function heropenArg(id) { _afgActie(`arg-${id}-uit`, `/api/arguments/${id}/heropenen`, 'POST'); }
+function verwijderArg(id) { if (confirm(`Argument #${id} definitief verwijderen uit de database? Onomkeerbaar.`)) _afgActie(`arg-${id}-uit`, `/api/arguments/${id}`, 'DELETE'); }
+function verwijderVoorstel(id) { if (confirm(`Voorstel #${id} definitief verwijderen uit de database? Onomkeerbaar.`)) _afgActie(`vst-${id}-uit`, `/api/voorstellen/${id}`, 'DELETE'); }
+// Verzamel de (eventueel) bewerkte velden uit het formulier en stuur ze mee; het endpoint
+// neemt alleen niet-lege velden over en zet daarna afgewezen → voorgesteld.
+function heraanmeldEntiteit(id) {
+  const v = (sel) => { const el = document.getElementById(sel); return el ? el.value : undefined; };
+  const naam = v(`afg-ent-naam-${id}`), type = v(`afg-ent-type-${id}`);
+  const rol = v(`afg-ent-rol-${id}`), omschr = v(`afg-ent-omschr-${id}`);
+  const body = {};
+  if (naam != null && naam.trim()) body.name = naam.trim();
+  if (type) body.type = type;
+  if (rol !== undefined) body.primary_role_id = rol === '' ? null : parseInt(rol, 10);
+  if (omschr !== undefined) body.description = omschr.trim() || null;
+  _afgActie(`afg-entiteit-${id}-uit`, `/api/entities/${id}/heraanmelden`, 'POST', body);
+}
+function heraanmeldRelatie(id) {
+  const v = (sel) => { const el = document.getElementById(sel); return el ? el.value : undefined; };
+  const type = v(`afg-rel-type-${id}`), omschr = v(`afg-rel-omschr-${id}`);
+  const zek = v(`afg-rel-zek-${id}`), inv = v(`afg-rel-inv-${id}`);
+  const body = {};
+  if (type) body.relation_type = type;
+  if (omschr !== undefined) body.description = omschr.trim() || null;
+  if (zek !== undefined && zek !== '') body.certainty = parseFloat(zek);
+  if (inv !== undefined && inv !== '') body.influence = parseFloat(inv);
+  _afgActie(`afg-relatie-${id}-uit`, `/api/relations/${id}/heraanmelden`, 'POST', body);
+}
+function verwijderEntiteit(id) { if (confirm(`Entiteit #${id} definitief verwijderen? Dit sleept ook gekoppelde relaties/argumenten mee. Onomkeerbaar.`)) _afgActie(`afg-entiteit-${id}-uit`, `/api/entities/${id}`, 'DELETE'); }
+function verwijderRelatie(id) { if (confirm(`Relatie #${id} definitief verwijderen? Dit sleept ook bijbehorende argumenten mee. Onomkeerbaar.`)) _afgActie(`afg-relatie-${id}-uit`, `/api/relations/${id}`, 'DELETE'); }
 async function herkeurGoed(id) {
   const uit = document.getElementById(`arg-${id}-uit`); uit.textContent = 'Bezig…';
   try {
@@ -1186,7 +1515,16 @@ async function laadVoorstellen() {
   const m = document.getElementById('vMain');
   m.innerHTML = 'Laden…';
   try {
-    reviewData = await (await fetch('/api/review_queue')).json();
+    // De wachtrij + (reviewer-only) agent-advies parallel; advies faalt stil voor wie
+    // geen reviewer is (401/403) → dan tonen we simpelweg geen paneel.
+    const [rq, adv, afg] = await Promise.all([
+      fetch('/api/review_queue').then(r => r.json()),
+      fetch('/api/review_advies').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/afgewezen').then(r => r.ok ? r.json() : null).catch(() => null)
+    ]);
+    reviewData = rq;
+    adviesData = adv;
+    afgewezenData = afg;
     reviewGeladen = true;
     // Eerste keer: spring automatisch naar de eerste niet-lege lijst zodat je nooit op een lege view landt.
     if (!voorstelTypeGekozen) {
@@ -1197,37 +1535,86 @@ async function laadVoorstellen() {
     tekenVoorstellen();
   } catch (e) { m.innerHTML = `<div class="banner">Kon de wachtrij niet laden (${esc(e.message)}).</div>`; }
 }
+// Agent-advies (reviewbeoordelaar) rechts van een wachtrij-item. Komt uit
+// /api/review_advies — een los rapport buiten het model, dus puur beslissteun; het
+// telt nergens mee en vervangt geen menselijk akkoord.
+const ADVIES_VERDICT = {
+  // argumenten/relaties
+  'merge-klaar': ['✅ Merge-klaar', '#3ddc84'],
+  'verbeteren':  ['⚠️ Verbeteren', '#e6a23c'],
+  'afwijzen':    ['❌ Afwijzen', '#e0635f'],
+  'context':     ['ℹ️ Let op', '#9aa0a6'],
+  // theorie (RfC's) — inhoudelijk oordeel, geen procesnoot
+  'steun':       ['✅ Steun — akkoord-waardig', '#3ddc84'],
+  'aanscherpen': ['🔧 Aanscherpen', '#e6a23c'],
+  'bezwaar':     ['⛔ Bezwaar', '#e0635f'],
+  'proces':      ['📋 Proces', '#6c8aff']
+};
+function adviesPaneel(key) {
+  const a = adviesData && adviesData.items ? adviesData.items[key] : null;
+  if (!a) return '';
+  const [label, kleur] = ADVIES_VERDICT[a.verdict] || ['Advies', '#9aa0a6'];
+  const datum = adviesData.gegenereerd ? ` · ${esc(adviesData.gegenereerd)}` : '';
+  return `<aside class="advies" style="border-left-color:${kleur}">` +
+    `<div class="advies-kop" style="color:${kleur}">${label}</div>` +
+    (a.kop ? `<div class="advies-titel">${esc(a.kop)}</div>` : '') +
+    (a.detail ? `<div class="advies-detail">${esc(a.detail)}</div>` : '') +
+    (a.bron_check ? `<div class="advies-broncheck">🔍 ${esc(a.bron_check)}</div>` : '') +
+    `<div class="advies-bron">reviewbeoordelaar · advies, telt niet mee${datum}</div></aside>`;
+}
+// Wikkel een kaart-HTML in een rij met het advies ernaast (rechts). Zonder advies
+// blijft de kaart simpelweg op volle breedte staan.
+function metAdvies(key, kaartHtml) {
+  const p = adviesPaneel(key);
+  return p ? `<div class="kaart-rij">${kaartHtml}${p}</div>` : kaartHtml;
+}
 function kiesVoorstelType(t) { actiefVoorstelType = t; voorstelTypeGekozen = true; tekenVoorstellen(); }
 function tekenVoorstellen() {
   const m = document.getElementById('vMain'), q = reviewData;
   if (!q) return;
   const nRfc = q.voorstellen.length, nArg = q.argumenten.length, nHerk = (q.herkeuring || []).length;
   const nEnt = (q.entiteiten || []).length, nRel = (q.relaties || []).length, nPraktijk = nEnt + nRel;
+  const af = afgewezenData || {};
+  const nAfg = (af.voorstellen || []).length + (af.argumenten || []).length
+             + (af.entiteiten || []).length + (af.relaties || []).length;
   let h = '';
   if (!ME) h += `<div class="banner">Niet ingelogd — lezen mag, maar akkoord/afwijzen/merge vereist <a href="/login">inloggen</a> (reviewer of hoger; niemand beoordeelt eigen werk).</div>`;
   else if (ME.role === 'bijdrager') h += `<div class="banner">Je bent <b>bijdrager</b> — acties vereisen reviewer of hoger.</div>`;
   // Segmented control: RfC's (zwaar, gestructureerd, 2 akkoorden) · argumenten (licht bewijs om te mergen)
   // · herkeuring (betwiste, al gemergede argumenten) · praktijk (voorgestelde entiteiten/relaties).
-  const pil = (t, label, n) => `<span class="vpil${actiefVoorstelType === t ? ' actief' : ''}" onclick="kiesVoorstelType('${t}')">${label}<span class="vpil-n">${n}</span></span>`;
-  h += `<div class="vsegment">${pil('rfc', "RfC's", nRfc)}${pil('argumenten', 'Argumenten', nArg)}` +
-    `${pil('herkeuring', 'Herkeuring', nHerk)}${pil('praktijk', 'Praktijk', nPraktijk)}</div>`;
+  const pil = (t, label, n, title) => `<span class="vpil${actiefVoorstelType === t ? ' actief' : ''}"${title ? ` title="${esc(title)}"` : ''} onclick="kiesVoorstelType('${t}')">${label}<span class="vpil-n">${n}</span></span>`;
+  h += `<div class="vsegment">${pil('rfc', 'Theorie', nRfc, 'Theorievoorstellen (ook wel RfC — Request for Comment): voorstellen voor een nieuw theorie-element dat eerst openlijk ter discussie staat voordat het wordt opgenomen.')}${pil('argumenten', 'Argumenten', nArg)}` +
+    `${pil('herkeuring', 'Herkeuring', nHerk)}${pil('praktijk', 'Praktijk', nPraktijk)}` +
+    `${pil('afgewezen', 'Afgewezen', nAfg, 'Afgewezen/ingetrokken inzendingen — herzien, heropenen, heraanmelden of hard verwijderen (maintainer).')}</div>`;
   if (actiefVoorstelType === 'rfc') {
     h += `<div class="banner" style="background:rgba(108,138,255,.10);border-color:color-mix(in srgb,var(--accent) 35%,transparent)">` +
-      `Theorie-RfC's vergen <b>twee</b> menselijke reviewer-akkoorden (indiener telt niet mee). In de opbouwfase telt één akkoord van een globale <b>maintainer</b> als volledig quorum — gevlagd, betwistbaar.</div>`;
-    h += nRfc ? q.voorstellen.map(rendVoorstel).join('') : '<div class="leeg">Geen open voorstellen.</div>';
+      `<b>Theorievoorstellen</b> — voorstellen voor een nieuw theorie-element (rol, mechanisme of emergent veld). Ze heten ook wel een <b>RfC</b> (<i>Request for Comment</i>): ze staan eerst openlijk ter discussie voordat ze in het model worden opgenomen. ` +
+      `Een theorievoorstel vergt <b>twee</b> menselijke reviewer-akkoorden (indiener telt niet mee). In de opbouwfase telt één akkoord van een globale <b>maintainer</b> als volledig quorum — gevlagd, betwistbaar.</div>`;
+    h += nRfc ? q.voorstellen.map(v => metAdvies('voorstel:' + v.id, rendVoorstel(v))).join('') : '<div class="leeg">Geen open voorstellen.</div>';
   } else if (actiefVoorstelType === 'herkeuring') {
     h += `<div class="banner">Al gemergede argumenten die <b>terug ter herkeuring</b> staan (status <code>betwist</code>) — ` +
       `bv. na een slechte rating of een drogreden-ondergraving. Keur opnieuw goed, wijs af (mét motivatie), of laat ` +
-      `de auteur een <b>revisie</b> indienen vanuit de draad.</div>`;
-    h += nHerk ? q.herkeuring.map(a => rendArg(a, 'herkeuring')).join('') : '<div class="leeg">Niets ter herkeuring.</div>';
+      `de auteur een <b>revisie</b> indienen vanuit de thread.</div>`;
+    h += nHerk ? q.herkeuring.map(a => metAdvies('arg:' + a.id, rendArg(a, 'herkeuring'))).join('') : '<div class="leeg">Niets ter herkeuring.</div>';
   } else if (actiefVoorstelType === 'praktijk') {
     h += `<div class="banner">Voorgestelde <b>praktijklaag</b>-elementen: entiteiten/relaties die een niet-maintainer toevoegde. ` +
       `Ze staan nog niet in de graaf; een reviewer+ keurt goed of af (niemand keurt eigen werk goed).</div>`;
     if (!nPraktijk) h += '<div class="leeg">Geen openstaande praktijkvoorstellen.</div>';
-    if (nEnt) h += `<h2 class="sectie">Entiteiten (${nEnt})</h2>` + q.entiteiten.map(rendModEntiteit).join('');
-    if (nRel) h += `<h2 class="sectie">Relaties (${nRel})</h2>` + q.relaties.map(rendModRelatie).join('');
+    if (nEnt) h += `<h2 class="sectie">Entiteiten (${nEnt})</h2>` + q.entiteiten.map(e => metAdvies('entiteit:' + e.id, rendModEntiteit(e))).join('');
+    if (nRel) h += `<h2 class="sectie">Relaties (${nRel})</h2>` + q.relaties.map(r => metAdvies('relatie:' + r.id, rendModRelatie(r))).join('');
+  } else if (actiefVoorstelType === 'afgewezen') {
+    const nav = (af.voorstellen || []).length, naa = (af.argumenten || []).length;
+    const nae = (af.entiteiten || []).length, nar = (af.relaties || []).length;
+    h += `<div class="banner">Afgewezen / ingetrokken inzendingen (vaak agent-werk). Als maintainer kun je ze ` +
+      `<b>verbeteren</b> (herzien / heropenen / heraanmelden — terug de wachtrij in) of <b>hard verwijderen</b> ` +
+      `(onomkeerbaar, geen audit-spoor). Afwijs-reden staat bij elk item.</div>`;
+    if (!nAfg) h += '<div class="leeg">Niets afgewezen of ingetrokken.</div>';
+    if (nav) h += `<h2 class="sectie">Theorie-voorstellen (${nav})</h2>` + af.voorstellen.map(rendVoorstel).join('');
+    if (naa) h += `<h2 class="sectie">Argumenten (${naa})</h2>` + af.argumenten.map(a => rendArg(a, 'afgewezen')).join('');
+    if (nae) h += `<h2 class="sectie">Entiteiten (${nae})</h2>` + af.entiteiten.map(rendAfgewezenPraktijk.bind(null, 'entiteit')).join('');
+    if (nar) h += `<h2 class="sectie">Relaties (${nar})</h2>` + af.relaties.map(rendAfgewezenPraktijk.bind(null, 'relatie')).join('');
   } else {
-    h += nArg ? q.argumenten.map(a => rendArg(a)).join('') : '<div class="leeg">Geen voorgestelde argumenten.</div>';
+    h += nArg ? q.argumenten.map(a => metAdvies('arg:' + a.id, rendArg(a))).join('') : '<div class="leeg">Geen voorgestelde argumenten.</div>';
   }
   m.innerHTML = h;
 }
@@ -1259,11 +1646,43 @@ function rendModEntiteit(e) {
     `<span class="uitslag" id="mod-entities-${e.id}-uit"></span></div></div>`;
 }
 function rendModRelatie(r) {
-  return `<div class="kaart"><div class="soort">relatie · #${r.id} · ${esc(r.relation_type)}${r.mechanism_name ? ' · ' + esc(r.mechanism_name) : ''}</div>` +
+  const args = r.argumenten || [];
+  const echteBron = args.some(a => (a.citations || []).some(c => c.echt));
+  const allesVoorgesteld = args.length && args.every(a => a.status === 'voorgesteld');
+  let bewijs;
+  if (!echteBron) {
+    // Geen gesourcet argument → de goedkeuringspoort blokkeert dit; maak dat hier zichtbaar.
+    bewijs = `<div class="vwaarde" style="margin:6px 0;color:#e0635f;background:rgba(224,99,95,.08);border-left:2px solid #e0635f;padding:6px 8px;border-radius:3px">` +
+      `⚠ Geen gesourcet argument — een edge zonder bewijs is een lege bewering. Goedkeuren is geblokkeerd; wijs af of vraag de indiener om een onderbouwend argument mét bron.</div>`;
+  } else {
+    bewijs = `<div style="margin:6px 0"><div class="vlabel">Onderbouwing (${args.length})</div>` +
+      args.map(a => {
+        const [sym, kleur] = STANCE[a.stance] || ['•', '#888'];
+        const pend = a.status === 'voorgesteld'
+          ? ` <span class="statusbadge" title="dit argument is zelf nog een voorstel — het telt pas mee in de score nadat een reviewer het merget">⏳ nog voorgesteld</span>` : '';
+        return `<div class="arg" style="margin-top:4px"><div class="arg-kop"><span class="stance" style="color:${kleur}">${sym}</span> <b>${esc(a.claim || '')}</b>${pend}</div>` +
+          (a.citations || []).map(citeHtml).join('') + `</div>`;
+      }).join('');
+    if (allesVoorgesteld) bewijs += `<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">` +
+      `ℹ De zekerheid blijft op de vloer tot het argument hierboven óók gemerged is (apart, in de Argumenten-tab).</div>`;
+    bewijs += `</div>`;
+  }
+  // Kenmerken-tags: propagandafilter + aard (pijl/halo) van het mechanisme, looptijd,
+  // bidirectioneel — zodat de reviewer ziet wélk soort verband dit is, niet alleen wie→wie.
+  const kenmerken = [];
+  if (r.mechanism_filter) kenmerken.push(`<span class="tag" title="propagandafilter van het gekoppelde mechanisme">${esc(r.mechanism_filter)}</span>`);
+  if (r.mechanism_aard) { const [al, atip] = aardLabel(r.mechanism_aard); kenmerken.push(`<span class="tag" title="${esc(atip)}" style="cursor:help">${esc(al)}</span>`); }
+  if (r.bidirectional) kenmerken.push(`<span class="tag" title="wederzijds verband (telt beide richtingen)">↔ bidirectioneel</span>`);
+  if (r.active_from || r.active_until) kenmerken.push(`<span class="tag" title="looptijd van het verband">${esc(r.active_from || '…')} – ${esc(r.active_until || 'heden')}</span>`);
+  const kenmerkenHtml = kenmerken.length ? `<div class="tags">${kenmerken.join('')}</div>` : '';
+  return `<div class="kaart"><div class="soort">relatie · #${r.id} · ${esc(r.relation_type)}${r.mechanism_name ? ' · ' + esc(r.mechanism_name) : ' · (geen mechanisme)'}</div>` +
     `<h3 style="font-size:14px">${esc(r.source_name)} → ${esc(r.target_name)}</h3>` +
     (r.description ? `<div class="vwaarde" style="margin:4px 0">${esc(r.description)}</div>` : '') +
+    kenmerkenHtml +
     `<div class="meta"><span>door <b>${esc(r.ingediend_door || '?')}</b></span>` +
-    `<span>zekerheid ${Math.round((r.certainty || 0) * 100)}% · invloed ${Math.round((r.influence || 0) * 100)}%</span></div>` +
+    `<span>${esc((r.created_at || '').slice(0, 16))}</span>` +
+    `<span title="zekerheid: bestaat dit verband? · invloed: hoe sterk stuurt het de berichtgeving?">zekerheid ${Math.round((r.certainty || 0) * 100)}% · invloed ${Math.round((r.influence || 0) * 100)}%</span></div>` +
+    bewijs +
     modActies('relations', r.id);
 }
 function modActies(tabel, id) {
@@ -1395,7 +1814,7 @@ async function leesHash() {
   kiesTab('overleg');
   if (!indexData) await laadIndex();
   // ?label= (meegegeven door de viz-titel-link) wint van de index-opzoeking — nodig voor
-  // elementen zonder bestaande draad (entiteiten).
+  // elementen zonder bestaande thread (entiteiten).
   const qlabel = new URLSearchParams(location.search).get('label');
   toonThread(param, id, qlabel || labelVoorThread(param, id));
 }

@@ -623,7 +623,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <span class="search-icon">&#x1F50D;</span>
     <input type="text" id="search" placeholder="Zoek..." autocomplete="off" spellcheck="false">
   </div>
-  <button type="button" id="discussieBtn" class="admin-btn" title="Open de overlegpagina — alle discussiedraden én open voorstellen, op een eigen pagina">Overleg</button>
+  <button type="button" id="discussieBtn" class="admin-btn" title="Open de overlegpagina — alle threads én open voorstellen, op een eigen pagina">Overleg</button>
   <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen" style="display:none">+ Toevoegen</button>
   <a id="authChip" class="admin-btn" href="/login" style="display:none;text-decoration:none">Inloggen</a>
   <div class="stats" id="stats"></div>
@@ -805,7 +805,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <select id="sizeMetric" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);font-size:12px"></select>
     <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
   </div>
-  <!-- Review-wachtrij + discussiedraden wonen op /overleg (topbar-knop "Overleg") -->
+  <!-- Review-wachtrij + threads wonen op /overleg (topbar-knop "Overleg") -->
   <div class="panel-section" id="healthSection">
     <h3 id="healthHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
         title="Gezondheidsfoto van het model — dezelfde checks als scripts/validate_model.py, live via /api/health.">
@@ -2163,6 +2163,15 @@ function buildGraph() {
   nodes.forEach(n => nodeById.set(n.id, n));
   nodeByIdGlobal = nodeById;          // voor de emergente-veld-hulls (id -> node-object)
 
+  // Defensief: gooi elke edge weg waarvan een eindpunt niet bij de huidige nodes zit.
+  // d3.forceLink gooit anders "missing: <id>" en de héle graaf laadt niet — één relatie
+  // naar een verborgen/afgewezen knoop zou zo het hele (praktijk)model platleggen.
+  links = links.filter(l => {
+    const s = (l.source && typeof l.source === 'object') ? l.source.id : l.source;
+    const t = (l.target && typeof l.target === 'object') ? l.target.id : l.target;
+    return nodeById.has(s) && nodeById.has(t);
+  });
+
   currentNodes = nodes;
   currentLinks = links;
   _ringMaps = { instance: null, theory: null };    // multi-filter-ring lui herberekenen op de nieuwe data
@@ -2668,14 +2677,14 @@ function renderEmergentScore(eff) {
     ${scoreVlaggen(eff)}`, { open: true, meta: `${pct(eff.geloofwaardigheid)}%` });
 }
 
-// Titel-link vanuit de detailbalk naar de overlegpagina (discussiedraad) van dít element —
+// Titel-link vanuit de detailbalk naar de overlegpagina (thread) van dít element —
 // het tegenstuk van de "↗ bekijk in de graaf"-knop op /overleg (round-trip).
 function overlegTitel(param, id, inner) {
   // Naam meegeven via ?label= zodat de overlegkop ook klopt voor elementen die nog
-  // geen draad (dus geen index-vermelding) hebben — m.n. entiteiten.
+  // geen thread (dus geen index-vermelding) hebben — m.n. entiteiten.
   const href = `/overleg?label=${encodeURIComponent(inner)}#${param}=${id}`;
   return `<a class="titel-overleg" href="${href}" `
-    + `title="Open de overlegpagina (discussiedraad) van dit element">${inner}<span class="pijl">↗</span></a>`;
+    + `title="Open de overlegpagina (thread) van dit element">${inner}<span class="pijl">↗</span></a>`;
 }
 
 function selectEmergent(eff) {
@@ -3140,7 +3149,15 @@ function selectRelation(r) {
   const inflDetail = r.influence_detail || null;
   const color = getLinkColor(r, state.model === 'theory');
 
+  // Terug-knop bovenaan, als nette breadcrumb in accentkleur (zelfde stijl als
+  // het afgeleide-pad-paneel) i.p.v. een losse knop onderin.
+  const terugLink = src
+    ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px"
+         onclick="selectNode(currentNodes.find(n=>n.id===${src.id}))">← terug naar ${srcName}</div>`
+    : '';
+
   let html = `
+    ${terugLink}
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${RELATION_LABELS[r.relation_type] || r.relation_type}${r.mechanism_name ? ' · ' + r.mechanism_name : ''}</div>
       <h2>${overlegTitel('relation_id', r.id, srcName + ' → ' + tgtName)}</h2>
@@ -3181,11 +3198,6 @@ function selectRelation(r) {
   </div>`;
   html += collapsibleSection('Discussie', relDiscTree + relDiscForm,
     { meta: nRelArgs ? `${nRelArgs} arg.` : 'geen', open: true });
-
-  // Terug-knop naar entiteit
-  if (src) {
-    html += `<div style="margin-top:12px"><button class="arg-toggle" onclick="selectNode(currentNodes.find(n=>n.id===${src.id}))">← ${srcName}</button></div>`;
-  }
 
   // Adminmodus: relatie verwijderen (praktijklaag). Mechanismen lopen via showMechanismDetail.
   if (state.adminMode) {
@@ -5098,9 +5110,9 @@ document.getElementById('healthHeader').addEventListener('click', () => {
 document.getElementById('healthRefresh').addEventListener('click', loadHealth);
 
 // ── Overleg-knop ─────────────────────────────────────────────
-// De discussiedraden én de review-wachtrij wonen op een eigen, rustige pagina
+// De threads én de review-wachtrij wonen op een eigen, rustige pagina
 // (/overleg). De knop neemt het geselecteerde element mee als deeplink, zodat je
-// vanuit de graaf rechtstreeks in de juiste draad belandt (round-trip met ↗-terugknop).
+// vanuit de graaf rechtstreeks in de juiste thread belandt (round-trip met ↗-terugknop).
 function overlegHashVoorSelectie() {
   if (state.emergentActive != null) return `#emergent_effect_id=${state.emergentActive}`;
   const isTheory = state.model === 'theory';

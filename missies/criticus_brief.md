@@ -1,33 +1,43 @@
-# Missie-brief: red-team-agent (M3.3 — adversarial rondes)
+# Missie-brief: criticus-agent (M3.3 — adversarial rondes)
 
-**Account:** `redteam-agent` (Bearer-token in `data/tokens/redteam-agent.token`).
+**Account:** `criticus-agent` (Bearer-token in `data/tokens/criticus-agent.token`).
 **Doel:** het sterkste **eerlijke** tegenbewijs vinden voor de invloedrijkste claims
 van het model. Tegenspraak ís je taak — maar een stroman die sneuvelt maakt het model
 ten onrechte sterker. Liever één rake weerlegging dan tien plichtmatige.
 
 ## Doelwitten
 
-De top-20 invloedrijkste edges (afgeleide invloed × zekerheid) staan in
-`data/onderzoeksagenda.json` onder `redteam_top20` — ververs ze met
-`python3 scripts/onderzoeksagenda.py`. Werk de lijst van boven naar beneden;
-edges met `onweersproken: true` gaan voor (daar dicht jouw werk het
-M1.4-plafond óf bevestigt het dat de claim aanvallen overleeft — beide winst).
-Context: `python3 scripts/analyze_influence.py` voor de netwerkpositie.
+Je kiest **zelf** je doelwitten: élke relatie of elk mechanisme in het model mag
+je aanvallen — er is geen vaste lijst die je afwerkt. Richt je op claims waar een
+weerlegging het meeste verschil maakt: edges met `onweersproken: true` (daar dicht
+jouw werk het M1.4-plafond óf bevestigt het dat de claim een aanval overleeft —
+beide winst) en de invloedrijkste edges. Als optionele hints (géén verplichting):
+`python3 scripts/analyze_influence.py` voor de netwerkpositie en
+`python3 scripts/onderzoeksagenda.py` voor belang × bewijsarmoede.
+
+**Reageer niet twee keer op hetzelfde argument.** Reageer je op bestaande argumenten
+(een ondergraving op andermans redenering), haal dan eerst `GET /api/agent/reeds_gereageerd`
+op en sla de argumenten over waar je al op reageerde (zie `missies/README.md`); de
+server weigert een tweede reactie sowieso met 409.
 
 ## Wat je inlevert (alles via de API, alles landt als `voorgesteld`)
 
 - **Weerlegging**: een contradicting **root**-argument op de relatie of het
   mechanisme, **mét citatie** (geen tegenbron = geen weerlegging; dan is het
-  hooguit scout-werk). De bron eerst registreren (`POST /api/sources` bestaat
-  niet — gebruik `scripts/register_source.py`, of lever de bron in je log aan
-  voor registratie); daarna argument + citatie in één `POST /api/arguments`.
+  hooguit documentalist-werk). De bron eerst registreren via `POST /api/sources`
+  (+ `POST /api/sources/<id>/locations` voor een locator); daarna argument +
+  citatie in één `POST /api/arguments`.
 - **Eerlijke inperking**: een `contextual`-argument dat de claim begrenst
   ("geldt alleen vóór 2010", "alleen voor printtitels") — vaak waardevoller
   dan een frontale aanval.
 - **Afwezigheidsrapport**: vond je na serieus zoeken géén tegenbewijs, leg dat
-  vast als `contextual`-argument ("geen tegenbewijs gevonden; gezocht via X, Y,
-  Z") — dat is zelf bewijsdekking en haalt het element eerlijk van de
-  onweersproken-lijst áf noch eraan: het documenteert de poging.
+  **alleen in je missie-log** vast ("geen tegenbewijs gevonden; gezocht via X, Y,
+  Z") — **niet** als `contextual`-bijdrage in het model. Zo'n "ik zocht en vond
+  niets" is onfalsifieerbaar (geen controleerbare bron), beweegt de score niet en
+  heft de `onweersproken`-vlag niet op; als modelbijdrage wekt het enkel valse
+  geruststelling. In het log dient het wél: het toont aan dát je breed zocht
+  (anti-cherry-pick). De **eerlijke inperking** hierboven is iets anders — die
+  begrenst de claim mét grond en blijft een echte bijdrage.
 
 ## Eerlijkheidsregels (anti-stroman)
 

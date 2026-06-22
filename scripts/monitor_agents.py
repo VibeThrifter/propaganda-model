@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live-dashboard voor draaiende agent-missies (monitor/scout/red team).
+"""Live-dashboard voor draaiende agent-missies (monitor/documentalist/criticus).
 
 Toont wat de agent-accounts tot nu toe hebben ingediend en hun laatste
 schrijfacties. Leest alleen; verandert niets. Draai zo vaak je wilt:
@@ -14,7 +14,7 @@ import sqlite3
 from pathlib import Path
 
 DB = Path(__file__).parent.parent / "data" / "propaganda_model.db"
-AGENTS = ("monitor-agent", "scout-agent", "redteam-agent", "verbinder-agent")
+AGENTS = ("monitor-agent", "documentalist-agent", "criticus-agent", "scout-agent")
 
 
 def main():

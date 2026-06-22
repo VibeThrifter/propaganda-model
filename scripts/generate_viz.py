@@ -88,6 +88,20 @@ def export_data():
     """)
     relations = [dict(row) for row in cur.fetchall()]
 
+    # Een relatie mag geen eindpunt hebben dat zélf buiten beeld valt: de statusfilters op
+    # entiteit en relatie lopen onafhankelijk, dus een 'voorgesteld'/'goedgekeurd' relatie
+    # kan naar een 'afgewezen' entiteit wijzen. Zo'n bungelende edge laat d3.forceLink in de
+    # viz crashen ("missing: <id>") → het praktijkmodel laadt dan niet meer. Houd alleen
+    # edges met béide eindpunten in de geëmitteerde entiteitenset.
+    levende_entiteit_ids = {e['id'] for e in entities}
+    _voor = len(relations)
+    relations = [r for r in relations
+                 if r['source_id'] in levende_entiteit_ids
+                 and r['target_id'] in levende_entiteit_ids]
+    if len(relations) != _voor:
+        print(f"  {_voor - len(relations)} relatie(s) met een eindpunt buiten beeld weggelaten "
+              "(entiteit afgewezen/verborgen)")
+
     # Roles (+ temporele velden: ook de theorielaag is historisch contingent)
     cur.execute("SELECT id, name, category, description, active_from, active_until "
                 "FROM roles WHERE NOT vervangen")

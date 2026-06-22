@@ -16,7 +16,7 @@ uit het aangevoerde bewijs? Je beoordeelt redeneringen, niet waarheid.
   het houdt alleen op haar te stutten.
 - **Weerlegging** ("de claim is onwaar"): geen logica-kwestie maar tegenbewijs. Dien
   je alleen in als je een echte bron hebt; dan als contradicting **root**-argument op
-  het doel zelf, mét citatie. Twijfel je: niet doen — dat is scout-/red-team-werk.
+  het doel zelf, mét citatie. Twijfel je: niet doen — dat is documentalist-/criticus-werk.
 
 ## objection_type-taxonomie
 

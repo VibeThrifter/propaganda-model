@@ -28,6 +28,7 @@ WEB_PATH = ROOT / "web"
 GENERATE_VIZ_SCRIPT = ROOT / "scripts" / "generate_viz.py"
 SECRET_KEY_PATH = Path(__file__).parent / "data" / "secret_key"
 BRIDGING_PATH = Path(__file__).parent / "data" / "bridging.json"
+REVIEW_ADVIES_PATH = Path(__file__).parent / "data" / "review_advies.json"
 RELEASES_PATH = Path(__file__).parent / "releases"
 
 app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
@@ -206,7 +207,7 @@ def werkbank_page():
 
 @app.route("/overleg")
 def overleg_page():
-    """Overlegpagina (Wikipedia-stijl 'Overleg'): alle discussiedraden én open
+    """Overlegpagina (Wikipedia-stijl 'Overleg'): alle threads én open
     voorstellen/RfC's op een eigen volledige pagina, los van de netwerkviz."""
     return send_file(WEB_PATH / "overleg.html")
 
@@ -566,11 +567,13 @@ def get_arguments():
             SELECT a.id FROM arguments a JOIN boom b ON a.parent_argument_id = b.id
         )
         SELECT a.*, c.id as citation_id, c.quote, c.page, c.section, c.context as cite_context,
-               s.title as source_title, s.author as source_author, s.reliability, s.onderwerp
+               s.title as source_title, s.author as source_author, s.reliability, s.onderwerp,
+               u.kind as auteur_kind
         FROM arguments a
         JOIN boom ON a.id = boom.id
         LEFT JOIN citations c ON c.argument_id = a.id
         LEFT JOIN sources s ON c.source_id = s.id
+        LEFT JOIN users u ON u.username = a.contributed_by
         ORDER BY a.parent_argument_id NULLS FIRST, a.id
     """, (targets[column],)).fetchall()
 
@@ -599,6 +602,7 @@ def get_arguments():
                 "objection_type": row["objection_type"],
                 "bezwaar_resolutie": row["bezwaar_resolutie"],
                 "contributed_by": row["contributed_by"],
+                "auteur_is_agent": (row["auteur_kind"] == "agent"),
                 "created_at": row["created_at"],
                 "vervangen": row["vervangen"],
                 "reviseert_id": row["reviseert_id"],
@@ -819,6 +823,18 @@ def create_argument():
             "SELECT 1 FROM arguments WHERE id = ?", (parent_id,)).fetchone():
         conn.close()
         return jsonify({"error": f"Parent-argument {parent_id} bestaat niet"}), 400
+    # Backstop tegen dubbel agent-werk: een agent reageert niet twee keer op hetzelfde
+    # argument. (Mensen mogen dat wel — een echte discussie kan meerdere reacties dragen.)
+    if parent_id is not None and g.user.get("kind") == "agent":
+        al = conn.execute(
+            "SELECT id FROM arguments WHERE parent_argument_id = ? AND contributed_by = ? "
+            "ORDER BY id LIMIT 1", (parent_id, contributed_by)).fetchone()
+        if al:
+            conn.close()
+            return jsonify({"error": f"Je reageerde al op argument #{parent_id} (jouw reactie "
+                                     f"#{al['id']}); een agent reageert niet twee keer op "
+                                     "hetzelfde argument.",
+                            "bestaande_reactie": al["id"]}), 409
     for c in citaties:
         if not conn.execute("SELECT 1 FROM sources WHERE id = ?", (c["source_id"],)).fetchone():
             conn.close()
@@ -961,9 +977,12 @@ def edit_argument(arg_id):
     if not arg:
         conn.close()
         return jsonify({"error": "Argument niet gevonden"}), 404
-    if arg["contributed_by"] != g.user["username"]:
+    if arg["contributed_by"] != g.user["username"] and not (
+            heeft_rol(conn, g.user, "maintainer") and _is_agent(conn, arg["contributed_by"])):
         conn.close()
-        return jsonify({"error": "Alleen de auteur bewerkt een eigen voorstel"}), 403
+        return jsonify({"error": "Alleen de auteur bewerkt een eigen voorstel "
+                                 "(een maintainer mag wél agent-werk bijschaven; een mens "
+                                 "herziet zijn eigen bijdrage zelf)"}), 403
     if arg["status"] != "voorgesteld":
         conn.close()
         return jsonify({"error": "Alleen een 'voorgesteld' argument is bewerkbaar; "
@@ -1897,6 +1916,29 @@ def _creator_van(conn, tabel, rid):
     return row["changed_by"] if row else None
 
 
+def _is_agent(conn, username):
+    """Is dit een agent-account (bot)? Bepaalt of een maintainer andermans werk in-place
+    mag bijschaven: alleen bot-werk — een mens herziet zijn eigen bijdrage zelf."""
+    if not username:
+        return False
+    row = conn.execute("SELECT kind FROM users WHERE username = ?", (username,)).fetchone()
+    return bool(row and row["kind"] == "agent")
+
+
+def _maintainer_mag_direct(conn, tabel, rid):
+    """Mag de ingelogde maintainer dit praktijk-element (entiteit/relatie) direct
+    bewerken? Ja voor agent-werk, eigen werk en seed/onbekende elementen; NEE voor de
+    bijdrage van een ándere mens (die herziet zijn eigen werk zelf — zelfde regel als
+    bij argumenten en RfC's). Geeft None als het mag, anders een (response, 403)."""
+    auteur = _creator_van(conn, tabel, rid)
+    if auteur and auteur != g.user["username"] and not _is_agent(conn, auteur):
+        return jsonify({"error": "Dit is het werk van een andere gebruiker — een maintainer "
+                                 "bewerkt alleen agent-werk (en eigen/seed-elementen) direct. "
+                                 "Laat de auteur het herzien, of stel een wijziging voor via "
+                                 "POST /api/voorstellen (soort 'herformuleren' of 'hernoemen')."}), 403
+    return None
+
+
 def _regenereer_viz(blocking=False):
     """Herbouw web/index.html uit de LIVE database via scripts/generate_viz.py.
 
@@ -1966,6 +2008,28 @@ def _modereer(tabel, rid):
         conn.close()
         return jsonify({"error": "Niemand keurt eigen werk goed (M2.1): laat een "
                                  "andere reviewer dit beoordelen"}), 403
+    # Bronplicht voor relaties (praktijklaag): een edge mag de graaf alleen in als ze
+    # door minstens één gesourcet root-argument (supporting/contradicting met echte
+    # citatie) wordt gedragen — anders is het een lege bewering. Het argument zelf mag
+    # nog 'voorgesteld' zijn (de score blijft op de vloer tot het gemerged is), maar het
+    # bewijs moet er zijn. Seed-/maintainer-relaties zijn al 'goedgekeurd' en passeren hier niet.
+    if tabel == "relations" and nieuw == "goedgekeurd":
+        heeft_bron = conn.execute("""
+            SELECT 1 FROM arguments a
+            WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
+              AND a.stance IN ('supporting', 'contradicting')
+              AND (EXISTS (SELECT 1 FROM citations c
+                           WHERE c.argument_id = a.id AND TRIM(COALESCE(c.quote, '')) <> '')
+                   OR EXISTS (SELECT 1 FROM citations c
+                              JOIN source_locations l ON l.source_id = c.source_id
+                              WHERE c.argument_id = a.id))
+            LIMIT 1""", (rid,)).fetchone()
+        if not heeft_bron:
+            conn.close()
+            return jsonify({"error": "Deze relatie heeft nog geen gesourcet argument "
+                "(een supporting/contradicting root met een echte citatie — quote of "
+                "vindplaats). Een edge zonder bewijs is een lege bewering: wijs af, of "
+                "laat de indiener eerst een onderbouwend argument met bron toevoegen."}), 400
     conn.execute(f"UPDATE {tabel} SET status = ? WHERE id = ?", (nieuw, rid))
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
@@ -1992,37 +2056,46 @@ def moderate_relation(rid):
 
 
 def _heraanmeld(tabel, rid, bewerkbaar):
-    """Een AFGEWEZEN praktijkelement bijwerken en opnieuw indienen (Fase D): alleen de
-    oorspronkelijke auteur, status 'afgewezen' → 'voorgesteld'. `bewerkbaar` = de
-    kolommen die de body mag overschrijven vóór de heraanmelding."""
+    """Een AFGEWEZEN praktijkelement bijwerken en opnieuw indienen (Fase D): de
+    oorspronkelijke auteur óf een maintainer (zodat de admin agent-werk dat is
+    afgewezen alsnog kan verbeteren), status 'afgewezen' → 'voorgesteld'. `bewerkbaar`
+    = de kolommen die de body mag overschrijven vóór de heraanmelding."""
     data = request.json or {}
     conn = get_db()
     rij = conn.execute(f"SELECT status FROM {tabel} WHERE id = ?", (rid,)).fetchone()
     if rij is None:
         conn.close()
         return jsonify({"error": "Niet gevonden"}), 404
-    if _creator_van(conn, tabel, rid) != g.user["username"]:
+    _auteur = _creator_van(conn, tabel, rid)
+    if (_auteur != g.user["username"]
+            and not (heeft_rol(conn, g.user, "maintainer") and _is_agent(conn, _auteur))):
         conn.close()
-        return jsonify({"error": "Alleen de auteur dient zijn afgewezen item opnieuw in"}), 403
+        return jsonify({"error": "Alleen de auteur dient zijn afgewezen item opnieuw in "
+                                 "(een maintainer mag dit voor agent-werk doen; een mens "
+                                 "meldt zijn eigen werk zelf opnieuw aan)"}), 403
     if rij["status"] != "afgewezen":
         conn.close()
         return jsonify({"error": f"Alleen een afgewezen item kun je opnieuw indienen "
                                  f"(huidige status: {rij['status']})"}), 400
-    sets, vals = [], []
+    sets, vals, bewerkt = [], [], {}
     for k in bewerkbaar:
         if k in data and data[k] is not None:
-            sets.append(f"{k} = ?"); vals.append(data[k])
+            sets.append(f"{k} = ?"); vals.append(data[k]); bewerkt[k] = data[k]
     sets.append("status = ?"); vals.append("voorgesteld")
     try:
         conn.execute(f"UPDATE {tabel} SET {', '.join(sets)} WHERE id = ?", vals + [rid])
     except sqlite3.IntegrityError as e:
         conn.close()
         return jsonify({"error": str(e)}), 400
+    # Het edit_log registreert óók welke velden meegingen, niet alleen de statusflip —
+    # zo blijft de herkomst eerlijk nu heraanmelden de inhoud mag corrigeren.
+    nieuw = {"status": "voorgesteld", **bewerkt}
+    reden = "opnieuw ingediend na herziening" + (f" (bewerkt: {', '.join(bewerkt)})" if bewerkt else " (ongewijzigd)")
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
         VALUES (?, ?, 'updated', ?, ?, ?, ?)
     """, (tabel, rid, g.user["username"], json.dumps({"status": "afgewezen"}),
-          json.dumps({"status": "voorgesteld"}), "opnieuw ingediend na herziening"))
+          json.dumps(nieuw, ensure_ascii=False), reden))
     conn.commit()
     conn.close()
     return jsonify({"id": rid, "status": "voorgesteld"})
@@ -2199,7 +2272,7 @@ def withdraw_argument(arg_id):
     """De auteur trekt een eigen, nog-VOORGESTELD argument in: een concept dat in niets
     meetelt en dat niemand nog beoordeeld heeft → definitief verwijderd (audit blijft).
     Een gemerged argument verbeter je via een revisie. Een maintainer mag elk argument
-    (met draad en al) verwijderen."""
+    (met thread en al) verwijderen."""
     conn = get_db()
     arg = conn.execute("SELECT id, contributed_by, status, claim FROM arguments WHERE id = ?",
                        (arg_id,)).fetchone()
@@ -2221,7 +2294,7 @@ def withdraw_argument(arg_id):
     if kinderen and not maintainer:
         conn.close()
         return jsonify({"error": f"Er hangen {kinderen} reactie(s) onder dit argument; "
-                                 "vraag een maintainer om het met draad en al te verwijderen."}), 409
+                                 "vraag een maintainer om het met thread en al te verwijderen."}), 409
     boom = _collect_argument_tree(conn, [arg_id])
     _delete_arguments(conn, boom)
     conn.execute("""
@@ -2644,16 +2717,114 @@ def patch_mechanism(mid):
     return _maintainer_patch("mechanisme")
 
 
+def _auteur_entiteit_patch(conn, eid, ent):
+    """Auteur-pad: de bijdrager (incl. agent) die deze entiteit aanmaakte mag haar
+    voorstelvelden — incl. de rol-suggestie `primary_role_id` — bijschaven zolang ze
+    'voorgesteld' is. Dan telt ze nog nergens in mee (viz/scores negeren 'voorgesteld'),
+    dus in-place bewerken breekt geen provenance. Spiegelt de argument-bewerklus
+    (PATCH /api/arguments/<id>); een goedgekeurde entiteit wijzigt alleen een maintainer.
+    Bewerkbaar: name, type, description, primary_role_id (alias role_id), active_from/until."""
+    d = request.json or {}
+    diff = {}
+    if "name" in d or "naam" in d:
+        nieuw = (d.get("name") or d.get("naam") or "").strip()
+        if not nieuw:
+            conn.close(); return jsonify({"error": "naam mag niet leeg zijn"}), 400
+        if nieuw != (ent["name"] or ""):
+            if voorstellen._naam_bestaat(conn, "entiteit", nieuw):
+                conn.close(); return jsonify({"error": "er bestaat al een entiteit met die naam"}), 400
+            diff["name"] = nieuw
+    if "type" in d:
+        nieuw = (d.get("type") or "").strip()
+        if nieuw and nieuw != (ent["type"] or ""):
+            diff["type"] = nieuw
+    if "description" in d or "definitie" in d:
+        nieuw = (d.get("description") or d.get("definitie") or "").strip() or None
+        if nieuw != ent["description"]:
+            diff["description"] = nieuw
+    if "primary_role_id" in d or "role_id" in d:
+        raw = d["primary_role_id"] if "primary_role_id" in d else d["role_id"]
+        if raw in (None, "", 0, "0"):
+            nieuw_rid = None
+        else:
+            try:
+                nieuw_rid = int(raw)
+            except (ValueError, TypeError):
+                conn.close()
+                return jsonify({"error": "primary_role_id moet een rol-id (geheel getal) of null zijn"}), 400
+            rol = conn.execute("SELECT vervangen FROM roles WHERE id = ?", (nieuw_rid,)).fetchone()
+            if rol is None:
+                conn.close(); return jsonify({"error": f"rol {nieuw_rid} bestaat niet"}), 400
+            if rol["vervangen"]:
+                conn.close(); return jsonify({"error": f"rol {nieuw_rid} is vervangen; kies de opvolger"}), 400
+        if nieuw_rid != ent["primary_role_id"]:
+            diff["primary_role_id"] = nieuw_rid
+    for kol in ("active_from", "active_until"):
+        if kol in d:
+            raw = d.get(kol)
+            nieuw = None if raw in (None, "", 0, "0") else str(raw).strip()
+            if nieuw != (ent[kol] if ent[kol] not in ("",) else None):
+                diff[kol] = nieuw
+    if not diff:
+        conn.close()
+        return jsonify({"error": "geen gewijzigd veld (toegestaan: name, type, description, "
+                                 "primary_role_id, active_from, active_until)"}), 400
+    try:
+        for kol, v in diff.items():
+            conn.execute(f"UPDATE entities SET {kol} = ? WHERE id = ?", (v, eid))
+        conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+                        VALUES ('entities', ?, 'updated', ?, ?, ?)""",
+                     (eid, g.user["username"], json.dumps(diff, ensure_ascii=False),
+                      "auteur bewerkt eigen voorstel"))
+        conn.commit(); conn.close()
+        return jsonify({"id": eid, "gewijzigd": list(diff), "auteur_bewerkt": True})
+    except sqlite3.IntegrityError as e:
+        conn.rollback(); conn.close()
+        msg = str(e)
+        if "UNIQUE" in msg:
+            return jsonify({"error": "er bestaat al een entiteit met die naam"}), 400
+        if "CHECK" in msg:
+            return jsonify({"error": f"ongeldig entiteittype: '{diff.get('type')}'"}), 400
+        return jsonify({"error": msg}), 400
+
+
 @app.route("/api/entities/<int:eid>", methods=["PATCH"])
 @require_user()
 def patch_entity(eid):
-    return _maintainer_patch("entiteit")
+    # Maintainer → volledige directe bewerking (opbouwfase). Anders: de auteur mag
+    # z'n eigen, nog-VOORGESTELDE entiteit bijschaven — rol-suggestie incluis.
+    conn = get_db()
+    if heeft_rol(conn, g.user, "maintainer"):
+        belet = _maintainer_mag_direct(conn, "entities", eid)
+        conn.close()
+        return belet or _maintainer_patch("entiteit")
+    ent = conn.execute("SELECT * FROM entities WHERE id = ?", (eid,)).fetchone()
+    if ent is None:
+        conn.close()
+        return jsonify({"error": "entiteit niet gevonden"}), 404
+    if ent["status"] != "voorgesteld":
+        conn.close()
+        return jsonify({"error": "Direct bewerken vereist een globale maintainer. "
+                                 "Stel anders een wijziging voor via POST /api/voorstellen "
+                                 "(soort 'herformuleren' of 'hernoemen')."}), 403
+    maker = conn.execute("SELECT changed_by FROM edit_log WHERE table_name='entities' "
+                         "AND record_id=? AND action='created' ORDER BY id LIMIT 1", (eid,)).fetchone()
+    if maker is None or maker["changed_by"] != g.user["username"]:
+        conn.close()
+        return jsonify({"error": "Alleen de auteur bewerkt een eigen voorstel "
+                                 "(zolang het 'voorgesteld' is)"}), 403
+    return _auteur_entiteit_patch(conn, eid, ent)
 
 
 @app.route("/api/relations/<int:rid>", methods=["PATCH"])
 @require_user()
 def patch_relation(rid):
-    return _maintainer_patch("relatie")
+    # Zelfde agent-scope als entiteiten: een maintainer bewerkt geen relatie van een
+    # ándere mens direct (die herziet zelf, of via een voorstel). Agent-/eigen/seed-werk wel.
+    conn = get_db()
+    belet = _maintainer_mag_direct(conn, "relations", rid) if heeft_rol(conn, g.user, "maintainer") else None
+    conn.close()
+    return belet or _maintainer_patch("relatie")
 
 
 # ── Instantiaties (klasse <-> instantie + exemplariteit) ─────
@@ -2762,6 +2933,10 @@ def _voorstel_dict(conn, rij) -> dict:
     payload = json.loads(rij["payload"])
     theorielaag = voorstellen.is_theorielaag(rij["soort"], payload)
     t = voorstellen.telling(conn, rij["id"], rij["ingediend_door"], theorielaag)
+    reviews = [dict(r) for r in conn.execute(
+        """SELECT vr.reviewer, vr.oordeel, vr.motivatie, vr.created_at, u.kind
+           FROM voorstel_reviews vr JOIN users u ON u.username = vr.reviewer
+           WHERE vr.voorstel_id = ? ORDER BY vr.id""", (rij["id"],))]
     return {
         "id": rij["id"], "soort": rij["soort"], "titel": rij["titel"],
         "payload": payload, "status": rij["status"],
@@ -2771,6 +2946,7 @@ def _voorstel_dict(conn, rij) -> dict:
         "theorielaag": theorielaag,
         "benodigde_akkoorden": voorstellen.benodigde_akkoorden(rij["soort"], payload),
         "telling": t,
+        "reviews": reviews,
     }
 
 
@@ -2830,10 +3006,11 @@ def herzien_voorstel(vid):
         return jsonify({"error": "Alleen een afgewezen of ingetrokken voorstel kun je "
                                  f"herzien (huidige status: {oud['status']})"}), 400
     if (oud["ingediend_door"] != g.user["username"]
-            and ROLE_ORDER.get(g.user["role"], 0) < ROLE_ORDER["maintainer"]):
+            and not (heeft_rol(conn, g.user, "maintainer") and _is_agent(conn, oud["ingediend_door"]))):
         conn.close()
-        return jsonify({"error": "Alleen de indiener of een maintainer herziet een "
-                                 "voorstel"}), 403
+        return jsonify({"error": "Alleen de indiener herziet een voorstel "
+                                 "(een maintainer mag dit voor agent-werk doen; een mens "
+                                 "herziet zijn eigen voorstel zelf)"}), 403
 
     data = request.json or {}
     payload = data.get("payload") or json.loads(oud["payload"])
@@ -2886,11 +3063,7 @@ def get_voorstel(vid):
     if not rij:
         conn.close()
         return jsonify({"error": "Voorstel niet gevonden"}), 404
-    uit = _voorstel_dict(conn, rij)
-    uit["reviews"] = [dict(r) for r in conn.execute(
-        """SELECT vr.reviewer, vr.oordeel, vr.motivatie, vr.created_at, u.kind
-           FROM voorstel_reviews vr JOIN users u ON u.username = vr.reviewer
-           WHERE vr.voorstel_id = ? ORDER BY vr.id""", (vid,))]
+    uit = _voorstel_dict(conn, rij)  # bevat al reviews (met motivatie)
 
     payload = uit["payload"]
     et = payload.get("element_type")
@@ -3062,7 +3235,7 @@ def _wortel_doel(conn, arg):
     """(param, id) van het doel waaraan de DRÁAD van dit argument hangt.
 
     Root-argumenten dragen hun doel zelf; reacties (geen eigen doel, M1.1) erven het
-    van hun wortel. Zo kan de reviewkaart de omringende draad laden, ook voor replies.
+    van hun wortel. Zo kan de reviewkaart de omringende thread laden, ook voor replies.
     """
     rij = arg
     while rij["parent_argument_id"] is not None:
@@ -3079,7 +3252,7 @@ def _wortel_doel(conn, arg):
 
 
 def _verrijk_review_argumenten(conn, rows):
-    """Maak van ruwe argumentrijen review-kaart-dicts: leesbaar doel, draad-anker
+    """Maak van ruwe argumentrijen review-kaart-dicts: leesbaar doel, thread-anker
     (param/id) en citaties + poort-vlag. Gedeeld door de voorgesteld- en de
     herkeuring-lijst (betwist)."""
     argumenten = []
@@ -3131,7 +3304,8 @@ def review_queue():
     herkeuring-lijst (betwiste, al gemergede argumenten — Fase B)."""
     conn = get_db()
     SELECT_ARG = """
-        SELECT a.id, a.stance, a.claim, a.property, a.parent_argument_id,
+        SELECT a.id, a.stance, a.claim, a.reasoning, a.property, a.property_value,
+               a.objection_type, a.bezwaar_resolutie, a.parent_argument_id,
                a.contributed_by, a.created_at, a.reviseert_id,
                a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.emergent_effect_id,
                (SELECT COUNT(*) FROM citations c WHERE c.argument_id = a.id) AS n_citaties
@@ -3157,23 +3331,258 @@ def review_queue():
         e = dict(e)
         e["ingediend_door"] = _creator_van(conn, "entities", e["id"])
         entiteiten.append(e)
-    relaties = []
-    for r in conn.execute("""
+    rel_rows = conn.execute("""
         SELECT r.id, r.relation_type, r.description, r.certainty, r.influence, r.created_at,
-               e1.name AS source_name, e2.name AS target_name, m.name AS mechanism_name
+               r.bidirectional, r.active_from, r.active_until,
+               e1.name AS source_name, e2.name AS target_name,
+               m.name AS mechanism_name, m.filter AS mechanism_filter, m.aard AS mechanism_aard
         FROM relations r
         JOIN entities e1 ON r.source_id = e1.id
         JOIN entities e2 ON r.target_id = e2.id
         LEFT JOIN mechanisms m ON r.mechanism_id = m.id
-        WHERE r.status = 'voorgesteld' ORDER BY r.id"""):
+        WHERE r.status = 'voorgesteld' ORDER BY r.id""").fetchall()
+    # De onderbouwende root-argumenten (mét citaties) meegeven, zodat de reviewer het
+    # bewijs op de praktijk-kaart ziet i.p.v. alleen de kale priors (0%). Een edge zonder
+    # gesourcet argument is een lege bewering — die status moet zichtbaar zijn vóór het
+    # goedkeuren (en wordt door _modereer geblokkeerd).
+    args_per_rel = {}
+    rel_ids = [r["id"] for r in rel_rows]
+    if rel_ids:
+        qs = ",".join("?" * len(rel_ids))
+        arg_rows = conn.execute(f"""
+            SELECT id, relation_id, stance, status, claim, property
+            FROM arguments
+            WHERE relation_id IN ({qs}) AND parent_argument_id IS NULL AND NOT vervangen
+            ORDER BY id""", rel_ids).fetchall()
+        cites = _citaties_per_argument(conn, [a["id"] for a in arg_rows])
+        for a in arg_rows:
+            d = dict(a)
+            d["citations"] = cites.get(a["id"], [])
+            args_per_rel.setdefault(a["relation_id"], []).append(d)
+    relaties = []
+    for r in rel_rows:
         r = dict(r)
         r["ingediend_door"] = _creator_van(conn, "relations", r["id"])
+        r["argumenten"] = args_per_rel.get(r["id"], [])
         relaties.append(r)
 
     conn.close()
     return jsonify({"argumenten": argumenten, "herkeuring": herkeuring,
                     "voorstellen": open_voorstellen,
                     "entiteiten": entiteiten, "relaties": relaties})
+
+
+@app.route("/api/review_advies")
+@require_user("reviewer")
+def review_advies():
+    """Adviesrapport van de reviewbeoordelaar-agent: read-only beslissteun die in de
+    UI rechts van elk wachtrij-item verschijnt. Bewust BUITEN het model — een los
+    JSON-bestand dat de agent schrijft (geen discussieboom-bijdrage, telt nergens
+    mee, mirrors data/gevoeligheid.json). Reviewer+ only: intern werkmateriaal voor
+    wie merget. Leeg als de agent nog geen ronde draaide (missies/reviewbeoordelaar_brief.md)."""
+    if not REVIEW_ADVIES_PATH.exists():
+        return jsonify({"gegenereerd": None, "ronde": None, "items": {}})
+    try:
+        return jsonify(json.loads(REVIEW_ADVIES_PATH.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Adviesbestand onleesbaar: {e}", "items": {}}), 500
+
+
+@app.route("/api/afgewezen")
+@require_user("reviewer")
+def afgewezen_queue():
+    """Afgewezen/ingetrokken inzendingen voor de admin: verworpen argumenten, afgewezen
+    entiteiten/relaties en afgewezen+ingetrokken RfC's — elk met de afwijs-feedback. Buiten
+    de gewone review_queue gehouden zodat afgewezen werk de wachtrij niet vervuilt, maar wél
+    vindbaar/handelbaar blijft. Reviewer+ mag kijken; de acties (herzien/heropenen/
+    heraanmelden/verwijderen) houden elk hun eigen poort (verwijderen = maintainer)."""
+    conn = get_db()
+    SELECT_ARG = """
+        SELECT a.id, a.stance, a.claim, a.reasoning, a.property, a.property_value,
+               a.objection_type, a.bezwaar_resolutie, a.parent_argument_id,
+               a.contributed_by, a.created_at, a.reviseert_id,
+               a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.emergent_effect_id,
+               (SELECT COUNT(*) FROM citations c WHERE c.argument_id = a.id) AS n_citaties
+        FROM arguments a WHERE a.status = 'verworpen' AND NOT a.vervangen ORDER BY a.id DESC"""
+    argumenten = _verrijk_review_argumenten(conn, conn.execute(SELECT_ARG).fetchall())
+    for a in argumenten:
+        a["feedback"] = _laatste_feedback(conn, "arguments", a["id"])
+        a["auteur_is_agent"] = _is_agent(conn, a["contributed_by"])
+
+    voorstellen_lijst = []
+    for r in conn.execute("SELECT * FROM voorstellen WHERE status IN ('afgewezen','ingetrokken') "
+                          "ORDER BY id DESC"):
+        v = _voorstel_dict(conn, r)
+        v["feedback"] = _laatste_feedback(conn, "voorstellen", v["id"])
+        v["auteur_is_agent"] = _is_agent(conn, v["ingediend_door"])
+        voorstellen_lijst.append(v)
+
+    entiteiten = []
+    for e in conn.execute("""SELECT e.id, e.name, e.type, e.description, e.created_at,
+                                    e.primary_role_id, ro.name AS role_name
+                             FROM entities e LEFT JOIN roles ro ON ro.id = e.primary_role_id
+                             WHERE e.status = 'afgewezen' ORDER BY e.id DESC"""):
+        e = dict(e)
+        e["ingediend_door"] = _creator_van(conn, "entities", e["id"])
+        e["feedback"] = _laatste_feedback(conn, "entities", e["id"])
+        e["auteur_is_agent"] = _is_agent(conn, e["ingediend_door"])
+        entiteiten.append(e)
+
+    relaties = []
+    for r in conn.execute("""SELECT r.id, r.relation_type, r.description, r.certainty, r.influence,
+                                    r.created_at, e1.name AS source_name, e2.name AS target_name,
+                                    m.name AS mechanism_name, m.filter AS mechanism_filter
+                             FROM relations r
+                             JOIN entities e1 ON r.source_id = e1.id
+                             JOIN entities e2 ON r.target_id = e2.id
+                             LEFT JOIN mechanisms m ON r.mechanism_id = m.id
+                             WHERE r.status = 'afgewezen' ORDER BY r.id DESC"""):
+        r = dict(r)
+        r["ingediend_door"] = _creator_van(conn, "relations", r["id"])
+        r["feedback"] = _laatste_feedback(conn, "relations", r["id"])
+        r["auteur_is_agent"] = _is_agent(conn, r["ingediend_door"])
+        relaties.append(r)
+
+    conn.close()
+    return jsonify({"argumenten": argumenten, "voorstellen": voorstellen_lijst,
+                    "entiteiten": entiteiten, "relaties": relaties})
+
+
+@app.route("/api/voorstellen/<int:vid>", methods=["DELETE"])
+@require_user("maintainer")
+def delete_voorstel(vid):
+    """Een afgewezen/ingetrokken RfC hard verwijderen (admin-keuze, geen audit-trail).
+    Alleen op een afgewezen of ingetrokken voorstel — een open/geaccepteerd voorstel
+    raak je hier niet aan. voorstel_reviews cascadet via FK (ON DELETE CASCADE)."""
+    conn = get_db()
+    row = conn.execute("SELECT id, titel, soort, status FROM voorstellen WHERE id = ?",
+                       (vid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Voorstel niet gevonden"}), 404
+    if row["status"] not in ("afgewezen", "ingetrokken"):
+        conn.close()
+        return jsonify({"error": "Alleen een afgewezen of ingetrokken voorstel kun je "
+                                 f"verwijderen (huidige status: {row['status']})"}), 400
+    try:
+        conn.execute("DELETE FROM lineage WHERE voorstel_id = ?", (vid,))  # defensief; normaal leeg
+        conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, reason)
+                        VALUES ('voorstellen', ?, 'deleted', ?, ?, ?)""",
+                     (vid, g.user["username"],
+                      json.dumps({"titel": row["titel"], "soort": row["soort"], "status": row["status"]}),
+                      "RfC hard verwijderd (admin)"))
+        conn.execute("DELETE FROM voorstellen WHERE id = ?", (vid,))
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback(); conn.close()
+        return jsonify({"error": str(e)}), 400
+    conn.close()
+    return jsonify({"id": vid, "deleted": True})
+
+
+@app.route("/api/arguments/<int:arg_id>", methods=["DELETE"])
+@require_user("maintainer")
+def delete_argument(arg_id):
+    """Een verworpen argument hard verwijderen (admin-keuze). Alleen op status
+    'verworpen'; weigert als er nog niet-verworpen antwoorden onder hangen (anders sleep
+    je levende discussie stilletjes mee). Citaties + de verworpen subboom gaan mee."""
+    conn = get_db()
+    arg = conn.execute("SELECT id, status, claim FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if not arg:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if arg["status"] != "verworpen":
+        conn.close()
+        return jsonify({"error": "Alleen een verworpen argument kun je hard verwijderen "
+                                 f"(huidige status: {arg['status']}); wijs het eerst af."}), 400
+    subtree = _collect_argument_tree(conn, [arg_id])
+    overig = [i for i in subtree if i != arg_id]
+    if overig:
+        ph = ",".join("?" * len(overig))
+        levend = [r["id"] for r in conn.execute(
+            f"SELECT id FROM arguments WHERE id IN ({ph}) AND status <> 'verworpen'", overig)]
+        if levend:
+            conn.close()
+            return jsonify({"error": "Dit argument heeft nog niet-verworpen antwoorden "
+                                     f"(#{', #'.join(map(str, levend))}); wijs die eerst af."}), 409
+    try:
+        conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, reason)
+                        VALUES ('arguments', ?, 'deleted', ?, ?, ?)""",
+                     (arg_id, g.user["username"], json.dumps({"claim": (arg["claim"] or "")[:200]}),
+                      "Verworpen argument hard verwijderd (admin)"))
+        _delete_arguments(conn, subtree)
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback(); conn.close()
+        return jsonify({"error": str(e)}), 400
+    conn.close()
+    return jsonify({"id": arg_id, "deleted": True, "verwijderd_aantal": len(subtree)})
+
+
+@app.route("/api/arguments/<int:arg_id>/heropenen", methods=["POST"])
+@require_user("maintainer")
+def heropen_argument(arg_id):
+    """Een verworpen argument terug in de wachtrij zetten (verworpen → voorgesteld), zodat
+    de auteur het kan bijschaven of een reviewer het opnieuw beoordeelt. De body mág het
+    argument meteen verbeteren (claim/reasoning/stance + property_value of objection_type +
+    citations) — symmetrisch met heraanmelden bij entiteiten/relaties. Inhoud bewerken volgt
+    dezelfde poort als PATCH /api/arguments: een maintainer schaaft agent- of eigen werk bij,
+    maar herschrijft het argument van een ándere mens niet (dan alléén heropenen; de auteur
+    herziet zelf)."""
+    data = request.json or {}
+    conn = get_db()
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if not arg:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if arg["status"] != "verworpen":
+        conn.close()
+        return jsonify({"error": "Alleen een verworpen argument kun je heropenen "
+                                 f"(huidige status: {arg['status']})"}), 400
+
+    # Optionele inhoudsbewerking bij heropenen — zelfde velden + auteurspoort als edit_argument.
+    BEWERKVELDEN = ("claim", "reasoning", "stance", "property_value", "objection_type", "citations")
+    velden, waarden, bewerkt = [], [], []
+    if any(k in data for k in BEWERKVELDEN):
+        if arg["contributed_by"] != g.user["username"] and not _is_agent(conn, arg["contributed_by"]):
+            conn.close()
+            return jsonify({"error": "Een maintainer schaaft agent-/eigen werk bij; het argument "
+                                     "van een andere mens herschrijf je niet — heropen het zonder "
+                                     "wijziging, dan herziet de auteur het zelf."}), 403
+        if "claim" in data:
+            claim = (data.get("claim") or "").strip()
+            if not claim:
+                conn.close()
+                return jsonify({"error": "Claim mag niet leeg zijn"}), 400
+            velden.append("claim = ?"); waarden.append(claim); bewerkt.append("claim")
+        if "reasoning" in data:
+            velden.append("reasoning = ?"); waarden.append((data.get("reasoning") or "").strip() or None); bewerkt.append("reasoning")
+        if "stance" in data:
+            if data["stance"] not in ("supporting", "contradicting", "contextual"):
+                conn.close()
+                return jsonify({"error": "Ongeldige stance"}), 400
+            velden.append("stance = ?"); waarden.append(data["stance"]); bewerkt.append("stance")
+        if "property_value" in data and arg["parent_argument_id"] is None:
+            velden.append("property_value = ?"); waarden.append((data.get("property_value") or "").strip() or None); bewerkt.append("property_value")
+        if "objection_type" in data and arg["parent_argument_id"] is not None:
+            velden.append("objection_type = ?"); waarden.append(data.get("objection_type") or None); bewerkt.append("objection_type")
+
+    velden.append("status = ?"); waarden.append("voorgesteld")
+    conn.execute(f"UPDATE arguments SET {', '.join(velden)} WHERE id = ?", waarden + [arg_id])
+    if isinstance(data.get("citations"), list):
+        fout = _zet_citaties(conn, arg_id, data["citations"])
+        if fout:
+            conn.rollback(); conn.close()
+            return jsonify({"error": fout}), 400
+        bewerkt.append("citations")
+    reden = "heropend door maintainer (verworpen → voorgesteld)" + (f"; bewerkt: {', '.join(bewerkt)}" if bewerkt else "")
+    conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+                    VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)""",
+                 (arg_id, g.user["username"], json.dumps({"status": "verworpen"}),
+                  json.dumps({"status": "voorgesteld", "bewerkt": bewerkt}, ensure_ascii=False), reden))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": arg_id, "status": "voorgesteld", "bewerkt": bewerkt})
 
 
 def _laatste_feedback(conn, tabel, rid):
@@ -3781,6 +4190,28 @@ def get_scores():
         conn, bridged_weights=scoring.bridged_weights_from_file(BRIDGING_PATH))
     conn.close()
     return jsonify(scores)
+
+
+# ── Agent-geheugen: waar heeft dit account al op gereageerd? ──
+# Voorkomt dat een agent over de tijd twee keer op hetzelfde argument reageert. Geen
+# eigen tabel nodig — de reacties staan al in de data: een reply is een argument met
+# parent_argument_id + contributed_by, een rating staat in argument_ratings. Een agent
+# haalt vóór een ronde zijn eigen lijst op en slaat die argumenten over.
+@app.route("/api/agent/reeds_gereageerd")
+@require_user()
+def reeds_gereageerd():
+    """De argument-id's waar het ingelogde account al op reageerde (reply of rating),
+    zodat een agent ze in een volgende ronde overslaat."""
+    conn = get_db()
+    ik = g.user["username"]
+    via_reply = sorted({r["parent_argument_id"] for r in conn.execute(
+        "SELECT DISTINCT parent_argument_id FROM arguments "
+        "WHERE contributed_by = ? AND parent_argument_id IS NOT NULL", (ik,))})
+    via_rating = sorted({r["argument_id"] for r in conn.execute(
+        "SELECT DISTINCT argument_id FROM argument_ratings WHERE rater = ?", (ik,))})
+    conn.close()
+    return jsonify({"door": ik, "via_reply": via_reply, "via_rating": via_rating,
+                    "gereageerd_op": sorted(set(via_reply) | set(via_rating))})
 
 
 if __name__ == "__main__":

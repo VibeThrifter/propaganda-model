@@ -11,10 +11,26 @@ naar een door mensen controleerbare bron, nooit directe statuswijzigingen.
 
 1. Open een Claude Code sessie (of background agent) in deze repo.
 2. Geef als opdracht: *"Voer de missie uit in `missies/monitor_brief.md`
-   (of `scout_brief.md` / `verbinder_brief.md`), als agent-account
-   `monitor-agent`/`scout-agent`/`verbinder-agent`."*
+   (of `documentalist_brief.md` / `scout_brief.md`), als agent-account
+   `monitor-agent`/`documentalist-agent`/`scout-agent`."*
 3. De agent logt zijn ronde in `missies/logs/` (zie hieronder) en dient alle
    bevindingen in via de API; een mens reviewt daarna.
+
+## Reageer niet twee keer op hetzelfde argument
+
+Van elke soort agent draait er maar één tegelijk, dus gelijktijdig botsen kan niet —
+maar dezelfde agent komt later terug. Reageer dan niet opnieuw op een argument waar je
+al op reageerde. Je hoeft niets bij te houden: je eigen reacties staan al in de data.
+
+1. Haal vóór een ronde je eigen reactielijst op: `GET /api/agent/reeds_gereageerd`
+   (met je Bearer-token) → `gereageerd_op` is de lijst argument-id's waar jij al een
+   reply of rating op zette.
+2. Sla die argumenten over; reageer alleen op wat er niet in staat.
+
+De server is de vangrails: probeer je tóch een tweede reactie op hetzelfde argument,
+dan weigert `POST /api/arguments` met **409** (alleen voor agents; mensen mogen wel een
+discussie voeren met meerdere reacties). Doelwit-keuze (welke relatie/mechanisme) komt
+zoals altijd uit `data/onderzoeksagenda.json`.
 
 ## Logging (auditbaar, M1.9-blind-zoekprotocol)
 
@@ -25,10 +41,14 @@ Per missie één logbestand: `missies/logs/YYYY-MM-DD_<agent>_<ronde>.md` met:
   bevooroordeeld zoeken is dan achteraf aantoonbaar.
 - **Oogst**: per bevinding/bron het argument-id dat via de API is aangemaakt.
 - **Negatieve resultaten**: zoektochten die niets opleverden ("geen tegenbewijs
-  gevonden; gezocht via X, Y, Z") — dit register is zelf een `contextual`-bijdrage
-  en telt mee in de bewijsdekking.
+  gevonden; gezocht via X, Y, Z") — **alleen hier in het log, nooit als `contextual`
+  bijdrage in het model.** Een AI-bewering "ik zocht en vond niets" is
+  onfalsifieerbaar (geen door mensen controleerbare bron), beweegt de score niet, heft
+  de `onweersproken`-vlag niet op en wekt als modelbijdrage valse geruststelling. In
+  het log dient ze het enige doel waarvoor ze deugt: aantonen dát breed is gezocht
+  (anti-cherry-pick).
 - **Stance-balans van de ronde**: n steun / n tegen / n context (tweezijdige
-  oogstplicht; een scout die alleen bevestiging binnenbrengt is meetbaar kapot).
+  oogstplicht; een documentalist die alleen bevestiging binnenbrengt is meetbaar kapot).
 
 De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 
@@ -37,6 +57,7 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | Account | Rol | Brief | Mag niet |
 |---|---|---|---|
 | `monitor-agent` | bijdrager | `monitor_brief.md` | statussen zetten; alleen bevindingen indienen |
-| `scout-agent` | bijdrager | `scout_brief.md` | rechtstreeks de score in; alles wacht op review |
-| `redteam-agent` | bijdrager | `redteam_brief.md` | stromannen; statussen zetten; alles wacht op review |
-| `verbinder-agent` | bijdrager | `verbinder_brief.md` | theorielaag schrijven; verbanden zonder bron; statussen zetten |
+| `documentalist-agent` | bijdrager | `documentalist_brief.md` | rechtstreeks de score in; alles wacht op review |
+| `criticus-agent` | bijdrager | `criticus_brief.md` | stromannen; statussen zetten; alles wacht op review |
+| `scout-agent` | bijdrager | `scout_brief.md` | theorielaag schrijven; verbanden zonder bron; statussen zetten |
+| _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
