@@ -102,8 +102,12 @@ naar wat het bewijs ís (zie `missies/monitor_brief.md`).
   ontstaan alleen via een RfC (`POST /api/voorstellen`, soort `nieuw_theorie_element`,
   twee menselijke reviewer-akkoorden). Jij werkt op de **instantielaag**: nieuwe
   entiteiten + relaties die bestáánde rollen/mechanismen instantiëren. Mis je een
-  mechanisme om een verband aan te haken? Dien een RfC in (of laat het in je log na),
-  haak het verband niet geforceerd aan het verkeerde mechanisme.
+  mechanisme om een verband aan te haken? Haak het **niet** geforceerd aan het verkeerde
+  mechanisme. Dien het in als **kandidaat** (bottom-up): een relatie *zonder*
+  `mechanism_id`. Ze landt `voorgesteld`, telt in niets en incubeert; `GET /api/kandidaten`
+  groepeert kandidaten op rol-paar (A→B), zodat een mens afleest wanneer een rol-paar
+  genoeg instanties heeft om er via een RfC een mechanisme van te maken (die de kandidaten
+  dan adopteert). Een los signaal dat (nog) geen verband is, blijft in je log.
 - **Geen duplicaten.** Bestaat de entiteit of het verband al, dan is het een
   hercitatie op het bestaande element, geen nieuwe knoop/edge. Difflib-detectie op
   argumenten geeft 409 met kandidaten; respecteer dat.

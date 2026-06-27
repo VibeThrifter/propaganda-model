@@ -19,6 +19,7 @@ from flask import Flask, g, jsonify, request, send_file, session
 
 import auth  # wachtwoord-/token-hashing (M0.6)
 import scoring  # scoringsketen: afgeleide praktijk- en theoriescores
+import politiek  # politieke kleurmeter: ideologische positie uit gesourcete signalen
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 
@@ -29,9 +30,21 @@ GENERATE_VIZ_SCRIPT = ROOT / "scripts" / "generate_viz.py"
 SECRET_KEY_PATH = Path(__file__).parent / "data" / "secret_key"
 BRIDGING_PATH = Path(__file__).parent / "data" / "bridging.json"
 REVIEW_ADVIES_PATH = Path(__file__).parent / "data" / "review_advies.json"
+BRON_SUGGESTIES_PATH = Path(__file__).parent / "data" / "bron_suggesties.json"
 RELEASES_PATH = Path(__file__).parent / "releases"
 
 app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
+
+
+@app.after_request
+def _no_cache_html(resp):
+    # HTML-pagina's (viz, /overleg, …) worden geregenereerd of tonen live data; zonder
+    # dit blijft de browser een oude kopie tonen en lijkt nieuwe data te ontbreken.
+    if resp.mimetype == "text/html":
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+    return resp
 
 
 def _secret_key():
@@ -484,7 +497,13 @@ def api_users_filterrol(uid):
 
 @app.route("/")
 def index():
-    return send_file(WEB_PATH / "index.html")
+    # No-cache: de viz wordt geregenereerd (scripts/generate_viz.py); zonder dit blijft
+    # de browser de oude ~580 KB index.html tonen en lijkt nieuwe data te ontbreken.
+    resp = send_file(WEB_PATH / "index.html")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 # ── Argumenten API ───────────────────────────────────────────
@@ -663,6 +682,11 @@ def discussion_index():
     def groepeer(sql):
         return [dict(r) for r in conn.execute(sql).fetchall()]
 
+    # Threads toont de discussie van het LEVENDE model: alléén goedgekeurde praktijk-
+    # elementen (entiteiten/relaties). Een nog-voorgesteld element zit in de Voorstellen-
+    # wachtrij en een afgewezen element in de Afgewezen-flow — die horen niet óók als losse
+    # thread hier (dat was 'raar en dubbel'). Theorie-elementen (rollen/mechanismen/velden)
+    # zijn altijd levend (ontstaan via RfC) en blijven dus ongefilterd.
     relaties = groepeer("""
         SELECT r.id,
                e1.name || ' → ' || e2.name || ' (' || r.relation_type || ')' AS label,
@@ -674,6 +698,7 @@ def discussion_index():
         JOIN entities e1 ON r.source_id = e1.id
         JOIN entities e2 ON r.target_id = e2.id
         LEFT JOIN mechanisms m ON r.mechanism_id = m.id
+        WHERE r.status = 'goedgekeurd'
         GROUP BY r.id ORDER BY label
     """)
 
@@ -684,11 +709,13 @@ def discussion_index():
         GROUP BY t.id ORDER BY label
     """)
 
-    def simpel(tabel, kol):
+    def simpel(tabel, kol, alleen_goedgekeurd=False):
+        waar = "WHERE t.status = 'goedgekeurd'" if alleen_goedgekeurd else ""
         return groepeer(f"""
             SELECT t.id, t.name AS label, COUNT(*) AS n,
                    SUM(CASE WHEN a.status = 'voorgesteld' THEN 1 ELSE 0 END) AS n_open
             FROM arguments a JOIN {tabel} t ON a.{kol} = t.id
+            {waar}
             GROUP BY t.id ORDER BY n DESC, label
         """)
 
@@ -701,7 +728,7 @@ def discussion_index():
 
     uit = {
         "relaties": relaties,
-        "entiteiten": simpel("entities", "entity_id"),
+        "entiteiten": simpel("entities", "entity_id", alleen_goedgekeurd=True),
         "rollen": simpel("roles", "role_id"),
         "mechanismen": mechanismen,
         "emergente_velden": emergente_velden,
@@ -772,6 +799,32 @@ def create_argument():
         if not (str(prop_value or "").isdigit()):
             return jsonify({"error": "property_value voor 'mechanism' moet een "
                                      "mechanisme-ID zijn (rename-vast)"}), 400
+    # Politiek positie-signaal (kleurmeter): hoort bij een ENTITEIT (persoon/org). Een
+    # signaal codeert ALLEEN een RICHTING (pool) — GEEN zelf-getypt getal; de magnitude
+    # wordt afgeleid (politiek.py: Σ(gewicht·richting)/(Σgewicht+K)). Uitzondering: een
+    # externe meting (CHES) mag '<as>:meting:<-1..1>' dragen — dat getal komt uit een
+    # dataset, niet uit een mens. Bron is verplicht (gated, zie onder).
+    if prop == "politieke_positie":
+        if not entity_id:
+            return jsonify({"error": "property 'politieke_positie' hoort bij een entiteit "
+                                     "(entity_id)"}), 400
+        as_, _, rest = str(prop_value or "").partition(":")
+        ok = False
+        if as_ in politiek.ASSEN:
+            if rest in politiek.POOL_TEKEN.get(as_, {}):
+                ok = True                                       # richting-pool
+            elif rest.startswith("meting:"):
+                try:
+                    mv = float(rest.split(":", 1)[1]); ok = -1.0 <= mv <= 1.0
+                except ValueError:
+                    ok = False
+        if not ok:
+            return jsonify({"error": "property_value voor 'politieke_positie' codeert een "
+                                     "RICHTING, geen getal: '<as>:<pool>' met as ∈ {economisch, "
+                                     "cultureel, establishment} en pool ∈ {links|rechts, "
+                                     "progressief|conservatief, anti-establishment|establishment}. "
+                                     "Een externe meting (CHES) mag '<as>:meting:<-1..1>'. "
+                                     "De magnitude wordt afgeleid, niet zelf gezet."}), 400
     if prop and parent_id is not None:
         return jsonify({"error": "Een reactie draagt geen property: aspect-argumenten "
                                  "richten zich als root-argument op het doel zelf"}), 400
@@ -845,11 +898,12 @@ def create_argument():
     # vindplaats (source_locations). Een kale titel-stub telt niet. Vroeger was dit een zachte
     # poort bij merge (→ bronvermelding_nodig, score-straf); nu blokkeert de API onbronnde
     # claims zodat ze het model niet eens binnenkomen.
-    #   Wél bron nodig: gewoon bewijs (geen property) en invloed-bewijs (property='influence').
+    #   Wél bron nodig: gewoon bewijs (geen property), invloed-bewijs (property='influence')
+    #   en politiek positie-signaal (property='politieke_positie') — ideologie moet je staven.
     #   Vrijgesteld (interpretatie/structuur, geen extern bewijs): classificatie-aspecten
     #   (property='filter'/'mechanism'), compositie- en padclaims ('compositie'/'indirecte_invloed_op'),
     #   contextual-roots, en replies/ondergravingen ('logica klopt niet' — parent_id gezet).
-    evidentieel = prop in (None, "influence")
+    evidentieel = prop in (None, "influence", "politieke_positie")
     if parent_id is None and stance in ("supporting", "contradicting") and evidentieel:
         heeft_echte_bron = any(
             bool((c.get("quote") or "").strip()) or conn.execute(
@@ -1751,6 +1805,33 @@ def patch_citation(cid):
     return jsonify({"id": cid, "argument_status": nieuwe_status}), 200
 
 
+@app.route("/api/citations/<int:cid>", methods=["DELETE"])
+@require_user()
+def delete_citation(cid):
+    """Hard delete van een citatie — maintainer-only (consistent met de overige
+    hard-deletes van afgewezen/foutieve content). Schrijft een 'deleted'-regel in
+    edit_log. Bedoeld voor o.a. een verkeerd aan een argument gehangen citatie."""
+    conn = get_db()
+    if not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "Verwijderen vereist maintainer"}), 403
+    row = conn.execute("SELECT id, argument_id, source_id, quote FROM citations WHERE id = ?",
+                       (cid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Citatie niet gevonden"}), 404
+    conn.execute("DELETE FROM citations WHERE id = ?", (cid,))
+    conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+                    VALUES ('citations', ?, 'deleted', ?, ?, ?)""",
+                 (cid, g.user["username"],
+                  json.dumps({"argument_id": row["argument_id"], "source_id": row["source_id"],
+                              "quote": row["quote"]}, ensure_ascii=False),
+                  "Citatie verwijderd (maintainer)"))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": cid, "deleted": True}), 200
+
+
 # ── Entiteiten & relaties API ────────────────────────────────
 
 @app.route("/api/entities", methods=["POST"])
@@ -1864,7 +1945,13 @@ def create_relation():
             conn.close()
             return jsonify({"error": f"{label}-entiteit bestaat niet"}), 400
 
-    status = "goedgekeurd" if heeft_rol(conn, g.user, "maintainer") else "voorgesteld"
+    # Een kandidaat-relatie (nog geen theorie-huis: mechanism_id leeg) landt ALTIJD als
+    # 'voorgesteld' — ook van een maintainer. Ze incubeert (telt in niets) tot een RfC
+    # haar een mechanisme geeft; pas dan kan ze naar 'goedgekeurd' (poort in _modereer).
+    if mechanism_id is None:
+        status = "voorgesteld"
+    else:
+        status = "goedgekeurd" if heeft_rol(conn, g.user, "maintainer") else "voorgesteld"
     try:
         cur = conn.execute("""
             INSERT INTO relations
@@ -2008,6 +2095,17 @@ def _modereer(tabel, rid):
         conn.close()
         return jsonify({"error": "Niemand keurt eigen werk goed (M2.1): laat een "
                                  "andere reviewer dit beoordelen"}), 403
+    # Orphan-poort (bottom-up): een mechanisme-loze relatie is een kandidaat — een
+    # praktijkpatroon dat nog geen theorie-huis heeft. Ze mag incuberen als 'voorgesteld'
+    # (telt in niets) maar NIET de goedgekeurde graaf in: eerst een RfC die haar adopteert.
+    if tabel == "relations" and nieuw == "goedgekeurd":
+        if conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
+                        (rid,)).fetchone()["mechanism_id"] is None:
+            conn.close()
+            return jsonify({"error": "Dit is een kandidaat-relatie zonder mechanisme "
+                "(incuberende instantie). Ze kan niet worden goedgekeurd zolang er geen "
+                "theorie-element bij hoort: dien een RfC in (soort 'nieuw_theorie_element') "
+                "die deze relatie adopteert, of laat haar 'voorgesteld' incuberen."}), 400
     # Bronplicht voor relaties (praktijklaag): een edge mag de graaf alleen in als ze
     # door minstens één gesourcet root-argument (supporting/contradicting met echte
     # citatie) wordt gedragen — anders is het een lege bewering. Het argument zelf mag
@@ -2036,11 +2134,36 @@ def _modereer(tabel, rid):
         VALUES (?, ?, 'updated', ?, ?, ?, ?)
     """, (tabel, rid, g.user["username"], json.dumps({"status": "voorgesteld"}),
           json.dumps({"status": nieuw}), (data.get("motivatie") or "").strip() or None))
+    # Argumenten bouwen het element: wordt een entiteit/relatie afgewezen, dan vervalt ook de
+    # onderbouwing. Reject de hele discussie(sub)boom mee — de root-argumenten die op dit
+    # element wijzen plus al hun reacties — voor zover nog niet verworpen/vervangen. Zo blijven
+    # er geen wees-argumenten 'voorgesteld' in de wachtrij hangen voor een afgewezen element,
+    # en verschijnen ze (verworpen) in de Afgewezen-flow waar je ze kunt verbeteren & heropenen.
+    # Geen score-effect: scoring.py telt alleen goedgekeurde elementen, en verworpen weegt 0.
+    mee_afgewezen = 0
+    if nieuw == "afgewezen":
+        col = "entity_id" if tabel == "entities" else "relation_id"
+        boom = conn.execute(f"""
+            WITH RECURSIVE boom(id) AS (
+              SELECT id FROM arguments WHERE {col} = ? AND parent_argument_id IS NULL
+              UNION ALL
+              SELECT a.id FROM arguments a JOIN boom b ON a.parent_argument_id = b.id
+            )
+            SELECT a.id, a.status FROM arguments a
+            WHERE a.id IN (SELECT id FROM boom) AND a.status <> 'verworpen' AND NOT a.vervangen
+        """, (rid,)).fetchall()
+        for ar in boom:
+            conn.execute("UPDATE arguments SET status = 'verworpen' WHERE id = ?", (ar["id"],))
+            conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+                            VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)""",
+                         (ar["id"], g.user["username"], json.dumps({"status": ar["status"]}),
+                          json.dumps({"status": "verworpen"}), f"mee-afgewezen met {tabel} #{rid}"))
+        mee_afgewezen = len(boom)
     conn.commit()
     conn.close()
     if nieuw == "goedgekeurd":
         _auto_regen()  # nieuw goedgekeurde node/edge meteen in de viz (indien aangezet)
-    return jsonify({"id": rid, "status": nieuw})
+    return jsonify({"id": rid, "status": nieuw, "argumenten_mee_afgewezen": mee_afgewezen})
 
 
 @app.route("/api/entities/<int:eid>/status", methods=["PATCH"])
@@ -2950,6 +3073,51 @@ def _voorstel_dict(conn, rij) -> dict:
     }
 
 
+@app.route("/api/kandidaten")
+def list_kandidaten():
+    """Incubator (bottom-up): mechanisme-loze 'voorgesteld'-relaties — praktijk-
+    patronen die nog geen theorie-huis hebben — gegroepeerd op rol-paar (A→B).
+    Zo lees je af wanneer een rol-paar genoeg instanties heeft verzameld om er via
+    een RfC een mechanisme van te maken (die de kandidaten dan adopteert). Telt in
+    niets tot adoptie. Open (read)."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT r.id, r.relation_type, r.description, r.certainty, r.influence,
+               e1.name AS bron, e2.name AS doel,
+               e1.primary_role_id AS bron_rol_id, e2.primary_role_id AS doel_rol_id,
+               s.name AS bron_rol, t.name AS doel_rol,
+               (SELECT COUNT(*) FROM arguments a WHERE a.relation_id = r.id) AS n_argumenten
+        FROM relations r
+        JOIN entities e1 ON r.source_id = e1.id
+        JOIN entities e2 ON r.target_id = e2.id
+        LEFT JOIN roles s ON e1.primary_role_id = s.id
+        LEFT JOIN roles t ON e2.primary_role_id = t.id
+        WHERE r.mechanism_id IS NULL AND r.status = 'voorgesteld' AND NOT r.vervangen
+        ORDER BY e1.primary_role_id, e2.primary_role_id, r.id
+    """).fetchall()
+    conn.close()
+    groepen, ongekoppeld = {}, []
+    for r in rows:
+        rel = {"id": r["id"], "relation_type": r["relation_type"],
+               "description": r["description"], "bron": r["bron"], "doel": r["doel"],
+               "certainty": r["certainty"], "influence": r["influence"],
+               "n_argumenten": r["n_argumenten"]}
+        # Zonder afleidbaar rol-paar kun je nog geen mechanisme (rol→rol-edge) destilleren.
+        if r["bron_rol_id"] is None or r["doel_rol_id"] is None:
+            ongekoppeld.append(rel)
+            continue
+        groep = groepen.setdefault((r["bron_rol_id"], r["doel_rol_id"]), {
+            "bron_rol": {"id": r["bron_rol_id"], "naam": r["bron_rol"]},
+            "doel_rol": {"id": r["doel_rol_id"], "naam": r["doel_rol"]},
+            "relaties": []})
+        groep["relaties"].append(rel)
+    kandidaten = sorted(
+        ({**g_, "aantal": len(g_["relaties"])} for g_ in groepen.values()),
+        key=lambda g_: g_["aantal"], reverse=True)
+    return jsonify({"kandidaten": kandidaten, "ongekoppeld": ongekoppeld,
+                    "totaal": len(rows)})
+
+
 @app.route("/api/voorstellen", methods=["POST"])
 @require_user()
 def create_voorstel():
@@ -3166,7 +3334,8 @@ def review_voorstel(vid):
         besluit = "afgewezen"
     elif len(set(t["akkoorden"])) >= benodigd or maintainer_quorum:
         try:
-            resultaat = voorstellen.voer_uit(conn, rij["soort"], payload, vid)
+            resultaat = voorstellen.voer_uit(conn, rij["soort"], payload, vid,
+                                             ingediend_door=rij["ingediend_door"])
             via_maintainer = maintainer_quorum and len(set(t["akkoorden"])) < benodigd
             resultaat["self_merged"] = t["zelf_akkoord"] or indiener_keurde_goed
             resultaat["maintainer_quorum"] = via_maintainer
@@ -3331,6 +3500,24 @@ def review_queue():
         e = dict(e)
         e["ingediend_door"] = _creator_van(conn, "entities", e["id"])
         entiteiten.append(e)
+    # Root-argumenten (mét citaties) ook aan entiteiten meegeven — symmetrisch met relaties
+    # hieronder — zodat de reviewer de onderbouwing/positie-signalen op de entiteit-kaart
+    # ziet (bv. de politieke_positie-signalen) i.p.v. alleen naam + beschrijving.
+    ent_ids = [e["id"] for e in entiteiten]
+    args_per_ent = {}
+    if ent_ids:
+        qs = ",".join("?" * len(ent_ids))
+        arg_rows = conn.execute(f"""
+            SELECT id, entity_id, stance, status, claim, property, property_value
+            FROM arguments
+            WHERE entity_id IN ({qs}) AND parent_argument_id IS NULL AND NOT vervangen
+            ORDER BY id""", ent_ids).fetchall()
+        cites = _citaties_per_argument(conn, [a["id"] for a in arg_rows])
+        for a in arg_rows:
+            d = dict(a); d["citations"] = cites.get(a["id"], [])
+            args_per_ent.setdefault(a["entity_id"], []).append(d)
+    for e in entiteiten:
+        e["argumenten"] = args_per_ent.get(e["id"], [])
     rel_rows = conn.execute("""
         SELECT r.id, r.relation_type, r.description, r.certainty, r.influence, r.created_at,
                r.bidirectional, r.active_from, r.active_until,
@@ -3388,6 +3575,23 @@ def review_advies():
         return jsonify({"error": f"Adviesbestand onleesbaar: {e}", "items": {}}), 500
 
 
+@app.route("/api/bron_suggesties")
+@require_user("reviewer")
+def bron_suggesties():
+    """Bron-suggesties van de documentalist-agent voor probleem-argumenten (afgewezen
+    of bronloos ingediend): per arg:<id> een lijst voorgestelde bronnen, elk optioneel
+    met een `check`-verdict van de reviewbeoordelaar (bestaat de bron, dekt hij de claim?).
+    Read-only beslissteun BUITEN het model — een los JSON-bestand dat de agents schrijven
+    (geen discussieboom-bijdrage, telt nergens mee, mirrors review_advies.json). Reviewer+
+    only. Leeg tot de documentalist een ronde draaide (missies/documentalist_brief.md)."""
+    if not BRON_SUGGESTIES_PATH.exists():
+        return jsonify({"gegenereerd": None, "agent": None, "items": {}})
+    try:
+        return jsonify(json.loads(BRON_SUGGESTIES_PATH.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Bron-suggestiebestand onleesbaar: {e}", "items": {}}), 500
+
+
 @app.route("/api/afgewezen")
 @require_user("reviewer")
 def afgewezen_queue():
@@ -3395,15 +3599,33 @@ def afgewezen_queue():
     entiteiten/relaties en afgewezen+ingetrokken RfC's — elk met de afwijs-feedback. Buiten
     de gewone review_queue gehouden zodat afgewezen werk de wachtrij niet vervuilt, maar wél
     vindbaar/handelbaar blijft. Reviewer+ mag kijken; de acties (herzien/heropenen/
-    heraanmelden/verwijderen) houden elk hun eigen poort (verwijderen = maintainer)."""
+    heraanmelden/verwijderen) houden elk hun eigen poort (verwijderen = maintainer).
+
+    De argumenten-lijst toont alléén *standalone* verworpen argumenten — afwijzingen op een
+    nog levend element (goedgekeurd/voorgesteld). Een argument dat mee-afgewezen is met zíjn
+    element hoort niet als los kaartje hier: dat bewerk/heropen je in de discussieboom ónder
+    de afgewezen entiteit/relatie zelf (cohesief, niet los van elkaar)."""
     conn = get_db()
+    # 'onder_afgewezen' = de hele (sub)boom van elk afgewezen element (root-argumenten die op
+    # een afgewezen entiteit/relatie wijzen + al hun reacties). Die sluiten we hier uit; ze
+    # leven onder de element-kaart.
     SELECT_ARG = """
+        WITH RECURSIVE onder_afgewezen(id) AS (
+          SELECT id FROM arguments WHERE parent_argument_id IS NULL AND (
+               relation_id IN (SELECT id FROM relations WHERE status = 'afgewezen')
+            OR entity_id   IN (SELECT id FROM entities  WHERE status = 'afgewezen'))
+          UNION ALL
+          SELECT a.id FROM arguments a JOIN onder_afgewezen o ON a.parent_argument_id = o.id
+        )
         SELECT a.id, a.stance, a.claim, a.reasoning, a.property, a.property_value,
                a.objection_type, a.bezwaar_resolutie, a.parent_argument_id,
                a.contributed_by, a.created_at, a.reviseert_id,
                a.relation_id, a.entity_id, a.role_id, a.mechanism_id, a.emergent_effect_id,
                (SELECT COUNT(*) FROM citations c WHERE c.argument_id = a.id) AS n_citaties
-        FROM arguments a WHERE a.status = 'verworpen' AND NOT a.vervangen ORDER BY a.id DESC"""
+        FROM arguments a
+        WHERE a.status = 'verworpen' AND NOT a.vervangen
+          AND a.id NOT IN (SELECT id FROM onder_afgewezen)
+        ORDER BY a.id DESC"""
     argumenten = _verrijk_review_argumenten(conn, conn.execute(SELECT_ARG).fetchall())
     for a in argumenten:
         a["feedback"] = _laatste_feedback(conn, "arguments", a["id"])
@@ -3426,6 +3648,9 @@ def afgewezen_queue():
         e["ingediend_door"] = _creator_van(conn, "entities", e["id"])
         e["feedback"] = _laatste_feedback(conn, "entities", e["id"])
         e["auteur_is_agent"] = _is_agent(conn, e["ingediend_door"])
+        e["n_argumenten"] = conn.execute(
+            "SELECT COUNT(*) c FROM arguments WHERE entity_id = ? "
+            "AND parent_argument_id IS NULL AND NOT vervangen", (e["id"],)).fetchone()["c"]
         entiteiten.append(e)
 
     relaties = []
@@ -3441,6 +3666,9 @@ def afgewezen_queue():
         r["ingediend_door"] = _creator_van(conn, "relations", r["id"])
         r["feedback"] = _laatste_feedback(conn, "relations", r["id"])
         r["auteur_is_agent"] = _is_agent(conn, r["ingediend_door"])
+        r["n_argumenten"] = conn.execute(
+            "SELECT COUNT(*) c FROM arguments WHERE relation_id = ? "
+            "AND parent_argument_id IS NULL AND NOT vervangen", (r["id"],)).fetchone()["c"]
         relaties.append(r)
 
     conn.close()
@@ -4190,6 +4418,19 @@ def get_scores():
         conn, bridged_weights=scoring.bridged_weights_from_file(BRIDGING_PATH))
     conn.close()
     return jsonify(scores)
+
+
+@app.route("/api/kleurmeter")
+def get_kleurmeter():
+    """Afgeleide politieke kleurmeter (politiek.py): per persoon een 2-assige
+    ideologische positie uit GESOURCETE 'politieke_positie'-signalen, per organisatie
+    geaggregeerd uit haar bestuurders/leden. ?preview=1 telt nog-`voorgesteld` signalen
+    voorlopig mee (vóór menselijke review); standaard alleen gemergde signalen."""
+    preview = request.args.get("preview") in ("1", "true", "ja")
+    conn = get_db()
+    res = politiek.compute_kleurmeter(conn, include_voorgesteld=preview)
+    conn.close()
+    return jsonify(res)
 
 
 # ── Agent-geheugen: waar heeft dit account al op gereageerd? ──

@@ -223,6 +223,91 @@ def main():
         "maintainer-akkoord telt als volledig quorum (opbouwfase)")
     c.delete(f"/api/roles/{j['resultaat']['id']}", headers=kop["baas"])
 
+    # 6d. Bottom-up: een kandidaat-relatie (mechanisme-loos) incubeert, en een RfC
+    #     adopteert óf creëert haar instantie (koppeling van indiening, niet van de poorten).
+    r = c.post("/api/relations", headers=kop["baas"],
+               json={"source_id": 1, "target_id": 2, "relation_type": "beinvloeding"})
+    eis(r.status_code == 201 and r.get_json()["status"] == "voorgesteld",
+        "kandidaat-relatie (mechanisme-loos) landt 'voorgesteld', ook van een maintainer")
+    kand_id = r.get_json()["id"]
+    r = c.patch(f"/api/relations/{kand_id}/status", headers=kop["r1"],
+                json={"status": "goedgekeurd"})
+    eis(r.status_code == 400 and "kandidaat" in r.get_json()["error"].lower(),
+        "een kandidaat kan niet worden goedgekeurd zonder mechanisme (orphan-poort)")
+
+    # Incubator: rolloze kandidaat valt in 'ongekoppeld'; mét rol-paar groepeert ze op A→B.
+    inc = c.get("/api/kandidaten").get_json()
+    eis(any(rel["id"] == kand_id for rel in inc["ongekoppeld"]),
+        "incubator toont de rolloze kandidaat in 'ongekoppeld'")
+    conn = sqlite3.connect(tmp)
+    conn.execute("INSERT INTO entities (id, name, type, primary_role_id) "
+                 "VALUES (10, 'F2-Drukker', 'persoon', ?)", (rol_id,))
+    conn.execute("INSERT INTO entities (id, name, type, primary_role_id) "
+                 "VALUES (11, 'F2-Redacteur', 'persoon', ?)", (rol_id,))
+    conn.commit(); conn.close()
+    kand2_id = c.post("/api/relations", headers=kop["baas"],
+                      json={"source_id": 10, "target_id": 11,
+                            "relation_type": "beinvloeding"}).get_json()["id"]
+    inc = c.get("/api/kandidaten").get_json()
+    groep = next((g for g in inc["kandidaten"]
+                  if g["bron_rol"]["id"] == rol_id and g["doel_rol"]["id"] == rol_id), None)
+    eis(groep is not None and any(rel["id"] == kand2_id for rel in groep["relaties"]),
+        "incubator groepeert kandidaten op rol-paar (A→B) zodra beide entiteiten een rol hebben")
+
+    # Validatie: een gestructureerde (relatie-)instantiatie kan alleen bij een mechanisme-RfC.
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "nieuw_theorie_element", "titel": "Rol met relatie-instantiatie",
+        "payload": dict(rfc, naam="rol_met_relatie",
+                        instantiaties=[{"source_id": 1, "target_id": 2, "relation_type": "x"}])})
+    eis(r.status_code == 400 and any("mechanisme-RfC" in f for f in r.get_json()["fouten"]),
+        "gestructureerde instantiatie alleen toegestaan bij een mechanisme-RfC")
+
+    mech_rfc = {"element_type": "mechanisme", "filter": "flak", "aard": "direct",
+                "definitie": "Testmechanisme bottom-up.", "effect": "Disciplineert.",
+                "freeze_test": "Zonder levende afzender dooft het — dus direct.",
+                "afgrenzing": "Anders dan publieke_aanval: informeel/privé.",
+                "falsificatiecriterium": "Geen gedocumenteerd geval.", "bronnen": ["F2-Bron"]}
+
+    # RfC adopteert de incuberende kandidaat → mechanism_id wordt gezet.
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "nieuw_theorie_element", "titel": "Mechanisme adopteert kandidaat",
+        "payload": dict(mech_rfc, naam="f2_adoptiemechanisme",
+                        instantiaties=[{"bestaande_relatie_id": kand_id}])})
+    eis(r.status_code == 201, "mechanisme-RfC met adoptie-instantiatie indienbaar")
+    vid_ad = r.get_json()["id"]
+    c.post(f"/api/voorstellen/{vid_ad}/reviews", headers=kop["r1"], json={"oordeel": "akkoord"})
+    j = c.post(f"/api/voorstellen/{vid_ad}/reviews", headers=kop["r2"],
+               json={"oordeel": "akkoord"}).get_json()
+    eis(j["besluit"] == "geaccepteerd"
+        and j["resultaat"].get("instantiaties_geadopteerd") == [kand_id],
+        "adoptie-RfC geaccepteerd; de kandidaat is geadopteerd")
+    mech_ad = j["resultaat"]["id"]
+    conn = sqlite3.connect(tmp)
+    eis(conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
+                     (kand_id,)).fetchone()[0] == mech_ad,
+        "de geadopteerde kandidaat hangt nu aan het nieuwe mechanisme")
+    conn.close()
+
+    # RfC creëert tegelijk een verse instantie → nieuwe 'voorgesteld'-relatie, influence-vloer.
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "nieuw_theorie_element", "titel": "Mechanisme creëert instantie",
+        "payload": dict(mech_rfc, naam="f2_creatiemechanisme",
+                        instantiaties=[{"source_id": 2, "target_id": 1,
+                                        "relation_type": "flak", "certainty": 0.6}])})
+    vid_cr = r.get_json()["id"]
+    c.post(f"/api/voorstellen/{vid_cr}/reviews", headers=kop["r1"], json={"oordeel": "akkoord"})
+    j = c.post(f"/api/voorstellen/{vid_cr}/reviews", headers=kop["r2"],
+               json={"oordeel": "akkoord"}).get_json()
+    mech_cr = j["resultaat"]["id"]
+    nieuw_rel = (j["resultaat"].get("instantiaties_aangemaakt") or [None])[0]
+    eis(nieuw_rel is not None, "verse instantie gematerialiseerd uit het RfC")
+    conn = sqlite3.connect(tmp)
+    row = conn.execute("SELECT mechanism_id, status, influence FROM relations WHERE id = ?",
+                       (nieuw_rel,)).fetchone()
+    conn.close()
+    eis(row == (mech_cr, "voorgesteld", 0.05),
+        "verse instantie: 'voorgesteld', aan het nieuwe mechanisme, influence-vloer 0,05")
+
     # 6c. Titel/beschrijving bewerken (Wikipedia/OSS): voorstel door iedereen,
     #     directe bewerking alleen door maintainer.
     herf = {"soort": "herformuleren", "titel": "Scherpere definitie testwaakhond",

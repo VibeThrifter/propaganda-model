@@ -278,6 +278,20 @@ herleidbaar). Een afgewezen praktijkelement gaat dezelfde weg via
 `POST /api/{entities,relations}/<id>/heraanmelden` (auteur bewerkt → terug op
 `voorgesteld`).
 
+**Bottom-up: kandidaat-relaties & RfC-koppeling.** Niet elk praktijkpatroon heeft
+meteen een theorie-huis. Een relatie zónder mechanisme is daarom geen verboden orphan
+maar een **kandidaat**: ze landt `voorgesteld` (telt in niets) en incubeert tot er
+genoeg vergelijkbare instanties zijn om er een mechanisme van te destilleren.
+`GET /api/kandidaten` groepeert de kandidaten op rol-paar (A→B), zodat je afleest
+wanneer een mechanisme rijp is; de orphan-poort zit op het *goedkeur*-moment (een
+kandidaat kan niet `goedgekeurd` worden zolang ze mechanisme-loos is — `_modereer`),
+niet op creatie. Een mechanisme-RfC kan in zijn `instantiaties` een **gestructureerde**
+instantiatie meegeven — `{"bestaande_relatie_id": N}` **adopteert** een incuberende
+kandidaat, `{"source_id","target_id","relation_type",…}` **creëert** een verse — die
+bij acceptatie aan het nieuwe mechanisme worden gekoppeld (verse instanties landen
+`voorgesteld`). Eén besluit koppelt zo de *indiening* van theorie + praktijk, zonder de
+*poorten* te koppelen: de gekoppelde relatie behoudt haar eigen bronplicht.
+
 **Argument-revisie-lus (verbeter-pad voor de discussieboom).** Argumenten zijn niet
 meer onveranderlijk. Een nog-`voorgesteld` argument schaaft de auteur in-place bij
 (`PATCH /api/arguments/<id>` — het telt nog nergens in mee). Een al *gemerged*

@@ -130,6 +130,73 @@ function bronOpties() {
     BRONNEN.map(b => `<option value="${b.id}">${esc((b.author ? b.author + ' — ' : '') + (b.title || 'bron #' + b.id)).slice(0, 70)}</option>`).join('');
 }
 
+// ── Meerdere bronnen per argument ───────────────────────────
+// Elke rij: kies een bestaande bron óf "+ nieuwe bron…" (titel/type + optionele URL),
+// plus een citaat. "+ bron toevoegen" voegt rijen toe; collectWCites() leest ze uit.
+const SOURCE_TYPE_OPTS = ['boek', 'academisch_artikel', 'rapport', 'nieuwsartikel', 'transcript',
+  'interview', 'dataset', 'wetgeving', 'persbericht', 'website', 'overig'];
+let _wCiteSeq = 0;
+function wCiteRowHtml(rid, removable) {
+  return `<div class="cite-row" data-rowid="${rid}" style="position:relative;border-left:2px solid var(--border);padding-left:10px;margin:8px 0">
+      ${removable ? `<button type="button" title="Deze bron verwijderen" onclick="removeWCiteRow('${rid}')" style="position:absolute;top:-2px;right:0;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;line-height:1">×</button>` : ''}
+      <label>Bron</label>
+      <select id="${rid}-src" style="width:100%;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text)" onchange="wCiteToggle('${rid}')">${bronOpties()}<option value="__new__">+ nieuwe bron…</option></select>
+      <label style="margin-top:6px">Citaat (optioneel)</label><input type="text" id="${rid}-quote" placeholder="Letterlijk citaat uit de bron (optioneel)">
+      <label style="margin-top:6px">URL / vindplaats (optioneel)</label><input type="text" id="${rid}-nurl" placeholder="https://… — voor een nieuwe bron, óf om een gekozen bron verifieerbaar te maken">
+      <div id="${rid}-nieuw" style="display:none;border:1px dashed var(--border);border-radius:6px;padding:8px;margin-top:6px">
+        <label>Titel nieuwe bron *</label><input type="text" id="${rid}-ntitel" placeholder="bv. WRR — Aandacht voor media">
+        <label style="margin-top:6px">Brontype</label><select id="${rid}-ntype">${SOURCE_TYPE_OPTS.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+    </div>`;
+}
+function wCiteListHtml(slot) {
+  return `<div class="cite-list" id="${slot}-cites">${wCiteRowHtml(slot + '__r0', false)}</div>
+    <button type="button" onclick="addWCiteRow('${slot}')" style="font-size:12px;margin:2px 0 4px">+ bron toevoegen</button>`;
+}
+function addWCiteRow(slot) {
+  const list = document.getElementById(slot + '-cites'); if (!list) return;
+  const w = document.createElement('div');
+  w.innerHTML = wCiteRowHtml(slot + '__r' + (++_wCiteSeq), true).trim();
+  list.appendChild(w.firstElementChild);
+}
+function removeWCiteRow(rid) { const r = document.querySelector(`.cite-row[data-rowid="${rid}"]`); if (r) r.remove(); }
+function wCiteToggle(rid) { const sel = document.getElementById(rid + '-src'); const blok = document.getElementById(rid + '-nieuw'); if (blok) blok.style.display = (sel && sel.value === '__new__') ? '' : 'none'; }
+async function resolveWCite(rid, msg) {
+  const sel = document.getElementById(rid + '-src'); if (!sel) return null;
+  const v = sel.value;
+  const quote = (document.getElementById(rid + '-quote')?.value || '').trim() || null;
+  const nurl = (document.getElementById(rid + '-nurl')?.value || '').trim();
+  if (v === '__new__') {
+    const ntitel = (document.getElementById(rid + '-ntitel')?.value || '').trim();
+    const ntype = document.getElementById(rid + '-ntype')?.value || 'overig';
+    if (!ntitel) { if (msg) msg.innerHTML = '<span style="color:#e0635f">Titel van de nieuwe bron is verplicht.</span>'; return false; }
+    const nbody = { title: ntitel, source_type: ntype };
+    if (nurl) nbody.location = { type: 'url', value: nurl };
+    try {
+      const br = await fetch('/api/sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(nbody) });
+      const bj = await br.json().catch(() => ({}));
+      if (!br.ok) { if (msg) msg.innerHTML = `<span style="color:#e0635f">${esc(bj.error || 'bron aanmaken mislukt')}</span>`; return false; }
+      return { source_id: bj.id, quote };
+    } catch (e) { if (msg) msg.innerHTML = `<span style="color:#e0635f">Netwerkfout: ${esc(e.message)}</span>`; return false; }
+  } else if (v) {
+    const id = parseInt(v, 10);
+    // Optionele URL bij een BESTAANDE bron → als vindplaats toevoegen (dedupt server-side).
+    if (nurl) { try { await fetch(`/api/sources/${id}/locations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'url', value: nurl }) }); } catch (e) {} }
+    return { source_id: id, quote };
+  }
+  return null;
+}
+async function collectWCites(slot, msg) {
+  const list = document.getElementById(slot + '-cites'); if (!list) return [];
+  const out = [];
+  for (const row of list.querySelectorAll('.cite-row')) {
+    const c = await resolveWCite(row.dataset.rowid, msg);
+    if (c === false) return false;
+    if (c) out.push(c);
+  }
+  return out;
+}
+
 const kort = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
 
 const grid = html => `<div class="grid">${html}</div>`;
@@ -284,9 +351,8 @@ function toonForm(slot, modus, argId) {
     <label>Bewering ${modus === 'revisie' ? '(leeg = origineel)' : '*'}</label>
     <input type="text" id="${slot}-claim" placeholder="${modus === 'revisie' ? 'verbeterde bewering' : 'nieuwe bewering'}">
     <label>Onderbouwing</label><textarea id="${slot}-reason"></textarea>
-    <label>Bron vervangen (optioneel)</label>
-    <select id="${slot}-src" style="width:100%;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text)">${bronOpties()}</select>
-    <input type="text" id="${slot}-quote" placeholder="Citaat (optioneel)" style="margin-top:6px">
+    <label>Bron(nen) vervangen (optioneel — leeg laten = citaten ongewijzigd)</label>
+    ${wCiteListHtml(slot)}
     <div class="acties"><button class="prim" onclick="verstuurForm('${slot}','${modus}',${argId})">${modus === 'revisie' ? 'Revisie indienen' : 'Opslaan'}</button>
       <button onclick="document.getElementById('${slot}-form').innerHTML=''">Annuleren</button></div>
     <div class="melding" id="${slot}-msg"></div></div>`;
@@ -294,14 +360,14 @@ function toonForm(slot, modus, argId) {
 async function verstuurForm(slot, modus, argId) {
   const claim = document.getElementById(slot + '-claim').value.trim();
   const reason = document.getElementById(slot + '-reason').value.trim();
-  const src = document.getElementById(slot + '-src').value;
-  const quote = document.getElementById(slot + '-quote').value.trim();
   const msg = document.getElementById(slot + '-msg');
-  if (modus === 'edit' && !claim && !reason && !src) { msg.innerHTML = '<span style="color:#e0635f">Niets gewijzigd.</span>'; return; }
+  const citations = await collectWCites(slot, msg);
+  if (citations === false) return;
+  if (modus === 'edit' && !claim && !reason && !citations.length) { msg.innerHTML = '<span style="color:#e0635f">Niets gewijzigd.</span>'; return; }
   const body = {};
   if (claim) body.claim = claim;
   if (reason) body.reasoning = reason;
-  if (src) body.citations = [{ source_id: parseInt(src, 10), quote: quote || null }];
+  if (citations.length) body.citations = citations;   // leeg = citaten ongewijzigd
   const url = modus === 'revisie' ? `/api/arguments/${argId}/revisie` : `/api/arguments/${argId}`;
   const method = modus === 'revisie' ? 'POST' : 'PATCH';
   msg.textContent = 'Bezig…';

@@ -80,6 +80,34 @@ niet om de wereld te onderzoeken**. Dit is de scheidslijn die je niet overschrij
   het item (zie schema) én ze kan het verdict verzwaren (citaat niet te vinden →
   `verbeteren`; aantoonbaar verzonnen bron → `afwijzen`, mét de gevonden grond).
 
+## Bron-suggesties van de documentalist checken (admin-bijstand)
+
+De documentalist stelt voor bronloze/afgewezen argumenten kandidaat-bronnen voor in
+`data/bron_suggesties.json` (zie `missies/documentalist_brief.md`). Jij bent de
+**checker**: ga per voorgestelde bron na — met dezelfde gescopete webverificatie als
+hierboven — of ze deugt, en vul per bron een `check`-veld in. Doe dit ná de
+documentalist (jij bent de laatste schrijver van het bestand).
+
+Toets per bron:
+- **Bestaat de bron echt** en resolvet de URL (geen verzonnen titel, geen dode link)?
+- **Dekt ze de claim zoals geformuleerd**, of gaat ze over iets anders / een zwakkere
+  of sterkere bewering? Een quote moet letterlijk in de bron staan.
+- Is ze **controleerbaar** door een mens (niet enkel een paywall-samenvatting of een
+  AI-synthese)?
+
+Schrijf het resultaat terug in hetzelfde bestand, als `check` op elke bron:
+
+```json
+{"titel": "...", "url": "...", "waarom": "...",
+ "check": {"verdict": "klopt | twijfel | klopt-niet",
+           "detail": "bv. 'bron bestaat, quote letterlijk teruggevonden, dekt de claim'"}}
+```
+
+`verdict` ∈ `klopt` (bruikbaar) · `twijfel` (deels/onzeker — laat de admin kijken) ·
+`klopt-niet` (verzonnen, dood, of dekt de claim niet). `/overleg` toont jouw verdict
+rechts van het argument, onder de suggestie. Het telt nergens mee — de admin beslist.
+Log de webcontroles in je ronde-log.
+
 ## Beoordelingscriteria per relatie/entiteit (instance-laag)
 
 - Klopt de **richting** (source → target), het mechanisme en de `aard`?

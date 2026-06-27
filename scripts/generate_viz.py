@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import scoring  # noqa: E402  (repo-root module met de scoringsketen)
+import politiek  # noqa: E402  (politieke kleurmeter)
 
 DB_PATH = Path(__file__).parent.parent / "data" / "propaganda_model.db"
 OUT_PATH = Path(__file__).parent.parent / "web" / "index.html"
@@ -217,6 +218,15 @@ def export_data():
         conn, bridged_weights=scoring.bridged_weights_from_file(
             DB_PATH.parent / "bridging.json"))
 
+    # Politieke kleurmeter (id-gekoppelde maps voor het detailpaneel). Preview = ook
+    # `voorgesteld` signalen tellen voorlopig mee; nieuw werk staat immers nog voorgesteld.
+    km = politiek.compute_kleurmeter(conn, include_voorgesteld=True)
+    kleurmeter = {
+        'preview': km['preview'],
+        'personen': {p['id']: p for p in km['personen']},
+        'organisaties': {o['id']: o for o in km['organisaties']},
+    }
+
     # Argument counts per relation (voor edge labels)
     arg_counts = {}
     for a in arguments:
@@ -324,6 +334,7 @@ def export_data():
         'citations': citations,
         'instantiations': instantiations,
         'release': laatste_release(),   # M3.1: releasetag in de topbar (of null)
+        'kleurmeter': kleurmeter,       # politieke kleurmeter per entiteit (detailpaneel)
     }
 
 

@@ -24,6 +24,7 @@ Kernregels M2.6 (zie VERBETERPLAN § M2.6):
 Alleen stdlib.
 """
 from __future__ import annotations
+import json
 
 SOORTEN = ("nieuw_theorie_element", "splitsen", "samenvoegen", "hernoemen",
            "herformuleren")
@@ -77,6 +78,62 @@ def _element(conn, element_type, element_id):
         f"SELECT * FROM {TABEL[element_type]} WHERE id = ?", (element_id,)).fetchone()
 
 
+# ── Gestructureerde instantiaties (bottom-up koppeling) ──────
+# Een RfC-payload draagt verplicht ≥ 1 instantiatie. Een instantiatie als losse string
+# is louter beschrijvend; als object (dict) is ze een *praktijkrelatie* die bij
+# acceptatie aan het nieuwe mechanisme wordt gekoppeld — óf een nieuwe 'voorgesteld'-
+# relatie, óf adoptie van een bestaande kandidaat ({'bestaande_relatie_id': N}). Zo
+# krijgt een incuberend praktijkpatroon eindelijk zijn theorie-huis, in één besluit.
+
+def _clamp01(v):
+    if v in (None, ""):
+        return None
+    try:
+        return min(1.0, max(0.0, float(v)))
+    except (ValueError, TypeError):
+        return None
+
+
+def _instantiatie_specs(payload) -> list:
+    """De gestructureerde (dict) instantiaties; tekst-instantiaties (str) materialiseren niets."""
+    return [d for d in (payload.get("instantiaties") or []) if isinstance(d, dict)]
+
+
+def _valideer_instantiatie_specs(conn, element_type, payload, fouten):
+    specs = _instantiatie_specs(payload)
+    if not specs:
+        return
+    if element_type != "mechanisme":
+        fouten.append("een gestructureerde instantiatie (relatie) kan alleen bij een "
+                      f"mechanisme-RfC; gebruik beschrijvende tekst voor een {element_type}-RfC")
+        return
+    for i, spec in enumerate(specs, 1):
+        pre = f"instantiatie #{i}: "
+        if spec.get("type", "relatie") != "relatie":
+            fouten.append(f"{pre}alleen type 'relatie' wordt ondersteund")
+            continue
+        if spec.get("bestaande_relatie_id"):
+            rij = conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
+                               (spec["bestaande_relatie_id"],)).fetchone()
+            if rij is None:
+                fouten.append(f"{pre}relatie #{spec['bestaande_relatie_id']} bestaat niet")
+            elif rij["mechanism_id"] is not None:
+                fouten.append(f"{pre}relatie #{spec['bestaande_relatie_id']} hangt al aan een "
+                              "mechanisme — alleen een kandidaat (mechanisme-loos) is adopteerbaar")
+            continue
+        bron, doel = spec.get("source_id"), spec.get("target_id")
+        if not bron or not doel:
+            fouten.append(f"{pre}source_id en target_id (of bestaande_relatie_id) zijn verplicht")
+        elif bron == doel:
+            fouten.append(f"{pre}bron en doel mogen niet dezelfde entiteit zijn")
+        else:
+            for label, eid in (("bron", bron), ("doel", doel)):
+                if not conn.execute("SELECT 1 FROM entities WHERE id = ?", (eid,)).fetchone():
+                    fouten.append(f"{pre}{label}-entiteit #{eid} bestaat niet")
+        if not _tekst(spec, "relation_type"):
+            fouten.append(f"{pre}relation_type is verplicht")
+
+
 # ── Sjablooncontrole bij indienen ────────────────────────────
 
 def _valideer_elementvelden(conn, element_type, velden, fouten, prefix=""):
@@ -107,6 +164,18 @@ def _valideer_elementvelden(conn, element_type, velden, fouten, prefix=""):
         leden = velden.get("leden") or []
         if len(leden) < 2:
             fouten.append(f"{prefix}een emergent veld vergt ≥ 2 leden (rol-id's)")
+        # Optioneel: koppel het nieuwe veld bij acceptatie als deel-effect onder een
+        # bestaand (apex-)veld. Zonder dit veld blijft het een standalone veld.
+        deel_van = velden.get("deel_van")
+        if deel_van is not None:
+            rij = conn.execute("SELECT vervangen FROM emergent_effects WHERE id = ?",
+                               (deel_van,)).fetchone()
+            if rij is None:
+                fouten.append(f"{prefix}deel_van #{deel_van} bestaat niet "
+                              "(onbekend apex-veld om als deel-effect onder te hangen)")
+            elif rij["vervangen"]:
+                fouten.append(f"{prefix}deel_van #{deel_van} is vervangen; "
+                              "koppel aan de opvolger")
     elif element_type == "entiteit":
         if not _tekst(velden, "type"):
             fouten.append(f"{prefix}type is verplicht")
@@ -138,6 +207,7 @@ def valideer_payload(conn, soort, payload) -> list:
         if not payload.get("instantiaties"):
             fouten.append("≥ 1 beoogde instantiatie is verplicht (welke praktijk-"
                           "relatie/-entiteit valt eronder?)")
+        _valideer_instantiatie_specs(conn, et, payload, fouten)
         if not payload.get("bronnen"):
             fouten.append("≥ 1 onafhankelijke bron is verplicht")
 
@@ -332,9 +402,15 @@ def _maak_element(conn, element_type, velden) -> int:
             (velden["naam"].strip(), velden["label"].strip(),
              velden.get("categorie") or "systeemactor",
              velden["definitie"].strip(), velden["effect"].strip()))
+        eff_id = cur.lastrowid
         for rid in velden.get("leden") or []:
             conn.execute("INSERT INTO emergent_effect_members (emergent_effect_id, role_id)"
-                         " VALUES (?, ?)", (cur.lastrowid, rid))
+                         " VALUES (?, ?)", (eff_id, rid))
+        # Deel-effect-koppeling onder een apex-veld (optioneel; gevalideerd bij indienen).
+        if velden.get("deel_van"):
+            conn.execute("INSERT OR IGNORE INTO emergent_effect_subeffects "
+                         "(parent_effect_id, child_effect_id) VALUES (?, ?)",
+                         (velden["deel_van"], eff_id))
     else:
         raise ValueError(f"onbekend element_type '{element_type}'")
     return cur.lastrowid
@@ -387,7 +463,70 @@ def _dupliceer_relatie(conn, rel_id, overrides) -> int:
 
 # ── Uitvoering ná acceptatie ─────────────────────────────────
 
-def voer_uit(conn, soort, payload, voorstel_id) -> dict:
+def _materialiseer_instantiaties(conn, mechanism_id, payload, voorstel_id, ingediend_door):
+    """Maak/adopteer de gestructureerde instantiaties als praktijkrelaties aan het
+    zojuist gemaakte mechanisme. Nieuw → een 'voorgesteld'-relatie (telt in niets tot
+    een reviewer haar apart goedkeurt — de poorten blijven ontkoppeld); adoptie → een
+    bestaande kandidaat krijgt dit mechanisme (en wordt zo goedkeurbaar). Evidence komt
+    er daarna via de eigen discussieboom. Raise ValueError = niet uitvoerbaar."""
+    nieuw, geadopteerd = [], []
+    for spec in _instantiatie_specs(payload):
+        bestaand = spec.get("bestaande_relatie_id")
+        if bestaand:
+            rij = conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
+                               (bestaand,)).fetchone()
+            if rij is None:
+                raise ValueError(f"kandidaat-relatie #{bestaand} bestaat niet meer")
+            if rij["mechanism_id"] is not None:
+                raise ValueError(f"relatie #{bestaand} hangt al aan een mechanisme")
+            conn.execute("UPDATE relations SET mechanism_id = ? WHERE id = ?",
+                         (mechanism_id, bestaand))
+            conn.execute("""
+                INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+                VALUES ('relations', ?, 'updated', ?, ?, ?)
+            """, (bestaand, ingediend_door, json.dumps({"mechanism_id": mechanism_id}),
+                  f"kandidaat geadopteerd door RfC-voorstel #{voorstel_id}"))
+            # Klasse↔instantie-link: zonder deze rij telt de relatie niet mee in de
+            # theoriescore van het mechanisme (laag C) en trekt ze KOPPEL-REL-INST.
+            conn.execute("INSERT OR IGNORE INTO instantiations (mechanism_id, relation_id) "
+                         "VALUES (?, ?)", (mechanism_id, bestaand))
+            geadopteerd.append(bestaand)
+            continue
+        bron, doel = spec.get("source_id"), spec.get("target_id")
+        for label, eid in (("bron", bron), ("doel", doel)):
+            if not conn.execute("SELECT 1 FROM entities WHERE id = ?", (eid,)).fetchone():
+                raise ValueError(f"{label}-entiteit #{eid} bestaat niet meer")
+        rtype = (spec.get("relation_type") or "").strip()
+        influence = _clamp01(spec.get("influence"))
+        if influence is None:
+            influence = 0.05   # guilty-until-proven-vloer, als POST /api/relations
+        cur = conn.execute("""
+            INSERT INTO relations
+                (source_id, target_id, relation_type, mechanism_id, description,
+                 certainty, influence, bidirectional, active_from, active_until, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'voorgesteld')
+        """, (bron, doel, rtype, mechanism_id,
+              (spec.get("description") or "").strip() or None,
+              _clamp01(spec.get("certainty")), influence,
+              1 if spec.get("bidirectional") else 0,
+              (spec.get("active_from") or "").strip() or None,
+              (spec.get("active_until") or "").strip() or None))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('relations', ?, 'created', ?, ?, ?)
+        """, (cur.lastrowid, ingediend_door,
+              json.dumps({"source_id": bron, "target_id": doel, "relation_type": rtype,
+                          "mechanism_id": mechanism_id, "status": "voorgesteld"}),
+              f"instantiatie gematerialiseerd uit RfC-voorstel #{voorstel_id} (wacht op merge)"))
+        # Klasse↔instantie-link (zie adoptie-tak): laat de relatie meetellen in de
+        # theoriescore van het mechanisme en houd KOPPEL-REL-INST schoon.
+        conn.execute("INSERT OR IGNORE INTO instantiations (mechanism_id, relation_id) "
+                     "VALUES (?, ?)", (mechanism_id, cur.lastrowid))
+        nieuw.append(cur.lastrowid)
+    return nieuw, geadopteerd
+
+
+def voer_uit(conn, soort, payload, voorstel_id, ingediend_door=None) -> dict:
     """Voer een geaccepteerd voorstel uit (binnen de transactie van de aanroeper).
 
     Raise ValueError = niet uitvoerbaar (bv. hertriage-restlijst niet leeg);
@@ -396,7 +535,15 @@ def voer_uit(conn, soort, payload, voorstel_id) -> dict:
     if soort == "nieuw_theorie_element":
         et = payload["element_type"]
         nieuw_id = _maak_element(conn, et, payload)
-        return {"element_type": et, "id": nieuw_id}
+        resultaat = {"element_type": et, "id": nieuw_id}
+        if et == "mechanisme":
+            nieuw, geadopteerd = _materialiseer_instantiaties(
+                conn, nieuw_id, payload, voorstel_id, ingediend_door)
+            if nieuw:
+                resultaat["instantiaties_aangemaakt"] = nieuw
+            if geadopteerd:
+                resultaat["instantiaties_geadopteerd"] = geadopteerd
+        return resultaat
 
     if soort == "hernoemen":
         et = payload["element_type"]

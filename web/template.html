@@ -984,7 +984,8 @@ const PROPERTY_LABELS = {
   description: 'Beschrijving', type: 'Entiteittype', role: 'Rol',
   mechanism: 'Mechanisme', filter: 'Filter',
   indirecte_invloed_op: 'Indirecte invloed op',
-  compositie: 'Compositieclaim'
+  compositie: 'Compositieclaim',
+  politieke_positie: 'Positie'
 };
 // Leesbare weergave van property_value: classificatie-aspecten dragen een ID of
 // enum (rol/mechanisme = ID sinds M2.6, rename-vast; filter = enum) — resolve naar
@@ -995,6 +996,16 @@ function propValueDisplay(property, value) {
   if ((property === 'indirecte_invloed_op' || property === 'role') && roleById[id]) return roleById[id].name;
   if (property === 'mechanism' && mechById[id]) return mechById[id].name;
   if (property === 'filter') return FILTER_LABELS[value] || value;
+  if (property === 'politieke_positie') {
+    const parts = String(value).split(':');     // [as,pool] (richting) of [as,'meting',getal]
+    const as = parts[0];
+    if (parts[1] === 'meting') {
+      const v = parseFloat(parts[2]);
+      return isNaN(v) ? value : `${as} ${v > 0 ? '+' : ''}${v.toFixed(2)} (meting)`;
+    }
+    if (parts.length >= 2) return `${as}: ${parts.slice(1).join(':')}`;   // richting-pool
+    return value;
+  }
   return value;
 }
 const STATUS_LABELS = {
@@ -1145,11 +1156,11 @@ function renderArgNode(arg, depth) {
   // een TAK in de boom — aanvullen (+) en nuanceren (~) bouwen voort op het argument,
   // weerleggen (✗) is de ondergraving die de kracht dempt tot ze is opgelost. Het reply-
   // formulier erft de doelen van de parent via argsById.
+  // Geen losse '+ bron' op een bestaand argument: bronnen voeg je toe bij het MAKEN of
+  // REVISEREN van je eigen argument (niet bij dat van een ander). Reageren blijft.
   html += `<div class="reageer-bar">
     <button class="reageer-knop" onclick="showReplyForm(${arg.id}, 'supporting')" title="Reageer op dit argument — kies Voor, Tegen of Context">↩ Reageer</button>
-    <button class="reageer-knop bron" onclick="showCitationForm(${arg.id})" title="Een bron/citaat aan dit argument hangen (ook bij andermans argument)">+ bron</button>
   </div>`;
-  html += `<div id="cite-slot-${arg.id}"></div>`;
   html += `<div id="reply-slot-${arg.id}"></div>`;
 
   if (hasChildren) {
@@ -1311,7 +1322,7 @@ function citationFieldsHtml(formId) {
   const typeOpts = SOURCE_TYPES.map(t => `<option value="${t}">${t.replace(/_/g, ' ')}</option>`).join('');
   return `
     <div class="form-row">
-      <label>Bron (citaat)</label>
+      <label>Bron</label>
       <div class="bronkies">
         <input type="hidden" id="${formId}-source" value="">
         <input type="text" id="${formId}-source-zoek" autocomplete="off"
@@ -1335,12 +1346,12 @@ function citationFieldsHtml(formId) {
         <div style="flex:1"><label>Datum</label>
           <input type="text" id="${formId}-src-date" placeholder="2018-01-01"></div>
       </div>
-      <div class="form-row"><label>URL / vindplaats (optioneel)</label>
-        <input type="text" id="${formId}-src-url" placeholder="https://… — maakt de bron klikbaar en verifieerbaar"></div>
     </div>
+    <div class="form-row"><label>URL / vindplaats (optioneel)</label>
+      <input type="text" id="${formId}-src-url" placeholder="https://… — voor een nieuwe bron, óf om een gekozen bron klikbaar/verifieerbaar te maken"></div>
     <div class="form-row" style="display:flex;gap:8px" id="${formId}-citemeta">
-      <div style="flex:3"><label>Citaat (quote)</label>
-        <input type="text" id="${formId}-quote" placeholder="Letterlijk citaat dat de bewering dekt"></div>
+      <div style="flex:3"><label>Citaat (optioneel)</label>
+        <input type="text" id="${formId}-quote" placeholder="Letterlijk citaat dat de bewering dekt (optioneel)"></div>
       <div style="flex:1"><label>Pagina</label>
         <input type="text" id="${formId}-page" placeholder="bijv. 12"></div>
     </div>`;
@@ -1351,7 +1362,16 @@ function citationFieldsHtml(formId) {
 async function resolveSourceId(formId, msgEl) {
   const sel = document.getElementById(formId + '-source');
   if (!sel || !sel.value) return null;
-  if (sel.value !== '__new__') return { id: parseInt(sel.value, 10) };
+  const losseUrl = (document.getElementById(formId + '-src-url')?.value || '').trim();
+  if (sel.value !== '__new__') {
+    const id = parseInt(sel.value, 10);
+    // Optionele URL bij een BESTAANDE bron → als vindplaats toevoegen (dedupt server-side).
+    if (losseUrl) {
+      try { await fetch(`/api/sources/${id}/locations`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'url', value: losseUrl }) }); } catch (e) {}
+    }
+    return { id };
+  }
   const title = (document.getElementById(formId + '-src-title').value || '').trim();
   const type = document.getElementById(formId + '-src-type').value;
   if (!title) { msgEl.innerHTML = '<div class="form-message error">Titel van de nieuwe bron is verplicht</div>'; return false; }
@@ -1380,6 +1400,49 @@ function citationFromForm(formId) {
   const quote = (document.getElementById(formId + '-quote').value || '').trim() || null;
   const page = (document.getElementById(formId + '-page').value || '').trim() || null;
   return { quote, page };
+}
+
+// ── Meerdere bronnen per argument ───────────────────────────
+// Elke citatie-RIJ is een los bron-/citaatblok (citationFieldsHtml) met een eigen
+// rij-id, zodat de bestaande per-id helpers (zoekBron/kiesBron/resolveSourceId/
+// citationFromForm) ongewijzigd per rij werken. Een "+ bron toevoegen"-knop voegt
+// rijen toe; collectCitations() leest ze allemaal uit (lege rijen worden overgeslagen).
+let _citeSeq = 0;
+function citeRowHtml(rowId, removable) {
+  return `<div class="cite-row" data-rowid="${rowId}" style="position:relative;border-left:2px solid var(--border);padding-left:10px;margin-bottom:10px">
+      ${removable ? `<button type="button" title="Deze bron verwijderen" onclick="removeCiteRow('${rowId}')" style="position:absolute;top:-2px;right:0;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1">×</button>` : ''}
+      ${citationFieldsHtml(rowId)}
+    </div>`;
+}
+function citationListHtml(formId) {
+  return `<div class="cite-list" id="${formId}-cites">${citeRowHtml(formId + '__r0', false)}</div>
+    <button type="button" class="reageer-knop bron" onclick="addCiteRow('${formId}')" style="margin-bottom:10px">+ bron toevoegen</button>`;
+}
+function addCiteRow(formId) {
+  const list = document.getElementById(formId + '-cites');
+  if (!list) return;
+  const w = document.createElement('div');
+  w.innerHTML = citeRowHtml(formId + '__r' + (++_citeSeq), true).trim();
+  list.appendChild(w.firstElementChild);
+}
+function removeCiteRow(rowId) {
+  const r = document.querySelector(`.cite-row[data-rowid="${rowId}"]`);
+  if (r) r.remove();
+}
+// Verzamel alle citatie-rijen → [{source_id, quote, page}]. Maakt nieuwe bronnen zo
+// nodig aan (resolveSourceId). null-rij = leeg (overslaan); false = fout (stop).
+async function collectCitations(formId, msgEl) {
+  const list = document.getElementById(formId + '-cites');
+  if (!list) return [];
+  const out = [];
+  for (const row of list.querySelectorAll('.cite-row')) {
+    const rid = row.dataset.rowid;
+    const bron = await resolveSourceId(rid, msgEl);
+    if (bron === false) return false;
+    if (bron === null) continue;
+    out.push({ source_id: bron.id, ...citationFromForm(rid) });
+  }
+  return out;
 }
 
 // Classificatie-aspecten ('filter'/'mechanism'/'role') hebben een gesloten waardenset,
@@ -1507,7 +1570,7 @@ function renderArgForm(opts) {
         <textarea id="${formId}-reasoning" placeholder="${isReply ? 'Redenering of toelichting — verplicht bij − Tegen' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
       </div>
       ${propertyRows}
-      ${citationFieldsHtml(formId)}
+      ${citationListHtml(formId)}
       <div class="form-row">
         <label>Gewicht (0-100%)</label>
         <input type="text" id="${formId}-weight" placeholder="bijv. 70">
@@ -1555,10 +1618,9 @@ async function submitArgument(formId, opts) {
 
   const weight = weightRaw ? Math.min(100, Math.max(0, parseInt(weightRaw))) / 100 : null;
 
-  // Bron oplossen (maakt zo nodig eerst een nieuwe bron aan); false = fout, stop.
-  const bron = await resolveSourceId(formId, msgEl);
-  if (bron === false) return;
-  const citaties = bron ? [{ source_id: bron.id, ...citationFromForm(formId) }] : [];
+  // Bronnen oplossen (meerdere rijen; maakt zo nodig nieuwe bronnen aan); false = fout, stop.
+  const citaties = await collectCitations(formId, msgEl);
+  if (citaties === false) return;
 
   // Boomsemantiek (M1.1): een reply stuurt GEEN doelen mee — de doelen in opts
   // dienen alleen om hieronder de juiste discussie te herladen.
@@ -1788,43 +1850,8 @@ function findArgTargets(argId) {
 // Bron toevoegen aan een BESTAAND argument (ook van iemand anders): /api/citations
 // vereist alleen een ingelogde gebruiker, geen eigenaarschap. De citatiepoort (M0.3)
 // tilt 'bronvermelding_nodig' automatisch naar 'ongecontroleerd'.
-function showCitationForm(argId) {
-  const slot = document.getElementById('cite-slot-' + argId);
-  if (!slot) return;
-  if (slot.children.length) { slot.innerHTML = ''; return; }  // toggle dicht
-  const formId = 'cite-form-' + argId;
-  slot.innerHTML = `
-    <div class="arg-form" id="${formId}">
-      <h5>Bron toevoegen aan dit argument</h5>
-      ${citationFieldsHtml(formId)}
-      <div class="field-hint">${authIndienHint()}</div>
-      <button class="btn-submit" onclick="submitCitation('${formId}', ${argId})">Bron toevoegen</button>
-      <button class="btn-cancel" onclick="document.getElementById('cite-slot-${argId}').innerHTML=''">Annuleren</button>
-      <div id="${formId}-msg"></div>
-    </div>`;
-}
-
-async function submitCitation(formId, argId) {
-  const msgEl = document.getElementById(formId + '-msg');
-  const bron = await resolveSourceId(formId, msgEl);
-  if (bron === false) return;
-  if (bron === null) { msgEl.innerHTML = '<div class="form-message error">Kies of voer een bron in</div>'; return; }
-  const cite = citationFromForm(formId);
-  try {
-    const resp = await fetch('/api/citations', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ argument_id: argId, source_id: bron.id, quote: cite.quote, page: cite.page }),
-    });
-    const j = await resp.json();
-    if (!resp.ok) { msgEl.innerHTML = `<div class="form-message error">${j.error || 'Fout bij opslaan'}</div>`; return; }
-    const promo = j.argument_status === 'ongecontroleerd'
-      ? ' — status: bron geleverd → <b>ongecontroleerd</b>' : '';
-    msgEl.innerHTML = `<div class="form-message success">Bron toegevoegd${promo}.</div>`;
-    setTimeout(() => reloadDiscussion(findArgTargets(argId)), 500);
-  } catch (e) {
-    msgEl.innerHTML = `<div class="form-message error">Netwerkfout: ${e.message}</div>`;
-  }
-}
+// (showCitationForm/submitCitation verwijderd: bronnen voeg je toe bij het maken of
+// reviseren van je eigen argument, niet los aan een bestaand — ook niet andermans.)
 
 // ============================================================
 // PREPARE DATA
@@ -4525,6 +4552,96 @@ function renderRoleBruggenSection(roleId) {
     { meta: tel(aff) || tel(bez), color: BRUG_COLOR });
 }
 
+// ── Politieke kleurmeter in het detailpaneel ──────────────────
+// Toont per entiteit (persoon/org) de afgeleide ideologische positie op drie assen,
+// uit gesourcete 'politieke_positie'-signalen (de onderbouwing staat in 'Discussie').
+const KM_POLEN = {
+  economisch: ['links', 'rechts'],
+  cultureel: ['progressief', 'conservatief'],
+  establishment: ['anti-establishment', 'establishment'],
+};
+function kmBalk(soort, val) {
+  if (val == null) return '';
+  const [laag, hoog] = KM_POLEN[soort];
+  const pct = (val + 1) / 2 * 100;
+  return `<div style="margin:8px 0">
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px">
+      <span>◄ ${laag}</span><span style="color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em">${soort}</span><span>${hoog} ►</span>
+    </div>
+    <div style="position:relative;height:6px;background:var(--border-light);border-radius:3px">
+      <span style="position:absolute;left:50%;top:-2px;width:1px;height:10px;background:var(--border)"></span>
+      <span style="position:absolute;left:${pct}%;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--accent);transform:translateX(-50%);box-shadow:0 0 0 2px var(--bg)"></span>
+    </div>
+  </div>`;
+}
+const KM_AS_TITEL = { establishment: 'Establishment', cultureel: 'Cultureel', economisch: 'Economisch' };
+function kmAsBlok(as, val, axisArgs, soort) {
+  // Eén as: titel + balk + (optioneel) de eigen argumentenboom van die as. Bij een
+  // externe meting (CHES) badge: de magnitude komt dan uit data, niet uit de afleiding.
+  const badge = soort === 'meting'
+    ? ` <span style="font-size:8px;font-weight:600;color:#caa84a;border:1px solid color-mix(in srgb,#caa84a 45%,transparent);border-radius:3px;padding:0 4px;letter-spacing:.03em">CHES-METING</span>`
+    : ` <span style="font-size:8px;color:var(--text-muted);letter-spacing:.03em">afgeleid uit signalen</span>`;
+  let h = `<div style="margin:6px 0 14px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);margin-bottom:4px">${KM_AS_TITEL[as]}${val == null ? '' : badge}</div>
+    ${kmBalk(as, val)}`;
+  if (axisArgs && axisArgs.length) h += `<div style="margin-top:6px">${renderArgTree(axisArgs)}</div>`;
+  else if (axisArgs) h += `<div style="font-size:10px;color:var(--text-muted);margin-top:4px">nog geen gesourcet signaal op deze as</div>`;
+  return h + `</div>`;
+}
+function renderKleurmeter(d) {
+  const km = DATA.kleurmeter;
+  if (!km) return '';
+  const persoon = km.personen && km.personen[d.id];
+  const org = km.organisaties && km.organisaties[d.id];
+  if (!persoon && !org) return '';
+  // Eigen positie-signalen van deze entiteit, per as een eigen aanvechtbare boom.
+  const ownArgs = (argsByEntity[d.id] || []).filter(a => a.property === 'politieke_positie');
+
+  // Eigen positie: een persoon (uitspraken) ÓF een organisatie met eigen programma/lijn/missie.
+  const eigen = persoon
+    ? { positie: persoon.positie, kleur: persoon.kleur, alpha: persoon.alpha, n: persoon.n_signalen, as_soort: persoon.as_soort }
+    : (org && org.eigen ? { positie: org.eigen.positie, kleur: org.eigen.kleur, alpha: org.eigen.alpha, n: org.eigen.n_signalen, as_soort: org.eigen.as_soort } : null);
+  const afgeleid = org && org.afgeleid ? org.afgeleid : null;
+
+  let body = '';
+  // 1) Eigen positie met per-as bomen (zelfde bewijslogica voor persoon én organisatie).
+  if (eigen) {
+    if (org) body += `<div style="font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:6px">Eigen positie <span style="font-weight:400;color:var(--text-muted)">(programma / lijn / missie)</span></div>`;
+    ['establishment', 'cultureel', 'economisch'].forEach(as => {
+      const axisArgs = ownArgs.filter(a => String(a.property_value || '').startsWith(as + ':'));
+      if (eigen.positie[as] == null && !axisArgs.length) return;
+      body += kmAsBlok(as, eigen.positie[as], axisArgs, eigen.as_soort && eigen.as_soort[as]);
+    });
+  }
+  // 2) Afgeleide positie uit de leden (organisatie).
+  if (afgeleid) {
+    if (!eigen) {
+      ['establishment', 'cultureel', 'economisch'].forEach(as => {
+        if (afgeleid.positie[as] == null) return;
+        body += kmAsBlok(as, afgeleid.positie[as], null, afgeleid.as_soort && afgeleid.as_soort[as]);
+      });
+    }
+    const leden = afgeleid.leden.map(m => `${m.naam} <span style="color:var(--text-muted)">(${m.band}${m.lopend ? '' : ', beëindigd'})</span>`).join(', ');
+    body += `<div style="font-size:10px;color:var(--text-dim);margin-top:8px;line-height:1.5;border-top:1px solid var(--border);padding-top:8px">
+      <b>Afgeleid uit leden</b> (${afgeleid.n_leden}): <b>${afgeleid.kleur}</b><br>${leden}</div>`;
+  }
+  if (!body) return '';
+
+  // Kop met de getoonde kleur + bron.
+  let kop;
+  if (persoon) {
+    kop = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">
+      <b>${persoon.kleur}</b> · vertrouwen α=${persoon.alpha} · ${persoon.n_signalen} gesourcet signaal/-en.
+      Elke as rust op haar eigen boom; reageer eronder om een codering aan te vechten.</div>`;
+  } else {
+    const bron = org.bron === 'eigen' ? 'eigen signaal (programma/lijn/missie)' : 'afgeleid uit leden';
+    kop = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">
+      <b>${org.kleur}</b> · bron: ${bron}${org.genoeg ? '' : ' <span style="color:var(--text-muted)">(indicatief)</span>'}.</div>`;
+  }
+  return collapsibleSection('Politieke kleurmeter', kop + body,
+    { open: true, meta: km.preview ? 'voorlopig' : null });
+}
+
 function showInstanceDetail(d, content, color) {
   // Diachroon: alle banden van deze entiteit (alle jaren), niet door de tijdbalk gefilterd.
   const allRels = DATA.relations || [];
@@ -4558,6 +4675,7 @@ function showInstanceDetail(d, content, color) {
       </div>
       ${scoreVlaggen(sd)}`, { open: true, meta: `${pctScore}%` });
   }
+  html += renderKleurmeter(d);
   html += renderTimespanSection(d, 'entity_id', d.id);
   html += renderLoopbaanStrook(d);
   if (outgoing.length) {
@@ -4574,8 +4692,9 @@ function showInstanceDetail(d, content, color) {
 
   // Discussieboom voor deze entiteit — het toevoeg-formulier hoort BINNEN de sectie
   // (onder de boom), niet eronder; sectie altijd tonen, ook zonder argumenten.
-  const entityArgs = argsByEntity[d.id];
-  const nEntArgs = entityArgs && entityArgs.length ? countStances(entityArgs).total : 0;
+  // Politieke-positie-signalen tonen we in de kleurmeter (per-as-bomen), niet hier dubbel.
+  const entityArgs = (argsByEntity[d.id] || []).filter(a => a.property !== 'politieke_positie');
+  const nEntArgs = entityArgs.length ? countStances(entityArgs).total : 0;
   const entDiscTree = nEntArgs ? renderArgTree(entityArgs)
     : `<div style="font-size:11px;color:var(--text-muted);padding:2px 0">Nog geen argumenten over deze entiteit.</div>`;
   const entDiscForm = `<div class="detail-section" style="margin-top:8px">

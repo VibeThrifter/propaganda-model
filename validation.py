@@ -32,6 +32,9 @@ BEKENDE_DDL_VERSCHILLEN = {
     "sources": "CHECK op reliability_voorgesteld/onderwerp_voorgesteld leeft alleen in "
                "schema.sql; live kolommen kwamen via ALTER TABLE "
                "(migrate_classificatie_voorstel.py)",
+    "arguments": "property-CHECK kreeg 'politieke_positie' via tabel-rebuild "
+                 "(migrate_politieke_positie_property.py); de enum-waarden zijn gelijk, "
+                 "alleen het CHECK-commentaar verschilt van schema.sql",
 }
 
 
@@ -102,8 +105,12 @@ def check_koppelingsplicht(conn):
         """)]
 
     return [
-        _bevinding("KOPPEL-REL-MECH", "Relaties zonder mechanisme", "fout", rel_zonder_mech,
-                   "Elke praktijk-edge hoort aan een theoretisch mechanisme te hangen."),
+        _bevinding("KOPPEL-REL-MECH", "Goedgekeurde relaties zonder mechanisme", "fout",
+                   rel_zonder_mech,
+                   "Een *goedgekeurde* praktijk-edge hoort aan een theoretisch mechanisme "
+                   "te hangen. Een mechanisme-loze 'voorgesteld'-relatie is géén fout maar "
+                   "een toegestane kandidaat (incubeert tot een RfC haar adopteert) — "
+                   "zie GET /api/kandidaten."),
         _bevinding("KOPPEL-REL-INST", "Relaties mét mechanisme maar zonder instantiations-rij",
                    "fout", rel_zonder_inst,
                    "Zonder instantiatie telt de relatie stilletjes niet mee in de theoriescore (laag C)."),
@@ -608,6 +615,14 @@ def kerngetallen(conn):
             WHERE NOT EXISTS (SELECT 1 FROM arguments a WHERE a.relation_id = r.id)"""),
         "relaties_zonder_mechanisme": een(
             "SELECT COUNT(*) FROM relations WHERE mechanism_id IS NULL"),
+        # Bottom-up: kandidaten (voorgesteld, incuberen — toegestaan) vs. de echte
+        # overtreding (een goedgekeurde orphan).
+        "kandidaat_relaties": een(
+            "SELECT COUNT(*) FROM relations WHERE mechanism_id IS NULL "
+            "AND status = 'voorgesteld' AND NOT vervangen"),
+        "goedgekeurde_orphans": een(
+            "SELECT COUNT(*) FROM relations WHERE mechanism_id IS NULL "
+            "AND status = 'goedgekeurd' AND NOT vervangen"),
         "relaties_met_mech_zonder_instantiatie": een("""
             SELECT COUNT(*) FROM relations r
             WHERE r.mechanism_id IS NOT NULL

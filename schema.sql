@@ -423,8 +423,13 @@ CREATE TABLE arguments (
         'indirecte_invloed_op', -- padclaim: rol heeft samengestelde invloed op de rol wiens ID
                              -- in property_value staat (rol-ID sinds M2.6; voorheen rolnaam —
                              -- naam brak stil bij hernoemen/splitsen/samenvoegen)
-        'compositie'         -- compositieclaim (M1.5): het SAMENSPEL van een emergent veld bestaat,
+        'compositie',        -- compositieclaim (M1.5): het SAMENSPEL van een emergent veld bestaat,
                              -- niet alleen de leden — analoog aan padclaims voor afgeleide pijlen
+        'politieke_positie'  -- ideologisch positie-signaal over een entiteit (persoon/org); bron
+                             -- VERPLICHT (gated als 'influence'), telt NIET in de zekerheidsbalans
+                             -- (ASPECT_PROPERTIES). property_value = '<as>:<signed -1..1>',
+                             -- as ∈ {economisch, cultureel}, − = links/progressief, + = rechts/
+                             -- conservatief. Voedt de afgeleide politieke kleurmeter (politiek.py).
     )),
     property_value TEXT,     -- voorgestelde waarde (bijv. '2019' voor active_from)
     stance TEXT NOT NULL CHECK(stance IN (

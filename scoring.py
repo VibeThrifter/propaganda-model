@@ -121,7 +121,7 @@ ZONDER_BRON_CLUSTER = "_zonder_bron"
 # hoort staat los van de vraag óf het bestaat. Deze worden (nog) door niets afgeleid
 # geconsumeerd; ze leggen het debat vast (ik stel voor, jij beslist).
 ASPECT_PROPERTIES = ("influence", "indirecte_invloed_op", "compositie",
-                     "mechanism", "filter")
+                     "mechanism", "filter", "politieke_positie")
 
 
 # ── Laag A: basiskracht τ per argument ───────────────────────
@@ -707,9 +707,19 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     ent_infl = {eid: (sum(v) / len(v) if v else 0.0) for eid, v in ent_infl_acc.items()}
     entity_filter_scores = {eid: {f: round(s, 4) for f, s in fs.items()}
                             for eid, fs in ent_filter_acc.items()}
-    entity_primary_filter = {
-        eid: max(fs.items(), key=lambda kv: (kv[1], kv[0]))[0]
-        for eid, fs in ent_filter_acc.items() if fs}
+    # Een entiteit wordt nooit op grond van haar EDGES als 'tegenmacht' geclassificeerd
+    # (besluit juni 2026): tegenmacht is een eigenschap van edges/functies, geen emergente
+    # identiteit van een knoop. De tegenmacht-edges blijven gewoon in het theoriemodel én in
+    # entity_filter_scores hierboven (de detailafbraak toont de bijdrage); alleen de afgeleide
+    # kleur/categorie kiest uit de niet-tegenmacht-filters. Heeft de entiteit alléén
+    # tegenmacht-edges, dan krijgt ze geen afgeleid filter en valt ze terug op primary_role_id
+    # — een *expliciete* tegenmacht-ROL (toezichthouder, klokkenluider, …) blijft dus wél een
+    # knoop kleuren; dat is een bewuste classificatie, geen emergente over-simplificatie.
+    entity_primary_filter = {}
+    for eid, fs in ent_filter_acc.items():
+        kleurbaar = [(f, s) for f, s in fs.items() if f != "tegenmacht"]
+        if kleurbaar:
+            entity_primary_filter[eid] = max(kleurbaar, key=lambda kv: (kv[1], kv[0]))[0]
 
     # Afgeleide geloofwaardigheid per entiteit (prior = gem. zekerheid van haar relaties)
     entity_detail = {}
