@@ -189,16 +189,33 @@ def compute_kleurmeter(conn, include_voorgesteld: bool = False) -> dict:
         del e["assen"]
 
     # ── Laag 2: AFGELEIDE organisatiepositie uit de leden (elk met hun EIGEN positie) ──
+    # Een affiliatie-band is per definitie persoon↔organisatie. De PERSOON-kant kleurt de
+    # ORG-kant — en welke rol wie heeft bepalen we op TYPE, niet op source/target: de DB
+    # bevat namelijk BEIDE richtingen (persoon→org voor bestuurszetels, maar partij→persoon
+    # voor 'lidmaatschap'). Zonder die type-poort werd een partij (mét eigen signalen) als
+    # 'lid' gelezen en de persoon als 'org', waardoor personen als organisatie verschenen met
+    # de partijkleur. We eisen daarom precies één persoon + één org; persoon↔persoon of
+    # org↔org levert geen afleidbare org-kleur en wordt overgeslagen.
     afgeleid: dict[int, dict] = {}
     affil_qs = ",".join("?" * len(AFFIL_GEWICHT))
     aff_rows = conn.execute(f"""
-        SELECT r.source_id, r.target_id, r.relation_type, r.active_until, e.name, e.type
-        FROM relations r JOIN entities e ON e.id = r.target_id
+        SELECT r.source_id, es.type, es.name, r.target_id, et.type, et.name,
+               r.relation_type, r.active_until
+        FROM relations r
+        JOIN entities es ON es.id = r.source_id
+        JOIN entities et ON et.id = r.target_id
         WHERE r.relation_type IN ({affil_qs}) AND NOT r.vervangen
           AND r.status IN ('goedgekeurd','voorgesteld')
     """, tuple(AFFIL_GEWICHT))
-    for sid, tid, rtype, act_until, org_naam, org_type in aff_rows:
-        lid = eigen.get(sid)
+    for sid, stype, sname, tid, ttype, tname, rtype, act_until in aff_rows:
+        # Rol op type: de persoon-kant levert de kleur, de org-kant ontvangt 'm.
+        if stype == "persoon" and ttype != "persoon":
+            pid, oid, org_naam, org_type = sid, tid, tname, ttype
+        elif ttype == "persoon" and stype != "persoon":
+            pid, oid, org_naam, org_type = tid, sid, sname, stype
+        else:
+            continue  # persoon↔persoon of org↔org: geen afleidbare org-kleur
+        lid = eigen.get(pid)
         if not lid:
             continue  # alleen leden met een eigen positie informeren een org
         recency = 1.0 if not act_until else 0.45
@@ -207,12 +224,12 @@ def compute_kleurmeter(conn, include_voorgesteld: bool = False) -> dict:
             if lid["positie"][a] is None:
                 continue
             g = band * lid["alpha"] * recency
-            o = afgeleid.setdefault(tid, {"id": tid, "naam": org_naam, "type": org_type,
+            o = afgeleid.setdefault(oid, {"id": oid, "naam": org_naam, "type": org_type,
                                           "assen": {x: {"sw": 0.0, "w": 0.0} for x in ASSEN},
                                           "leden": {}})
             o["assen"][a]["sw"] += lid["positie"][a] * g
             o["assen"][a]["w"] += g
-            o["leden"][sid] = {"naam": lid["naam"], "band": rtype,
+            o["leden"][pid] = {"naam": lid["naam"], "band": rtype,
                                "kleur": lid["kleur"], "lopend": not act_until}
     for o in afgeleid.values():
         pos, assoort = {}, {}

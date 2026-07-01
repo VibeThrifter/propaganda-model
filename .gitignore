@@ -12,6 +12,7 @@ data/bridging.json
 # Fase 3: idem (releases/ daarentegen wordt ingecheckt — dat ís de release)
 data/onderzoeksagenda.json
 data/voorspellingen_kalibratie.json
+data/kleurmeter.json
 # Adviserende agent-uitvoer (beslissteun, telt nergens mee in het model)
 data/review_advies.json
 data/bron_suggesties.json

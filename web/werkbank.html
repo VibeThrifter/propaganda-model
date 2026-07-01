@@ -321,7 +321,11 @@ function rendRating(r) {
 
 function rendArg(a) {
   const [sym, kleur] = STANCE[a.stance] || ['•', '#888'];
-  const doel = a.thread_param ? `${PARAM_LABEL[a.thread_param] || a.thread_param} #${a.thread_id}`
+  // Leesbaar doel: type + náám van het element (uit /api/mijn/bijdragen) — niet enkel
+  // "type #id". Een reactie erft het element van haar thread-wortel; we noteren dat.
+  const tlabel = a.doel_type || PARAM_LABEL[a.thread_param] || a.thread_param;
+  const naam = a.doel_naam || (a.thread_id ? `#${a.thread_id}` : '');
+  const doel = tlabel ? `${tlabel}: ${naam}${a.parent_argument_id ? ' (via reactie)' : ''}`
     : (a.parent_argument_id ? `reactie op #${a.parent_argument_id}` : '—');
   let acties = '';
   if (a.vervangen) {

@@ -121,7 +121,7 @@ ZONDER_BRON_CLUSTER = "_zonder_bron"
 # hoort staat los van de vraag óf het bestaat. Deze worden (nog) door niets afgeleid
 # geconsumeerd; ze leggen het debat vast (ik stel voor, jij beslist).
 ASPECT_PROPERTIES = ("influence", "indirecte_invloed_op", "compositie",
-                     "mechanism", "filter", "politieke_positie")
+                     "mechanism", "filter", "politieke_positie", "inkomensaandeel")
 
 
 # ── Laag A: basiskracht τ per argument ───────────────────────
@@ -823,6 +823,103 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
         "emergent_effects": effs,
         "argument_scores": argument_scores,
     }
+
+
+# ── Afgeleide inkomstensamenstelling (de 'pie') ──────────────
+
+def parse_inkomensaandeel(value):
+    """property_value '<pct 0-100>:<jaar>' → (pct: float|None, jaar: int|None).
+
+    Het jaar is optioneel. Een onparseerbare of buiten-bereik waarde geeft (None, None)
+    zodat de afleiding zo'n slice gewoon overslaat i.p.v. te struikelen.
+    """
+    if value is None:
+        return None, None
+    pct_str, _, jaar_str = str(value).partition(":")
+    try:
+        pct = float(pct_str.strip())
+    except ValueError:
+        return None, None
+    if not (0.0 <= pct <= 100.0):
+        return None, None
+    jaar_str = jaar_str.strip()
+    jaar = int(jaar_str) if (jaar_str.isdigit() and len(jaar_str) == 4) else None
+    return pct, jaar
+
+
+def compute_income_composition(conn, include_voorgesteld=False):
+    """Afgeleide inkomstensamenstelling per outlet — de 'pie'.
+
+    Model-getrouw, net als de rest van het model: een COMBINATIE VAN EDGES. Elke
+    inkomende financier-edge draagt een GESOURCET aandeel als aspect-argument
+    (property='inkomensaandeel', property_value='<pct>:<jaar>'); de samenstelling van
+    een outlet is de verzameling van die edges plus één afgeleid RESTpart
+    'eigen inkomsten (leden/markt)' = max(0, 100 − Σ institutionele aandelen). Geen
+    verzonnen leden-entiteit — het restpart is precies wat de institutionele edges
+    niet dekken, en het maakt meteen de propagandamodel-relevante splitsing zichtbaar:
+    institutioneel/staat/fonds-geld versus publiek/markt-geld.
+
+    Dogfood: een 'voorgesteld' aandeel-argument telt in NIETS tot een mens het merget;
+    include_voorgesteld=True toont ze voorlopig (viz-preview, zoals de kleurmeter).
+    Verworpen/vervangen argumenten en vervangen relaties tellen nooit mee. Draagt één
+    edge meerdere aandeel-argumenten (bijv. verschillende jaren), dan wint het recentste
+    jaar (tiebreak: hoogste argument-id).
+
+    Retourneert {outlet_id: {outlet, slices:[…], som_institutioneel, residu, jaren,
+    bevat_voorgesteld}}. Geen institutionele edge → outlet komt niet voor (geen pie).
+    """
+    rows = conn.execute("""
+        SELECT a.id, a.relation_id, a.property_value, a.status,
+               r.source_id, r.target_id, r.relation_type,
+               se.name, te.name
+        FROM arguments a
+        JOIN relations r ON a.relation_id = r.id
+        JOIN entities se ON r.source_id = se.id
+        JOIN entities te ON r.target_id = te.id
+        WHERE a.property = 'inkomensaandeel'
+          AND a.parent_argument_id IS NULL
+          AND NOT a.vervangen
+          AND a.status != 'verworpen'
+          AND NOT r.vervangen
+    """).fetchall()
+
+    # Per edge het beste aandeel-argument kiezen (recentste jaar, tiebreak hoogste id).
+    per_edge = {}
+    for (aid, rid, pv, status, src, tgt, rtype, bron, outlet) in rows:
+        if status == "voorgesteld" and not include_voorgesteld:
+            continue
+        pct, jaar = parse_inkomensaandeel(pv)
+        if pct is None:
+            continue
+        kandidaat = {"relation_id": rid, "bron_id": src, "bron": bron,
+                     "outlet_id": tgt, "outlet": outlet, "relation_type": rtype,
+                     "share": pct, "jaar": jaar, "status": status,
+                     "voorgesteld": status == "voorgesteld", "arg_id": aid}
+        huidig = per_edge.get(rid)
+        if huidig is None or (jaar or 0, aid) > (huidig["jaar"] or 0, huidig["arg_id"]):
+            per_edge[rid] = kandidaat
+
+    # Groeperen per outlet (target) en het restpart afleiden.
+    per_outlet = {}
+    for slice_ in per_edge.values():
+        per_outlet.setdefault(slice_["outlet_id"], []).append(slice_)
+
+    resultaat = {}
+    for oid, slices in per_outlet.items():
+        slices.sort(key=lambda s: (-s["share"], s["bron"] or ""))
+        som = sum(s["share"] for s in slices)
+        jaren = sorted({s["jaar"] for s in slices if s["jaar"]})
+        resultaat[oid] = {
+            "outlet": slices[0]["outlet"],
+            "slices": [{k: s[k] for k in ("relation_id", "bron_id", "bron",
+                        "relation_type", "share", "jaar", "voorgesteld")}
+                       for s in slices],
+            "som_institutioneel": round(som, 1),
+            "residu": round(max(0.0, 100.0 - som), 1),
+            "jaren": jaren,
+            "bevat_voorgesteld": any(s["voorgesteld"] for s in slices),
+        }
+    return resultaat
 
 
 # ── CLI-sanity ───────────────────────────────────────────────

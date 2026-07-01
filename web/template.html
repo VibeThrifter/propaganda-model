@@ -646,6 +646,15 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <div class="view-toggle" id="viewToggle">
       <button class="active" data-mode="type">Type</button>
       <button data-mode="filter">Filter</button>
+      <button data-mode="ideologie" title="Kleur de nodes naar hun afgeleide politieke positie (kleurmeter). Eén as tegelijk: kies hieronder. Geen gesourcet signaal → grijs; dun bewijs → bleker.">Ideologie</button>
+    </div>
+    <div id="ideoControls" style="display:none;margin-top:8px">
+      <div class="view-toggle" id="ideoAxisToggle" style="font-size:10px">
+        <button class="active" data-axis="economisch">Economisch</button>
+        <button data-axis="cultureel">Cultureel</button>
+        <button data-axis="establishment">Establishment</button>
+      </div>
+      <div id="ideoLegend" style="margin-top:8px"></div>
     </div>
   </div>
   <div class="panel-section collapsible" id="filterSection">
@@ -1903,6 +1912,7 @@ const mechLinks = DATA.mechanisms.map(m => {
 let state = {
   model: 'theory',       // 'instance' | 'theory' — theoretisch model als startpunt
   colorMode: 'type',
+  ideoAxis: 'economisch', // kleurmodus 'ideologie': welke as kleurt (economisch|cultureel|establishment)
   activeFilters: new Set(Object.keys(FILTER_LABELS)),  // filter-as: categorieën van de EDGES
   activeThemes: new Set(Object.keys(THEME_LABELS)),    // thema-as: dwarsverbanden van de EDGES
   certMin: 0, inflMin: 0,
@@ -3002,6 +3012,7 @@ function getNodeColor(d) {
     return state.showFilterMix ? mixedFilterColor(d, d.category)
                                : (FILTER_COLORS[d.category] || FILTER_COLORS.overig);
   }
+  if (state.colorMode === 'ideologie') return ideoColor(d);
   if (state.colorMode === 'filter') {
     // Kleur is tijdsafhankelijk: in een gekozen jaar beslist de dan-actieve set
     // bron-relaties; bij 'alle jaren' (of geen actieve band) de timeloze bakwaarde.
@@ -3033,6 +3044,55 @@ function mixedFilterColor(d, fallbackFilter) {
   });
   if (!total) return pure;
   return d3.lab(L / total, A / total, B / total).formatHex();
+}
+
+// ── Kleurmodus "ideologie": node-kleur = afgeleide politieke positie (kleurmeter) ──
+// Eén diverging schaal per as; je wisselt van as met de sub-knoppen. De positie (−1..+1)
+// komt uit DATA.kleurmeter (politiek.py) — gesourcete, aanvechtbare signalen, géén
+// zelf-gezet getal. Eerlijk over onzekerheid: geen signaal op deze as → neutraal grijs;
+// dun bewijs (laag vertrouwen α) → bleek richting het midden (we durven niet te committen).
+const IDEO_AXES = {
+  economisch:    { laag: 'links',              hoog: 'rechts',        cLaag: '#e0524a', cHoog: '#4a82d6' },
+  cultureel:     { laag: 'progressief',        hoog: 'conservatief',  cLaag: '#36b37e', cHoog: '#e08a2e' },
+  establishment: { laag: 'anti-establishment', hoog: 'establishment', cLaag: '#a05fd6', cHoog: '#c9a227' },
+};
+const IDEO_MID = '#9aa0a8';       // centrum (positie ≈ 0 mét signaal): licht, neutraal
+const IDEO_GEEN = '#41464d';      // geen signaal op deze as: dof, leest als 'onbepaald'
+
+// Lineaire mix van twee kleuren in Lab-ruimte (natuurlijker dan sRGB-interpolatie).
+function labMix(c1, c2, t) {
+  const a = d3.lab(c1), b = d3.lab(c2);
+  return d3.lab(a.l + (b.l - a.l) * t, a.a + (b.a - a.a) * t, a.b + (b.b - a.b) * t).formatHex();
+}
+
+// Positie + vertrouwen van een node op de actieve as, of null als er geen signaal is.
+// Persoon: eigen positie + per-as vertrouwen. Organisatie: getoonde positie (eigen ⊕
+// afgeleid uit leden); vertrouwen = eigen α indien eigen signaal, anders matig/zwak.
+function ideoDatum(d) {
+  const km = DATA.kleurmeter; if (!km) return null;
+  const as = state.ideoAxis;
+  const p = km.personen && km.personen[d.id];
+  if (p && p.positie && p.positie[as] != null)
+    return { pos: p.positie[as], conf: (p.vertrouwen && p.vertrouwen[as] != null) ? p.vertrouwen[as] : p.alpha };
+  const o = km.organisaties && km.organisaties[d.id];
+  if (o && o.positie && o.positie[as] != null) {
+    const conf = (o.eigen && o.eigen.alpha != null) ? o.eigen.alpha : (o.genoeg ? 0.5 : 0.3);
+    return { pos: o.positie[as], conf };
+  }
+  return null;
+}
+
+function ideoColor(d) {
+  const dat = ideoDatum(d);
+  if (!dat) return IDEO_GEEN;
+  const ax = IDEO_AXES[state.ideoAxis] || IDEO_AXES.economisch;
+  const t = Math.max(0, Math.min(1, (dat.pos + 1) / 2));   // −1..+1 → 0..1
+  // Pool → midden → pool: extreem = verzadigde pool, centrum = licht neutraal.
+  const base = t < 0.5 ? labMix(ax.cLaag, IDEO_MID, t * 2)
+                       : labMix(IDEO_MID, ax.cHoog, (t - 0.5) * 2);
+  // Vertrouwen-wash: laag α trekt richting het neutrale midden (bleek = dun bewijs).
+  const conf = Math.max(0, Math.min(1, dat.conf == null ? 0.5 : dat.conf));
+  return labMix(IDEO_MID, base, 0.35 + 0.65 * conf);
 }
 
 // Herkleur de bestaande node-bollen zonder rebuild (na een kleurmodus- of meng-wissel).
@@ -4642,6 +4702,50 @@ function renderKleurmeter(d) {
     { open: true, meta: km.preview ? 'voorlopig' : null });
 }
 
+// ── Inkomstenbron (donut) in het detailpaneel ─────────────────
+// De inkomstensamenstelling van een outlet als 'pie': een COMBINATIE VAN EDGES — elke
+// inkomende financier-relatie draagt een gesourcet aandeel (property='inkomensaandeel'),
+// plus één afgeleid restpart 'eigen inkomsten' = 100 − Σ. Komt uit DATA.inkomsten
+// (scoring.compute_income_composition). d3.arc/d3.pie genereren de paden rekenkundig,
+// dus geen post-insert DOM-stap nodig. De onderbouwing (jaarrekening-citaten) staat in
+// 'Discussie' op elke financier-relatie.
+const INK_PALET = ['#c0563f', '#caa84a', '#5a8f7b', '#6a7fb5', '#9b6bb0', '#b5836a'];
+function renderInkomsten(d) {
+  const ink = DATA.inkomsten && DATA.inkomsten[d.id];
+  if (!ink) return '';
+  const pct = v => (v % 1 ? (+v).toFixed(1) : (+v).toFixed(0));
+  const slices = (ink.slices || []).filter(s => s.share > 0).map((s, i) => ({
+    label: s.bron, share: s.share, jaar: s.jaar, voorgesteld: s.voorgesteld,
+    color: INK_PALET[i % INK_PALET.length],
+  }));
+  if (ink.residu > 0) slices.push({
+    label: 'eigen inkomsten (leden / markt / overig)', share: ink.residu, color: '#454552',
+  });
+  if (!slices.length) return '';
+  const R = 64, r = 40, cx = 74, cy = 74;
+  const pie = d3.pie().sort(null).value(s => s.share);
+  const arc = d3.arc().innerRadius(r).outerRadius(R).padAngle(0.012).cornerRadius(2);
+  const paths = pie(slices).map(a => {
+    const s = a.data;
+    const tip = `${s.label}: ${pct(s.share)}%${s.jaar ? ' (' + s.jaar + ')' : ''}`;
+    const ghost = s.voorgesteld ? ' opacity="0.6" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2"' : '';
+    return `<path d="${arc(a)}" transform="translate(${cx},${cy})" fill="${s.color}"${ghost}><title>${tip}</title></path>`;
+  }).join('');
+  const center = `<text x="${cx}" y="${cy - 1}" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text)">${pct(ink.som_institutioneel)}%</text>
+    <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="7.5" letter-spacing=".06em" fill="var(--text-muted)">INSTITUTIONEEL</text>`;
+  const svg = `<svg width="148" height="148" viewBox="0 0 148 148" style="display:block;margin:2px auto 10px">${paths}${center}</svg>`;
+  const legend = slices.map(s => `<div style="display:flex;align-items:center;gap:7px;font-size:11px;margin:3px 0">
+    <span style="width:10px;height:10px;border-radius:2px;background:${s.color};flex:none${s.voorgesteld ? ';outline:1px dashed var(--accent);outline-offset:1px' : ''}"></span>
+    <span style="flex:1;color:var(--text-dim)">${s.label}${s.jaar ? ` <span style="color:var(--text-muted)">${s.jaar}</span>` : ''}</span>
+    <span style="color:var(--text);font-weight:600">${pct(s.share)}%</span>
+  </div>`).join('');
+  const note = `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5">
+    Afgeleid uit de inkomende financier-edges, elk met een gesourcet aandeel (zie <b>Discussie</b> op die relatie). Het restpart is wat die edges niet dekken — er is geen aparte leden-entiteit.${ink.bevat_voorgesteld ? ' <span style="color:var(--accent)">Streepjes = nog niet gereviewd (voorlopig).</span>' : ''}</div>`;
+  const jaren = ink.jaren && ink.jaren.length ? ink.jaren.join('–') : null;
+  return collapsibleSection('Inkomstenbron', svg + legend + note,
+    { open: true, meta: ink.bevat_voorgesteld ? 'voorlopig' : jaren });
+}
+
 function showInstanceDetail(d, content, color) {
   // Diachroon: alle banden van deze entiteit (alle jaren), niet door de tijdbalk gefilterd.
   const allRels = DATA.relations || [];
@@ -4676,6 +4780,7 @@ function showInstanceDetail(d, content, color) {
       ${scoreVlaggen(sd)}`, { open: true, meta: `${pctScore}%` });
   }
   html += renderKleurmeter(d);
+  html += renderInkomsten(d);
   html += renderTimespanSection(d, 'entity_id', d.id);
   html += renderLoopbaanStrook(d);
   if (outgoing.length) {
@@ -4987,6 +5092,7 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     const isTheory = state.model === 'theory';
     configureSliders(isTheory);     // drempels werken in beide modellen, op model-eigen velden
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
+    syncIdeoControls();             // as-kiezer hoort bij de instantie-kleurmodus 'ideologie'
     // Tijdlijn blijft in beide modellen zichtbaar: ook theorie-elementen zijn temporeel.
     // Veld-effecten bestaan alleen in het theoriemodel; in het praktijkmodel verbergen we die
     // rij en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
@@ -5435,6 +5541,33 @@ function renderLegend() {
   });
 }
 
+// Toon/verberg de as-kiezer + gradiënt-legenda (alleen relevant in kleurmodus 'ideologie',
+// die zelf alleen in het instantiemodel bestaat — colorModeSection is verborgen in theorie).
+function syncIdeoControls() {
+  const box = document.getElementById('ideoControls');
+  if (!box) return;
+  const on = state.colorMode === 'ideologie' && state.model !== 'theory';
+  box.style.display = on ? '' : 'none';
+  if (on) renderIdeoLegend();
+}
+
+// Gradiënt-balk + pool-labels voor de actieve as: de "legenda" van de ideologie-kleuring.
+function renderIdeoLegend() {
+  const el = document.getElementById('ideoLegend');
+  if (!el) return;
+  const ax = IDEO_AXES[state.ideoAxis] || IDEO_AXES.economisch;
+  const grad = `linear-gradient(to right, ${ax.cLaag}, ${IDEO_MID}, ${ax.cHoog})`;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px">
+      <span>◄ ${ax.laag}</span><span>centrum</span><span>${ax.hoog} ►</span>
+    </div>
+    <div style="height:9px;border-radius:5px;background:${grad};border:1px solid var(--border)"></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-muted);margin-top:6px">
+      <span class="swatch" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${IDEO_GEEN};border:1px solid var(--border)"></span>
+      geen gesourcet signaal · dun bewijs → bleker
+    </div>`;
+}
+
 // View toggle (color mode)
 document.querySelectorAll('#viewToggle button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -5442,8 +5575,20 @@ document.querySelectorAll('#viewToggle button').forEach(btn => {
     btn.classList.add('active');
     state.colorMode = btn.dataset.mode;
     state.legendSelection.clear();  // keys verschillen per kleurmodus
+    syncIdeoControls();
     renderLegend();
     applyFilters();
+    recolorNodes();
+  });
+});
+
+// As-kiezer binnen de ideologie-kleurmodus
+document.querySelectorAll('#ideoAxisToggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#ideoAxisToggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.ideoAxis = btn.dataset.axis;
+    renderIdeoLegend();
     recolorNodes();
   });
 });
@@ -6047,6 +6192,7 @@ populateSizeMetricOptions();
 const initTheory = state.model === 'theory';
 configureSliders(initTheory);
 document.getElementById('colorModeSection').style.display = initTheory ? 'none' : '';
+syncIdeoControls();
 document.getElementById('fieldToggleRow').style.display = initTheory ? '' : 'none';
 document.getElementById('edgeLabelRow').style.display = initTheory ? 'flex' : 'none';
 buildGraph();

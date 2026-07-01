@@ -825,6 +825,21 @@ def create_argument():
                                      "progressief|conservatief, anti-establishment|establishment}. "
                                      "Een externe meting (CHES) mag '<as>:meting:<-1..1>'. "
                                      "De magnitude wordt afgeleid, niet zelf gezet."}), 400
+    # Inkomensaandeel (pie): welk deel van de inkomsten van de TARGET-outlet loopt via
+    # deze financier-edge? Hoort dus bij een RELATIE; property_value codeert '<pct>:<jaar>'
+    # (pct 0-100, jaar optioneel). Telt niet in de zekerheidsbalans (ASPECT_PROPERTIES),
+    # maar is WÉL gesourcet (gated, zie onder) — het getal komt uit een jaarrekening, niet
+    # uit een mens. Voedt scoring.compute_income_composition (residu = 100 − Σ edges).
+    if prop == "inkomensaandeel":
+        if not relation_id:
+            return jsonify({"error": "property 'inkomensaandeel' hoort bij een financier-"
+                                     "relatie (relation_id) — welk deel van de inkomsten "
+                                     "van de outlet loopt hierlangs?"}), 400
+        if scoring.parse_inkomensaandeel(prop_value)[0] is None:
+            return jsonify({"error": "property_value voor 'inkomensaandeel' is "
+                                     "'<percentage 0-100>:<jaar>' (jaar optioneel), bijv. "
+                                     "'56:2024'. De magnitude komt uit de bron, niet vrij "
+                                     "gekozen."}), 400
     if prop and parent_id is not None:
         return jsonify({"error": "Een reactie draagt geen property: aspect-argumenten "
                                  "richten zich als root-argument op het doel zelf"}), 400
@@ -898,12 +913,13 @@ def create_argument():
     # vindplaats (source_locations). Een kale titel-stub telt niet. Vroeger was dit een zachte
     # poort bij merge (→ bronvermelding_nodig, score-straf); nu blokkeert de API onbronnde
     # claims zodat ze het model niet eens binnenkomen.
-    #   Wél bron nodig: gewoon bewijs (geen property), invloed-bewijs (property='influence')
-    #   en politiek positie-signaal (property='politieke_positie') — ideologie moet je staven.
+    #   Wél bron nodig: gewoon bewijs (geen property), invloed-bewijs (property='influence'),
+    #   politiek positie-signaal (property='politieke_positie') én inkomensaandeel — een
+    #   feitelijke magnitude uit een jaarrekening moet je staven.
     #   Vrijgesteld (interpretatie/structuur, geen extern bewijs): classificatie-aspecten
     #   (property='filter'/'mechanism'), compositie- en padclaims ('compositie'/'indirecte_invloed_op'),
     #   contextual-roots, en replies/ondergravingen ('logica klopt niet' — parent_id gezet).
-    evidentieel = prop in (None, "influence", "politieke_positie")
+    evidentieel = prop in (None, "influence", "politieke_positie", "inkomensaandeel")
     if parent_id is None and stance in ("supporting", "contradicting") and evidentieel:
         heeft_echte_bron = any(
             bool((c.get("quote") or "").strip()) or conn.execute(
@@ -3420,6 +3436,33 @@ def _wortel_doel(conn, arg):
     return (None, None)
 
 
+def _doel_leesbaar(conn, param, tid):
+    """(type-label, naam) van het doel-element op (param, id). Werkt voor zowel een
+    root-argument (z'n eigen doel) als een reactie (die het doel van haar thread-wortel
+    erft via _wortel_doel) — zo weet je áltijd over welk element een argument gaat."""
+    if not param or not tid:
+        return (None, None)
+    if param == "relation_id":
+        r = conn.execute("""SELECT e1.name || ' → ' || e2.name AS n FROM relations r
+                            JOIN entities e1 ON r.source_id = e1.id
+                            JOIN entities e2 ON r.target_id = e2.id
+                            WHERE r.id = ?""", (tid,)).fetchone()
+        return ("relatie", r["n"] if r else f"#{tid}")
+    if param == "entity_id":
+        r = conn.execute("SELECT name FROM entities WHERE id = ?", (tid,)).fetchone()
+        return ("entiteit", r["name"] if r else f"#{tid}")
+    if param == "role_id":
+        r = conn.execute("SELECT name FROM roles WHERE id = ?", (tid,)).fetchone()
+        return ("rol", r["name"] if r else f"#{tid}")
+    if param == "mechanism_id":
+        r = conn.execute("SELECT name FROM mechanisms WHERE id = ?", (tid,)).fetchone()
+        return ("mechanisme", r["name"] if r else f"#{tid}")
+    if param == "emergent_effect_id":
+        r = conn.execute("SELECT label FROM emergent_effects WHERE id = ?", (tid,)).fetchone()
+        return ("veld", r["label"] if r else f"#{tid}")
+    return (None, None)
+
+
 def _verrijk_review_argumenten(conn, rows):
     """Maak van ruwe argumentrijen review-kaart-dicts: leesbaar doel, thread-anker
     (param/id) en citaties + poort-vlag. Gedeeld door de voorgesteld- en de
@@ -3429,30 +3472,16 @@ def _verrijk_review_argumenten(conn, rows):
         a = dict(a)
         param, tid = _wortel_doel(conn, a)
         a["thread_param"], a["thread_id"] = param, tid
+        # Doel-element altijd resolven via de thread-wortel — ook voor een reactie, die
+        # zelf geen doel draagt (M1.1) maar wél over het element van haar wortel gaat.
+        doel_type, doel_naam = _doel_leesbaar(conn, param, tid)
+        a["doel_type"], a["doel_naam"] = doel_type, doel_naam
         if a["parent_argument_id"]:
-            doel = f"reactie op argument #{a['parent_argument_id']}"
-        elif a["relation_id"]:
-            r = conn.execute("""SELECT e1.name || ' → ' || e2.name AS n FROM relations r
-                                JOIN entities e1 ON r.source_id = e1.id
-                                JOIN entities e2 ON r.target_id = e2.id
-                                WHERE r.id = ?""", (a["relation_id"],)).fetchone()
-            doel = f"relatie: {r['n']}" if r else f"relatie #{a['relation_id']}"
-        elif a["entity_id"]:
-            r = conn.execute("SELECT name FROM entities WHERE id = ?",
-                             (a["entity_id"],)).fetchone()
-            doel = f"entiteit: {r['name']}" if r else f"entiteit #{a['entity_id']}"
-        elif a["role_id"]:
-            r = conn.execute("SELECT name FROM roles WHERE id = ?", (a["role_id"],)).fetchone()
-            doel = f"rol: {r['name']}" if r else f"rol #{a['role_id']}"
-        elif a["mechanism_id"]:
-            r = conn.execute("SELECT name FROM mechanisms WHERE id = ?",
-                             (a["mechanism_id"],)).fetchone()
-            doel = f"mechanisme: {r['name']}" if r else f"mechanisme #{a['mechanism_id']}"
+            a["doel"] = f"reactie op argument #{a['parent_argument_id']}"
+        elif doel_type:
+            a["doel"] = f"{doel_type}: {doel_naam}"
         else:
-            r = conn.execute("SELECT label FROM emergent_effects WHERE id = ?",
-                             (a["emergent_effect_id"],)).fetchone()
-            doel = f"veld: {r['label']}" if r else f"veld #{a['emergent_effect_id']}"
-        a["doel"] = doel
+            a["doel"] = "—"
         argumenten.append(a)
 
     # Citaties op de reviewkaart (quote + bron + link/archief) zodat reviewen iets
@@ -3840,6 +3869,9 @@ def mijn_bijdragen():
         a = dict(a)
         param, tid = _wortel_doel(conn, a)
         a["thread_param"], a["thread_id"] = param, tid
+        # Leesbaar doel-element (naam i.p.v. enkel "type #id") — ook voor een reactie,
+        # die het element van haar thread-wortel erft.
+        a["doel_type"], a["doel_naam"] = _doel_leesbaar(conn, param, tid)
         # Feedback alleen tonen waar ze betekenis heeft (verworpen/betwist/verouderd).
         if a["status"] in ("verworpen", "betwist", "verouderd"):
             a["feedback"] = _laatste_feedback(conn, "arguments", a["id"])
@@ -4418,6 +4450,21 @@ def get_scores():
         conn, bridged_weights=scoring.bridged_weights_from_file(BRIDGING_PATH))
     conn.close()
     return jsonify(scores)
+
+
+@app.route("/api/inkomsten")
+def get_inkomsten():
+    """Afgeleide inkomstensamenstelling per outlet (de 'pie'): een COMBINATIE VAN EDGES —
+    de inkomende financier-relaties, elk met een gesourcet aandeel (property=
+    'inkomensaandeel'), plus een afgeleid restpart 'eigen inkomsten (leden/markt)' =
+    100 − Σ. Model-getrouw: het getal komt uit een jaarrekening-citaat, de samenstelling
+    wordt afgeleid, niet zelf gezet. ?preview=1 telt nog-`voorgesteld` aandelen voorlopig
+    mee (vóór menselijke review); standaard alleen gemergde."""
+    preview = request.args.get("preview") in ("1", "true", "ja")
+    conn = get_db()
+    res = scoring.compute_income_composition(conn, include_voorgesteld=preview)
+    conn.close()
+    return jsonify(res)
 
 
 @app.route("/api/kleurmeter")

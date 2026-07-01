@@ -425,6 +425,11 @@ CREATE TABLE arguments (
                              -- naam brak stil bij hernoemen/splitsen/samenvoegen)
         'compositie',        -- compositieclaim (M1.5): het SAMENSPEL van een emergent veld bestaat,
                              -- niet alleen de leden — analoog aan padclaims voor afgeleide pijlen
+        'inkomensaandeel',   -- inkomstenaandeel (pie): welk deel van de inkomsten van de target-
+                             -- outlet loopt via deze financier-edge? property_value = '<pct 0-100>:<jaar>'.
+                             -- Bron VERPLICHT (gated als 'influence'), telt NIET in de zekerheidsbalans
+                             -- (ASPECT_PROPERTIES) — voedt de afgeleide inkomstensamenstelling
+                             -- (scoring.compute_income_composition; residu = 100 − Σ institutionele edges).
         'politieke_positie'  -- ideologisch positie-signaal over een entiteit (persoon/org); bron
                              -- VERPLICHT (gated als 'influence'), telt NIET in de zekerheidsbalans
                              -- (ASPECT_PROPERTIES). property_value = '<as>:<signed -1..1>',

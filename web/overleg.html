@@ -158,6 +158,17 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .graaf-link:hover { text-decoration: underline; }
 .context-link { font-size: 11px; color: var(--accent); text-decoration: none; margin-left: 8px; }
 .context-link:hover { text-decoration: underline; }
+/* doel-badge: over wélk element gaat dit argument — prominent boven de bewering */
+.doel-badge { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  font-size: 12px; margin: 2px 0 8px; padding: 4px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); }
+.doel-badge .doel-type { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--accent); font-weight: 600; }
+.doel-badge b { color: var(--text); font-weight: 600; }
+.doel-badge .doel-reply { color: var(--text-muted); font-style: italic; }
+.doel-badge .doel-graaf { font-size: 11px; color: var(--accent); text-decoration: none; }
+.doel-badge .doel-graaf:hover { text-decoration: underline; }
 /* formulier */
 .form { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
         padding: 14px 16px; margin-top: 16px; }
@@ -1480,6 +1491,18 @@ function contextLink(a) {
   const param = a.thread_param, id = a.thread_id;
   return (param && id) ? ` <a class="context-link" href="#${param}=${id}" title="Bekijk dit argument in zijn thread">↗ in context</a>` : '';
 }
+// Prominente "over welk element gaat dit?"-badge boven de bewering. doel_type/doel_naam
+// komen uit /api/review_queue (via de thread-wortel), dus ook een reactie toont het
+// element waar de hele draad over gaat — met (via reactie)-noot en een graaf-link.
+function doelBadge(a) {
+  if (!a.doel_type) return '';
+  const sel = PARAM_SEL[a.thread_param];
+  const reply = a.parent_argument_id ? ` <span class="doel-reply">via reactie</span>` : '';
+  const graaf = (sel && a.thread_id)
+    ? ` <a class="doel-graaf" href="/#sel=${sel}:${a.thread_id}" target="_blank" rel="noopener" title="Selecteer dit element in de netwerkvisualisatie">↗ graaf</a>` : '';
+  return `<div class="doel-badge" title="Dit argument gaat over dit ${esc(a.doel_type)}">` +
+    `<span class="doel-type">${esc(a.doel_type)}</span> <b>${esc(a.doel_naam || '')}</b>${reply}${graaf}</div>`;
+}
 // Read-only thread-render voor de reviewkaart (Fase A): toon de hele thread in context,
 // markeer het te beoordelen argument, en laat de 👍/👎-stand (community-signaal) zien
 // vóór de poort-klik. Read-only → geen knoppen/ids die met de Threads-tab botsen.
@@ -1601,9 +1624,13 @@ function rendArg(a, modus) {
   const feedbk = (modus === 'afgewezen' && a.feedback && a.feedback.reason)
     ? `<div style="font-size:12px;color:var(--text-dim);background:color-mix(in srgb,#e0635f 9%,transparent);border-left:2px solid #e0635f;padding:5px 8px;margin:6px 0;border-radius:3px">✕ afgewezen door <b>${esc(a.feedback.changed_by || '?')}</b>: ${esc(a.feedback.reason)}</div>` : '';
   const suffix = modus === 'herkeuring' ? ' · betwist' : modus === 'afgewezen' ? ' · verworpen' : '';
+  // Reply-doel ("reactie op argument #N") blijft in de meta; het element zelf staat al
+  // prominent in de doelBadge, dus voor een root tonen we het hier niet nog eens.
+  const doelMeta = a.parent_argument_id ? esc(a.doel) : '';
   return `<div class="kaart"><div class="soort">argument #${a.id} · ${esc(a.stance)}${a.property ? ' · ' + esc(a.property) + propval : ''}${suffix}</div>` +
+    doelBadge(a) +
     `<h3 style="font-size:14px">${esc(a.claim || '')}</h3>` + reden + ondMeta + revnoot +
-    `<div class="meta"><span>${esc(a.doel)}${contextLink(a)}</span><span>${esc(a.contributed_by)}</span><span>${esc((a.created_at || '').slice(0, 16))}</span><span>${bronmeta}</span></div>` +
+    `<div class="meta"><span>${doelMeta}${contextLink(a)}</span><span>${esc(a.contributed_by)}</span><span>${esc((a.created_at || '').slice(0, 16))}</span><span>${bronmeta}</span></div>` +
     badge + feedbk +
     (cites ? `<div class="cites">${cites}</div>` : '') +
     `<div class="acties">${thread}${acties}<span class="uitslag" id="arg-${a.id}-uit"></span></div>` +
@@ -1959,7 +1986,22 @@ function tekenVoorstellen() {
     if (nae) h += `<h2 class="sectie">Entiteiten (${nae})</h2>` + af.entiteiten.map(rendAfgewezenPraktijk.bind(null, 'entiteit')).join('');
     if (nar) h += `<h2 class="sectie">Relaties (${nar})</h2>` + af.relaties.map(rendAfgewezenPraktijk.bind(null, 'relatie')).join('');
   } else {
-    h += nArg ? q.argumenten.map(a => metAdvies('arg:' + a.id, rendArg(a))).join('') : '<div class="leeg">Geen voorgestelde argumenten.</div>';
+    if (!nArg) {
+      h += '<div class="leeg">Geen voorgestelde argumenten.</div>';
+    } else {
+      // Ideologie-signalen (politieke_positie, voor de kleurmeter) krijgen een eigen kopje:
+      // het is een aparte as-codering die niet in de zekerheidsbalans telt.
+      const rendQ = a => metAdvies('arg:' + a.id, rendArg(a));
+      const ideo = q.argumenten.filter(a => a.property === 'politieke_positie');
+      const rest = q.argumenten.filter(a => a.property !== 'politieke_positie');
+      if (rest.length) h += `<h2 class="sectie">Argumenten (${rest.length})</h2>` + rest.map(rendQ).join('');
+      if (ideo.length) h += `<h2 class="sectie">Ideologie · kleurmeter (${ideo.length})</h2>` +
+        `<div class="banner" style="background:rgba(108,138,255,.10);border-color:color-mix(in srgb,var(--accent) 35%,transparent)">` +
+        `Politieke-positie-signalen voor de <b>kleurmeter</b> — gesourcete richting-codering per as ` +
+        `(economisch links/rechts · cultureel progressief/conservatief · establishment anti/pro). ` +
+        `Telt niet in de zekerheidsbalans; de magnitude wordt afgeleid uit de richtingen.</div>` +
+        ideo.map(rendQ).join('');
+    }
   }
   m.innerHTML = h;
 }

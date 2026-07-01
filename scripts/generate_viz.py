@@ -227,6 +227,11 @@ def export_data():
         'organisaties': {o['id']: o for o in km['organisaties']},
     }
 
+    # Inkomstensamenstelling per outlet (de 'pie' in het detailpaneel): afgeleid uit de
+    # financier-edges met gesourcete aandelen. Preview = ook nog-`voorgesteld` aandelen,
+    # zodat nieuw werk meteen zichtbaar is (zoals de kleurmeter).
+    inkomsten = scoring.compute_income_composition(conn, include_voorgesteld=True)
+
     # Argument counts per relation (voor edge labels)
     arg_counts = {}
     for a in arguments:
@@ -335,6 +340,7 @@ def export_data():
         'instantiations': instantiations,
         'release': laatste_release(),   # M3.1: releasetag in de topbar (of null)
         'kleurmeter': kleurmeter,       # politieke kleurmeter per entiteit (detailpaneel)
+        'inkomsten': inkomsten,         # inkomstensamenstelling per outlet (donut, detailpaneel)
     }
 
 
