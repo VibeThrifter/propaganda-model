@@ -86,8 +86,12 @@ def main():
 
     print("4. Bearer-flow (agent)")
     kop = {"Authorization": f"Bearer {agent_token}"}
+    # De harde citatiepoort (6af4f97) geldt ook voor agents: bewijzend zonder bron = 400.
     r = c.post("/api/arguments", headers=kop,
                json={"relation_id": 1, "stance": "supporting", "claim": "Agent-test zonder bron"})
+    eis(r.status_code == 400, f"bronplicht geldt ook voor agents ({r.status_code})")
+    r = c.post("/api/arguments", headers=kop,
+               json={"relation_id": 1, "stance": "contextual", "claim": "Agent-test (duiding)"})
     a = r.get_json()
     eis(r.status_code == 201 and a["contributed_by"] == "smoke-agent",
         "agent-POST geattribueerd aan agent-account")

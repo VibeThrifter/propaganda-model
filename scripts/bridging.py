@@ -31,7 +31,7 @@ een rapport ZONDER gewichten — scoring.py valt dan terug op het zelfgekozen
 scripts/kalibratie_agents.py en is advies.
 
 Uitvoer: data/bridging.json — {"actief": bool, "weights": {argument_id: 0..1}}.
-``/api/scores`` en generate_viz.py lezen dit bestand automatisch (M2.5).
+``/api/scores``, ``/api/graph_data`` en de statische export lezen dit automatisch (M2.5).
 Gebruik: python3 scripts/bridging.py
 """
 import json
@@ -140,7 +140,7 @@ def main():
     OUT_PATH.write_text(json.dumps(rapport, indent=1))
     print(f"Bridging actief: {len(weights)} argumentgewichten (krimp naar 1,0, k={SHRINK_K}) "
           f"uit {len(ratings)} oordelen van {len(raters)} beoordelaars.")
-    print(f"Geschreven: {OUT_PATH} (gelezen door /api/scores en generate_viz.py)")
+    print(f"Geschreven: {OUT_PATH} (gelezen door /api/scores, /api/graph_data en de statische export)")
 
 
 if __name__ == "__main__":

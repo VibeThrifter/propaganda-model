@@ -10,9 +10,6 @@ import json
 import os
 import re
 import sqlite3
-import subprocess
-import sys
-import threading
 import time
 from pathlib import Path
 from flask import Flask, g, jsonify, request, send_file, session
@@ -22,11 +19,11 @@ import scoring  # scoringsketen: afgeleide praktijk- en theoriescores
 import politiek  # politieke kleurmeter: ideologische positie uit gesourcete signalen
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
+import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
 
 ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 WEB_PATH = ROOT / "web"
-GENERATE_VIZ_SCRIPT = ROOT / "scripts" / "generate_viz.py"
 SECRET_KEY_PATH = Path(__file__).parent / "data" / "secret_key"
 BRIDGING_PATH = Path(__file__).parent / "data" / "bridging.json"
 REVIEW_ADVIES_PATH = Path(__file__).parent / "data" / "review_advies.json"
@@ -38,8 +35,8 @@ app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
 
 @app.after_request
 def _no_cache_html(resp):
-    # HTML-pagina's (viz, /overleg, …) worden geregenereerd of tonen live data; zonder
-    # dit blijft de browser een oude kopie tonen en lijkt nieuwe data te ontbreken.
+    # HTML-pagina's (viz, /overleg, …) tonen live data; zonder dit blijft de
+    # browser een oude kopie tonen en lijkt nieuwe data te ontbreken.
     if resp.mimetype == "text/html":
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         resp.headers["Pragma"] = "no-cache"
@@ -497,13 +494,50 @@ def api_users_filterrol(uid):
 
 @app.route("/")
 def index():
-    # No-cache: de viz wordt geregenereerd (scripts/generate_viz.py); zonder dit blijft
-    # de browser de oude ~580 KB index.html tonen en lijkt nieuwe data te ontbreken.
-    resp = send_file(WEB_PATH / "index.html")
-    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    resp.headers["Pragma"] = "no-cache"
-    resp.headers["Expires"] = "0"
-    return resp
+    # Dunne pagina (W5.1): web/template.html zelf, mét de "%%DATA%%"-sentinel er
+    # nog in — de boot-loader in de pagina haalt de graafdata live via
+    # GET /api/graph_data. De statische export (scripts/generate_viz.py →
+    # web/index.html) hangt hier niet meer onder; die blijft bereikbaar als
+    # /static/index.html. No-cache komt uit _no_cache_html.
+    return send_file(WEB_PATH / "template.html")
+
+
+# ── Graafdata voor de visualisatie (W5.1) ────────────────────
+# De pagina op / is dun; de data komt live hiervandaan. Een mtime-cache voorkomt
+# dat elke paginalaad de volledige scoringsketen (~0,75 s) opnieuw draait: de
+# sleutel verandert zodra de DB, bridging.json of de nieuwste release verandert —
+# precies de drie inputs van viz_data.export_data.
+_graph_cache = {}
+
+
+def _graph_cache_key():
+    def _stat(p):
+        try:
+            st = p.stat()
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return (0, 0)
+    nieuwste_release = max((_stat(p) for p in RELEASES_PATH.glob("model-v*.json")),
+                           default=(0, 0))
+    return (_stat(DB_PATH), _stat(BRIDGING_PATH), nieuwste_release)
+
+
+@app.route("/api/graph_data")
+def graph_data():
+    """Volledige viz-datastructuur (entiteiten, relaties, theorielaag, discussiebomen,
+    afgeleide scores, kleurmeter, inkomsten) — identiek aan wat de statische export
+    in web/index.html bakt (zelfde bouw: viz_data.export_data)."""
+    sleutel = _graph_cache_key()
+    entry = _graph_cache.get("entry")
+    if entry is None or entry[0] != sleutel:
+        conn = get_db()
+        try:
+            data = viz_data.export_data(conn)
+        finally:
+            conn.close()
+        entry = (sleutel, json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+        _graph_cache["entry"] = entry
+    return app.response_class(entry[1], mimetype="application/json")
 
 
 # ── Argumenten API ───────────────────────────────────────────
@@ -733,6 +767,43 @@ def discussion_index():
         "mechanismen": mechanismen,
         "emergente_velden": emergente_velden,
     }
+
+    # n_bezwaar (W3.1): lopende resolutielussen per thread — ondergravingen die op
+    # afhandeling wachten ('open' wacht op de auteur, 'herzien' op herbeoordeling door
+    # de bezwaarmaker; 'blijft'/'opgelost' zijn afgehandeld). Alleen mee-tellende
+    # ondergravingen: gemerged (niet 'voorgesteld' — die staan in de reviewwachtrij),
+    # niet verworpen, niet vervangen. Reacties dragen geen doel (M1.1), dus de
+    # recursieve keten zoekt per ondergraving de thread-wortel.
+    bezwaar_rows = conn.execute("""
+        WITH RECURSIVE keten(id, wortel) AS (
+            SELECT id, id FROM arguments WHERE parent_argument_id IS NULL
+            UNION ALL
+            SELECT a.id, k.wortel FROM arguments a JOIN keten k ON a.parent_argument_id = k.id
+        )
+        SELECT w.relation_id, w.entity_id, w.role_id, w.mechanism_id, w.emergent_effect_id,
+               COUNT(*) AS n
+        FROM arguments ond
+        JOIN keten k ON k.id = ond.id
+        JOIN arguments w ON w.id = k.wortel
+        WHERE ond.parent_argument_id IS NOT NULL
+          AND ond.stance = 'contradicting'
+          AND ond.bezwaar_resolutie IN ('open', 'herzien')
+          AND NOT ond.vervangen
+          AND ond.status NOT IN ('voorgesteld', 'verworpen')
+        GROUP BY 1, 2, 3, 4, 5
+    """).fetchall()
+    bezwaar = {}
+    kolom_per_groep = {"relaties": "relation_id", "entiteiten": "entity_id",
+                       "rollen": "role_id", "mechanismen": "mechanism_id",
+                       "emergente_velden": "emergent_effect_id"}
+    for r in bezwaar_rows:
+        for groep, kol in kolom_per_groep.items():
+            if r[kol] is not None:
+                bezwaar[(groep, r[kol])] = bezwaar.get((groep, r[kol]), 0) + r["n"]
+    for groep, items in uit.items():
+        for it in items:
+            it["n_bezwaar"] = bezwaar.get((groep, it["id"]), 0)
+
     conn.close()
     return jsonify(uit)
 
@@ -2042,52 +2113,6 @@ def _maintainer_mag_direct(conn, tabel, rid):
     return None
 
 
-def _regenereer_viz(blocking=False):
-    """Herbouw web/index.html uit de LIVE database via scripts/generate_viz.py.
-
-    blocking=True levert het subprocess-resultaat terug (handmatige knop); anders
-    vuurt het op de achtergrond, zodat een schrijfactie er niet op hoeft te wachten."""
-    def _run():
-        return subprocess.run([sys.executable, str(GENERATE_VIZ_SCRIPT)],
-                              cwd=str(ROOT), capture_output=True, text=True, timeout=300)
-    if blocking:
-        return _run()
-
-    def _bg():
-        try:
-            _run()
-        except Exception:  # noqa: BLE001 — een regen-fout mag nooit de schrijfactie raken
-            pass
-    threading.Thread(target=_bg, daemon=True).start()
-    return None
-
-
-def _auto_regen():
-    """Auto-regen ná goedkeuring/merge — alléén als PROPAGANDA_AUTO_REGEN gezet is.
-    Standaard uit: zo herschrijven de tests (die op een temp-DB draaien) nooit de
-    live viz. Productie: `export PROPAGANDA_AUTO_REGEN=1` vóór `python3 server.py`."""
-    if os.environ.get("PROPAGANDA_AUTO_REGEN"):
-        _regenereer_viz(blocking=False)
-
-
-@app.route("/api/regenerate", methods=["POST"])
-@require_user("reviewer")
-def regenerate_viz():
-    """Herbouw de statische visualisatie (web/index.html) uit de live DB. reviewer+.
-    De 'Ververs viz'-knop in de topbar roept dit aan en herlaadt daarna de pagina."""
-    try:
-        proc = _regenereer_viz(blocking=True)
-    except Exception as e:  # noqa: BLE001
-        return jsonify({"ok": False, "melding": f"regeneratie faalde: {e}"}), 500
-    ok = proc.returncode == 0
-    regels = [r for r in (proc.stdout or "").splitlines() if r.strip()]
-    return jsonify({
-        "ok": ok,
-        "melding": (regels[0] if regels else "viz herbouwd") if ok else "regeneratie faalde",
-        "detail": regels[-3:] if ok else (proc.stderr or "").strip()[-500:],
-    }), (200 if ok else 500)
-
-
 def _modereer(tabel, rid):
     """Moderatie van een 'voorgesteld' node/edge: reviewer+ keurt goed of af.
     Niemand keurt eigen werk goed (M2.1)."""
@@ -2177,8 +2202,6 @@ def _modereer(tabel, rid):
         mee_afgewezen = len(boom)
     conn.commit()
     conn.close()
-    if nieuw == "goedgekeurd":
-        _auto_regen()  # nieuw goedgekeurde node/edge meteen in de viz (indien aangezet)
     return jsonify({"id": rid, "status": nieuw, "argumenten_mee_afgewezen": mee_afgewezen})
 
 
@@ -4141,6 +4164,27 @@ def recent_changes():
         uit.append(dict(r))
         if len(uit) >= limit:
             break
+
+    # Verrijking voor de startkaart op /overleg (W3.1): argument-regels krijgen de
+    # claim + het thread-anker (param/id, via de wortel — reacties dragen zelf geen
+    # doel, M1.1) zodat de feed klikbaar naar de juiste thread kan linken. Een
+    # inmiddels hard verwijderd argument levert niets op; de client slaat regels
+    # zonder anker over. Backward compatible: bestaande velden blijven onaangetast.
+    for rij in uit:
+        if rij["table_name"] != "arguments":
+            continue
+        arg = conn.execute(
+            "SELECT id, parent_argument_id, stance, claim, relation_id, entity_id, "
+            "role_id, mechanism_id, emergent_effect_id FROM arguments WHERE id = ?",
+            (rij["record_id"],)).fetchone()
+        if arg is None:
+            continue
+        param, tid = _wortel_doel(conn, arg)
+        doel_type, doel_naam = _doel_leesbaar(conn, param, tid)
+        rij.update({"claim": arg["claim"], "stance": arg["stance"],
+                    "thread_param": param, "thread_id": tid,
+                    "doel_type": doel_type, "doel_naam": doel_naam})
+
     conn.close()
     return jsonify(uit)
 

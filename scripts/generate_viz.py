@@ -1,363 +1,46 @@
-"""Genereer een interactieve webvisualisatie van het propagandamodel.
+"""Statische export van de visualisatie (web/index.html).
 
-Leest de SQLite database en produceert een standalone HTML-bestand
-met een D3.js force-directed graph.
+De live app op `/` serveert web/template.html en haalt de graafdata via
+GET /api/graph_data (W5.1). Dit script bakt een momentopname van diezelfde
+data (viz_data.export_data) plus de gedeelde woordenschat in het template,
+voor wie een statisch serveerbare kopie wil — bereikbaar als /static/index.html.
+De kopie veroudert bij elke datawijziging; de live pagina niet.
 """
 import json
-import re
 import sqlite3
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-import scoring  # noqa: E402  (repo-root module met de scoringsketen)
-import politiek  # noqa: E402  (politieke kleurmeter)
+import viz_data  # noqa: E402  (repo-root module, gedeeld met GET /api/graph_data)
 
-DB_PATH = Path(__file__).parent.parent / "data" / "propaganda_model.db"
 OUT_PATH = Path(__file__).parent.parent / "web" / "index.html"
 TEMPLATE_PATH = Path(__file__).parent.parent / "web" / "template.html"
 SHARED_VOCAB_PATH = Path(__file__).parent.parent / "web" / "shared_vocab.js"
-RELEASES_DIR = Path(__file__).parent.parent / "releases"
-
-
-def laatste_release():
-    """Nieuwste release-snapshot (M3.1) voor de releasetag in de topbar, of None."""
-    nieuwste, beste = None, ()
-    for pad in RELEASES_DIR.glob("model-v*.json"):
-        m = re.fullmatch(r"model-v(\d+)\.(\d+)\.(\d+)\.json", pad.name)
-        if m and tuple(map(int, m.groups())) > beste:
-            beste, nieuwste = tuple(map(int, m.groups())), pad
-    if nieuwste is None:
-        return None
-    try:
-        snap = json.loads(nieuwste.read_text())
-        return {"versie": snap.get("versie"), "gegenereerd": snap.get("gegenereerd"),
-                "titel": snap.get("titel")}
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def export_data():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-
-    # Entities with role info + temporal data.
-    # Vervangen elementen (M2.6) blijven overal buiten beeld: de viz toont het
-    # levende model; opvolging is opvraagbaar via /api/lineage.
-    # 'voorgesteld' wordt méégegeven (getagd met status) zodat de viz het als
-    # gestippelde 'in review'-ghost kan tonen achter een toggle; default blijft de
-    # viz het goedgekeurde model tonen. Vervangen (M2.6) blijft altijd buiten beeld.
-    cur.execute("""
-        SELECT e.id, e.name, e.type, e.description, e.status,
-               e.active_from, e.active_until, e.active,
-               r.name as role_name, r.category as filter_category
-        FROM entities e
-        LEFT JOIN roles r ON e.primary_role_id = r.id
-        WHERE NOT e.vervangen AND e.status IN ('goedgekeurd', 'voorgesteld')
-    """)
-    entities = [dict(row) for row in cur.fetchall()]
-
-    # Alle rollen per entiteit (hoofdrol + entity_roles) — nodig om padclaims
-    # (rol ⇢ rol) op praktijk-paren te kunnen toetsen.
-    entity_role_ids = {}
-    for eid, rid in cur.execute(
-        "SELECT entity_id, role_id FROM entity_roles WHERE role_id IS NOT NULL"
-    ):
-        entity_role_ids.setdefault(eid, set()).add(rid)
-    for eid, rid in cur.execute(
-        "SELECT id, primary_role_id FROM entities WHERE primary_role_id IS NOT NULL"
-    ):
-        entity_role_ids.setdefault(eid, set()).add(rid)
-    for e in entities:
-        e['role_ids'] = sorted(entity_role_ids.get(e['id'], []))
-
-    # Relations with entity names, mechanism + temporal data
-    cur.execute("""
-        SELECT r.id, r.source_id, r.target_id, r.relation_type,
-               r.certainty, r.influence, r.bidirectional,
-               r.description, r.mechanism_id, r.status,
-               r.active_from, r.active_until, r.active,
-               e1.name as source_name, e2.name as target_name,
-               m.name as mechanism_name, m.filter as mechanism_filter,
-               COALESCE(m.aard, 'direct') as aard
-        FROM relations r
-        JOIN entities e1 ON r.source_id = e1.id
-        JOIN entities e2 ON r.target_id = e2.id
-        LEFT JOIN mechanisms m ON r.mechanism_id = m.id
-        WHERE NOT r.vervangen AND r.status IN ('goedgekeurd', 'voorgesteld')
-    """)
-    relations = [dict(row) for row in cur.fetchall()]
-
-    # Een relatie mag geen eindpunt hebben dat zélf buiten beeld valt: de statusfilters op
-    # entiteit en relatie lopen onafhankelijk, dus een 'voorgesteld'/'goedgekeurd' relatie
-    # kan naar een 'afgewezen' entiteit wijzen. Zo'n bungelende edge laat d3.forceLink in de
-    # viz crashen ("missing: <id>") → het praktijkmodel laadt dan niet meer. Houd alleen
-    # edges met béide eindpunten in de geëmitteerde entiteitenset.
-    levende_entiteit_ids = {e['id'] for e in entities}
-    _voor = len(relations)
-    relations = [r for r in relations
-                 if r['source_id'] in levende_entiteit_ids
-                 and r['target_id'] in levende_entiteit_ids]
-    if len(relations) != _voor:
-        print(f"  {_voor - len(relations)} relatie(s) met een eindpunt buiten beeld weggelaten "
-              "(entiteit afgewezen/verborgen)")
-
-    # Roles (+ temporele velden: ook de theorielaag is historisch contingent)
-    cur.execute("SELECT id, name, category, description, active_from, active_until "
-                "FROM roles WHERE NOT vervangen")
-    roles = [dict(row) for row in cur.fetchall()]
-
-    # Mechanisms (incl. `aard`: direct / veld_instantiatie / veld_eigenschap)
-    cur.execute("SELECT id, name, filter, mechanism_type, aard, description, effect, "
-                "source_role_id, target_role_id, active_from, active_until "
-                "FROM mechanisms WHERE NOT vervangen")
-    mechanisms = [dict(row) for row in cur.fetchall()]
-
-    # Twee-assen-tags: alle filters (multi) + thema's (dwarsverbanden) per mechanisme.
-    # Primair filter (kleur/lead) staat altijd vooraan in 'filters'.
-    mech_filters, mech_themes = {}, {}
-    for mid, flt in cur.execute("SELECT mechanism_id, filter FROM mechanism_filters"):
-        mech_filters.setdefault(mid, []).append(flt)
-    for mid, thm in cur.execute("SELECT mechanism_id, theme FROM mechanism_themes"):
-        mech_themes.setdefault(mid, []).append(thm)
-    for m in mechanisms:
-        fs = mech_filters.get(m['id'], [m['filter']])
-        # primair filter vooraan
-        m['filters'] = [m['filter']] + [f for f in fs if f != m['filter']]
-        m['themes'] = sorted(mech_themes.get(m['id'], []))
-
-    # Emergente effecten (hyperedge): een systeemeigenschap over MEERDERE rollen.
-    # Optioneel — oudere DB's zonder de tabel leveren simpelweg een lege lijst.
-    emergent_effects = []
-    have_emergent = cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='emergent_effects'"
-    ).fetchone()
-    if have_emergent:
-        cur.execute("SELECT id, name, label, category, description, effect, active_from, "
-                    "active_until FROM emergent_effects WHERE NOT vervangen")
-        emergent_effects = [dict(row) for row in cur.fetchall()]
-        members = {}
-        for eid, rid in cur.execute(
-            "SELECT emergent_effect_id, role_id FROM emergent_effect_members"
-        ):
-            members.setdefault(eid, []).append(rid)
-        for e in emergent_effects:
-            e['member_role_ids'] = members.get(e['id'], [])
-        # Tweede-orde-structuur: deel-effecten (apex-veld) + omgekeerde verwijzing
-        sub, parent = {}, {}
-        if cur.execute("SELECT name FROM sqlite_master WHERE type='table' "
-                       "AND name='emergent_effect_subeffects'").fetchone():
-            for pid, cid in cur.execute(
-                    "SELECT parent_effect_id, child_effect_id FROM emergent_effect_subeffects"):
-                sub.setdefault(pid, []).append(cid)
-                parent.setdefault(cid, []).append(pid)
-        for e in emergent_effects:
-            e['sub_effect_ids'] = sub.get(e['id'], [])
-            e['parent_effect_ids'] = parent.get(e['id'], [])
-
-    # Arguments: volledige discussiebomen
-    cur.execute("""
-        SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id,
-               a.emergent_effect_id, a.parent_argument_id,
-               a.property, a.property_value,
-               a.stance, a.claim, a.title, a.reasoning, a.weight, a.status,
-               a.objection_type
-        FROM arguments a
-        ORDER BY a.parent_argument_id NULLS FIRST, a.id
-    """)
-    arguments = [dict(row) for row in cur.fetchall()]
-
-    # Citations per argument (incl. klikbare vindplaats/archief uit source_locations)
-    cur.execute("""
-        SELECT c.id, c.argument_id, c.quote, c.page, c.section, c.context,
-               c.source_id, s.title as source_title, s.author as source_author
-        FROM citations c
-        JOIN sources s ON c.source_id = s.id
-    """)
-    citations = [dict(row) for row in cur.fetchall()]
-    bron_locs = {}
-    for sid, lt, lv in cur.execute("SELECT source_id, location_type, location FROM source_locations"):
-        bron_locs.setdefault(sid, []).append((lt, lv))
-
-    def _link(lt, lv):
-        if lt in ("url", "archive_url"):
-            return lv
-        if lt == "doi":
-            return f"https://doi.org/{lv}"
-        if lt == "handle":
-            return f"https://hdl.handle.net/{lv}"
-        return None
-    for c in citations:
-        sl = bron_locs.get(c.get("source_id"), [])
-        c["url"] = next((_link(t, v) for t, v in sl if _link(t, v)), None)
-        c["archive_url"] = next((v for t, v in sl if t == "archive_url"), None)
-        c["has_locator"] = bool(sl)
-
-    # Instantiations: expliciete klasse<->instantie-koppeling + exemplariteit
-    cur.execute("SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity FROM instantiations")
-    instantiations = [dict(r) for r in cur.fetchall()]
-
-    # Ratings-aggregaat per argument (M2.5): mens en agent apart (agent = advies)
-    ratings = {}
-    if cur.execute("SELECT name FROM sqlite_master WHERE type='table' "
-                   "AND name='argument_ratings'").fetchone():
-        for aid, kind, oordeel, n in cur.execute("""
-            SELECT ar.argument_id, u.kind, ar.oordeel, COUNT(*)
-            FROM argument_ratings ar JOIN users u ON u.username = ar.rater
-            GROUP BY ar.argument_id, u.kind, ar.oordeel"""):
-            ratings.setdefault(aid, {"mens": {"nuttig": 0, "niet_nuttig": 0},
-                                     "agent": {"nuttig": 0, "niet_nuttig": 0}})
-            ratings[aid][kind][oordeel] = n
-    for a in arguments:
-        a['ratings'] = ratings.get(a['id'])
-
-    # Volledige scoringsketen (gedeeld met /api/scores), zolang de connectie nog open is.
-    # Bridged gewichten (M2.5) tellen mee zodra scripts/bridging.py ze geschreven heeft.
-    scores = scoring.compute_all_scores(
-        conn, bridged_weights=scoring.bridged_weights_from_file(
-            DB_PATH.parent / "bridging.json"))
-
-    # Politieke kleurmeter (id-gekoppelde maps voor het detailpaneel). Preview = ook
-    # `voorgesteld` signalen tellen voorlopig mee; nieuw werk staat immers nog voorgesteld.
-    km = politiek.compute_kleurmeter(conn, include_voorgesteld=True)
-    kleurmeter = {
-        'preview': km['preview'],
-        'personen': {p['id']: p for p in km['personen']},
-        'organisaties': {o['id']: o for o in km['organisaties']},
-    }
-
-    # Inkomstensamenstelling per outlet (de 'pie' in het detailpaneel): afgeleid uit de
-    # financier-edges met gesourcete aandelen. Preview = ook nog-`voorgesteld` aandelen,
-    # zodat nieuw werk meteen zichtbaar is (zoals de kleurmeter).
-    inkomsten = scoring.compute_income_composition(conn, include_voorgesteld=True)
-
-    # Argument counts per relation (voor edge labels)
-    arg_counts = {}
-    for a in arguments:
-        rid = a.get('relation_id')
-        if rid:
-            if rid not in arg_counts:
-                arg_counts[rid] = {'arg_count': 0, 'stances': []}
-            arg_counts[rid]['arg_count'] += 1
-            arg_counts[rid]['stances'].append(a['stance'])
-
-    conn.close()
-
-    # Compute degree for node sizing — alleen op het goedgekeurde model; ghosts
-    # (voorgesteld) tellen niet mee, anders zou node-grootte van review-werk afhangen.
-    degree = {}
-    for r in relations:
-        if r.get('status') != 'goedgekeurd':
-            continue
-        degree[r['source_id']] = degree.get(r['source_id'], 0) + 1
-        degree[r['target_id']] = degree.get(r['target_id'], 0) + 1
-
-    for e in entities:
-        e['degree'] = degree.get(e['id'], 0)
-        ac = arg_counts.get(e['id'])
-
-    for r in relations:
-        ac = arg_counts.get(r['id'])
-        r['argument_count'] = ac['arg_count'] if ac else 0
-        # Relatie erft de twee-assen-tags van haar mechanisme (primair filter blijft mechanism_filter)
-        mid = r.get('mechanism_id')
-        r['mechanism_filters'] = mech_filters.get(mid, [r['mechanism_filter']] if r.get('mechanism_filter') else [])
-        r['mechanism_themes'] = sorted(mech_themes.get(mid, []))
-
-    # ── Afgeleide scores injecteren (uit scoring.compute_all_scores) ──
-    # Naast het kale cijfer ook het scoring-v2-detail (interval, onweersproken-,
-    # SPOF- en clustervlaggen) en de afgeleide invloed (M1.7).
-    for r in relations:
-        r['derived_certainty'] = scores['relations'].get(r['id'], r.get('certainty') or 0.0)
-        r['score_detail'] = scores['relations_detail'].get(r['id'])
-        r['derived_influence'] = scores['relations_influence'].get(r['id'], r.get('influence') or 0.0)
-        r['influence_detail'] = scores['relations_influence_detail'].get(r['id'])
-    for e in entities:
-        e['derived_certainty'] = scores['entities'].get(e['id'], 0.0)
-        e['score_detail'] = scores['entities_detail'].get(e['id'])
-        # Afgeleide primaire rol = bron van waarheid voor kleur/categorie: het filter
-        # met de grootste Σ(zekerheid×invloed) over de relaties van de entiteit. De
-        # toegekende primary_role-categorie (uit de SQL hierboven) blijft als fallback
-        # voor entiteiten die nog geen (goedgekeurde) relaties hebben.
-        e['filter_scores'] = scores.get('entity_filter_scores', {}).get(e['id'], {})
-        afgeleid = scores.get('entity_primary_filter', {}).get(e['id'])
-        if afgeleid:
-            e['toegekend_filter_category'] = e.get('filter_category')
-            e['filter_category'] = afgeleid
-            e['filter_category_bron'] = 'afgeleid'
-        else:
-            e['filter_category_bron'] = 'toegekend' if e.get('filter_category') else 'geen'
-            e['filter_category'] = e.get('filter_category') or 'overig'
-    for role in roles:
-        role.update(scores['roles'].get(role['id'], {}))
-    for m in mechanisms:
-        m.update(scores['mechanisms'].get(m['id'], {}))
-    for eff in emergent_effects:
-        eff.update(scores.get('emergent_effects', {}).get(eff['id'], {}))
-    # Per argument τ (basiskracht) en σ (eindkracht na replies, M1.1)
-    for a in arguments:
-        sc = scores.get('argument_scores', {}).get(a['id'])
-        if sc:
-            a['tau'] = sc['tau']
-            a['sigma'] = sc['sigma']
-
-    # ── Structurele invloed-centraliteit (topologie) ──
-    # Twee varianten per node: de basisvelden (influence_*) komen uit de SCHONE dyadische graaf
-    # (veld-effecten weg) — dat is de default-view. De *_veld-velden komen uit de variant MÉT
-    # veld-effecten (fan-out gedempt); de viz-toggle "toon veld-effecten" schakelt ernaartoe.
-    def _attach_influence(items, clean_map, field_map):
-        keys = [('direct', 'influence_direct'), ('transitive', 'influence_transitive'),
-                ('reach', 'influence_reach'), ('transitive_norm', 'influence_norm'),
-                ('rank', 'influence_rank'), ('public', 'influence_public'),
-                ('public_norm', 'influence_public_norm'), ('public_rank', 'influence_public_rank'),
-                ('politiek', 'influence_politiek'), ('politiek_norm', 'influence_politiek_norm'),
-                ('politiek_rank', 'influence_politiek_rank')]
-        defaults = {'reach': 0, 'rank': None, 'public_rank': None, 'politiek_rank': None}
-        for it in items:
-            clean = clean_map.get(it['id'], {})
-            field = field_map.get(it['id'], {})
-            for src_key, dst_key in keys:
-                d = defaults.get(src_key, 0.0)
-                it[dst_key] = clean.get(src_key, d)
-                it[dst_key + '_veld'] = field.get(src_key, d)
-
-    _attach_influence(entities,
-                      scores.get('entity_influence_clean', {}),
-                      scores.get('entity_influence', {}))   # instantiemodel
-    _attach_influence(roles,
-                      scores.get('role_influence_clean', {}),
-                      scores.get('role_influence', {}))      # theoretisch model
-
-    return {
-        'entities': entities,
-        'relations': relations,
-        'roles': roles,
-        'mechanisms': mechanisms,
-        'emergent_effects': emergent_effects,
-        'arguments': arguments,
-        'citations': citations,
-        'instantiations': instantiations,
-        'release': laatste_release(),   # M3.1: releasetag in de topbar (of null)
-        'kleurmeter': kleurmeter,       # politieke kleurmeter per entiteit (detailpaneel)
-        'inkomsten': inkomsten,         # inkomstensamenstelling per outlet (donut, detailpaneel)
-    }
+VOCAB_TAG = '<script src="/static/shared_vocab.js"></script>'
 
 
 def generate():
-    data = export_data()
+    conn = sqlite3.connect(viz_data.DB_PATH)
+    data = viz_data.export_data(conn)
+    conn.close()
+
     template = TEMPLATE_PATH.read_text(encoding='utf-8')
-    # Gedeelde filter-woordenschat inlinen (web/shared_vocab.js) zodat index.html
-    # standalone blijft en niet uiteenloopt met de overlegpagina (zelfde bronbestand).
+    # Gedeelde filter-woordenschat (web/shared_vocab.js) inlinen op de plek van de
+    # script-tag, zodat de export niet uiteenloopt met de live pagina (zelfde bron).
+    if VOCAB_TAG not in template:
+        raise SystemExit(f"template.html mist de woordenschat-tag {VOCAB_TAG}")
     vocab = SHARED_VOCAB_PATH.read_text(encoding='utf-8')
-    if '/*%%SHARED_VOCAB%%*/' not in template:
-        raise SystemExit("template.html mist de /*%%SHARED_VOCAB%%*/ placeholder")
-    html = template.replace('/*%%SHARED_VOCAB%%*/', vocab)
+    html = template.replace(VOCAB_TAG, '<script>\n' + vocab + '</script>')
+    # Data in de boot-loader bakken: de sentinel "%%DATA%%" wordt het JSON-object,
+    # waarna de loader de fetch naar /api/graph_data overslaat.
+    if '"%%DATA%%"' not in html:
+        raise SystemExit('template.html mist de "%%DATA%%" sentinel (boot-loader)')
     html = html.replace('"%%DATA%%"', json.dumps(data, ensure_ascii=False, indent=2))
     OUT_PATH.write_text(html, encoding='utf-8')
-    print(f"Visualisatie gegenereerd: {OUT_PATH}")
+    print(f"Statische export gegenereerd: {OUT_PATH}")
     print(f"  {len(data['entities'])} entiteiten, {len(data['relations'])} relaties")
-    print(f"  Open in browser: file://{OUT_PATH.resolve()}")
+    print("  Live pagina (altijd actueel): http://localhost:5000/ — deze export: /static/index.html")
 
 
 if __name__ == "__main__":

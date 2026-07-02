@@ -1,0 +1,352 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   HUISSTIJL — één bron van waarheid voor alle pagina's (/, /overleg,
+   /werkbank, /account, /beheer, /login). Laden via:
+     <link rel="stylesheet" href="/static/huisstijl.css">
+   Pagina-specifieke stijl blijft in de eigen <style>; alles wat twee of
+   meer pagina's delen (tokens, knoppen, kaarten, tabs, badges, formulieren,
+   toasts, dialogen) hoort hier — niet opnieuw kopiëren.
+   Vocabulaire (kleursemantiek):
+     blauw (--accent)  = interactief / actieve selectie
+     goud  (--goud)    = telling / open werk / attentie
+     groen (--ok)      = akkoord / ondersteunend / gelukt
+     rood  (--fout)    = afwijzen / weerspreken / fout
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* — kern — */
+  --bg:           #0a0a0f;
+  --bg-panel:     rgba(16, 16, 24, 0.92);
+  --bg-card:      rgba(24, 24, 36, 0.85);
+  --bg-hover:     rgba(40, 40, 60, 0.6);
+  --bg-inzet:     rgba(0, 0, 0, 0.3);        /* invoervelden, verzonken vlakken */
+  --border:       rgba(255,255,255,0.10);
+  --border-zwak:  rgba(255,255,255,0.06);    /* haarlijnen (viz-panelen) */
+  --border-light: rgba(255,255,255,0.14);    /* nadruk/hover */
+  --text:         #e8e8f0;
+  --text-dim:     #8888a0;
+  --text-muted:   #5a5a70;
+  --accent:       #6c8aff;
+  --goud:         #e3b341;
+  /* — status & oordeel — */
+  --ok:           #3ddc84;
+  --fout:         #e0635f;
+  --warn:         #e0a23a;
+  --info:         #5bc8c2;
+  --knop-groen:   #1f7a44;   /* akkoord/vóór-acties */
+  --knop-rood:    #7a2f2f;   /* afwijzen/tegen-acties */
+  --knop-context: #4a4a66;   /* neutrale duiding */
+  /* — de vijf filters + rest (zelfde waarden als shared_vocab.js) — */
+  --c-eigendom:    #e74c3c;
+  --c-advertentie: #f0a030;
+  --c-sourcing:    #3498db;
+  --c-flak:        #9b59b6;
+  --c-ideologie:   #2ecc71;
+  --c-systeemactor:#e8c547;
+  --c-cross_filter:#fd79a8;
+  --c-tegenmacht:  #1abc9c;
+  --c-overig:      #7f8c9a;
+  /* — maatvoering — */
+  --radius:       12px;
+  --radius-k:     8px;
+  --shadow:       0 8px 32px rgba(0,0,0,0.4);
+  --topbal-h:     52px;
+}
+
+/* ── Basis ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  background: rgba(0,0,0,0.35); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, Menlo, monospace; font-size: 0.85em;
+}
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* Zichtbare focus voor toetsenbordgebruikers — nergens onderdrukken. */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Dunne, rustige scrollbalken (WebKit) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+/* ── Topbal (gedeelde navigatie; gevuld door huisstijl.js) ─────────── */
+header.topbal {
+  display: flex; align-items: center; gap: 14px;
+  min-height: var(--topbal-h); padding: 0 20px;
+  background: var(--bg-panel); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  flex-shrink: 0; flex-wrap: wrap;
+}
+.topbal-merk {
+  font-size: 15px; font-weight: 650; letter-spacing: -0.02em;
+  color: var(--text); white-space: nowrap; text-decoration: none;
+}
+.topbal-merk:hover { text-decoration: none; }
+.topbal-merk .sub { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 7px; }
+nav.topbal-nav { display: flex; gap: 2px; }
+nav.topbal-nav a {
+  font-size: 13px; color: var(--text-dim); text-decoration: none;
+  padding: 5px 11px; border-radius: var(--radius-k);
+}
+nav.topbal-nav a:hover { color: var(--text); background: var(--bg-hover); text-decoration: none; }
+nav.topbal-nav a.actief {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+/* min-width blijft op 'auto' (min-content): zo krimpt de slot niet naar nul en
+   wrapt hij als geheel naar een eigen regel op smalle schermen. */
+.topbal-slot { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; flex-wrap: wrap; }
+.topbal-chip {
+  font-size: 12px; color: var(--text-dim); text-decoration: none;
+  border: 1px solid var(--border); border-radius: 11px; padding: 4px 12px;
+  white-space: nowrap; margin-left: auto;
+}
+.topbal-slot + .topbal-chip { margin-left: 0; }
+.topbal-chip:hover { color: var(--text); border-color: var(--border-light); text-decoration: none; }
+.topbal-chip.invite { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.spacer { margin-left: auto; }
+@media (max-width: 700px) {
+  header.topbal { padding: 8px 12px; gap: 8px 12px; }
+  .topbal-merk .sub { display: none; }
+}
+
+/* ── Micro-koppen ──────────────────────────────────────────────────── */
+h2.sectie, .groep-kop {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-dim);
+}
+h2.sectie { margin: 24px 0 12px; }
+
+/* ── Kaart ─────────────────────────────────────────────────────────── */
+.kaart {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px;
+}
+.kaart h3 { font-size: 14.5px; margin: 2px 0 6px; }
+.meta { font-size: 12px; color: var(--text-dim); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+/* ── Chips & tags ──────────────────────────────────────────────────── */
+.chip {
+  font-size: 12px; color: var(--text-dim); border: 1px solid var(--border);
+  border-radius: 11px; padding: 3px 10px;
+}
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tag { font-size: 11px; padding: 2px 9px; border-radius: 9px; background: rgba(255,255,255,0.06); color: var(--text-dim); }
+
+/* ── Tabs (paginabladen) — actief = accentblauw, tellingen = goud ──── */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px; border-radius: 9px; cursor: pointer;
+  border: 1px solid transparent; background: transparent;
+  color: var(--text-dim); font: inherit; font-size: 13px; user-select: none;
+}
+.tab:hover { background: var(--bg-hover); color: var(--text); }
+.tab.actief {
+  background: color-mix(in srgb, var(--accent) 17%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--text);
+}
+.tab.leeg:not(.actief) { opacity: 0.45; }
+.tab.hot:not(.actief) { border-color: color-mix(in srgb, var(--goud) 55%, transparent); color: var(--goud); }
+.tab .telb, .tab .badge {
+  font-size: 11px; min-width: 19px; text-align: center; padding: 0 6px;
+  border-radius: 8px; font-variant-numeric: tabular-nums;
+  background: rgba(255,255,255,0.10); color: inherit;
+}
+.tab .badge { background: color-mix(in srgb, var(--goud) 22%, transparent); color: var(--goud); }
+
+/* ── Knoppen ───────────────────────────────────────────────────────── */
+button, .knop {
+  padding: 7px 13px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg-inzet); color: var(--text);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+button:hover, .knop:hover { filter: brightness(1.15); }
+button:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+button.prim, button.primair { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+button.icoon { padding: 5px 10px; font-size: 15px; line-height: 1.2; border-color: var(--border-light); }
+button.akkoord { background: var(--knop-groen); border-color: transparent; color: #fff; }
+button.afwijzen, button.gevaar { background: var(--knop-rood); border-color: transparent; color: #fff; }
+
+/* ── Formulieren ───────────────────────────────────────────────────── */
+.form {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; margin-top: 14px;
+}
+.form h4 { margin: 0 0 10px; font-size: 13px; }
+.form label, .veldlabel {
+  display: block; font-size: 11px; color: var(--text-dim); margin: 8px 0 3px;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.form input, .form textarea, .form select,
+input.veld, textarea.veld, select.veld {
+  width: 100%; padding: 7px 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--bg-inzet);
+  color: var(--text); font: inherit; font-size: 13px;
+}
+.form textarea, textarea.veld { min-height: 56px; resize: vertical; }
+.form input:focus, .form textarea:focus, .form select:focus,
+input.veld:focus, textarea.veld:focus { border-color: var(--accent); outline: none; }
+
+/* ── Meldingen in de pagina ────────────────────────────────────────── */
+.melding, .uitslag { font-size: 12px; min-height: 1em; }
+.banner {
+  background: rgba(108,138,255,0.10);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 9px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px;
+}
+.banner.waarschuwing {
+  background: rgba(240,160,48,0.12);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.banner.hot {
+  background: rgba(227,179,65,0.10);
+  border-color: color-mix(in srgb, var(--goud) 40%, transparent);
+}
+.leeg { color: var(--text-muted); font-size: 13px; padding: 8px 2px; }
+.fout-tekst { color: var(--fout); font-size: 12px; min-height: 1em; }
+.ok-tekst { color: var(--ok); font-size: 12px; }
+
+/* ── Statusbadges (modelstatussen) ─────────────────────────────────── */
+.statusbadge {
+  font-size: 10px; padding: 1px 7px; border-radius: 8px; vertical-align: middle;
+  background: rgba(255,255,255,0.07); color: var(--text-muted);
+}
+.statusbadge.voorgesteld { background: color-mix(in srgb, var(--goud) 20%, transparent); color: var(--goud); }
+.statusbadge.betwist, .statusbadge.verworpen, .statusbadge.afgewezen { background: rgba(224,99,95,0.16); color: var(--fout); }
+.statusbadge.geverifieerd, .statusbadge.goedgekeurd { background: rgba(61,220,132,0.14); color: var(--ok); }
+.statusbadge.bronvermelding_nodig, .statusbadge.verouderd { background: rgba(224,162,58,0.14); color: var(--warn); }
+.statusbadge.ingetrokken { color: var(--text-muted); }
+.statusbadge.vervangen { text-decoration: line-through; }
+
+.feedback-box {
+  font-size: 12px; color: var(--text-dim); background: rgba(224,99,95,0.08);
+  border: 1px solid color-mix(in srgb, var(--fout) 28%, transparent);
+  border-radius: 8px; padding: 7px 10px; margin: 8px 0; white-space: pre-wrap;
+}
+.feedback-box .van { color: var(--text-muted); font-size: 11px; }
+.acties { display: flex; gap: 10px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ── Toast (melding() in huisstijl.js) ─────────────────────────────── */
+#hsToosts {
+  position: fixed; right: 18px; bottom: 18px; z-index: 1000;
+  display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 36px));
+}
+.toost {
+  background: var(--bg-panel); backdrop-filter: blur(16px);
+  border: 1px solid var(--border-light); border-left: 3px solid var(--text-dim);
+  border-radius: 9px; box-shadow: var(--shadow);
+  padding: 10px 14px; font-size: 13px; line-height: 1.45;
+  animation: toost-in 0.22s ease-out;
+}
+.toost.ok { border-left-color: var(--ok); }
+.toost.fout { border-left-color: var(--fout); }
+.toost.warn { border-left-color: var(--warn); }
+@keyframes toost-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.toost.weg { opacity: 0; transform: translateY(6px); transition: opacity 0.25s, transform 0.25s; }
+
+/* ── Dialoog (bevestig() / vraagTekst() in huisstijl.js) ───────────── */
+.hs-dlg-overlay {
+  position: fixed; inset: 0; z-index: 900;
+  background: rgba(5,5,10,0.6); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.hs-dlg {
+  width: 440px; max-width: 100%; max-height: 85vh; overflow-y: auto;
+  background: #16161f; border: 1px solid var(--border-light);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px;
+  animation: dlg-in 0.18s ease-out;
+}
+@keyframes dlg-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+.hs-dlg h3 { margin: 0 0 8px; font-size: 15px; }
+.hs-dlg .dlg-tekst { font-size: 13px; color: var(--text-dim); white-space: pre-wrap; margin-bottom: 14px; }
+.hs-dlg textarea, .hs-dlg input[type="text"] {
+  width: 100%; padding: 8px 10px; border-radius: 7px; margin-bottom: 4px;
+  border: 1px solid var(--border); background: var(--bg-inzet);
+  color: var(--text); font: inherit; font-size: 13px;
+}
+.hs-dlg textarea { min-height: 84px; resize: vertical; }
+.hs-dlg textarea:focus, .hs-dlg input:focus { border-color: var(--accent); outline: none; }
+.hs-dlg .dlg-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.hs-dlg .dlg-acties { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+/* ── Uitleg-popover (klikbare ⓘ; vervangt title-only tooltips) ──────── */
+/* Gebruik: <button type="button" class="uitleg" data-uitleg="…" aria-label="Uitleg">ⓘ</button>
+   huisstijl.js opent/sluit de popover (klik, Esc, klik-buiten; één tegelijk). */
+button.uitleg {
+  background: none; border: none; padding: 0 3px; margin: 0;
+  color: var(--text-muted); font-size: 12px; line-height: 1;
+  cursor: pointer; border-radius: 50%; flex-shrink: 0;
+}
+button.uitleg:hover, button.uitleg[aria-expanded="true"] {
+  color: var(--accent); filter: none; background: none;
+}
+.hs-popover {
+  position: fixed; z-index: 950; max-width: min(320px, calc(100vw - 16px));
+  background: #16161f; border: 1px solid var(--border-light);
+  border-radius: 8px; box-shadow: var(--shadow); padding: 10px 12px;
+  font-size: 12px; line-height: 1.55; color: var(--text-dim);
+  white-space: pre-wrap; animation: dlg-in 0.15s ease-out;
+}
+
+/* ── Actie-menu (hsMenu): één ⋯-knop i.p.v. een rij actieknoppen ─────── */
+/* Gebruik: hsMenu(ankerKnop, [{label, onClick, gevaar?, titel?}, '---', …]).
+   huisstijl.js opent/sluit (klik, Esc met focus-terug, klik-buiten, scroll;
+   pijltjes ↑/↓ lopen door de items; één menu tegelijk). */
+.hs-menu {
+  position: fixed; z-index: 960; min-width: 180px;
+  max-width: min(300px, calc(100vw - 16px));
+  background: #16161f; border: 1px solid var(--border-light);
+  border-radius: 8px; box-shadow: var(--shadow); padding: 4px;
+  animation: dlg-in 0.12s ease-out;
+}
+.hs-menu-item {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; border-radius: 5px;
+  padding: 7px 10px; font: inherit; font-size: 12.5px;
+  color: var(--text-dim); cursor: pointer; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.hs-menu-item:hover, .hs-menu-item:focus-visible {
+  background: rgba(255,255,255,.07); color: var(--text);
+}
+.hs-menu-item.gevaar { color: var(--fout); }
+.hs-menu-item.gevaar:hover, .hs-menu-item.gevaar:focus-visible {
+  background: color-mix(in srgb, var(--fout) 12%, transparent); color: var(--fout);
+}
+.hs-menu-scheiding { height: 1px; background: var(--border); margin: 4px 6px; }
+/* De ⋯-ankerknop bij een actie-menu: rustig in rust, zichtbaar bij hover/open.
+   Gedeeld door /overleg en de viz-discussieboom (W3.2/W3.2b). */
+.hs-menu-knop {
+  flex-shrink: 0; background: none; border: 1px solid transparent; border-radius: 6px;
+  color: var(--text-muted); font: inherit; font-size: 15px; line-height: 1;
+  padding: 0 7px 4px; cursor: pointer;
+}
+.hs-menu-knop:hover, .hs-menu-knop[aria-expanded="true"] {
+  color: var(--text); border-color: var(--border); background: rgba(255,255,255,.05);
+}

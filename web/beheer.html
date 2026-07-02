@@ -4,22 +4,16 @@
 <meta charset="utf-8">
 <title>Accountbeheer — Propagandamodel</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/huisstijl.css">
+<script src="/static/huisstijl.js"></script>
 <style>
-:root {
-  --bg: #0a0a0f; --bg-card: rgba(24,24,36,0.85); --border: rgba(255,255,255,0.12);
-  --text: #e8e8f0; --text-dim: #8888a0; --text-muted: #5a5a70; --accent: #6c8aff;
-  --groen: #5fbf7f; --rood: #e0635f;
-}
-* { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
-       font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; padding: 28px; }
-.wrap { max-width: 1040px; margin: 0 auto; }
+:root { --groen: var(--ok); --rood: var(--fout); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 28px 40px; }
 h1 { font-size: 19px; margin: 0 0 2px; }
 .sub { font-size: 12px; color: var(--text-dim); margin-bottom: 22px; }
 h2 { font-size: 13px; margin: 26px 0 10px; color: var(--text-dim);
      text-transform: uppercase; letter-spacing: 0.05em; }
-.kaart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-         padding: 18px; }
+.kaart { padding: 18px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 6px 10px;
      border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase;
@@ -30,12 +24,8 @@ tr.zelf { background: rgba(108,138,255,0.06); }
 .naam { font-weight: 600; }
 .meta { font-size: 11px; color: var(--text-muted); }
 select, input { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
-        background: rgba(0,0,0,0.3); color: var(--text); font-size: 12px; }
-button { padding: 6px 11px; border: 1px solid var(--border); border-radius: 6px;
-         background: rgba(0,0,0,0.3); color: var(--text); font-size: 12px; cursor: pointer; }
-button.primair { background: var(--accent); border: none; color: #fff; font-weight: 600; }
-button:hover { filter: brightness(1.15); }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
+        background: var(--bg-inzet); color: var(--text); font-size: 12px; }
+button { padding: 6px 11px; font-size: 12px; }
 .chip { display: inline-block; background: rgba(108,138,255,0.15); border: 1px solid var(--border);
         border-radius: 12px; padding: 2px 8px; margin: 0 4px 4px 0; font-size: 11px; }
 .chip b { color: var(--accent); }
@@ -54,10 +44,10 @@ a { color: var(--text-dim); }
          align-items: end; }
 .nieuw label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
 .nieuw input, .nieuw select { width: 100%; }
-code { background: rgba(0,0,0,0.35); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
 </style>
 </head>
 <body>
+<header class="topbal" data-actief="beheer"></header>
 <div class="wrap" id="wrap">Laden…</div>
 <script>
 const ROLLEN = ['bijdrager', 'reviewer', 'maintainer'];
@@ -92,8 +82,7 @@ async function laad() {
   wrap.innerHTML = `
     <h1>Accountbeheer</h1>
     <div class="sub">Rollen, filterrollen en accounts beheren — ingelogd als
-      <b>${esc(me.username)}</b> (maintainer). <a href="/account">account</a> ·
-      <a href="/">visualisatie</a></div>
+      <b>${esc(me.username)}</b> (maintainer).</div>
     <div class="fout" id="fout"></div>
 
     <h2>Nieuwe gebruiker</h2>

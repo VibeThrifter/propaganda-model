@@ -21,7 +21,7 @@ token is elke schrijfactie onmogelijk.
 - voorgestelde **relaties/entiteiten** (instance-laag, `status='voorgesteld'`)
 - open **RfC's / voorstellen** (`voorstellen.status='open'`)
 
-Ids haal je rechtstreeks uit de DB of de in `web/index.html` gebakken JSON
+Ids haal je rechtstreeks uit de DB of via `GET /api/graph_data`
 (GET-endpoints zijn open en vergen geen token).
 
 ## Beoordelingscriteria per argument

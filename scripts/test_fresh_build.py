@@ -144,25 +144,47 @@ def main():
         eis(r.status_code == 201, f"POST /api/instantiations rol↔entiteit ({r.status_code})")
         inst_id = r.get_json()["id"]
 
+        # Harde citatiepoort (sinds 6af4f97): een supporting/contradicting root
+        # zónder echte citatie komt er bij creatie al niet meer in.
         r = client.post("/api/arguments", headers=kop, json={
             "relation_id": rel_id, "stance": "supporting",
-            "claim": "Testclaim voor de verse build."})
+            "claim": "Testclaim zonder bron."})
+        eis(r.status_code == 400,
+            f"POST /api/arguments zonder citatie botst op de bronplicht ({r.status_code})")
+
+        bron_id = sqlite3.connect(db).execute("SELECT MIN(id) FROM sources").fetchone()[0]
+        r = client.post("/api/arguments", headers=kop, json={
+            "relation_id": rel_id, "stance": "supporting",
+            "claim": "Testclaim voor de verse build.",
+            "citations": [{"source_id": bron_id, "quote": "Testcitaat."}]})
         a = r.get_json()
         eis(r.status_code == 201 and a["status"] == "voorgesteld",
-            f"POST /api/arguments landt als voorstel (M2.2) ({a.get('status')})")
+            f"POST /api/arguments (mét citatie) landt als voorstel (M2.2) ({a.get('status')})")
         arg_id = a["id"]
 
         r = client.post(f"/api/arguments/{arg_id}/merge", headers=kop_r1)
-        eis(r.status_code == 200 and r.get_json()["status"] == "bronvermelding_nodig",
-            f"merge past de citatiepoort toe ({r.get_json().get('status')})")
+        eis(r.status_code == 200 and r.get_json()["status"] == "ongecontroleerd",
+            f"merge van een gesourcete root → ongecontroleerd ({r.get_json().get('status')})")
 
-        bron_id = sqlite3.connect(db).execute("SELECT MIN(id) FROM sources").fetchone()[0]
+        # De mergetijd-citatiepoort blijft de vangrail voor legacy on-gesourcete roots;
+        # zo'n rij kan alleen nog als DB-fixture bestaan (de API weigert 'm hierboven).
+        conn = sqlite3.connect(db)
+        legacy_id = conn.execute(
+            "INSERT INTO arguments (relation_id, stance, claim, status, contributed_by)"
+            " VALUES (?, 'supporting', 'Legacy-claim zonder bron.', 'voorgesteld', ?)",
+            (rel_id, "verse-buildtest")).lastrowid
+        conn.commit()
+        conn.close()
+        r = client.post(f"/api/arguments/{legacy_id}/merge", headers=kop_r1)
+        eis(r.status_code == 200 and r.get_json()["status"] == "bronvermelding_nodig",
+            f"merge past de citatiepoort toe op een legacy-root ({r.get_json().get('status')})")
+
         r = client.post("/api/citations", headers=kop, json={
-            "argument_id": arg_id, "source_id": bron_id, "quote": "Testcitaat."})
+            "argument_id": legacy_id, "source_id": bron_id, "quote": "Testcitaat."})
         eis(r.status_code == 201 and r.get_json()["argument_status"] == "ongecontroleerd",
             f"POST /api/citations promoveert het argument ({r.status_code})")
 
-        r = client.patch(f"/api/arguments/{arg_id}/status", headers=kop_r1,
+        r = client.patch(f"/api/arguments/{legacy_id}/status", headers=kop_r1,
                          json={"status": "geverifieerd"})
         eis(r.status_code == 200, f"PATCH status door niet-auteur ({r.status_code})")
 
@@ -172,6 +194,13 @@ def main():
         eis(r.status_code == 200, f"GET /api/health ({r.status_code})")
         r = client.get("/api/review_queue")
         eis(r.status_code == 200, f"GET /api/review_queue ({r.status_code})")
+        r = client.get("/")
+        eis(r.status_code == 200 and b'id="appScript"' in r.data and b'"%%DATA%%"' in r.data,
+            f"GET / serveert de dunne pagina (template + boot-loader, W5.1) ({r.status_code})")
+        r = client.get("/api/graph_data")
+        j = r.get_json()
+        eis(r.status_code == 200 and j.get("entities") and j.get("relations"),
+            f"GET /api/graph_data levert de graafdata ({r.status_code})")
         r = client.get(f"/api/arguments/{arg_id}/score_diff?status=verworpen")
         eis(r.status_code == 200, f"GET score_diff ({r.status_code})")
 

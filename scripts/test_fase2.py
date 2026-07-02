@@ -83,18 +83,24 @@ def main():
     kop = {n: {"Authorization": f"Bearer {t}"} for n, t in tokens.items()}
 
     print("1. M2.2 — voorstel-workflow: landen, niet meetellen, score-diff, merge")
+    # Harde citatiepoort (M0.3, sinds 'harde bronplicht'): een ondersteunend/weerleggend
+    # root-argument zonder échte bron komt er bij creatie niet in.
     r = c.post("/api/arguments", headers=kop["bij"], json={
         "relation_id": 1, "stance": "supporting", "claim": "R1 blijkt uit het jaarverslag."})
+    eis(r.status_code == 400, f"ongesourcete supporting root wordt geweigerd ({r.status_code})")
+    r = c.post("/api/arguments", headers=kop["bij"], json={
+        "relation_id": 1, "stance": "supporting", "claim": "R1 blijkt uit het jaarverslag.",
+        "citations": [{"source_id": 1, "quote": "p. 12"}]})
     a = r.get_json()
     eis(r.status_code == 201 and a["status"] == "voorgesteld",
-        f"argument landt als 'voorgesteld' ({a.get('status')})")
+        f"argument (mét bron) landt als 'voorgesteld' ({a.get('status')})")
     arg1 = a["id"]
     s = c.get("/api/scores").get_json()
     eis(s["relations_detail"]["1"]["bron"] == "prior",
         "voorgesteld argument telt niet mee (R1 blijft op de prior)")
     r = c.get(f"/api/arguments/{arg1}/score_diff")
     d = r.get_json()
-    eis(r.status_code == 200 and d["doelstatus"] == "bronvermelding_nodig"
+    eis(r.status_code == 200 and d["doelstatus"] == "ongecontroleerd"
         and any(x["categorie"] == "relatie" and x["id"] == "1" or x["id"] == 1
                 for x in d["diff"]),
         "score-diff-preview toont de merge-impact vooraf")
@@ -105,16 +111,26 @@ def main():
     eis(r.status_code == 403, f"agent (bijdrager) mag niet mergen ({r.status_code})")
     r = c.post(f"/api/arguments/{arg1}/merge", headers=kop["bij"])
     j = r.get_json()
-    eis(r.status_code == 200 and j["status"] == "bronvermelding_nodig",
-        "M2.1: filterrol (bij = reviewer voor 'eigendom') mag deze merge; "
-        "citatiepoort geldt op het merge-moment")
+    eis(r.status_code == 200 and j["status"] == "ongecontroleerd",
+        "M2.1: filterrol (bij = reviewer voor 'eigendom') mag deze merge")
     eis(j["self_merged"] is True, "zelf-merge wordt gevlagd (auteur = merger)")
     s = c.get("/api/scores").get_json()
     eis(s["relations_detail"]["1"]["bron"] == "bewijs", "na merge telt het argument mee")
 
-    print("2. M2.1 — zelf-verificatie technisch onmogelijk")
+    print("2. M2.1 — zelf-verificatie onmogelijk (+ zachte merge-poort voor legacy)")
+    # Legacy-backstop: een historische ongesourcete root (via de API niet meer te maken)
+    # krijgt bij merge de zachte poort — status 'bronvermelding_nodig' (score-straf).
+    con = sqlite3.connect(tmp)
+    con.execute("""INSERT INTO arguments (id, relation_id, stance, claim, status,
+                   contributed_by) VALUES (9902, 1, 'supporting',
+                   'Legacy-claim zonder bron.', 'voorgesteld', 'bij')""")
+    con.commit()
+    con.close()
+    r = c.post("/api/arguments/9902/merge", headers=kop["r1"])
+    eis(r.status_code == 200 and r.get_json()["status"] == "bronvermelding_nodig",
+        "legacy ongesourcete root krijgt bij merge de zachte poort (bronvermelding_nodig)")
     r = c.post("/api/citations", headers=kop["bij"],
-               json={"argument_id": arg1, "source_id": 1, "quote": "p. 12"})
+               json={"argument_id": 9902, "source_id": 1, "quote": "p. 12"})
     eis(r.status_code == 201 and r.get_json()["argument_status"] == "ongecontroleerd",
         "citatie promoveert bronvermelding_nodig → ongecontroleerd")
     r = c.patch(f"/api/arguments/{arg1}/status", headers=kop["bij"],
@@ -126,12 +142,13 @@ def main():
 
     print("3. M2.4 — duplicaatdetectie")
     r = c.post("/api/arguments", headers=kop["bij"], json={
-        "relation_id": 1, "stance": "supporting", "claim": "R1 blijkt uit het jaarverslag!"})
+        "relation_id": 1, "stance": "supporting", "claim": "R1 blijkt uit het jaarverslag!",
+        "citations": [{"source_id": 1, "quote": "q"}]})
     eis(r.status_code == 409 and r.get_json().get("duplicaat_kandidaten"),
         "vrijwel identieke claim wordt gesignaleerd (409 + kandidaten)")
     r = c.post("/api/arguments", headers=kop["bij"], json={
         "relation_id": 1, "stance": "supporting", "claim": "R1 blijkt uit het jaarverslag!",
-        "negeer_duplicaten": True})
+        "citations": [{"source_id": 1, "quote": "q"}], "negeer_duplicaten": True})
     eis(r.status_code == 201, "negeer_duplicaten dient alsnog in")
     arg_dup = r.get_json()["id"]
 
@@ -506,7 +523,8 @@ def main():
     rfc = {"soort": "nieuw_theorie_element", "titel": "Herzien-test", "payload": {
         "element_type": "mechanisme", "naam": "herzien_mech", "definitie": "d", "filter": "eigendom",
         "effect": "e", "aard": "direct", "afgrenzing": "a", "falsificatiecriterium": "f", "freeze_test": "ft",
-        "instantiaties": [{"relation_id": 1, "toelichting": "t"}], "bronnen": [{"titel": "b"}]}}
+        "instantiaties": [{"source_id": 1, "target_id": 2, "relation_type": "eigendom",
+                           "toelichting": "t"}], "bronnen": [{"titel": "b"}]}}
     vid = c.post("/api/voorstellen", headers=kop["bij"], json=rfc).get_json()["id"]
     eis(c.post(f"/api/voorstellen/{vid}/reviews", headers=kop["r1"],
                json={"oordeel": "afwijzen", "motivatie": "nee"}).get_json()["besluit"] == "afgewezen",

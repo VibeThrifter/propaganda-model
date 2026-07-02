@@ -4,52 +4,40 @@
 <meta charset="utf-8">
 <title>Overleg — Propagandamodel</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/huisstijl.css">
+<script src="/static/huisstijl.js"></script>
 <style>
-:root {
-  --bg: #0a0a0f; --bg-card: rgba(24,24,36,0.85); --bg-hover: rgba(40,40,60,0.6);
-  --border: rgba(255,255,255,0.10); --text: #e8e8f0; --text-dim: #8888a0;
-  --text-muted: #5a5a70; --accent: #6c8aff; --goud: #e3b341;
-}
-* { box-sizing: border-box; }
 html, body { height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column;
-       font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
-header { display: flex; align-items: center; gap: 16px; padding: 12px 20px;
-         border-bottom: 1px solid var(--border); flex-shrink: 0; }
-header h1 { font-size: 16px; margin: 0; }
-.spacer { margin-left: auto; }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-.tabs { display: flex; gap: 4px; }
-.tab { padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text-dim);
-       border: 1px solid transparent; }
-.tab:hover { background: var(--bg-hover); color: var(--text); }
-.tab.actief { background: color-mix(in srgb, var(--goud) 16%, transparent); color: var(--text);
-              border-color: color-mix(in srgb, var(--goud) 40%, transparent); }
-.tab .badge { font-size: 10px; padding: 0 5px; margin-left: 5px; border-radius: 8px;
-              background: color-mix(in srgb, var(--goud) 22%, transparent); color: var(--goud); }
-.chip { font-size: 12px; color: var(--text-dim); border: 1px solid var(--border);
-        border-radius: 10px; padding: 3px 10px; }
-button { padding: 7px 14px; border: 1px solid var(--border); border-radius: 7px;
-         background: rgba(0,0,0,.3); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
-button:hover { filter: brightness(1.15); }
-button.akkoord { background: #1f7a44; border: none; color: #fff; }
-button.afwijzen { background: #7a2f2f; border: none; color: #fff; }
-button.prim { background: var(--accent); border: none; color: #fff; }
+body { display: flex; flex-direction: column; }
+/* De topbal scrollt hier niet mee (eigen paneel-layout met interne scroll). */
+header.topbal { position: static; }
 #tab-overleg { flex: 1; display: flex; min-height: 0; }
 #tab-overleg.verborgen, #tab-voorstellen.verborgen, #tab-bronnen.verborgen { display: none; }
 /* — Overleg (threads) — */
 #oIndex { width: 340px; flex-shrink: 0; border-right: 1px solid var(--border);
           display: flex; flex-direction: column; min-height: 0; }
-#oZoek { margin: 10px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
-         background: var(--bg-card); color: var(--text); font: inherit; font-size: 12px; }
+/* Eén filterzone (W3.4): twee rijen, daaronder meteen de lijst. */
+#oBalk { display: flex; flex-direction: column; gap: 7px; padding: 10px 10px 9px;
+         border-bottom: 1px solid var(--border); }
+.obalk-rij { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+#oZoek { flex: 1; min-width: 120px; margin: 0; padding: 6px 10px; border-radius: 8px;
+         border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
+         font: inherit; font-size: 12px; }
+#oBalk select { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 5px 6px;
+         border-radius: 7px; border: 1px solid var(--border); background: var(--bg-card);
+         color: var(--text-dim); }
+#oBalk select:hover { color: var(--text); border-color: var(--border-light); }
+#oFilterDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+         border: 1px solid var(--border); }
 #oLijst { overflow-y: auto; padding: 0 6px 14px; flex: 1; }
+.lijst-legenda { display: flex; align-items: center; gap: 5px; font-size: 10.5px;
+         color: var(--text-muted); padding: 8px 8px 2px; }
 .groep-kop { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted);
              padding: 10px 8px 4px; position: sticky; top: 0; background: var(--bg); }
 .t-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
           font-size: 12px; color: var(--text-dim); cursor: pointer; }
 .t-item:hover { background: rgba(255,255,255,.06); color: var(--text); }
-.t-item.actief { background: color-mix(in srgb, var(--goud) 16%, transparent); color: var(--text); }
+.t-item.actief { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
 .t-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t-n { font-size: 10px; padding: 0 6px; border-radius: 8px; flex-shrink: 0; font-variant-numeric: tabular-nums;
        background: rgba(255,255,255,.08); color: var(--text-muted); }
@@ -74,14 +62,35 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .fchip.open-chip { margin-left: auto; color: var(--goud); border-color: color-mix(in srgb, var(--goud) 35%, transparent); }
 .fchip.open-chip.actief { background: color-mix(in srgb, var(--goud) 18%, transparent); color: var(--goud); }
 .filter-chips.toolbar { padding-top: 2px; border-bottom: 1px solid var(--border); margin-bottom: 8px; padding-bottom: 10px; }
+#oPaneel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 #oDetail { flex: 1; overflow-y: auto; padding: 20px 26px; min-width: 0; }
+/* W4.3: onder ~800px zijn lijst en gesprek twee schermen; de klasse .m-detail op
+   #tab-overleg kiest welk scherm zichtbaar is (desktop negeert haar — de media query
+   beperkt de werking). De terugbalk bestaat alleen op het gesprek-scherm. */
+#oTerugBalk { display: none; flex-shrink: 0; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+#oTerugBalk button { background: none; border: none; color: var(--accent); font: inherit;
+  font-size: 13px; cursor: pointer; padding: 5px 9px; border-radius: 6px; }
+#oTerugBalk button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+@media (max-width: 800px) {
+  #oIndex { width: auto; flex: 1 1 auto; border-right: none; }
+  #tab-overleg.m-detail #oIndex,
+  #tab-overleg:not(.m-detail) #oPaneel { display: none; }
+  #oTerugBalk { display: flex; }
+  #oDetail { padding: 14px 14px 22px; }
+}
 /* argumentboom */
 .arg { position: relative; border-left: 2px solid var(--border); padding: 6px 0 6px 14px; margin: 6px 0; }
 /* tak-connector: verbindt de verticale ruggengraat van de ouder met elke reactie eronder,
    zodat de boomstructuur leesbaar wordt (een reageer-knop bouwt zichtbaar een tak). */
 .arg .arg::before { content: ''; position: absolute; left: -16px; top: 15px; width: 14px; height: 2px;
   background: var(--border); }
+/* Rustige knoop (W3.2): kop = inhoud + één ⋯-knop rechts; acties zitten in het menu.
+   De flex-layout geldt alleen mét tekst-wrapper (de read-only renderers houden de
+   gewone inline kop). */
 .arg-kop { font-size: 13.5px; }
+.arg-kop:has(> .arg-kop-tekst) { display: flex; align-items: flex-start; gap: 8px; }
+.arg-kop-tekst { flex: 1; min-width: 0; }
+/* ⋯-knopstijl (.hs-menu-knop) komt uit de huisstijl — gedeeld met de viz-boom (W3.2b). */
 .stance { font-weight: 700; }
 .arg-reden { font-size: 12.5px; color: var(--text-dim); margin: 3px 0; white-space: pre-wrap; }
 .arg-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
@@ -97,7 +106,6 @@ button.prim { background: var(--accent); border: none; color: #fff; }
              border: 1px solid color-mix(in srgb, #e0a23a 35%, transparent); border-radius: 8px;
              padding: 6px 10px; margin: 2px 0 10px; }
 .bronbadge code { background: rgba(0,0,0,.3); padding: 1px 4px; border-radius: 4px; }
-.reageer-link { font-size: 11px; color: var(--accent); cursor: pointer; margin-left: 8px; }
 /* oordeel-paar: ✓ Logica klopt / ✗ Logica klopt niet — gebalanceerd, samen, even zwaar */
 .oordeel-rij { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11px; flex-wrap: wrap; }
 .oordeel { padding: 2px 10px; border-radius: 9px; border: 1px solid var(--border); font-variant-numeric: tabular-nums; }
@@ -108,39 +116,20 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .oordeel.oneens { color: #e0635f; border-color: color-mix(in srgb, #e0635f 32%, transparent); }
 .oordeel.oneens.knop:hover { background: color-mix(in srgb, #e0635f 14%, transparent); }
 .oordeel.stat { opacity: .7; }
-/* bewijs-bar: twee richtinggevende acties (vóór/tegen), los van het oordeel-paar.
-   De richting zit in label én kleur, niet in losse uitleg-tekst. */
-.reageer-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; flex-wrap: wrap; }
+/* neutrale actieknop (o.a. '+ bron toevoegen' in het citatie-formulier) */
 .reageer-knop { font-size: 11px; cursor: pointer; padding: 2px 10px; border-radius: 9px;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); user-select: none; }
 .reageer-knop:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.reageer-knop.voor { border-color: color-mix(in srgb, #3ddc84 45%, transparent); color: #3ddc84; }
-.reageer-knop.voor:hover { background: color-mix(in srgb, #3ddc84 14%, transparent); }
-.reageer-knop.tegen { border-color: color-mix(in srgb, #e0635f 45%, transparent); color: #e0635f; }
-.reageer-knop.tegen:hover { background: color-mix(in srgb, #e0635f 14%, transparent); }
 .reply-kruimel { font-size: 11px; color: var(--text-muted); margin: 2px 0 8px; line-height: 1.4; }
 .reply-kruimel b { color: var(--text-dim); font-weight: 600; }
-/* statusbadge + inline acties (Fase A–C): poort & revisie zichtbaar in de thread */
-.statusbadge { font-size: 10px; padding: 0 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle;
-  background: rgba(255,255,255,.07); color: var(--text-muted); }
-.statusbadge.voorgesteld { background: color-mix(in srgb, var(--goud) 20%, transparent); color: var(--goud); }
-.statusbadge.betwist { background: rgba(224,99,95,.16); color: #e0635f; }
-.statusbadge.geverifieerd { background: rgba(61,220,132,.14); color: #3ddc84; }
-.statusbadge.bronvermelding_nodig { background: rgba(224,162,58,.14); color: #e0a23a; }
-.statusbadge.vervangen { text-decoration: line-through; }
-.arg-acties { display: flex; gap: 10px; margin: 4px 0 2px; flex-wrap: wrap; }
-.arg-acties span { font-size: 11px; color: var(--accent); cursor: pointer; }
-.arg-acties span:hover { text-decoration: underline; }
-.arg-acties span.gevaar { color: #e0635f; }
+/* statusbadge (basis in huisstijl.css): poort & revisie zichtbaar in de thread */
+.statusbadge { margin-left: 6px; }
 .arg.vervangen-arg { opacity: .55; }
 .arg.dit-voorstel { background: color-mix(in srgb, var(--accent) 10%, transparent); border-left-color: var(--accent); }
 .reviewthread { border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px; margin: 8px 0 4px;
   background: rgba(0,0,0,.18); }
 .reviewthread .kop { font-size: 11px; color: var(--text-muted); margin: 4px 0; }
 .revisie-noot { font-size: 12px; color: var(--accent); margin: 2px 0 6px; }
-.feedback-box { font-size: 12px; color: var(--text-dim); background: rgba(224,99,95,.08);
-  border: 1px solid color-mix(in srgb, #e0635f 28%, transparent); border-radius: 8px;
-  padding: 6px 10px; margin: 6px 0; white-space: pre-wrap; }
 /* ratings (community-notes-laag, M2.5): mens telt, agent = advies */
 .ratings { display: flex; gap: 8px; align-items: center; margin: 5px 0 2px; font-size: 11.5px; }
 .rate-tel, .rate-knop { color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -158,6 +147,25 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .graaf-link:hover { text-decoration: underline; }
 .context-link { font-size: 11px; color: var(--accent); text-decoration: none; margin-left: 8px; }
 .context-link:hover { text-decoration: underline; }
+/* startkaart (W3.1): het rechtervlak verwelkomt i.p.v. leeg te staren */
+.start-kaart { max-width: 700px; }
+.start-kaart h2 { font-size: 16px; margin: 0 0 6px; }
+.start-intro { font-size: 13px; color: var(--text-muted); margin: 0 0 20px; max-width: 62ch; }
+.start-sectie { margin: 0 0 22px; }
+.start-sectie .vlabel { display: flex; align-items: center; gap: 4px; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-bottom: 7px; }
+.start-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.start-chips .fchip { font-size: 12px; padding: 5px 12px; }
+.wacht-n { font-size: 10.5px; padding: 0 6px; border-radius: 8px; font-variant-numeric: tabular-nums;
+  background: rgba(255,255,255,.08); color: var(--text-muted); }
+.wacht-n.open { background: color-mix(in srgb, var(--goud) 22%, transparent); color: var(--goud); }
+.start-item { display: block; padding: 7px 9px; border-radius: 6px; cursor: pointer; }
+.start-item:hover { background: rgba(255,255,255,.06); }
+.start-item .si-claim { font-size: 12.5px; color: var(--text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.start-item:hover .si-claim { color: var(--text); }
+.start-item .si-meta { font-size: 10.5px; color: var(--text-muted); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* doel-badge: over wélk element gaat dit argument — prominent boven de bewering */
 .doel-badge { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
   font-size: 12px; margin: 2px 0 8px; padding: 4px 10px; border-radius: 8px;
@@ -169,21 +177,15 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .doel-badge .doel-reply { color: var(--text-muted); font-style: italic; }
 .doel-badge .doel-graaf { font-size: 11px; color: var(--accent); text-decoration: none; }
 .doel-badge .doel-graaf:hover { text-decoration: underline; }
-/* formulier */
-.form { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
-        padding: 14px 16px; margin-top: 16px; }
-.form h4 { margin: 0 0 10px; font-size: 13px; }
-.form label { display: block; font-size: 11px; color: var(--text-dim); margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
-.form input, .form textarea, .form select { width: 100%; padding: 7px 9px; border-radius: 7px;
-        border: 1px solid var(--border); background: rgba(0,0,0,.3); color: var(--text); font: inherit; font-size: 13px; }
-.form textarea { min-height: 56px; resize: vertical; }
+/* formulier (basis in huisstijl.css) */
+.form { margin-top: 16px; }
 .stance-kies { display: flex; gap: 6px; }
 .stance-kies button { flex: 1; }
-.stance-kies button.sel-sup { background: #1f7a44; border: none; color: #fff; }
-.stance-kies button.sel-con { background: #7a2f2f; border: none; color: #fff; }
-.stance-kies button.sel-ctx { background: #4a4a66; border: none; color: #fff; }
+.stance-kies button.sel-sup { background: var(--knop-groen); border-color: transparent; color: #fff; }
+.stance-kies button.sel-con { background: var(--knop-rood); border-color: transparent; color: #fff; }
+.stance-kies button.sel-ctx { background: var(--knop-context); border-color: transparent; color: #fff; }
 .stance-kies.vast { display: block; }
-.stance-vast { display: inline-block; background: #7a2f2f; color: #fff; font-size: 12px;
+.stance-vast { display: inline-block; background: var(--knop-rood); color: #fff; font-size: 12px;
   font-weight: 600; padding: 4px 12px; border-radius: 6px; }
 .rij2 { display: flex; gap: 10px; }
 .rij2 > div { flex: 1; }
@@ -196,7 +198,7 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .bron-optie:hover { background: rgba(255,255,255,.07); }
 .bron-optie.nieuw { color: var(--goud); font-weight: 600; }
 .bron-leeg { padding: 7px 9px; font-size: 12px; color: var(--text-muted); }
-.melding { font-size: 12px; margin-top: 8px; min-height: 1em; }
+.melding { margin-top: 8px; }
 /* — Voorstellen (review) — */
 #tab-voorstellen, #tab-bronnen { flex: 1; overflow-y: auto; }
 .vsegment { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 16px; border-radius: 11px;
@@ -204,14 +206,13 @@ button.prim { background: var(--accent); border: none; color: #fff; }
 .vpil { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim);
   padding: 6px 14px; border-radius: 8px; cursor: pointer; user-select: none; }
 .vpil:hover { color: var(--text); }
-.vpil.actief { background: color-mix(in srgb, var(--goud) 16%, transparent); color: var(--text);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--goud) 30%, transparent); }
+.vpil.actief { background: color-mix(in srgb, var(--accent) 17%, transparent); color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 .vpil-n { font-size: 11px; padding: 1px 7px; border-radius: 8px; background: rgba(255,255,255,.08);
   color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.vpil.actief .vpil-n { color: var(--goud); background: color-mix(in srgb, var(--goud) 18%, transparent); }
+.vpil.actief .vpil-n { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 main { max-width: 880px; margin: 0 auto; padding: 22px; }
-h2.sectie { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); margin: 22px 0 12px; }
-.kaart { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
+.kaart { padding: 18px 20px; }
 /* Wachtrij-item + agent-advies ernaast (reviewbeoordelaar; los van het model, telt niet mee) */
 .kaart-rij { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; }
 .kaart-rij > .kaart { flex: 1 1 460px; min-width: 0; margin-bottom: 0; }
@@ -244,45 +245,50 @@ h2.sectie { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; c
 .bronsug-bron { margin-top: 9px; font-size: 10px; color: var(--text-muted); }
 .soort { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--goud); }
 .kaart h3 { font-size: 15px; margin: 4px 0 6px; }
-.meta { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.meta { margin-bottom: 10px; }
 .veld { margin: 10px 0; }
 .veld .vlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-bottom: 2px; }
 .veld .vwaarde { font-size: 13px; white-space: pre-wrap; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .tag { font-size: 11px; padding: 2px 9px; border-radius: 9px; background: rgba(255,255,255,.06); color: var(--text-dim); }
 ul.lijst { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
-.acties { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
-.uitslag { font-size: 12px; min-height: 1em; }
-.banner { background: rgba(240,160,48,.12); border: 1px solid color-mix(in srgb, #f0a030 40%, transparent);
-          border-radius: 9px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
-.leeg { color: var(--text-muted); font-size: 13px; padding: 8px; }
-code { background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.acties { margin-top: 14px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Overleg</h1>
-  <a href="/" title="Terug naar de netwerkvisualisatie">← Netwerk</a>
-  <div class="tabs">
-    <div class="tab actief" id="tabOverleg" onclick="kiesTab('overleg')">Threads</div>
-    <div class="tab" id="tabVoorstellen" onclick="kiesTab('voorstellen')">Voorstellen<span class="badge" id="vBadge" style="display:none">0</span></div>
-    <div class="tab" id="tabBronnen" onclick="kiesTab('bronnen')">Bronnen</div>
+<header class="topbal" data-actief="overleg">
+  <div class="topbal-slot">
+    <div class="tabs">
+      <div class="tab actief" id="tabOverleg" onclick="kiesTab('overleg')">Threads</div>
+      <div class="tab" id="tabVoorstellen" onclick="kiesTab('voorstellen')">Voorstellen<span class="badge" id="vBadge" style="display:none">0</span></div>
+      <div class="tab" id="tabBronnen" onclick="kiesTab('bronnen')">Bronnen</div>
+    </div>
+    <button class="icoon" onclick="ververs()" title="Alles opnieuw laden" aria-label="Alles opnieuw laden">↻</button>
   </div>
-  <span class="spacer"></span>
-  <button onclick="ververs()" title="Verversen">Ververs</button>
-  <span class="chip" id="authChip">…</span>
 </header>
 
 <div id="tab-overleg">
   <div id="oIndex">
-    <input type="text" id="oZoek" placeholder="Zoek in threads…" autocomplete="off" spellcheck="false">
-    <div id="oSoort" class="filter-chips toolbar"></div>
-    <div id="oFilters" class="filter-chips"></div>
+    <!-- Eén compacte zoek-en-filterzone (W3.4): rij 1 = zoeken + alleen-open,
+         rij 2 = soort- en filterkeuze. Zelfde state/gedrag als de oude chip-lagen. -->
+    <div id="oBalk">
+      <div class="obalk-rij">
+        <input type="text" id="oZoek" placeholder="Zoek in threads…" autocomplete="off" spellcheck="false">
+        <span class="fchip open-chip" id="oOpenChip" onclick="toggleAlleenOpen()"
+              title="Alleen threads met open (voorgestelde) argumenten">● open</span>
+      </div>
+      <div class="obalk-rij">
+        <select id="oSoortSel" onchange="kiesSoort(this.value)" aria-label="Soort element"></select>
+        <span class="fdot" id="oFilterDot"></span>
+        <select id="oFilterSel" onchange="kiesFilter(this.value)" aria-label="Propagandafilter"></select>
+      </div>
+    </div>
     <div id="oLijst">Laden…</div>
   </div>
-  <div id="oDetail">
-    <div style="color:var(--text-muted);font-size:13px;padding:24px 4px">
-      Kies links een relatie, entiteit, rol, mechanisme of emergent veld om de thread (argumentboom) rustig te lezen — of voeg er een argument aan toe.
+  <div id="oPaneel">
+    <div id="oTerugBalk"><button type="button" onclick="oTerug()" title="Terug naar de threadlijst">← Alle threads</button></div>
+    <div id="oDetail">
+      <div style="color:var(--text-muted);font-size:13px;padding:24px 4px">Laden…</div>
     </div>
   </div>
 </div>
@@ -489,9 +495,10 @@ async function classificeerBron(id) {
     setTimeout(tekenBronnen, 700);
   } catch (e) { msg.innerHTML = `<span style="color:#e0635f">${esc(e.message)}</span>`; }
 }
-function ververs() {
+async function ververs() {
   if (document.getElementById('tab-voorstellen').classList.contains('verborgen')) {
-    laadIndex(); if (huidig) toonThread(huidig.param, huidig.id, huidig.label);
+    await laadIndex();
+    if (huidig) toonThread(huidig.param, huidig.id, huidig.label); else toonStartkaart();
   } else { laadVoorstellen(); }
 }
 
@@ -501,19 +508,15 @@ async function init() {
     const meResp = await fetch('/api/me');
     ME = meResp.ok ? await meResp.json() : null;
   } catch (e) { ME = null; }
-  document.getElementById('authChip').innerHTML = ME
-    ? `<a href="/werkbank" title="Mijn werkbank: eigen ingediend werk + feedback">Werkbank</a>`
-      + (ME.role === 'maintainer' ? ` · <a href="/beheer" title="Accountbeheer: rollen &amp; accounts">Beheer</a>` : '')
-      + ` · <a href="/account">${esc(ME.username)} (${esc(ME.role)})</a>`
-    : `<a href="/login">Inloggen</a>`;
   try { ROLLEN = await (await fetch('/api/roles')).json(); } catch (e) { ROLLEN = []; }
   try { BRIDGING = await (await fetch('/api/bridging')).json(); } catch (e) { BRIDGING = null; }
   laadVoorstellenBadge();
-  // Routing: /overleg/voorstel/<id> = eigen voorstel-pagina; #<param>=<id> = thread-permalink.
+  // Routing: /overleg/voorstel/<id> = eigen voorstel-pagina; #<param>=<id> = thread-permalink;
+  // zonder permalink verwelkomt de startkaart (W3.1).
   const vid = huidigeVoorstelId();
   if (vid != null) { toonVoorstelPagina(vid); laadIndex(); return; }  // index op achtergrond klaar
   await laadIndex();
-  if (location.hash) leesHash();
+  if (!location.hash || !(await leesHash())) toonStartkaart();
 }
 
 // ── Overleg: index ──
@@ -524,6 +527,18 @@ async function laadIndex() {
     const resp = await fetch('/api/discussion_index');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     indexData = await resp.json();
+    // Leesbare namen (W2.3): rollen/mechanismen komen als snake_case uit de API.
+    // Toon de weergavenaam (shared_vocab.weergaveNaam); de ruwe naam blijft in
+    // .zoek zodat zoeken op beide werkt. Relatie-labels dragen het relatietype
+    // tussen haakjes — alleen dat staartje wordt leesbaar gemaakt.
+    ['rollen', 'mechanismen'].forEach(k => (indexData[k] || []).forEach(it => {
+      it.zoek = it.label;
+      it.label = weergaveNaam(it.label);
+    }));
+    (indexData.relaties || []).forEach(it => {
+      it.label = it.label.replace(/\(([a-z0-9_]+)\)$/,
+        (m, t) => '(' + weergaveNaam(t).toLowerCase() + ')');
+    });
     tekenToolbar();
     tekenLijst(document.getElementById('oZoek').value);
   } catch (e) {
@@ -533,9 +548,13 @@ async function laadIndex() {
 function itemHtml(it, param) {
   const act = (huidig && huidig.param === param && huidig.id === it.id) ? ' actief' : '';
   const lab = JSON.stringify(it.label).replace(/"/g, '&quot;');
+  // Telling legt zichzelf uit (W3.3): totaal argumenten · waarvan nog 'voorgesteld'
+  // (goud = open werk); de legenda boven de lijst geeft dezelfde sleutel.
+  const uitleg = `${it.n} argument(en) in deze thread` +
+    (it.n_open ? ` · ${it.n_open} nog voorgesteld (wacht op review, telt nog niet mee)` : '');
   return `<div class="t-item${act}" onclick="toonThread('${param}',${it.id},${lab})">` +
     `<span class="t-label" title="${esc(it.label)}">${esc(it.label)}</span>` +
-    `<span class="t-n${it.n_open ? ' open' : ''}" title="${it.n} argument(en)${it.n_open ? ', ' + it.n_open + ' open' : ''}">` +
+    `<span class="t-n${it.n_open ? ' open' : ''}" title="${esc(uitleg)}">` +
     `${it.n}${it.n_open ? '·' + it.n_open : ''}</span></div>`;
 }
 // Volgorde van filterwaarden zoals ze in de data voorkomen (canoniek eerst).
@@ -545,39 +564,49 @@ function filterVolgordeUit(keys) {
     .concat(keys.filter(fk => !gezien.has(fk)).sort());
 }
 
-// Toolbar: soort-chips (groep) + "alleen open", en eronder de filter-chips.
+// Filterzone (W3.4): één compacte balk — rij 1 zoeken + '● open', rij 2 de soort-
+// en filter-select. Zelfde state en gedrag als de oude chip-lagen (actiefSoort/
+// actiefFilter/alleenOpen); de accordeons (soort → filter) in de lijst blijven.
 function tekenToolbar() {
   if (!indexData) return;
-  const soortEl = document.getElementById('oSoort');
-  let sh = `<span class="fchip${actiefSoort == null ? ' actief' : ''}" onclick="kiesSoort('__alle__')">Alle soorten</span>`;
+  document.getElementById('oOpenChip').classList.toggle('actief', alleenOpen);
+
+  const soortSel = document.getElementById('oSoortSel');
+  let sh = `<option value="__alle__">Alle soorten</option>`;
   GROEPEN.forEach(([key, titel]) => {
     const n = (indexData[key] || []).length;
     if (!n) return;  // lege groepen (bv. entiteiten) tonen we niet
-    sh += `<span class="fchip${actiefSoort === key ? ' actief' : ''}" onclick="kiesSoort('${key}')">` +
-      `${esc(titel)} <span class="fc-n">${n}</span></span>`;
+    sh += `<option value="${key}">${esc(titel)} (${n})</option>`;
   });
-  sh += `<span class="fchip open-chip${alleenOpen ? ' actief' : ''}" onclick="toggleAlleenOpen()" ` +
-    `title="Alleen threads met open (voorgestelde) argumenten">● open</span>`;
-  soortEl.innerHTML = sh;
+  soortSel.innerHTML = sh;
+  soortSel.value = actiefSoort == null ? '__alle__' : actiefSoort;
 
-  // Filter-chips alleen tonen als een filterdragende soort in beeld is.
-  const filterEl = document.getElementById('oFilters');
+  // Filterkeuze alleen tonen als een filterdragende soort in beeld is.
+  const filterSel = document.getElementById('oFilterSel');
+  const dot = document.getElementById('oFilterDot');
   const toonFilters = actiefSoort == null || actiefSoort === 'relaties' || actiefSoort === 'mechanismen';
-  if (!toonFilters) { filterEl.style.display = 'none'; filterEl.innerHTML = ''; return; }
-  filterEl.style.display = '';
+  filterSel.style.display = toonFilters ? '' : 'none';
+  dot.style.display = toonFilters ? '' : 'none';
+  if (!toonFilters) return;
   const fset = new Set();
   GROEPEN.forEach(([key, , , perFilter]) => {
     if (!perFilter || (actiefSoort != null && key !== actiefSoort)) return;
     (indexData[key] || []).forEach(it => fset.add(it.filter || ''));
   });
   const fs = filterVolgordeUit([...fset]);
-  let fh = `<span class="fchip${actiefFilter == null ? ' actief' : ''}" onclick="kiesFilter('__alle__')">Alle filters</span>`;
+  let fh = `<option value="__alle__">Alle filters</option>`;
   fs.forEach(fk => {
-    fh += `<span class="fchip${actiefFilter === fk ? ' actief' : ''}" onclick="kiesFilter('${fk}')">` +
-      `<span class="fdot" style="background:${FILTER_KLEUR[fk] || FILTER_KLEUR['']}"></span>` +
-      `${esc(FILTER_LABEL[fk] != null ? FILTER_LABEL[fk] : fk)}</span>`;
+    fh += `<option value="${fk}">${esc(FILTER_LABEL[fk] != null ? FILTER_LABEL[fk] : fk)}</option>`;
   });
-  filterEl.innerHTML = fh;
+  filterSel.innerHTML = fh;
+  filterSel.value = actiefFilter == null ? '__alle__' : actiefFilter;
+  // Het gekozen filter komt na een soortwissel mogelijk niet meer voor → terug naar alle.
+  if (filterSel.value !== (actiefFilter == null ? '__alle__' : actiefFilter)) {
+    actiefFilter = null;
+    filterSel.value = '__alle__';
+  }
+  // Kleurdot naast de select spiegelt het gekozen filter (kleurcode uit de graaf).
+  dot.style.background = actiefFilter != null ? (FILTER_KLEUR[actiefFilter] || FILTER_KLEUR['']) : 'transparent';
 }
 
 function kiesSoort(key) {
@@ -606,12 +635,17 @@ function tekenLijst(filter) {
   if (!indexData) return;
   const f = (filter || '').toLowerCase().trim();
   const zoekt = !!f;
+  // Legenda (W3.3): de badge-telling is informatie, geen geheimtaal.
+  const legenda = `<div class="lijst-legenda"><span class="t-n open">7·2</span>` +
+    `<span>= 7 argumenten · 2 open</span>` +
+    `<button type="button" class="uitleg" aria-label="Uitleg telling" data-uitleg="Elke thread draagt een telling: het eerste getal is het totaal aantal argumenten op dat element, het tweede hoeveel daarvan nog 'voorgesteld' zijn — die wachten op review en tellen nog nergens in mee. Goud = open werk. De filterkeuze hierboven met '● open' toont alleen threads met zulk open werk.">ⓘ</button></div>`;
   let h = '';
   GROEPEN.forEach(([key, titel, param, perFilter]) => {
     if (actiefSoort != null && key !== actiefSoort) return;          // soortfilter
     if (actiefFilter != null && !perFilter) return;                 // filter geldt alleen voor filterdragers
     let items = (indexData[key] || []);
-    if (f) items = items.filter(it => it.label.toLowerCase().includes(f));
+    if (f) items = items.filter(it => it.label.toLowerCase().includes(f)
+      || (it.zoek && it.zoek.toLowerCase().includes(f)));
     if (alleenOpen) items = items.filter(it => it.n_open > 0);
     if (actiefFilter != null && perFilter) items = items.filter(it => (it.filter || '') === actiefFilter);
     if (!items.length) return;
@@ -636,7 +670,7 @@ function tekenLijst(filter) {
       h += items.map(it => itemHtml(it, param)).join('');
     }
   });
-  lijst.innerHTML = h || '<div class="leeg">Niets gevonden.</div>';
+  lijst.innerHTML = legenda + (h || '<div class="leeg">Niets gevonden.</div>');
 }
 
 // ── Overleg: thread ──
@@ -672,55 +706,97 @@ function statusBadge(a) {
   const lab = a.status || '';
   return ` <span class="statusbadge ${esc(lab)}" title="verificatiestatus (de poort)">${esc(lab)}</span>`;
 }
-// Inline acties in de thread (Fase A–C): zo handel je vanuit de context zonder naar het
-// Voorstellen-tabblad te springen. De server is de echte poort (gate); deze knoppen
-// volgen de globale rol als hint — een 403 wordt netjes gemeld.
-function argActies(a, ck) {
+// Acties per argument (W3.2): in rust toont een knoop alleen het oordeel-paar en één
+// ⋯-menu; alle overige acties zitten in dat menu (hsMenu, huisstijl). De server is de
+// echte poort (gate); de items volgen de rol als hint — een 403 wordt netjes gemeld.
+function argMenuItems(a, ck) {
   ck = ck || '';
-  if (!ME || a.vervangen) return '';
+  if (!ME || a.vervangen) return [];
   // Afgewezen-context: de argumenten zijn mee-afgewezen (verworpen). De enige zinvolle
   // actie is verbeteren & heropenen (verworpen → voorgesteld) — maintainer-werk. Een
   // maintainer schaaft agent-/eigen werk bij; andermans menswerk heropent hij ongewijzigd.
   if (ck.startsWith('afg-')) {
-    if (ME.role !== 'maintainer') return '';
-    // Eerste klik = een groene 'Verbeteren'-knop die het bewerkformulier opent; onderaan dat
-    // formulier sluit je af met 'Heropenen' (verworpen → voorgesteld). Andermans menswerk
-    // herschrijf je niet → dan alleen direct 'Heropenen' (ongewijzigd).
-    const klein = 'padding:3px 11px;font-size:11px';
+    if (ME.role !== 'maintainer') return [];
     if (a.status === 'verworpen') {
       const magBewerk = a.auteur_is_agent || a.contributed_by === ME.username;
       return magBewerk
-        ? `<div class="arg-acties"><button class="akkoord" style="${klein}" onclick="bewerkArg(${a.id},'${ck}','heropen')" title="dit argument verbeteren; onderaan het formulier heropen je het (verworpen → voorgesteld)">Verbeteren</button></div>`
-        : `<div class="arg-acties"><button style="${klein}" onclick="heropenArgT(${a.id},'${ck}')" title="ongewijzigd heropenen; andermans menswerk herschrijf je niet — de auteur herziet zelf">Heropenen</button></div>`;
+        ? [{ label: 'Verbeteren & heropenen…', onClick: () => bewerkArg(a.id, ck, 'heropen'),
+             titel: 'dit argument verbeteren; onderaan het formulier heropen je het (verworpen → voorgesteld)' }]
+        : [{ label: 'Heropenen (ongewijzigd)', onClick: () => heropenArgT(a.id, ck),
+             titel: 'andermans menswerk herschrijf je niet — de auteur herziet zelf' }];
     }
     // Legacy: een nog niet mee-afgewezen 'voorgesteld' argument (van vóór de cascade) —
     // bijschaven kan; mergen niet (het element is afgewezen).
     if (a.status === 'voorgesteld' && (a.auteur_is_agent || a.contributed_by === ME.username))
-      return `<div class="arg-acties"><button class="akkoord" style="${klein}" onclick="bewerkArg(${a.id},'${ck}')" title="bijschaven (telt nog nergens)">Verbeteren</button></div>`;
-    return '';
+      return [{ label: 'Verbeteren…', onClick: () => bewerkArg(a.id, ck), titel: 'bijschaven (telt nog nergens)' }];
+    return [];
   }
-  const r = [], isAuteur = a.contributed_by === ME.username, reviewer = ME.role !== 'bijdrager';
-  // Een mens herziet zijn eigen voorstel; een maintainer mag bot-werk bijschaven (een
-  // gewone gebruiker niet andermans werk).
+  // Bewijs aandragen (de oude reageer-bar) — stance volgt de knop, wisselen kan in de composer.
+  const items = [
+    { label: '＋ Bewijs vóór…', onClick: () => toonReply(a.id, 'supporting', false, ck),
+      titel: 'draag bewijs of een argument aan dat dit argument ondersteunt' },
+    { label: '－ Bewijs tegen…', onClick: () => toonReply(a.id, 'contradicting', false, ck),
+      titel: 'draag bewijs of een argument aan dat tegen dit argument in gaat' },
+  ];
+  // Poort-acties (de oude arg-acties). Een mens herziet zijn eigen voorstel; een
+  // maintainer mag bot-werk bijschaven (een gewone gebruiker niet andermans werk).
+  const isAuteur = a.contributed_by === ME.username, reviewer = ME.role !== 'bijdrager';
   const magBewerken = isAuteur || (ME.role === 'maintainer' && a.auteur_is_agent);
+  const poort = [];
   if (a.status === 'voorgesteld') {
-    if (magBewerken) r.push(`<span onclick="bewerkArg(${a.id},'${ck}')" title="${isAuteur ? 'je voorstel bijschaven (telt nog nergens)' : 'agent-werk bijschaven (admin)'}">bewerk</span>`);
+    if (magBewerken) poort.push({ label: 'Bewerk…', onClick: () => bewerkArg(a.id, ck),
+      titel: isAuteur ? 'je voorstel bijschaven (telt nog nergens)' : 'agent-werk bijschaven (admin)' });
     if (reviewer) {
-      r.push(`<span onclick="mergeArgT(${a.id},'${ck}')" title="toelaten — telt mee na merge">merge</span>`);
-      r.push(`<span class="gevaar" onclick="afwijsArgT(${a.id},'${ck}')" title="afwijzen met motivatie">afwijzen</span>`);
+      poort.push({ label: 'Merge', onClick: () => mergeArgT(a.id, ck), titel: 'toelaten — telt mee na merge' });
+      poort.push({ label: 'Afwijzen…', gevaar: true, onClick: () => afwijsArgT(a.id, ck), titel: 'afwijzen met motivatie' });
     }
   } else {
-    r.push(`<span onclick="reviseerArg(${a.id},'${ck}')" title="een verbeterde versie indienen die deze vervangt na merge">reviseer</span>`);
-    if (reviewer) r.push(`<span class="gevaar" onclick="herkeurArg(${a.id},'${ck}')" title="terug naar herkeuring (betwist) met reden">herkeuren</span>`);
+    poort.push({ label: 'Reviseer…', onClick: () => reviseerArg(a.id, ck),
+      titel: 'een verbeterde versie indienen die deze vervangt na merge' });
+    if (reviewer) poort.push({ label: 'Naar herkeuring…', gevaar: true, onClick: () => herkeurArg(a.id, ck),
+      titel: 'terug naar herkeuring (betwist) met reden' });
   }
-  return r.length ? `<div class="arg-acties">${r.join('')}</div>` : '';
+  if (poort.length) items.push('---', ...poort);
+  // Afhandeling van een ondergraving (de oude linkjes op de resolutiebadge).
+  if (a.parent_argument_id && a.stance === 'contradicting' && a.bezwaar_resolutie) {
+    const st = a.bezwaar_resolutie;
+    const parent = ctx(ck).map().get(a.parent_argument_id) || {};
+    const benAuteur = parent.contributed_by === ME.username;
+    const benBezwaarmaker = a.contributed_by === ME.username;
+    const benReviewer = ['reviewer', 'maintainer'].includes(ME.role);
+    const bez = [];
+    if (st !== 'opgelost' && (benAuteur || benReviewer))
+      bez.push({ label: 'Bezwaar: ik heb dit aangepast', onClick: () => bezwaarActieO(a.id, 'herzien', ck),
+        titel: 'meld dat het bekritiseerde argument is herzien — de bezwaarmaker herbeoordeelt' });
+    if (benBezwaarmaker) {
+      bez.push({ label: 'Bezwaar: opgelost', onClick: () => bezwaarActieO(a.id, 'opgelost', ck),
+        titel: 'jouw bezwaar is verholpen — het dempt niet langer' });
+      bez.push({ label: 'Bezwaar: blijft staan', onClick: () => bezwaarActieO(a.id, 'blijft', ck),
+        titel: 'de herziening lost je bezwaar niet op — het blijft dempen' });
+    } else if (benReviewer && st === 'herzien') {
+      bez.push({ label: 'Bezwaar sluiten (overrule)', onClick: () => bezwaarActieO(a.id, 'opgelost', ck),
+        titel: 'reviewer-overrule ná herziening: sluit het bezwaar als opgelost' });
+    }
+    if (bez.length) items.push('---', ...bez);
+  }
+  return items;
+}
+function argMenu(id, ck, knop) {
+  const a = ctx(ck).map().get(id);
+  if (a) hsMenu(knop, argMenuItems(a, ck));
 }
 function rendNode(a, ck) {
   ck = ck || '';
   const [sym, kleur] = STANCE[a.stance] || ['•', '#888'];
   let h = `<div class="arg${a.vervangen ? ' vervangen-arg' : ''}">`;
-  h += `<div class="arg-kop"><span class="stance" style="color:${kleur}">${sym}</span> <b>${esc(a.claim || '')}</b>`;
+  // Rustige knoop (W3.2): in rust alleen inhoud + oordeel-paar; alle overige acties
+  // achter één ⋯-knop rechtsboven (argMenu → hsMenu, huisstijl).
+  const heeftMenu = argMenuItems(a, ck).length > 0;
+  h += `<div class="arg-kop"><div class="arg-kop-tekst"><span class="stance" style="color:${kleur}">${sym}</span> <b>${esc(a.claim || '')}</b>`;
   h += statusBadge(a);
+  h += `</div>`;
+  if (heeftMenu) h += `<button type="button" class="hs-menu-knop" onclick="argMenu(${a.id},'${ck}',this)" ` +
+    `aria-haspopup="menu" aria-expanded="false" aria-label="Acties voor argument #${a.id}" title="Acties (bewijs aandragen, bewerken, review)">⋯</button>`;
   h += `</div>`;
   if (a.reasoning) h += `<div class="arg-reden">${esc(a.reasoning)}</div>`;
   const m = [esc(a.contributed_by || ''), '#' + a.id];
@@ -730,13 +806,11 @@ function rendNode(a, ck) {
   h += `<div class="arg-meta">${m.filter(Boolean).join(' · ')}</div>`;
   h += (a.citations || []).map(citeHtml).join('');
   // Onder een afgewezen element (ck = 'afg-…') zijn de argumenten mee-afgewezen: geen
-  // reageren/beoordelen (dat zou nieuwe wezen maken) — alleen verbeteren & heropenen.
+  // reageren/beoordelen (dat zou nieuwe wezen maken) — alleen verbeteren & heropenen (⋯).
   if (!ck.startsWith('afg-')) {
-    h += reageerBar(a, ck);
     h += ratingRegel(a, ck);
-    h += bezwaarRegelO(a, ck);
+    h += bezwaarRegelO(a);
   }
-  h += argActies(a, ck);
   h += `<div id="${replySlot(ck, a.id)}"></div>`;
   (a._kids || []).forEach(k => { h += rendNode(k, ck); });
   h += `</div>`;
@@ -775,37 +849,16 @@ function ratingRegel(a, ck) {
     : '';
   return `<div class="oordeel-rij">${eens}${oneens}${saldo}</div>`;
 }
-// Eén neutrale 'Reageer'-knop: opent de composer met de standaard positiekeuze
-// (Voor/Tegen/Context). Apart van het oordeel-paar hierboven. Inloggen vereist.
-function reageerBar(a, ck) {
-  ck = ck || '';
-  if (!ME || a.vervangen) return '';
-  return `<div class="reageer-bar">
-    <span class="reageer-knop voor" onclick="toonReply(${a.id},'supporting',false,'${ck}')" title="Draag bewijs of een argument aan dat dit argument ondersteunt.">＋ Bewijs vóór</span>
-    <span class="reageer-knop tegen" onclick="toonReply(${a.id},'contradicting',false,'${ck}')" title="Draag bewijs of een argument aan dat tegen dit argument in gaat.">－ Bewijs tegen</span>
-  </div>`;
-}
-// Resolutielus-badge + overgangsknoppen op een ondergraving (server bewaakt de rechten).
-function bezwaarRegelO(a, ck) {
-  ck = ck || '';
+// Resolutielus-badge op een ondergraving — puur status; de overgangsacties
+// (herzien/opgelost/blijft/overrule) zitten in het ⋯-menu van de knoop (W3.2).
+function bezwaarRegelO(a) {
   if (!a.parent_argument_id || a.stance !== 'contradicting' || !a.bezwaar_resolutie) return '';
   const st = a.bezwaar_resolutie;
   const BADGE = { open: ['⏳ bezwaar open', '#e67e22'], herzien: ['↻ herzien — herbeoordeel', '#3aa0e0'],
     blijft: ['● blijft staan', '#e0635f'], opgelost: ['✓ opgelost (dempt niet)', '#3ddc84'] };
   const [label, kleur] = BADGE[st] || [st, 'var(--text-muted)'];
-  let h = `<div class="ratings" style="gap:10px"><span style="color:${kleur};font-weight:600" title="Stand van de resolutielus">${label}</span>`;
-  if (ME) {
-    const parent = ctx(ck).map().get(a.parent_argument_id) || {};
-    const benAuteur = parent.contributed_by === ME.username;
-    const benBezwaarmaker = a.contributed_by === ME.username;
-    const benReviewer = ['reviewer', 'maintainer'].includes(ME.role);
-    const knop = (actie, tekst) => `<span class="reageer-link" onclick="bezwaarActieO(${a.id},'${actie}','${ck}')">${tekst}</span>`;
-    if (st !== 'opgelost' && (benAuteur || benReviewer)) h += knop('herzien', 'ik heb dit aangepast');
-    if (benBezwaarmaker) { h += knop('opgelost', 'opgelost'); h += knop('blijft', 'blijft staan'); }
-    else if (benReviewer && st === 'herzien') h += knop('opgelost', 'sluiten (overrule)');
-  }
-  h += '</div>';
-  return h;
+  return `<div class="ratings" style="gap:10px"><span style="color:${kleur};font-weight:600" ` +
+    `title="Stand van de resolutielus — afhandelen kan via het ⋯-menu van dit argument">${label}</span></div>`;
 }
 // Eerlijk over rating-latentie: een duim is zichtbaar advies en beweegt de score pas
 // zodra de beoordelaarspool de bridging-drempel haalt én scripts/bridging.py opnieuw draait.
@@ -833,15 +886,24 @@ async function rateArg(id, oordeel, wasActief, ck) {
       ? await fetch(`/api/arguments/${id}/ratings`, { method: 'DELETE' })
       : await fetch(`/api/arguments/${id}/ratings`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oordeel }) });
-    if (!resp.ok) { const j = await resp.json().catch(() => ({})); alert(j.error || 'Kon niet beoordelen'); return; }
+    if (!resp.ok) { const j = await resp.json().catch(() => ({})); melding(j.error || 'Kon niet beoordelen', 'fout'); return; }
     ctxHerlaad(ck);
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 // param (relation_id…) -> sel-type voor de viz-permalink (/#sel=relation:42).
 const PARAM_SEL = { relation_id: 'relation', entity_id: 'entity', role_id: 'role',
   mechanism_id: 'mechanism', emergent_effect_id: 'emergent' };
+// W4.3: mobiel wisselt tussen lijst- en gesprek-scherm; de klasse is op desktop onschadelijk.
+function zetMobielDetail(aan) {
+  document.getElementById('tab-overleg').classList.toggle('m-detail', !!aan);
+}
+function oTerug() {
+  if (location.hash) history.replaceState(null, '', location.pathname);
+  toonStartkaart();
+}
 async function toonThread(param, id, label) {
   huidig = { param, id, label };
+  zetMobielDetail(true);
   // Adresseerbaar: de thread krijgt een permalink in de hash (#relation_id=42).
   const ankerhash = `#${param}=${id}`;
   // Schoon de URL op naar enkel de permalink-hash (verwijdert o.a. de consumeerde ?label=).
@@ -849,6 +911,7 @@ async function toonThread(param, id, label) {
   tekenLijst(document.getElementById('oZoek').value);
   const d = document.getElementById('oDetail');
   d.innerHTML = '<div style="color:var(--text-muted);padding:24px">Laden…</div>';
+  d.scrollTop = 0;
   try {
     const args = await (await fetch(`/api/arguments?${param}=${id}`)).json();
     ARG_BY_ID = new Map(args.map(a => [a.id, a]));  // voor bewerk/reviseer-formulieren
@@ -866,6 +929,91 @@ async function toonThread(param, id, label) {
   } catch (e) {
     d.innerHTML = `<div class="banner">Netwerkfout: ${esc(e.message)}</div>`;
   }
+}
+
+// ── Startkaart (W3.1): zonder permalink toont het rechtervlak meteen iets nuttigs ──
+// Drie blokken: wachtrij-tellingen per soort (klikbaar naar de juiste Voorstellen-
+// lijst; reviewers zien ze bovenaan), threads met lopende bezwaren (n_bezwaar uit
+// /api/discussion_index) en de recentste argumenten (/api/recent_changes, klikbaar
+// naar hun thread). Een deeplink (#relation_id=…) opent zoals altijd direct de thread.
+function openVoorstellen(t) { kiesVoorstelType(t); kiesTab('voorstellen'); }
+function openThreadUitStart(param, id) { toonThread(param, id, labelVoorThread(param, id)); }
+async function toonStartkaart() {
+  huidig = null;
+  zetMobielDetail(false);                                // mobiel: terug naar het lijst-scherm
+  tekenLijst(document.getElementById('oZoek').value);   // actieve lijst-markering weghalen
+  const d = document.getElementById('oDetail');
+  d.innerHTML = '<div style="color:var(--text-muted);padding:24px">Laden…</div>';
+  const [queue, feed] = await Promise.all([
+    haalReviewQueue(false).catch(() => null),
+    fetch('/api/recent_changes?limit=120').then(r => r.ok ? r.json() : []).catch(() => []),
+  ]);
+  if (huidig) return;  // de gebruiker opende ondertussen al een thread
+
+  // (1) Wacht op review — telling per wachtrij-soort, klikbaar naar het Voorstellen-tabblad.
+  let wachtHtml = '';
+  if (queue && queue.voorstellen) {
+    const soorten = [
+      ['argumenten', 'Argumenten', (queue.argumenten || []).length],
+      ['rfc', 'Theorie', (queue.voorstellen || []).length],
+      ['herkeuring', 'Herkeuring', (queue.herkeuring || []).length],
+      ['praktijk', 'Praktijk', (queue.entiteiten || []).length + (queue.relaties || []).length],
+    ];
+    const chips = soorten.map(([t, lbl, n]) =>
+      `<span class="fchip" onclick="openVoorstellen('${t}')" title="Open de ${lbl}-wachtrij op het Voorstellen-tabblad">` +
+      `${lbl} <span class="wacht-n${n ? ' open' : ''}">${n}</span></span>`).join('');
+    wachtHtml = `<div class="start-sectie"><div class="vlabel">Wacht op review` +
+      `<button type="button" class="uitleg" aria-label="Uitleg wachtrij" data-uitleg="Alles wat wordt ingediend telt pas mee nadat een reviewer het heeft beoordeeld — tot die tijd staat het hier als open werk (goud). Klik een soort om de wachtrij te openen; meelezen kan ook zonder reviewersrol.">ⓘ</button></div>` +
+      `<div class="start-chips">${chips}</div></div>`;
+  }
+
+  // (2) Threads met lopende bezwaren — 'logica klopt niet'-reacties die op afhandeling
+  // wachten (resolutielus 'open' of 'herzien'); n_bezwaar komt uit de discussie-index.
+  const bezwaren = [];
+  GROEPEN.forEach(([key, , param]) => ((indexData && indexData[key]) || []).forEach(it => {
+    if (it.n_bezwaar > 0) bezwaren.push({ param, id: it.id, label: it.label, n: it.n_bezwaar });
+  }));
+  bezwaren.sort((a, b) => b.n - a.n);
+  const bezwaarHtml = !bezwaren.length ? '' :
+    `<div class="start-sectie"><div class="vlabel">Threads met lopende bezwaren` +
+    `<button type="button" class="uitleg" aria-label="Uitleg bezwaren" data-uitleg="Een bezwaar ('logica klopt niet') dempt de kracht van een argument tot het is afgehandeld: de auteur past het argument aan ('herzien'), waarna de bezwaarmaker het bezwaar sluit ('opgelost') of laat staan ('blijft'). Deze threads hebben bezwaren die nog op zo'n stap wachten.">ⓘ</button></div>` +
+    bezwaren.slice(0, 6).map(b =>
+      `<div class="t-item" onclick="openThreadUitStart('${b.param}',${b.id})">` +
+      `<span class="t-label" title="${esc(b.label)}">${esc(b.label)}</span>` +
+      `<span class="t-n open" title="${b.n} lopende ondergraving(en) die op afhandeling wachten">⚑ ${b.n}</span></div>`).join('') + `</div>`;
+
+  // (3) Recente activiteit — nieuwste argumenten (nieuw of gemerged), één regel per
+  // argument (dedupe op record_id; de feed is nieuwste-eerst).
+  const gezien = new Set();
+  const recent = [];
+  for (const r of (feed || [])) {
+    if (r.table_name !== 'arguments' || (r.action !== 'created' && r.action !== 'merged')) continue;
+    if (!r.thread_param || !r.thread_id || !r.claim) continue;   // bv. inmiddels verwijderd
+    if (gezien.has(r.record_id)) continue;
+    gezien.add(r.record_id);
+    recent.push(r);
+    if (recent.length >= 6) break;
+  }
+  const recentHtml = `<div class="start-sectie"><div class="vlabel">Recente activiteit</div>` +
+    (recent.length ? recent.map(r => {
+      const [sym, kleur] = STANCE[r.stance] || ['•', '#888'];
+      const actie = r.action === 'merged'
+        ? '<span style="color:var(--ok)">gemerged</span>'
+        : '<span style="color:var(--goud)">nieuw</span>';
+      const doelNaam = (r.doel_type === 'rol' || r.doel_type === 'mechanisme')
+        ? weergaveNaam(r.doel_naam) : r.doel_naam;
+      return `<div class="start-item" onclick="openThreadUitStart('${r.thread_param}',${r.thread_id})" title="Open deze thread">` +
+        `<div class="si-claim"><span class="stance" style="color:${kleur}">${sym}</span> ${esc(r.claim)}</div>` +
+        `<div class="si-meta">${actie} · ${esc(r.changed_by || '?')} · ${esc((r.created_at || '').slice(0, 16))}${doelNaam ? ' · ' + esc(r.doel_type) + ': ' + esc(doelNaam) : ''}</div></div>`;
+    }).join('') : `<div class="leeg">Nog geen recente argumenten.</div>`) + `</div>`;
+
+  // Reviewers zien hun wachtrij bovenaan; anderen eerst het leven in het model.
+  const isReviewer = ME && ME.role !== 'bijdrager';
+  const secties = isReviewer ? [wachtHtml, bezwaarHtml, recentHtml]
+                             : [recentHtml, bezwaarHtml, wachtHtml];
+  d.innerHTML = `<div class="start-kaart"><h2>Overleg</h2>` +
+    `<p class="start-intro">Kies links een relatie, entiteit, rol, mechanisme of emergent veld om de thread (argumentboom) rustig te lezen — of voeg er een argument aan toe.</p>` +
+    secties.join('') + `</div>`;
 }
 
 // ── Toevoegformulier (root of reply) ──
@@ -1097,9 +1245,9 @@ async function bezwaarActieO(id, actie, ck) {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ actie }) });
     const j = await resp.json().catch(() => ({}));
-    if (!resp.ok) { alert(j.error || 'Actie mislukt'); return; }
+    if (!resp.ok) { melding(j.error || 'Actie mislukt', 'fout'); return; }
     ctxHerlaad(ck);
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
 // ── Bewerken / reviseren (Fase C) ──
@@ -1182,17 +1330,23 @@ async function argActie(url, method, body, ck) {
       headers: body ? { 'Content-Type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined });
     const j = await resp.json().catch(() => ({}));
-    if (!resp.ok) { alert(j.error || 'Actie mislukt'); return; }
+    if (!resp.ok) { melding(j.error || 'Actie mislukt', 'fout'); return; }
     ctxHerlaad(ck); laadVoorstellenBadge(); laadIndex();
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 function mergeArgT(id, ck) { argActie(`/api/arguments/${id}/merge`, 'POST', null, ck); }
-function afwijsArgT(id, ck) {
-  const mot = prompt('Motivatie (verplicht bij afwijzen):'); if (!mot) return;
+async function afwijsArgT(id, ck) {
+  const mot = await vraagTekst('Waarom wijs je dit argument af? De auteur ziet deze reden in de werkbank en kan ermee verbeteren.',
+    { titel: 'Argument afwijzen', label: 'Motivatie (verplicht)', okTekst: 'Afwijzen', gevaar: true,
+      placeholder: 'bv. feitelijke fout, formulering, of drogreden' });
+  if (!mot) return;
   argActie(`/api/arguments/${id}/status`, 'PATCH', { status: 'verworpen', motivatie: mot }, ck);
 }
-function herkeurArg(id, ck) {
-  const mot = prompt('Reden voor herkeuring (bv. fout, formulering of drogreden):'); if (!mot) return;
+async function herkeurArg(id, ck) {
+  const mot = await vraagTekst('Waarom moet dit gemergde argument opnieuw beoordeeld worden?',
+    { titel: 'Naar herkeuring', label: 'Reden (verplicht)', okTekst: 'Naar herkeuring',
+      placeholder: 'bv. fout, formulering of drogreden' });
+  if (!mot) return;
   argActie(`/api/arguments/${id}/status`, 'PATCH', { status: 'betwist', motivatie: mot }, ck);
 }
 function kiesStance(fid, stance, btn) {
@@ -1272,10 +1426,17 @@ const AARD = {
   indirect:          ['indirect (verouderd)',         'Verouderde aard — indirectheid hoort bij een pad, niet bij één pijl; wordt nu als directe pijl getekend.'],
 };
 const aardLabel = a => AARD[a] || [String(a ?? ''), ''];
-const rolNaam = id => { const r = (ROLLEN || []).find(x => String(x.id) === String(id)); return r ? r.name : `rol #${id}`; };
+const rolNaam = id => { const r = (ROLLEN || []).find(x => String(x.id) === String(id)); return r ? weergaveNaam(r.name) : `rol #${id}`; };
+// Eén gedeelde review_queue-fetch voor de tab-badge én de startkaart (W3.1):
+// de badge wil na elke actie verse cijfers; de startkaart lift mee op de laatste haal.
+let queuePromise = null;
+function haalReviewQueue(vernieuw) {
+  if (vernieuw || !queuePromise) queuePromise = fetch('/api/review_queue').then(r => r.json());
+  return queuePromise;
+}
 async function laadVoorstellenBadge() {
   try {
-    const q = await (await fetch('/api/review_queue')).json();
+    const q = await haalReviewQueue(true);
     const n = (q.voorstellen?.length || 0) + (q.argumenten?.length || 0)
       + (q.herkeuring?.length || 0) + (q.entiteiten?.length || 0) + (q.relaties?.length || 0);
     const b = document.getElementById('vBadge');
@@ -1319,8 +1480,10 @@ function rendInstantiatie(i) {
 function rendVoorstel(v) {
   const t = v.telling, akk = new Set(t.akkoorden).size, p = v.payload || {};
   let h = `<div class="kaart"><div class="soort">${esc(v.soort)} · <a class="permalink" href="/overleg/voorstel/${v.id}" title="Permalink naar dit theorievoorstel (RfC)">#${v.id}</a></div><h3>${esc(v.titel)}</h3>`;
+  // Quorum-telling legt zichzelf uit (W3.3): X van de Y benodigde reviewer-akkoorden.
   h += `<div class="meta"><span>door <b>${esc(v.ingediend_door)}</b></span><span>${esc((v.created_at || '').slice(0, 16))}</span>` +
-    `<span><b>${akk}/${v.benodigde_akkoorden}</b> akkoord</span>` +
+    `<span title="${akk} van de ${v.benodigde_akkoorden} benodigde akkoorden"><b>${akk}/${v.benodigde_akkoorden}</b> akkoord` +
+    `<button type="button" class="uitleg" aria-label="Uitleg akkoord-telling" data-uitleg="Tot nu toe ${akk} reviewer-akkoord(en) van de ${v.benodigde_akkoorden} die dit voorstel nodig heeft; bij het quorum wordt het geaccepteerd en ontstaat het element echt. De indiener telt niet mee en agent-oordelen zijn zichtbaar advies dat nooit meetelt. In de opbouwfase geldt één maintainer-akkoord als volledig quorum (gevlagd).">ⓘ</button></span>` +
     `<span>${v.theorielaag ? 'theorielaag — 2 menselijke reviewers' : 'praktijklaag — 1 reviewer'}</span></div>`;
   const tagHtml = (label, value, tip) =>
     `<span class="tag"${tip ? ` title="${esc(tip)}" style="cursor:help"` : ''}>${esc(label)}: ${esc(value)}${tip ? ' <span style="opacity:.45;font-weight:400">ⓘ</span>' : ''}</span>`;
@@ -1500,8 +1663,11 @@ function doelBadge(a) {
   const reply = a.parent_argument_id ? ` <span class="doel-reply">via reactie</span>` : '';
   const graaf = (sel && a.thread_id)
     ? ` <a class="doel-graaf" href="/#sel=${sel}:${a.thread_id}" target="_blank" rel="noopener" title="Selecteer dit element in de netwerkvisualisatie">↗ graaf</a>` : '';
+  // Rol-/mechanisme-doelen komen als snake_case uit de API → weergavenaam (W2.3).
+  const naam = (a.doel_type === 'rol' || a.doel_type === 'mechanisme')
+    ? weergaveNaam(a.doel_naam) : (a.doel_naam || '');
   return `<div class="doel-badge" title="Dit argument gaat over dit ${esc(a.doel_type)}">` +
-    `<span class="doel-type">${esc(a.doel_type)}</span> <b>${esc(a.doel_naam || '')}</b>${reply}${graaf}</div>`;
+    `<span class="doel-type">${esc(a.doel_type)}</span> <b>${esc(naam)}</b>${reply}${graaf}</div>`;
 }
 // Read-only thread-render voor de reviewkaart (Fase A): toon de hele thread in context,
 // markeer het te beoordelen argument, en laat de 👍/👎-stand (community-signaal) zien
@@ -1700,7 +1866,7 @@ function rendAfgewezenPraktijk(soort, item) {
   const titel = soort === 'relatie'
     ? `${esc(item.source_name)} → ${esc(item.target_name)}` : esc(item.name);
   const sub = soort === 'relatie'
-    ? `${esc(item.relation_type || '')}${item.mechanism_name ? ' · ' + esc(item.mechanism_name) : ' · (geen mechanisme)'}`
+    ? `${esc(item.relation_type || '')}${item.mechanism_name ? ' · ' + esc(weergaveNaam(item.mechanism_name)) : ' · (geen mechanisme)'}`
     : esc(item.type || '');
   const fb = (item.feedback && item.feedback.reason)
     ? `<div style="font-size:12px;color:var(--text-dim);background:color-mix(in srgb,#e0635f 9%,transparent);border-left:2px solid #e0635f;padding:5px 8px;margin:6px 0;border-radius:3px">✕ afgewezen door <b>${esc(item.feedback.changed_by || '?')}</b>: ${esc(item.feedback.reason)}</div>` : '';
@@ -1772,8 +1938,16 @@ async function _afgActie(uitId, url, method, body) {
   } catch (e) { if (uit) uit.innerHTML = ' <span style="color:#e0635f">Netwerkfout</span>'; }
 }
 function heropenArg(id) { _afgActie(`arg-${id}-uit`, `/api/arguments/${id}/heropenen`, 'POST'); }
-function verwijderArg(id) { if (confirm(`Argument #${id} definitief verwijderen uit de database? Onomkeerbaar.`)) _afgActie(`arg-${id}-uit`, `/api/arguments/${id}`, 'DELETE'); }
-function verwijderVoorstel(id) { if (confirm(`Voorstel #${id} definitief verwijderen uit de database? Onomkeerbaar.`)) _afgActie(`vst-${id}-uit`, `/api/voorstellen/${id}`, 'DELETE'); }
+async function verwijderArg(id) {
+  if (await bevestig(`Argument #${id} definitief verwijderen uit de database? Onomkeerbaar.`,
+      { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))
+    _afgActie(`arg-${id}-uit`, `/api/arguments/${id}`, 'DELETE');
+}
+async function verwijderVoorstel(id) {
+  if (await bevestig(`Voorstel #${id} definitief verwijderen uit de database? Onomkeerbaar.`,
+      { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))
+    _afgActie(`vst-${id}-uit`, `/api/voorstellen/${id}`, 'DELETE');
+}
 // Verzamel de (eventueel) bewerkte velden uit het formulier en stuur ze mee; het endpoint
 // neemt alleen niet-lege velden over en zet daarna afgewezen → voorgesteld.
 function heraanmeldEntiteit(id) {
@@ -1796,8 +1970,16 @@ function heraanmeldRelatie(id) {
   // Zekerheid/invloed gaan bewust NIET mee: afgeleid uit de discussieboom, niet met de hand gezet.
   _afgActie(`afg-relatie-${id}-uit`, `/api/relations/${id}/heraanmelden`, 'POST', body);
 }
-function verwijderEntiteit(id) { if (confirm(`Entiteit #${id} definitief verwijderen? Dit sleept ook gekoppelde relaties/argumenten mee. Onomkeerbaar.`)) _afgActie(`afg-entiteit-${id}-uit`, `/api/entities/${id}`, 'DELETE'); }
-function verwijderRelatie(id) { if (confirm(`Relatie #${id} definitief verwijderen? Dit sleept ook bijbehorende argumenten mee. Onomkeerbaar.`)) _afgActie(`afg-relatie-${id}-uit`, `/api/relations/${id}`, 'DELETE'); }
+async function verwijderEntiteit(id) {
+  if (await bevestig(`Entiteit #${id} definitief verwijderen? Dit sleept ook gekoppelde relaties/argumenten mee. Onomkeerbaar.`,
+      { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))
+    _afgActie(`afg-entiteit-${id}-uit`, `/api/entities/${id}`, 'DELETE');
+}
+async function verwijderRelatie(id) {
+  if (await bevestig(`Relatie #${id} definitief verwijderen? Dit sleept ook bijbehorende argumenten mee. Onomkeerbaar.`,
+      { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))
+    _afgActie(`afg-relatie-${id}-uit`, `/api/relations/${id}`, 'DELETE');
+}
 async function herkeurGoed(id) {
   const uit = document.getElementById(`arg-${id}-uit`); uit.textContent = 'Bezig…';
   try {
@@ -1937,7 +2119,7 @@ async function voegBronToe(key, idx, btn) {
     btn.classList.add('toegevoegd');
   } catch (e) {
     btn.disabled = false; btn.textContent = orig;
-    alert('Toevoegen mislukt: ' + e.message);
+    melding('Toevoegen mislukt: ' + e.message, 'fout');
   }
 }
 function kiesVoorstelType(t) { actiefVoorstelType = t; voorstelTypeGekozen = true; tekenVoorstellen(); }
@@ -2017,9 +2199,11 @@ function rendModEntiteit(e) {
   // van een entiteit is afgeleid/dynamisch (argmax Σ certainty×influence over haar bron-
   // relaties), niet vastgepind door de rol. De rol is enkel een handvat/fallback.
   const opties = [`<option value="">${leegLabel}</option>`]
-    .concat((ROLLEN || []).map(r => `<option value="${r.id}">${esc(r.name)}</option>`)).join('');
+    .concat((ROLLEN || []).slice()
+      .sort((a, b) => weergaveNaam(a.name).localeCompare(weergaveNaam(b.name)))
+      .map(r => `<option value="${r.id}">${esc(weergaveNaam(r.name))}</option>`)).join('');
   const huidigeTekst = huidige
-    ? `<div style="font-size:12px;color:var(--text-dim);margin:2px 0">huidige rol: <b>${esc(e.role_name || ('#' + huidige))}</b></div>`
+    ? `<div style="font-size:12px;color:var(--text-dim);margin:2px 0">huidige rol: <b>${esc(e.role_name ? weergaveNaam(e.role_name) : ('#' + huidige))}</b></div>`
     : '';
   // Onderbouwing / signalen (symmetrisch met de relatie-kaart): root-argumenten op deze
   // entiteit, met de politieke_positie-signalen als nette as-punten.
@@ -2081,12 +2265,12 @@ function rendModRelatie(r) {
   // Kenmerken-tags: propagandafilter + aard (pijl/halo) van het mechanisme, looptijd,
   // bidirectioneel — zodat de reviewer ziet wélk soort verband dit is, niet alleen wie→wie.
   const kenmerken = [];
-  if (r.mechanism_filter) kenmerken.push(`<span class="tag" title="propagandafilter van het gekoppelde mechanisme">${esc(r.mechanism_filter)}</span>`);
+  if (r.mechanism_filter) kenmerken.push(`<span class="tag" title="propagandafilter van het gekoppelde mechanisme">${esc(FILTER_LABEL[r.mechanism_filter] || r.mechanism_filter)}</span>`);
   if (r.mechanism_aard) { const [al, atip] = aardLabel(r.mechanism_aard); kenmerken.push(`<span class="tag" title="${esc(atip)}" style="cursor:help">${esc(al)}</span>`); }
   if (r.bidirectional) kenmerken.push(`<span class="tag" title="wederzijds verband (telt beide richtingen)">↔ bidirectioneel</span>`);
   if (r.active_from || r.active_until) kenmerken.push(`<span class="tag" title="looptijd van het verband">${esc(r.active_from || '…')} – ${esc(r.active_until || 'heden')}</span>`);
   const kenmerkenHtml = kenmerken.length ? `<div class="tags">${kenmerken.join('')}</div>` : '';
-  return `<div class="kaart"><div class="soort">relatie · #${r.id} · ${esc(r.relation_type)}${r.mechanism_name ? ' · ' + esc(r.mechanism_name) : ' · (geen mechanisme)'}</div>` +
+  return `<div class="kaart"><div class="soort">relatie · #${r.id} · ${esc(r.relation_type)}${r.mechanism_name ? ' · ' + esc(weergaveNaam(r.mechanism_name)) : ' · (geen mechanisme)'}</div>` +
     `<h3 style="font-size:14px">${esc(r.source_name)} → ${esc(r.target_name)}</h3>` +
     (r.description ? `<div class="vwaarde" style="margin:4px 0">${esc(r.description)}</div>` : '') +
     kenmerkenHtml +
@@ -2104,7 +2288,11 @@ function modActies(tabel, id) {
 async function modereer(tabel, id, status) {
   const uit = document.getElementById(`mod-${tabel}-${id}-uit`);
   let motivatie = null;
-  if (status === 'afgewezen') { motivatie = prompt('Motivatie (verplicht bij afwijzen):'); if (!motivatie) return; }
+  if (status === 'afgewezen') {
+    motivatie = await vraagTekst('Waarom wijs je dit af? De indiener ziet deze reden in de werkbank.',
+      { titel: 'Afwijzen', label: 'Motivatie (verplicht)', okTekst: 'Afwijzen', gevaar: true });
+    if (!motivatie) return;
+  }
   uit.textContent = 'Bezig…';
   try {
     const resp = await fetch(`/api/${tabel}/${id}/status`, {
@@ -2113,7 +2301,7 @@ async function modereer(tabel, id, status) {
     const j = await resp.json();
     if (!resp.ok) { uit.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
     uit.innerHTML = `<span style="color:${status === 'goedgekeurd' ? '#3ddc84' : '#e0635f'}">${esc(status)}.` +
-      `${status === 'goedgekeurd' ? ' Nu in de graaf (regenereer de viz).' : ''}</span>`;
+      `${status === 'goedgekeurd' ? ' Nu in de graaf.' : ''}</span>`;
     setTimeout(() => { laadVoorstellen(); laadVoorstellenBadge(); }, 1000);
   } catch (e) { uit.textContent = 'Netwerkfout: ' + e.message; }
 }
@@ -2145,14 +2333,18 @@ async function modereerEntiteit(id) {
     });
     const j = await resp.json();
     if (!resp.ok) { uit.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
-    uit.innerHTML = `<span style="color:#3ddc84">goedgekeurd${rolWijzigt ? ' + rol gezet' : ''}. Ververs de viz (knop in de topbar).</span>`;
+    uit.innerHTML = `<span style="color:#3ddc84">goedgekeurd${rolWijzigt ? ' + rol gezet' : ''}. Nu in de graaf.</span>`;
     setTimeout(() => { laadVoorstellen(); laadVoorstellenBadge(); }, 1000);
   } catch (e) { uit.textContent = 'Netwerkfout: ' + e.message; }
 }
 async function beoordeel(vid, oordeel) {
   const uit = document.getElementById(`vst-${vid}-uit`);
   let motivatie = null;
-  if (oordeel === 'afwijzen') { motivatie = prompt('Motivatie (verplicht bij afwijzen):'); if (!motivatie) return; }
+  if (oordeel === 'afwijzen') {
+    motivatie = await vraagTekst('Waarom wijs je dit voorstel af? De indiener ziet deze reden en kan het voorstel herzien.',
+      { titel: 'Voorstel afwijzen', label: 'Motivatie (verplicht)', okTekst: 'Afwijzen', gevaar: true });
+    if (!motivatie) return;
+  }
   uit.textContent = 'Bezig…';
   try {
     const resp = await fetch(`/api/voorstellen/${vid}/reviews`, {
@@ -2189,7 +2381,9 @@ async function mergeArg(id) {
 async function afwijsArg(id) {
   // Afwijzen vergt nu een motivatie (Fase B) — zonder feedback kan de auteur niet
   // verbeteren. De reden landt in edit_log en is zichtbaar in de werkbank.
-  const motivatie = prompt('Motivatie (verplicht bij afwijzen — bv. fout, formulering of drogreden):');
+  const motivatie = await vraagTekst('Waarom wijs je dit argument af? De auteur ziet deze reden in de werkbank en kan ermee verbeteren.',
+    { titel: 'Argument afwijzen', label: 'Motivatie (verplicht)', okTekst: 'Afwijzen', gevaar: true,
+      placeholder: 'bv. feitelijke fout, formulering, of drogreden' });
   if (!motivatie) return;
   const uit = document.getElementById(`arg-${id}-uit`); uit.textContent = 'Bezig…';
   try {
@@ -2220,7 +2414,7 @@ function labelVoorThread(param, id) {
 }
 async function leesHash() {
   const m = location.hash.match(/^#(relation_id|entity_id|role_id|mechanism_id|emergent_effect_id)=(\d+)$/);
-  if (!m) return;
+  if (!m) return false;
   const param = m[1], id = parseInt(m[2], 10);
   kiesTab('overleg');
   if (!indexData) await laadIndex();
@@ -2228,6 +2422,7 @@ async function leesHash() {
   // elementen zonder bestaande thread (entiteiten).
   const qlabel = new URLSearchParams(location.search).get('label');
   toonThread(param, id, qlabel || labelVoorThread(param, id));
+  return true;
 }
 // De RfC/voorstel-permalink: het 'dakloze' nieuwe theorie-element dat (nog) geen
 // knoop in de graaf heeft, krijgt een eigen adresseerbare pagina.
@@ -2249,7 +2444,8 @@ async function toonVoorstelPagina(vid) {
 function terugNaarVoorstellen() { history.pushState(null, '', '/overleg'); reviewGeladen = false; laadVoorstellen(); }
 
 document.getElementById('oZoek').addEventListener('input', e => tekenLijst(e.target.value));
-window.addEventListener('hashchange', leesHash);
+// Terug naar /overleg zonder hash (browser-terugknop) → startkaart i.p.v. lege detailkolom.
+window.addEventListener('hashchange', async () => { if (!(await leesHash())) toonStartkaart(); });
 init();
 </script>
 </body>

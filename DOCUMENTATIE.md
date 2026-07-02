@@ -797,8 +797,10 @@ propaganda-model/
 │   └── logs/                           # rondelogs (queries, oogst, stance-balans)
 │
 ├── web/
-│   ├── template.html                   # BRON van de D3-visualisatie (handmatig bewerken)
-│   └── index.html                      # GEGENEREERD door generate_viz.py (niet bewerken)
+│   ├── template.html                   # BRON van de D3-visualisatie; / serveert dit direct,
+│   │                                   #   data komt live via GET /api/graph_data (W5.1)
+│   └── index.html                      # OPTIONELE statische export (generate_viz.py; veroudert,
+│                                       #   bereikbaar als /static/index.html — niet bewerken)
 │
 ├── scripts/
 │   ├── init_db.py                      # Database aanmaken vanuit schema.sql
@@ -809,7 +811,7 @@ propaganda-model/
 │   ├── enrich_*.py                     # Verrijken van een bestaande DB (theorie + instanties)
 │   ├── migrate_*.py                    # Schema-/datamigraties (backup-then-migrate)
 │   ├── set_temporal_data.py            # Vult active_from/active_until op entiteiten/relaties
-│   ├── generate_viz.py                 # Regenereert web/index.html uit de DB
+│   ├── generate_viz.py                 # Optionele statische export (web/index.html) uit de DB
 │   └── register_source.py              # Registreer een academische bron via CLI
 │
 └── sources/                            # Bronmateriaal (teksten, transcripts)

@@ -28,7 +28,7 @@ claim niet) · `overig`.
 ## Werkwijze per ronde
 
 1. Lees argumenten per doel (`GET /api/arguments?relation_id=…` enz.; ids uit de DB
-   of `web/index.html`-data). Concentreer je op argumenten die score-dragend zijn
+   of `GET /api/graph_data`). Concentreer je op argumenten die score-dragend zijn
    (root, supporting/contradicting, niet `verworpen`).
 2. Toets per argument: (a) dekt het citaat de claim? (b) is de redeneerstap geldig?
    (c) Walton-achtige kritische vragen bij het schema (expertise-argument: is deze

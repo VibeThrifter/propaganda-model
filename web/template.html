@@ -4,31 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Propagandamodel — Nederlandse Politiek &amp; Media</title>
+<link rel="stylesheet" href="/static/huisstijl.css">
+<script src="/static/huisstijl.js"></script>
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Tokens komen uit huisstijl.css; hier alleen wat op deze (dichte) pagina
+   bewust afwijkt: haarlijn-randen en de paneel-maatvoering. */
 :root {
-  --bg:           #0a0a0f;
-  --bg-panel:     rgba(16, 16, 24, 0.92);
-  --bg-card:      rgba(24, 24, 36, 0.85);
-  --bg-hover:     rgba(40, 40, 60, 0.6);
-  --border:       rgba(255,255,255,0.06);
-  --border-light: rgba(255,255,255,0.12);
-  --text:         #e8e8f0;
-  --text-dim:     #8888a0;
-  --text-muted:   #5a5a70;
-  --accent:       #6c8aff;
-  --c-eigendom:    #e74c3c;
-  --c-advertentie: #f0a030;
-  --c-sourcing:    #3498db;
-  --c-flak:        #9b59b6;
-  --c-ideologie:   #2ecc71;
-  --c-systeemactor:#e8c547;
-  --c-cross_filter:#fd79a8;
-  --c-overig:      #7f8c9a;
+  --border: var(--border-zwak);
   --panel-w: 320px;
   --topbar-h: 56px;
-  --shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
 
 body {
@@ -121,6 +107,38 @@ body {
 .panel-section.collapsed > h3 { margin-bottom: 0; }
 /* !important: sommige rijen dragen een inline display:flex die anders van display:none wint. */
 .panel-section.collapsed > :not(h3) { display: none !important; }
+
+/* Eenvoudige standaardstand (W2.1): de expert-secties (class 'geavanceerd')
+   verschijnen pas als de Geavanceerd-schakelaar onderin aanstaat. */
+#sidebar.eenvoudig .panel-section.geavanceerd { display: none; }
+#advancedRow {
+  position: sticky; bottom: -16px;      /* plakt onderin; -16px dekt de sidebar-padding */
+  margin: auto -16px -16px;             /* volle breedte + bij weinig inhoud naar de bodem */
+  padding: 10px 16px; z-index: 2;
+  background: rgba(16,16,24,0.97); border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+#advancedRow label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;
+}
+#advancedRow input { cursor: pointer; }
+
+/* Eerste hulp bij de model-schakelaar (W2.4): eenmalige toelichting, wegklikbaar. */
+.model-intro {
+  position: fixed; z-index: 300;
+  max-width: min(360px, calc(100vw - 24px));
+  background: #16161f; border: 1px solid var(--border-light);
+  border-radius: 10px; box-shadow: var(--shadow);
+  padding: 14px 16px; font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+}
+.model-intro::before {
+  content: ''; position: absolute; top: -6px; left: var(--mi-pijl-x, 42px);
+  width: 10px; height: 10px; transform: rotate(45deg);
+  background: #16161f; border-left: 1px solid var(--border-light); border-top: 1px solid var(--border-light);
+}
+.model-intro b { color: var(--text); }
+.model-intro .mi-acties { display: flex; justify-content: flex-end; margin-top: 10px; }
 
 .filter-group { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -386,6 +404,8 @@ details.detail-section > .sec-body { margin-top: 8px; }
   font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4;
   flex: 1 1 220px;   /* wikkelt naar een nieuwe regel als er < 220px naast de badges over is */
 }
+/* ⋯-actie-menu-knop (W3.2b) rechts in de argument-kop; stijl komt uit de huisstijl. */
+.arg-header .hs-menu-knop { margin-left: auto; }
 .arg-reasoning {
   font-size: 11px; color: var(--text-dim); line-height: 1.5; margin-top: 4px;
 }
@@ -507,8 +527,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .oordeel.oneens { color: #e74c3c; border-color: rgba(231,76,60,0.32); }
 .oordeel.oneens.knop:hover { background: rgba(231,76,60,0.14); }
 .oordeel.stat { opacity: 0.7; }
-/* reageer-knop: één neutrale, accent-getinte actie, los van het oordeel-paar */
-.reageer-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+/* reageer-knop: één neutrale, accent-getinte actie ('+ bron toevoegen' in de composer) */
 .reageer-knop { background: none; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--accent); cursor: pointer; font-size: 10px; padding: 2px 10px; border-radius: 9px; }
 .reageer-knop:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
@@ -533,9 +552,54 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .arg-summary .count.con { color: #e74c3c; }
 .arg-summary .count.ctx { color: #6c8aff; }
 
+/* ── Mobiel (W4.1/W4.2): zijbalk als overlay-paneel, wrappende topbar, detail als sheet ── */
+#zijbalkKnop {
+  display: none; background: none; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 6px; font-size: 16px; line-height: 1; padding: 7px 10px; cursor: pointer; flex-shrink: 0;
+}
+#zijbalkKnop:hover, #zijbalkKnop[aria-expanded="true"] { color: var(--text); background: var(--bg-hover); }
+#zijbalkBackdrop { position: fixed; left: 0; right: 0; bottom: 0; top: var(--topbar-h);
+  background: rgba(0,0,0,0.5); z-index: 205; }
+#zijbalkBackdrop[hidden] { display: none; }
+#zijbalkSluitRij { display: none; align-items: center; justify-content: space-between; margin-bottom: -8px; }
+#zijbalkSluitRij span { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-muted); }
+#zijbalkSluitRij button {
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text-dim);
+  width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 15px;
+}
+
 @media (max-width: 900px) {
   :root { --panel-w: 0px; }
-  #sidebar { display: none; }
+  /* De topbar wrapt naar meerdere rijen; JS meet de echte hoogte terug in --topbar-h
+     zodat zijbalk, detailpaneel, backdrop en graaf precies blijven aansluiten. */
+  #topbar { flex-wrap: wrap; height: auto; min-height: 52px; padding: 8px 12px; gap: 6px 10px; }
+  #topbar .subtitle, #topbar .stats { display: none; }
+  .model-toggle { margin-left: 0; }
+  .search-box { flex: 1 1 110px; min-width: 0; margin-left: 0; }
+  #zijbalkKnop { display: block; }
+  /* W4.1: de zijbalk schuift als overlay-paneel van links binnen (☰-knop); de inhoud
+     is identiek aan desktop. visibility haalt haar dicht óók uit de tab-volgorde. */
+  #sidebar {
+    width: min(320px, 88vw); z-index: 210; visibility: hidden;
+    transform: translateX(calc(-100% - 24px));
+    transition: transform 0.22s ease, visibility 0.22s;
+    box-shadow: 6px 0 24px rgba(0,0,0,0.45);
+  }
+  #sidebar.open { transform: translateX(0); visibility: visible; }
+  #zijbalkSluitRij { display: flex; }
+}
+
+/* W4.2: onder ~700px is het detailpaneel een full-screen sheet; de sluitknop wordt
+   sticky (blijft bovenaan zichtbaar terwijl de inhoud eronder doorscrolt). */
+@media (max-width: 700px) {
+  #detail { width: 100vw; border-left: none; padding: 14px 16px 20px; }
+  #detail .close-btn {
+    position: sticky; top: 0; right: auto; margin-left: auto; width: 32px; height: 32px;
+    font-size: 16px; z-index: 5; background: color-mix(in srgb, var(--bg-panel) 82%, black);
+  }
+  .detail-header { padding-right: 0; }
+  .modal-overlay { padding: 12px; }
 }
 
 /* TOEVOEGEN-KNOP + MODAL */
@@ -608,13 +672,41 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .modal .arg-form .checkbox-row input { width: auto; }
 .modal .arg-form .form-row.two { display: flex; gap: 10px; }
 .modal .arg-form .form-row.two > div { flex: 1; }
+
+/* ── Laadscherm (W5.1): dekt de pagina tot de graafdata binnen is ── */
+#laadscherm {
+  /* Fallback-kleur: ook leesbaar als huisstijl.css zelf niet laadt (bv. file://) */
+  position: fixed; inset: 0; z-index: 600; background: var(--bg, #0a0a0f);
+  color: var(--text, #e8eaf0);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 20px;
+}
+#laadscherm .laad-titel { font-size: 15px; font-weight: 600; letter-spacing: 0.3px; }
+#laadscherm .laad-tekst { color: var(--text-dim); font-size: 12px; }
+.laad-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid var(--border-light); border-top-color: var(--accent);
+  animation: laad-tol 0.9s linear infinite;
+}
+@keyframes laad-tol { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .laad-spinner { animation: none; } }
+#laadFout { color: var(--text); font-size: 13px; max-width: 420px; line-height: 1.6; }
+#laadFout code { color: var(--text-dim); }
+#laadFout button {
+  display: block; margin: 10px auto 0; background: rgba(108,138,255,0.18);
+  border: 1px solid rgba(108,138,255,0.4); color: var(--accent);
+  padding: 7px 16px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px;
+}
+#laadFout button:hover { background: rgba(108,138,255,0.28); }
 </style>
 </head>
 <body>
 
 <header id="topbar">
+  <button type="button" id="zijbalkKnop" aria-expanded="false" aria-label="Filters en instellingen"
+          title="Filters en instellingen (zijbalk)">☰</button>
   <h1>Propagandamodel</h1>
-  <span class="subtitle">NL Politiek &amp; Media</span>
+  <span class="subtitle">NL politiek &amp; media</span>
   <div class="model-toggle" id="modelToggle">
     <button data-model="instance">Praktijk Model</button>
     <button class="active" data-model="theory">Theoretisch Model</button>
@@ -624,10 +716,23 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <input type="text" id="search" placeholder="Zoek..." autocomplete="off" spellcheck="false">
   </div>
   <button type="button" id="discussieBtn" class="admin-btn" title="Open de overlegpagina — alle threads én open voorstellen, op een eigen pagina">Overleg</button>
+  <a id="werkbankBtn" class="admin-btn" href="/werkbank" style="display:none;text-decoration:none" title="Mijn werkbank: eigen ingediend werk + ontvangen feedback">Werkbank</a>
+  <a id="beheerBtn" class="admin-btn" href="/beheer" style="display:none;text-decoration:none" title="Accountbeheer: rollen &amp; accounts (maintainer)">Beheer</a>
   <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen" style="display:none">+ Toevoegen</button>
   <a id="authChip" class="admin-btn" href="/login" style="display:none;text-decoration:none">Inloggen</a>
   <div class="stats" id="stats"></div>
 </header>
+
+<!-- Eerste hulp bij de model-schakelaar (W2.4): eenmalig, wegklikbaar; tekst volgt
+     DOCUMENTATIE.md § "Architectuur: twee lagen". Positie wordt onder #modelToggle gezet. -->
+<div class="model-intro" id="modelIntro" hidden>
+  <b>Twee lagen, één schakelaar.</b>
+  Het <b>theoretisch model</b> is abstract, zonder namen: welke rollen bestaan er in het
+  medialandschap en via welke mechanismen oefenen ze invloed uit? Het <b>praktijkmodel</b>
+  is concreet, met namen: de echte entiteiten en relaties in Nederland
+  (bijv. DPG Media bezit de Volkskrant).
+  <div class="mi-acties"><button type="button" class="prim" id="modelIntroOk">Begrepen</button></div>
+</div>
 
 <div class="modal-overlay" id="addModal">
   <div class="modal">
@@ -640,19 +745,28 @@ details.detail-section > .sec-body { margin-top: 8px; }
   </div>
 </div>
 
+<div id="zijbalkBackdrop" hidden></div>
 <aside id="sidebar">
+  <div id="zijbalkSluitRij">
+    <span>Weergave &amp; filters</span>
+    <button type="button" id="zijbalkSluit" aria-label="Zijbalk sluiten" title="Sluiten">&times;</button>
+  </div>
   <div class="panel-section collapsible" id="colorModeSection">
     <h3>Kleuring</h3>
     <div class="view-toggle" id="viewToggle">
       <button class="active" data-mode="type">Type</button>
       <button data-mode="filter">Filter</button>
-      <button data-mode="ideologie" title="Kleur de nodes naar hun afgeleide politieke positie (kleurmeter). Eén as tegelijk: kies hieronder. Geen gesourcet signaal → grijs; dun bewijs → bleker.">Ideologie</button>
+      <button data-mode="ideologie" title="Kleur op afgeleide politieke positie (kleurmeter)">Ideologie</button>
     </div>
     <div id="ideoControls" style="display:none;margin-top:8px">
-      <div class="view-toggle" id="ideoAxisToggle" style="font-size:10px">
-        <button class="active" data-axis="economisch">Economisch</button>
-        <button data-axis="cultureel">Cultureel</button>
-        <button data-axis="establishment">Establishment</button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="view-toggle" id="ideoAxisToggle" style="font-size:10px;flex:1">
+          <button class="active" data-axis="economisch">Economisch</button>
+          <button data-axis="cultureel">Cultureel</button>
+          <button data-axis="establishment">Establishment</button>
+        </div>
+        <button type="button" class="uitleg" aria-label="Uitleg over de ideologie-kleuring"
+                data-uitleg="Kleurt de nodes naar hun afgeleide politieke positie (kleurmeter), opgebouwd uit gesourcete signalen. Eén as tegelijk: economisch (links/rechts), cultureel (progressief/conservatief) of establishment (anti-elite-houding). Geen gesourcet signaal → grijs; dun bewijs → bleker.">ⓘ</button>
       </div>
       <div id="ideoLegend" style="margin-top:8px"></div>
     </div>
@@ -661,7 +775,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <h3>Filters (Chomsky/Herman)</h3>
     <div class="filter-group" id="filterChips"></div>
   </div>
-  <div class="panel-section collapsible" id="themeSection">
+  <div class="panel-section collapsible geavanceerd" id="themeSection">
     <h3>Thema's (dwarsverbanden)</h3>
     <div style="font-size:10px;color:var(--text-muted);margin:-2px 0 7px">Klik om in te zoomen op een dwarsverband (binnen de actieve filters)</div>
     <div class="filter-group" id="themeChips"></div>
@@ -677,7 +791,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <span id="timeMax">—</span>
     </div>
   </div>
-  <div class="panel-section collapsible" id="sliderSection">
+  <div class="panel-section collapsible geavanceerd" id="sliderSection">
     <h3>Drempelwaarden</h3>
     <div class="slider-row">
       <label id="certLabel">Zekerheid</label>
@@ -690,7 +804,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <span class="val" id="inflVal">0</span>
     </div>
   </div>
-  <div class="panel-section collapsible" id="fieldSection">
+  <div class="panel-section collapsible geavanceerd" id="fieldSection">
     <h3>Systemische effecten</h3>
     <div id="fieldToggleRow">
       <!-- Alleen het vinkje bedient de contour-toggle; klik op de rest van de rij
@@ -701,57 +815,57 @@ details.detail-section > .sec-body { margin-top: 8px; }
         <input type="checkbox" id="fieldToggle" style="cursor:pointer;flex-shrink:0"
                title="Alle emergente velden als vage contour tonen/verbergen">
         <div id="emergentDropdownRow" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer"
-             title="Klik om de lijst uit te klappen en velden uit te lichten — ook als de toggle uit staat.">
+             title="Klik om de lijst uit te klappen en velden uit te lichten">
           <span>Emergente velden</span>
-          <span style="color:var(--text-muted);font-size:11px" aria-hidden="true"
-                title="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van instemming). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel.">ⓘ</span>
+          <button type="button" class="uitleg" aria-label="Uitleg over emergente velden"
+                  data-uitleg="Transparante gouden velden rond een gróép rollen waarvan het samenspel een systeemeffect voortbrengt (bv. fabricage van instemming). Géén bron→doel-pijl: het effect hoort bij de hele groep; klik op het veld voor het samenspel. Het vinkje toont alle velden als vage contour; via het pijltje licht je één of meer velden uit — ook als het vinkje uit staat.">ⓘ</button>
           <button type="button" class="dropdown-btn" id="emergentDropdownBtn" style="margin-left:auto"
-                  title="Licht één of meer emergente velden uit in de graaf — ook als de toggle uit staat.">
+                  title="Licht één of meer emergente velden uit in de graaf">
             <span class="count" id="emergentCount" style="display:none">0</span>
             <span class="chev" aria-hidden="true">▼</span>
           </button>
         </div>
       </div>
       <div class="dropdown-list" id="emergentChips"></div>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
-             title="Violette ringen rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias). Diffuus, géén gericht kanaal. Aan = de node-grootte telt deze veld-effecten mee; uit = schone dyadische maat.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px">
         <input type="checkbox" id="haloToggle">
         <span>Halo's (veld-eigenschappen)</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over halo's"
+                data-uitleg="Violette ringen rond een node die een systeemeigenschap ondergáát (veld-eigenschap — bv. zelfcensuur, emergente bias). Diffuus, géén gericht kanaal. Aan = de node-grootte telt deze veld-effecten mee; uit = schone dyadische maat.">ⓘ</button>
       </label>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
-           title="Bij selectie berekende ≥2-hops-routes (violet, gestippeld): de sterkste onderbouwde keten van bron naar doel, getoetst aan de drie poorten (schakelscore, schakelargumenten, padclaim).">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px">
       <input type="checkbox" id="derivedToggle">
       <span>Indirecte (afgeleide) pijlen</span>
-      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      <button type="button" class="uitleg" aria-label="Uitleg over indirecte pijlen"
+              data-uitleg="Bij selectie berekende ≥2-hops-routes (violet, gestippeld): de sterkste onderbouwde keten van bron naar doel, getoetst aan de drie poorten (schakelscore, schakelargumenten, padclaim).">ⓘ</button>
     </label>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
-           title="De gewone dyadische edges. Uit = alleen nodes (plus eventuele velden/indirecte pijlen), handig om de niet-directe lagen los te bekijken.">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px">
       <input type="checkbox" id="directToggle" checked>
       <span>Directe pijlen</span>
-      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      <button type="button" class="uitleg" aria-label="Uitleg over directe pijlen"
+              data-uitleg="De gewone dyadische edges. Uit = alleen nodes (plus eventuele velden/indirecte pijlen), handig om de niet-directe lagen los te bekijken.">ⓘ</button>
     </label>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="brugAffRow"
-           title="Bij selectie van een node: neutrale stippellijnen naar nodes die via een gedeelde tussenpersoon of gedeeld gremium verbonden zijn — lidmaatschap, bestuur, adviseur, draaideur, personeel. Praktijkmodel = tussen entiteiten (diachroon); theoriemodel = dezelfde bruggen samengevat op rolniveau. Géén invloedsbewering, alleen wie-deelt-wie.">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="brugAffRow">
       <input type="checkbox" id="brugAffToggle">
       <span>Bruggen: gedeelde lidmaatschappen</span>
-      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      <button type="button" class="uitleg" aria-label="Uitleg over lidmaatschapsbruggen"
+              data-uitleg="Bij selectie van een node: neutrale stippellijnen naar nodes die via een gedeelde tussenpersoon of gedeeld gremium verbonden zijn — lidmaatschap, bestuur, adviseur, draaideur, personeel. Praktijkmodel = tussen entiteiten (diachroon); theoriemodel = dezelfde bruggen samengevat op rolniveau. Géén invloedsbewering, alleen wie-deelt-wie.">ⓘ</button>
     </label>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="brugBezitRow"
-           title="Idem, maar via gedeeld bezit/geld — gedeelde eigenaar, investeerder, financier of grootadverteerder. Default uit: via grote hubs (bv. een conglomeraat dat veel titels bezit) wordt dit snel een wolk.">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="brugBezitRow">
       <input type="checkbox" id="brugBezitToggle">
       <span>Bruggen: gedeeld bezit/geld</span>
-      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      <button type="button" class="uitleg" aria-label="Uitleg over bezitsbruggen"
+              data-uitleg="Als de lidmaatschapsbruggen, maar via gedeeld bezit/geld — gedeelde eigenaar, investeerder, financier of grootadverteerder. Default uit: via grote hubs (bv. een conglomeraat dat veel titels bezit) wordt dit snel een wolk.">ⓘ</button>
     </label>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="voorgesteldRow"
-           title="Toon entiteiten en relaties die nog 'voorgesteld' zijn (in review, nog niet goedgekeurd) — gestippeld/amber. Default uit: de viz toont het goedgekeurde model. Alleen relevant in het praktijkmodel.">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="voorgesteldRow">
       <input type="checkbox" id="voorgesteldToggle">
       <span>Toon voorgesteld (in review)</span>
-      <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+      <button type="button" class="uitleg" aria-label="Uitleg over voorgestelde elementen"
+              data-uitleg="Toon entiteiten en relaties die nog 'voorgesteld' zijn (in review, nog niet goedgekeurd) — gestippeld/amber. Default uit: de viz toont het goedgekeurde model. Alleen relevant in het praktijkmodel.">ⓘ</button>
     </label>
   </div>
-  <div class="panel-section" id="layoutSection">
+  <div class="panel-section geavanceerd" id="layoutSection">
     <h3 id="layoutHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
         title="Klik om de layout-opties uit of in te klappen.">
       Layout
@@ -759,66 +873,67 @@ details.detail-section > .sec-body { margin-top: 8px; }
     </h3>
     <div id="layoutBody" style="display:none">
       <!-- Wat de physics doet als filters/sliders elementen laten verschijnen of verdwijnen. -->
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"
-             title="Uitgefilterde nodes blijven onzichtbaar meedoen in de physics: de layout blijft stilstaan en terugkerende nodes verschijnen op hun vertrouwde plek.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
         <input type="radio" name="layoutMode" value="stable">
         <span>Stabiel</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over layout-modus Stabiel"
+                data-uitleg="Uitgefilterde nodes blijven onzichtbaar meedoen in de physics: de layout blijft stilstaan en terugkerende nodes verschijnen op hun vertrouwde plek.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
-             title="De physics volgt de zichtbare subset, maar met een zachte opwarm-puls: het netwerk schuift licht bij in de vrijgekomen ruimte zonder zich volledig te herschikken — posities blijven herkenbaar.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px">
         <input type="radio" name="layoutMode" value="soft">
         <span>Licht meebewegen</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over layout-modus Licht meebewegen"
+                data-uitleg="De physics volgt de zichtbare subset, maar met een zachte opwarm-puls: het netwerk schuift licht bij in de vrijgekomen ruimte zonder zich volledig te herschikken — posities blijven herkenbaar.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
-             title="De physics volgt de zichtbare subset met een stevige opwarm-puls: het netwerk trekt samen als er elementen wegvallen en vouwt open als er iets bijkomt. Posities kunnen flink verschuiven.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px">
         <input type="radio" name="layoutMode" value="reflow" checked>
         <span>Volledig hervormen</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over layout-modus Volledig hervormen"
+                data-uitleg="De physics volgt de zichtbare subset met een stevige opwarm-puls: het netwerk trekt samen als er elementen wegvallen en vouwt open als er iets bijkomt. Posities kunnen flink verschuiven.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px" id="edgeLabelRow"
-             title="De mechanisme-namen op de directe pijlen. Uit = rustiger beeld; hover op een pijl toont de naam alsnog.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px" id="edgeLabelRow">
         <input type="checkbox" id="edgeLabelToggle">
         <span>Namen op directe pijlen</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over namen op directe pijlen"
+                data-uitleg="De mechanisme-namen op de directe pijlen. Uit = rustiger beeld; hover op een pijl toont de naam alsnog.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px"
-             title="Korte samenvatting van de eindclaim op de afgeleide (indirecte) pijlen. Uit = rustiger beeld; hover en klik op de pijl blijven werken.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px">
         <input type="checkbox" id="derivedLabelToggle" checked>
         <span>Namen op indirecte pijlen</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over namen op indirecte pijlen"
+                data-uitleg="Korte samenvatting van de eindclaim op de afgeleide (indirecte) pijlen. Uit = rustiger beeld; hover en klik op de pijl blijven werken.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px"
-             title="Toon de bruggen (gedeelde lidmaatschappen/bezit) óók zonder dat je een node hebt aangeklikt — alle brug-paren over de zichtbare graaf. Default uit; kan druk worden. Volgt de affiliatie/bezit-toggles.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px">
         <input type="checkbox" id="brugGlobaalToggle" checked>
         <span>Bruggen ook zonder selectie</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over globale bruggen"
+                data-uitleg="Toon de bruggen (gedeelde lidmaatschappen/bezit) óók zonder dat je een node hebt aangeklikt — alle brug-paren over de zichtbare graaf. Default uit; kan druk worden. Volgt de affiliatie/bezit-toggles.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px" id="filterRingRow"
-             title="Een gekleurd boogsegment per propagandafilter dat deze node via zijn banden raakt (in- én uitgaand). De bolkleur toont alleen het primaire filter; de ring laat zien dat een speler vaak in meerdere filters tegelijk meedoet of eraan onderhevig is. Praktijkmodel = per entiteit, uit haar relaties (over alle jaren); theoriemodel = per rol, uit de mechanismen die de rol overspannen (systeemactoren lichten zo meerdere filters op). Boog-breedte ~ aantal banden in dat filter; alleen bij ≥2 filters. Géén invloedsbewering.">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:10px" id="filterRingRow">
         <input type="checkbox" id="filterRingToggle">
         <span>Filter-ring (multi-filter)</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over de filter-ring"
+                data-uitleg="Een gekleurd boogsegment per propagandafilter dat deze node via zijn banden raakt (in- én uitgaand). De bolkleur toont alleen het primaire filter; de ring laat zien dat een speler vaak in meerdere filters tegelijk meedoet of eraan onderhevig is. Praktijkmodel = per entiteit, uit haar relaties (over alle jaren); theoriemodel = per rol, uit de mechanismen die de rol overspannen. Boog-breedte ~ aantal banden in dat filter; alleen bij ≥2 filters. Géén invloedsbewering.">ⓘ</button>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="filterMixRow"
-             title="Vul de bol niet met de pure primaire-filterkleur, maar met een gewogen mengkleur van álle filters die op de node werken — naar rato van het aantal banden per filter (zelfde telling als de filter-ring). Een speler in één filter houdt die kleur; een hub die meerdere filters raakt krijgt een gemengde tint. De ring toont de exacte verdeling, de vulling de gestalt. Werkt op de filterkleur (theoriemodel altijd; praktijkmodel als 'Kleur op filter' aanstaat).">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="filterMixRow">
         <input type="checkbox" id="filterMixToggle">
         <span>Filterkleur mengen (i.p.v. primair)</span>
-        <span style="color:var(--text-muted);font-size:11px" aria-hidden="true">ⓘ</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over filterkleur mengen"
+                data-uitleg="Vul de bol niet met de pure primaire-filterkleur, maar met een gewogen mengkleur van álle filters die op de node werken — naar rato van het aantal banden per filter (zelfde telling als de filter-ring). Een speler in één filter houdt die kleur; een hub die meerdere filters raakt krijgt een gemengde tint. De ring toont de exacte verdeling, de vulling de gestalt.">ⓘ</button>
       </label>
     </div>
   </div>
-  <div class="panel-section collapsible" id="sizeSection">
+  <div class="panel-section collapsible geavanceerd" id="sizeSection">
     <h3>Node-grootte</h3>
     <select id="sizeMetric" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);font-size:12px"></select>
     <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Waar de grootte van de bollen op schaalt.</div>
   </div>
   <!-- Review-wachtrij + threads wonen op /overleg (topbar-knop "Overleg") -->
-  <div class="panel-section" id="healthSection">
-    <h3 id="healthHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
-        title="Gezondheidsfoto van het model — dezelfde checks als scripts/validate_model.py, live via /api/health.">
+  <div class="panel-section geavanceerd" id="healthSection">
+    <h3 id="healthHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center">
       Modelgezondheid
+      <button type="button" class="uitleg" aria-label="Uitleg over modelgezondheid" style="margin-left:6px;text-transform:none;letter-spacing:normal"
+              data-uitleg="Gezondheidsfoto van het model — dezelfde checks als scripts/validate_model.py, live via /api/health.">ⓘ</button>
       <span class="chev" id="healthChev" style="margin-left:auto;font-size:9px;transition:transform 0.15s" aria-hidden="true">▶</span>
     </h3>
     <div id="healthBody" style="display:none">
@@ -826,6 +941,14 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <button type="button" id="healthRefresh" class="dropdown-btn" style="margin-top:8px"
               title="Herbereken via /api/health (vereist een draaiende server.py)">Ververs</button>
     </div>
+  </div>
+  <div id="advancedRow">
+    <label>
+      <input type="checkbox" id="advancedToggle">
+      <span>Geavanceerd</span>
+    </label>
+    <button type="button" class="uitleg" aria-label="Uitleg over de geavanceerde stand"
+            data-uitleg="Toont de expert-lagen: thema's (dwarsverbanden), drempelwaarden, systemische effecten (velden, halo's, bruggen, indirecte pijlen), layout-instellingen, node-grootte en modelgezondheid. De stand wordt onthouden op dit apparaat.">ⓘ</button>
   </div>
 </aside>
 
@@ -847,18 +970,33 @@ details.detail-section > .sec-body { margin-top: 8px; }
 <div class="tooltip" id="tooltip"></div>
 <div class="help-hint">Klik op een node voor details &middot; Sleep om te verplaatsen &middot; Scroll om te zoomen</div>
 
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<div id="laadscherm" role="status">
+  <div class="laad-titel">Propagandamodel</div>
+  <div class="laad-spinner" id="laadSpinner" aria-hidden="true"></div>
+  <div class="laad-tekst" id="laadTekst">Modeldata laden&hellip;</div>
+  <div id="laadFout" hidden>
+    De modeldata kon niet geladen worden.<br>
+    Draait de server (<code>python3 server.py</code>)?
+    <button type="button" onclick="location.reload()">Probeer opnieuw</button>
+  </div>
+</div>
 
-<script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="/static/shared_vocab.js"></script>
+
+<script type="text/plain" id="appScript">
 // ============================================================
-// DATA
+// DATA — klaargezet door de boot-loader onderaan de pagina: live opgehaald
+// via GET /api/graph_data, of ingebakken door scripts/generate_viz.py in de
+// statische export. Dit script staat inert (type="text/plain") tot de data
+// er is en wordt dan als klassiek script geëvalueerd.
 // ============================================================
-const DATA = "%%DATA%%";
+const DATA = window.__GRAAFDATA__;
 
 // FILTER_COLORS + FILTER_LABELS komen uit de gedeelde model-woordenschat
-// (web/shared_vocab.js), hier ingelined door scripts/generate_viz.py. Eén bron van
+// (web/shared_vocab.js, hierboven als apart script geladen; de statische
+// export inlinet dat bestand op de plek van de script-tag). Eén bron van
 // waarheid, gedeeld met de overlegpagina. Niet hier opnieuw definiëren.
-/*%%SHARED_VOCAB%%*/
 // Kleuren per STRUCTURELE entiteitsvorm (kleurmodus "type"). Personen vormen één
 // categorie; hun functie in het model kleurt via de kleurmodus "filter".
 // Volgorde is bewust thematisch gegroepeerd; de legenda volgt deze volgorde.
@@ -911,6 +1049,21 @@ const THEME_COLORS = {
   platform: '#34e7e4', benoemingsketen: '#ff5e57',
   omroepbestel: '#0be881', kennis_expertise: '#ffa801',
 };
+
+// ── Leesbare namen (W2.3): weergavelaag over de theorielaag ──
+// De ruwe snake_case-sleutel blijft bewaard in .key (zoeken matcht op beide);
+// .name wordt overal de weergavenaam (weergaveNaam uit shared_vocab.js).
+// Puur weergave: ids, API-payloads en scores veranderen niet. Interne
+// naam-vergelijkingen (role_name ↔ rol.name) blijven kloppen doordat beide
+// kanten door dezelfde functie gaan.
+function leesbaarTheorieElement(el) {
+  if (el && el.key == null) { el.key = el.name; el.name = weergaveNaam(el.name); }
+  return el;
+}
+(DATA.roles || []).forEach(leesbaarTheorieElement);
+(DATA.mechanisms || []).forEach(leesbaarTheorieElement);
+(DATA.entities || []).forEach(e => { if (e.role_name) e.role_name = weergaveNaam(e.role_name); });
+(DATA.relations || []).forEach(r => { if (r.mechanism_name) r.mechanism_name = weergaveNaam(r.mechanism_name); });
 
 // ============================================================
 // DISCUSSIEBOOM HELPERS
@@ -1110,6 +1263,12 @@ function renderArgNode(arg, depth) {
   // M1.8: ondergraving-type op een contradicting-reply
   const objBadge = arg.objection_type ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,0.12);color:#e74c3c;white-space:nowrap" title="ondergraving: de redenering van het argument hierboven deugt niet">⌁ ${OBJECTION_LABELS[arg.objection_type] || arg.objection_type}</span>` : '';
 
+  // Rustige knoop (W3.2b, zelfde patroon als /overleg): in rust alleen inhoud +
+  // oordeel-paar; reageren en bezwaar-afhandeling zitten achter één ⋯-menu.
+  const menuKnop = argMenuItemsViz(arg).length
+    ? `<button type="button" class="hs-menu-knop" onclick="argMenuViz(${arg.id}, this)" aria-haspopup="menu"
+         aria-expanded="false" aria-label="Acties voor argument #${arg.id}" title="Acties (reageren, bezwaar afhandelen)">⋯</button>`
+    : '';
   let html = `<div class="arg-node ${depthClass} depth-${depth}">
     <div class="arg-header">
       <span class="arg-stance ${arg.stance}">${STANCE_SYMBOLS[arg.stance]}</span>
@@ -1117,6 +1276,7 @@ function renderArgNode(arg, depth) {
       <span class="arg-claim">${arg.claim}</span>
       ${objBadge}
       ${statusBadge}
+      ${menuKnop}
     </div>`;
 
   if (arg.reasoning) {
@@ -1161,15 +1321,7 @@ function renderArgNode(arg, depth) {
     html += '</div>';
   }
 
-  // Reageer-balk: drie expliciete 'moves' i.p.v. één vage 'Reageer'-knop. Elke reactie is
-  // een TAK in de boom — aanvullen (+) en nuanceren (~) bouwen voort op het argument,
-  // weerleggen (✗) is de ondergraving die de kracht dempt tot ze is opgelost. Het reply-
-  // formulier erft de doelen van de parent via argsById.
-  // Geen losse '+ bron' op een bestaand argument: bronnen voeg je toe bij het MAKEN of
-  // REVISEREN van je eigen argument (niet bij dat van een ander). Reageren blijft.
-  html += `<div class="reageer-bar">
-    <button class="reageer-knop" onclick="showReplyForm(${arg.id}, 'supporting')" title="Reageer op dit argument — kies Voor, Tegen of Context">↩ Reageer</button>
-  </div>`;
+  // Reageren zit in het ⋯-menu (W3.2b); het reply-formulier landt in dit slot.
   html += `<div id="reply-slot-${arg.id}"></div>`;
 
   if (hasChildren) {
@@ -1213,34 +1365,61 @@ function ratingRegel(arg, telling) {
   return `<span class="oordeel-rij">${eens}${oneens}</span>`;
 }
 
-// De resolutielus van een ONDERGRAVING: badge + overgangsknoppen. Auteur van het
-// aangevochten argument zet 'herzien' ('ik heb het aangepast'); de bezwaarmaker
-// beoordeelt opnieuw ('opgelost' of 'blijft staan'); een reviewer mag overrulen ná
-// 'herzien'. De server bewaakt wie wat mag — deze knoppen volgen alleen de identiteit.
+// De resolutielus van een ONDERGRAVING: hier alleen de status-badge; de overgangs-
+// acties (herzien/opgelost/blijft/overrule) zitten in het ⋯-menu van de knoop (W3.2b).
 function bezwaarRegel(arg) {
   if (!arg.parent_argument_id || arg.stance !== 'contradicting' || !arg.bezwaar_resolutie) return '';
-  const st = arg.bezwaar_resolutie;
   const BADGE = {
     open:     ['⏳ bezwaar open',           '#e67e22'],
     herzien:  ['↻ herzien — herbeoordeel',  '#3498db'],
     blijft:   ['● blijft staan',            '#e74c3c'],
     opgelost: ['✓ opgelost (dempt niet)',   '#2ecc71'],
   };
-  const [label, kleur] = BADGE[st] || [st, 'var(--text-muted)'];
-  let h = `<div style="font-size:10px;margin-top:2px"><span style="color:${kleur};font-weight:600" title="Stand van de resolutielus van dit bezwaar">${label}</span>`;
-  if (authUser) {
-    const me = authUser.username;
+  const [label, kleur] = BADGE[arg.bezwaar_resolutie] || [arg.bezwaar_resolutie, 'var(--text-muted)'];
+  return `<div style="font-size:10px;margin-top:2px"><span style="color:${kleur};font-weight:600"`
+    + ` title="Stand van de resolutielus van dit bezwaar — afhandelen kan via het ⋯-menu">${label}</span></div>`;
+}
+
+// W3.2b: alle acties op een argument-knoop in één ⋯-menu (gedeeld hsMenu-patroon,
+// zelfde taal als /overleg). Reageren vergt een account (de server weigert anoniem);
+// de bezwaar-overgangen volgen dezelfde identiteitsregels als voorheen — de server
+// bewaakt wie wat mag, dit menu toont alleen wat zinvol is.
+function argMenuItemsViz(arg) {
+  if (!authUser) return [];
+  const items = [
+    { label: '＋ Bewijs vóór…', onClick: () => showReplyForm(arg.id, 'supporting'),
+      titel: 'draag bewijs of een argument aan dat dit argument ondersteunt' },
+    { label: '－ Bewijs tegen…', onClick: () => showReplyForm(arg.id, 'contradicting'),
+      titel: 'draag bewijs of een argument aan dat tegen dit argument in gaat' },
+  ];
+  // Afhandeling van een ondergraving: auteur van het aangevochten argument meldt
+  // 'herzien'; de bezwaarmaker herbeoordeelt; een reviewer mag overrulen ná 'herzien'.
+  if (arg.parent_argument_id && arg.stance === 'contradicting' && arg.bezwaar_resolutie) {
+    const st = arg.bezwaar_resolutie;
     const parent = argsById.get(arg.parent_argument_id) || {};
-    const benAuteur = parent.contributed_by === me;       // auteur van het aangevochten argument
-    const benBezwaarmaker = arg.contributed_by === me;    // wie het bezwaar plaatste
+    const benAuteur = parent.contributed_by === authUser.username;
+    const benBezwaarmaker = arg.contributed_by === authUser.username;
     const benReviewer = ['reviewer', 'maintainer'].includes(authUser.role);
-    const knop = (actie, tekst) => ` <a href="#" style="color:var(--accent)" onclick="bezwaarActie(${arg.id},'${actie}');return false">${tekst}</a>`;
-    if (st !== 'opgelost' && (benAuteur || benReviewer)) h += knop('herzien', 'ik heb dit aangepast');
-    if (benBezwaarmaker) { h += knop('opgelost', 'opgelost'); h += knop('blijft', 'blijft staan'); }
-    else if (benReviewer && st === 'herzien') h += knop('opgelost', 'sluiten (overrule)');
+    const bez = [];
+    if (st !== 'opgelost' && (benAuteur || benReviewer))
+      bez.push({ label: 'Bezwaar: ik heb dit aangepast', onClick: () => bezwaarActie(arg.id, 'herzien'),
+        titel: 'meld dat het bekritiseerde argument is herzien — de bezwaarmaker herbeoordeelt' });
+    if (benBezwaarmaker) {
+      bez.push({ label: 'Bezwaar: opgelost', onClick: () => bezwaarActie(arg.id, 'opgelost'),
+        titel: 'jouw bezwaar is verholpen — het dempt niet langer' });
+      bez.push({ label: 'Bezwaar: blijft staan', onClick: () => bezwaarActie(arg.id, 'blijft'),
+        titel: 'de herziening lost je bezwaar niet op — het blijft dempen' });
+    } else if (benReviewer && st === 'herzien') {
+      bez.push({ label: 'Bezwaar sluiten (overrule)', onClick: () => bezwaarActie(arg.id, 'opgelost'),
+        titel: 'reviewer-overrule ná herziening: sluit het bezwaar als opgelost' });
+    }
+    if (bez.length) items.push('---', ...bez);
   }
-  h += '</div>';
-  return h;
+  return items;
+}
+function argMenuViz(id, knop) {
+  const a = argsById.get(id);
+  if (a) hsMenu(knop, argMenuItemsViz(a));
 }
 
 async function rateArgument(argId, oordeel) {
@@ -1510,8 +1689,9 @@ function renderArgForm(opts) {
     ? `<div class="reply-kruimel">↳ je reageert op <b>«${parentClaim.slice(0, 100)}${parentClaim.length > 100 ? '…' : ''}»</b></div>`
     : '';
   // Eén consistente positiekeuze (Voor/Tegen/Context), root én reply. Bij een reply staat de
-  // positie voorgekozen uit de knop waarmee je hier kwam (↩ Reageer→Voor, '✗ Logica klopt niet'
-  // →Tegen) en kun je nog wisselen; − Tegen is de ondergraving en vereist onderbouwing.
+  // positie voorgekozen uit de ingang ('＋ Bewijs vóór' in het ⋯-menu → Voor; '－ Bewijs tegen'
+  // of '✗ Logica klopt niet' → Tegen) en kun je nog wisselen; − Tegen is de ondergraving en
+  // vereist onderbouwing.
   const replyStance = opts.stance || 'supporting';
 
   const stanceHint = `Elk argument landt als <b>voorstel</b> (M2.2) en telt pas mee nadat een
@@ -1809,7 +1989,7 @@ function showReplyForm(argId, stance) {
 
 // '✗ Logica klopt niet' → de reageer-composer met '− Tegen' voorgekozen (onderbouwing verplicht).
 function showBezwaarForm(argId) {
-  if (!authUser) { alert('Log in om een bezwaar in te dienen.'); return; }
+  if (!authUser) { melding('Log in om een bezwaar in te dienen.', 'warn'); return; }
   showReplyForm(argId, 'contradicting');
 }
 
@@ -1822,11 +2002,11 @@ async function bezwaarActie(argId, actie) {
       body: JSON.stringify({ actie }),
     });
     const j = await resp.json();
-    if (!resp.ok) { alert(j.error || 'Fout'); return; }
+    if (!resp.ok) { melding(j.error || 'Fout', 'fout'); return; }
     const t = findArgTargets(argId);
     await refreshScores();
     reloadDiscussion(t);
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
 // Centrale herlaad-dispatch: kiest op basis van het doel de juiste discussie-reload.
@@ -1918,7 +2098,8 @@ let state = {
   certMin: 0, inflMin: 0,
   selectedNode: null,
   selectedRelation: null,
-  adminMode: false,
+  adminMode: false,      // aangezet door initAuth zodra de ingelogde gebruiker maintainer is
+  geavanceerd: false,    // W2.1: expert-secties in de zijbalk tonen? (onthouden in localStorage)
   searchTerm: '',
   timelineYear: null,    // null = show all, number = filter to year
   legendSelection: new Set(),  // leeg = alles tonen; anders alleen geselecteerde legenda-keys
@@ -2443,7 +2624,7 @@ function joinNodes(nodesArr) {
       const isT = state.model === 'theory';
       const period = formatPeriod(d);
       tooltip.innerHTML = `
-        <div class="tt-type" style="color:${getNodeColor(d)}">${isT ? 'Rol' : d.type}</div>
+        <div class="tt-type" style="color:${getNodeColor(d)}">${isT ? 'Rol' : weergaveNaam(d.type)}</div>
         <div class="tt-name">${d.name}</div>
         ${period ? `<div class="tt-desc" style="margin-bottom:4px">${period}</div>` : ''}
         ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
@@ -4111,6 +4292,7 @@ function showDetail(d) {
   // Ranglijst van afgeleide (indirecte) invloed — alleen gevuld direct na selectNode.
   content.insertAdjacentHTML('beforeend', renderDerivedSection());
   panel.classList.add('open');
+  panel.scrollTop = 0;   // verse selectie begint bovenaan (op mobiel is het paneel het scherm)
 }
 
 // Twee scorebalken + opsplitsing literatuur/praktijk voor een theorie-element.
@@ -4284,17 +4466,18 @@ async function submitInstantiation(field, id, fid) {
 }
 
 async function unlinkInstantiation(iid, field, id) {
-  if (!confirm('Deze koppeling losmaken? De entiteit/relatie zelf blijft bestaan.')) return;
+  if (!(await bevestig('Deze koppeling losmaken? De entiteit/relatie zelf blijft bestaan.',
+                       { titel: 'Koppeling losmaken', okTekst: 'Losmaken' }))) return;
   try {
     const resp = await fetch(`/api/instantiations/${iid}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
     });
     const result = await resp.json();
-    if (!resp.ok) { alert(result.error || 'Fout'); return; }
+    if (!resp.ok) { melding(result.error || 'Fout', 'fout'); return; }
     DATA.instantiations = DATA.instantiations.filter(it => it.id !== iid);
     await refreshScores();
     rerenderTheoryPanel(field, id);
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
 function rerenderTheoryPanel(field, id) {
@@ -4758,7 +4941,7 @@ function showInstanceDetail(d, content, color) {
 
   let html = `
     <div class="detail-header">
-      <div class="entity-type" style="color:${color}">${d.type}</div>
+      <div class="entity-type" style="color:${color}">${weergaveNaam(d.type)}</div>
       <h2>${overlegTitel('entity_id', d.id, d.name)}</h2>
       ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
     </div>
@@ -4920,7 +5103,9 @@ function computeVisibleLinks() {
   const nodePassesFilter = new Map();
   currentNodes.forEach(n => {
     const matchLegend = !legendSel.size || legendSel.has(legendKeyOf(n));
+    // Zoeken matcht de weergavenaam én de ruwe snake_case-sleutel (W2.3).
     const matchSearch = !search || n.name.toLowerCase().includes(search)
+      || (n.key && n.key.toLowerCase().includes(search))
       || (n.description && n.description.toLowerCase().includes(search));
     const matchTime = isActiveAt(n, year);
     // Voorgestelde nodes (in review) alleen tonen als de toggle aanstaat.
@@ -5133,6 +5318,56 @@ document.querySelectorAll('.panel-section.collapsible').forEach(sec => {
   h.addEventListener('click', () => sec.classList.toggle('collapsed'));
 });
 applyPanelCollapseDefaults();
+
+// ── Eenvoudige standaardstand (W2.1) ──
+// Default toont de zijbalk alleen de kernbediening (Kleuring, Filters, Tijdlijn);
+// de expert-secties (class 'geavanceerd') verschijnen achter de schakelaar onderin.
+// Verbergen is puur visueel: alle toggles houden hun stand/gedrag.
+function applyGeavanceerd() {
+  document.getElementById('sidebar').classList.toggle('eenvoudig', !state.geavanceerd);
+}
+try { state.geavanceerd = localStorage.getItem('pm-geavanceerd') === '1'; } catch (e) {}
+const advancedToggle = document.getElementById('advancedToggle');
+advancedToggle.checked = state.geavanceerd;
+advancedToggle.addEventListener('change', e => {
+  state.geavanceerd = e.target.checked;
+  try { localStorage.setItem('pm-geavanceerd', state.geavanceerd ? '1' : '0'); } catch (err) {}
+  applyGeavanceerd();
+});
+applyGeavanceerd();
+
+// ── Eerste hulp bij de model-schakelaar (W2.4) ──
+// Eénmalige toelichting bij de Praktijk/Theorie-schakelaar; daarna nooit meer
+// (localStorage). Sluit met de knop, Esc, of zodra de schakelaar zelf gebruikt wordt.
+(function modelIntro() {
+  const el = document.getElementById('modelIntro');
+  let gezien = true;
+  try { gezien = localStorage.getItem('pm-model-intro') === '1'; } catch (e) {}
+  if (!el || gezien) { if (el) el.remove(); return; }
+  const positioneer = () => {
+    const r = document.getElementById('modelToggle').getBoundingClientRect();
+    const x = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8));
+    el.style.top = (r.bottom + 10) + 'px';
+    el.style.left = x + 'px';
+    // Pijltje blijft naar de schakelaar wijzen, ook als de kaart tegen de rand klemt.
+    const pijl = Math.max(14, Math.min(el.offsetWidth - 24, r.left + r.width / 2 - x));
+    el.style.setProperty('--mi-pijl-x', pijl + 'px');
+  };
+  const sluit = () => {
+    try { localStorage.setItem('pm-model-intro', '1'); } catch (e) {}
+    el.remove();
+    window.removeEventListener('resize', positioneer);
+    document.removeEventListener('keydown', opEsc);
+    document.getElementById('modelToggle').removeEventListener('click', sluit);
+  };
+  const opEsc = (e) => { if (e.key === 'Escape') sluit(); };
+  el.hidden = false;
+  positioneer();
+  window.addEventListener('resize', positioneer);
+  document.addEventListener('keydown', opEsc);
+  document.getElementById('modelToggle').addEventListener('click', sluit);
+  document.getElementById('modelIntroOk').addEventListener('click', sluit);
+})();
 
 // Node-grootte-selector
 document.getElementById('sizeMetric').addEventListener('change', e => {
@@ -5372,6 +5607,13 @@ function authIndienHint() {
       chip.title = 'Ingelogd — naar de accountpagina (token, uitloggen)';
       // Bijdragen mag voor elke ingelogde gebruiker (alles loopt als voorstel).
       addBtn.style.display = '';
+      document.getElementById('werkbankBtn').style.display = '';
+      if (authUser.role === 'maintainer') {
+        document.getElementById('beheerBtn').style.display = '';
+        // W2.5: de verwijder-/ontkoppelknoppen in het detailpaneel volgen de rol —
+        // maintainer ziet ze, ieder ander niet (de server blijft de echte poort).
+        setAdminMode(true);
+      }
     } else {
       // Anoniem: lezen is vrij, schrijfknoppen blijven verborgen; één uitnodigende CTA.
       authUser = null;
@@ -5641,6 +5883,39 @@ document.getElementById('search').addEventListener('input', e => {
 // Detail close
 document.getElementById('detailClose').addEventListener('click', deselectNode);
 
+// ── Mobiel (W4.1/W4.2) ──
+// De zijbalk is onder 900px een overlay-paneel: ☰ opent, ×/Esc/tap-buiten sluiten.
+// De klasse is op desktop onschadelijk (de media query beperkt haar werking).
+function zetZijbalk(open) {
+  document.getElementById('sidebar').classList.toggle('open', open);
+  document.getElementById('zijbalkBackdrop').hidden = !open;
+  document.getElementById('zijbalkKnop').setAttribute('aria-expanded', String(open));
+}
+document.getElementById('zijbalkKnop').addEventListener('click', () =>
+  zetZijbalk(!document.getElementById('sidebar').classList.contains('open')));
+document.getElementById('zijbalkSluit').addEventListener('click', () => zetZijbalk(false));
+document.getElementById('zijbalkBackdrop').addEventListener('click', () => zetZijbalk(false));
+
+// De topbar wrapt mobiel naar meerdere rijen: meet de echte hoogte terug in --topbar-h
+// zodat zijbalk, detailpaneel, backdrop en graaf-container blijven aansluiten.
+const _topbarEl = document.getElementById('topbar');
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--topbar-h', _topbarEl.offsetHeight + 'px');
+}).observe(_topbarEl);
+
+// Esc sluit gelaagd (W4.2 — ook op desktop): add-modal → zijbalk-overlay → detailpaneel.
+// Capture-fase: een open hs-menu/-popover/-dialoog of de model-intro staat dan nog in de
+// DOM en houdt voorrang (die sluiten zichzelf via hun eigen Esc-afhandeling).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (document.querySelector('.hs-menu, .hs-popover, .hs-dlg-overlay, .model-intro:not([hidden])')) return;
+  const ae = document.activeElement;
+  if (ae && ['TEXTAREA', 'INPUT', 'SELECT'].includes(ae.tagName)) { ae.blur(); return; }
+  if (document.getElementById('addModal').classList.contains('open')) { closeAddModal(); return; }
+  if (document.getElementById('sidebar').classList.contains('open')) { zetZijbalk(false); return; }
+  if (document.getElementById('detail').classList.contains('open')) deselectNode();
+}, true);
+
 // Zoom
 document.getElementById('zoomIn').addEventListener('click', () => svgEl.transition().duration(300).call(zoom.scaleBy, 1.4));
 document.getElementById('zoomOut').addEventListener('click', () => svgEl.transition().duration(300).call(zoom.scaleBy, 0.7));
@@ -5668,7 +5943,7 @@ const ROLE_CAT_ORDER = ['eigendom','advertentie','sourcing','flak','ideologie',
 function entityTypeOptions() {
   return Object.entries(ENTITY_TYPE_GROUPS).map(([grp, types]) =>
     `<optgroup label="${grp}">` +
-    types.map(t => `<option value="${t}">${t.replace(/_/g, ' ')}</option>`).join('') +
+    types.map(t => `<option value="${t}">${weergaveNaam(t)}</option>`).join('') +
     `</optgroup>`).join('');
 }
 // Rollen gegroepeerd per filter — de filter is de betekenisvolle as, niet de losse rolnaam.
@@ -5912,7 +6187,8 @@ function removeEntityFromGraph(id) {
 async function deleteRelation(id) {
   const rel = DATA.relations.find(r => r.id === id);
   const label = rel ? `${rel.source_name || '?'} → ${rel.target_name || '?'}` : `#${id}`;
-  if (!confirm(`Relatie "${label}" definitief uit de database verwijderen?\n\nBijbehorende argumenten worden óók verwijderd.`)) return;
+  if (!(await bevestig(`Relatie "${label}" definitief uit de database verwijderen?\n\nBijbehorende argumenten worden óók verwijderd.`,
+                       { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))) return;
   try {
     const resp = await fetch(`/api/relations/${id}`, {
       method: 'DELETE',
@@ -5920,10 +6196,10 @@ async function deleteRelation(id) {
       body: JSON.stringify({ changed_by: 'admin' }),
     });
     const result = await resp.json();
-    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    if (!resp.ok) { melding(result.error || 'Verwijderen mislukt', 'fout'); return; }
     removeRelationFromGraph(id);
     deselectNode();
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
 async function deleteEntity(id) {
@@ -5931,7 +6207,8 @@ async function deleteEntity(id) {
   const name = ent ? ent.name : `#${id}`;
   const relCount = DATA.relations.filter(r => r.source_id === id || r.target_id === id).length;
   const warn = relCount ? `\n\nLet op: ${relCount} relatie(s) en bijbehorende argumenten worden óók verwijderd.` : '';
-  if (!confirm(`Entiteit "${name}" definitief uit de database verwijderen?${warn}`)) return;
+  if (!(await bevestig(`Entiteit "${name}" definitief uit de database verwijderen?${warn}`,
+                       { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))) return;
   try {
     const resp = await fetch(`/api/entities/${id}`, {
       method: 'DELETE',
@@ -5939,20 +6216,16 @@ async function deleteEntity(id) {
       body: JSON.stringify({ changed_by: 'admin' }),
     });
     const result = await resp.json();
-    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    if (!resp.ok) { melding(result.error || 'Verwijderen mislukt', 'fout'); return; }
     removeEntityFromGraph(id);
     deselectNode();
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
+// W2.5: aangeroepen door initAuth zodra de ingelogde gebruiker maintainer is.
+// Geen localStorage of aparte knop: de stand volgt puur de accountrol.
 function setAdminMode(on) {
   state.adminMode = !!on;
-  try { localStorage.setItem('pm-admin', state.adminMode ? '1' : '0'); } catch (e) {}
-  const btn = document.getElementById('adminToggle');
-  if (btn) {
-    btn.classList.toggle('active', state.adminMode);
-    btn.textContent = state.adminMode ? 'Admin ●' : 'Admin';
-  }
   // Heropen het actieve detailpaneel zodat de verwijderknop verschijnt/verdwijnt
   if (state.selectedRelation) selectRelation(state.selectedRelation);
   else if (state.selectedNode) selectNode(state.selectedNode);
@@ -5970,6 +6243,7 @@ function recomputeRoleDegrees() {
 }
 
 function addRoleToGraph(role) {
+  leesbaarTheorieElement(role);   // W2.3: verse API-objecten dragen de ruwe naam
   role.filterCat = role.category;
   role.degree = 0;
   DATA.roles.push(role);
@@ -5978,6 +6252,7 @@ function addRoleToGraph(role) {
 }
 
 function addMechanismToGraph(mech) {
+  leesbaarTheorieElement(mech);   // W2.3: verse API-objecten dragen de ruwe naam
   DATA.mechanisms.push(mech);
   if (mech.source_role_id && mech.target_role_id) {
     mechLinks.push({ ...mech, source: mech.source_role_id, target: mech.target_role_id, filterCat: mech.filter });
@@ -6087,16 +6362,17 @@ async function deleteRole(id) {
     if (mechCount) parts.push(`${mechCount} mechanisme(n)`);
     warn = `\n\nDe rol wordt losgemaakt van ${parts.join(' en ')} (die blijven zelf bestaan).`;
   }
-  if (!confirm(`Rol "${name}" definitief uit de database verwijderen?${warn}`)) return;
+  if (!(await bevestig(`Rol "${name}" definitief uit de database verwijderen?${warn}`,
+                       { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))) return;
   try {
     const resp = await fetch(`/api/roles/${id}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changed_by: 'admin' }),
     });
     const result = await resp.json();
-    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    if (!resp.ok) { melding(result.error || 'Verwijderen mislukt', 'fout'); return; }
     removeRoleFromGraph(id);
     deselectNode();
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
 async function deleteMechanism(id) {
@@ -6104,16 +6380,17 @@ async function deleteMechanism(id) {
   const name = mech ? mech.name : `#${id}`;
   const relCount = DATA.relations.filter(r => r.mechanism_id === id).length;
   const warn = relCount ? `\n\n${relCount} praktijk-relatie(s) verliezen de koppeling met dit mechanisme (de relaties blijven bestaan).` : '';
-  if (!confirm(`Mechanisme "${name}" definitief uit de database verwijderen?${warn}`)) return;
+  if (!(await bevestig(`Mechanisme "${name}" definitief uit de database verwijderen?${warn}`,
+                       { titel: 'Definitief verwijderen', okTekst: 'Verwijderen', gevaar: true }))) return;
   try {
     const resp = await fetch(`/api/mechanisms/${id}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changed_by: 'admin' }),
     });
     const result = await resp.json();
-    if (!resp.ok) { alert(result.error || 'Verwijderen mislukt'); return; }
+    if (!resp.ok) { melding(result.error || 'Verwijderen mislukt', 'fout'); return; }
     removeMechanismFromGraph(id);
     deselectNode();
-  } catch (e) { alert('Netwerkfout: ' + e.message); }
+  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 
 async function submitEntity() {
@@ -6218,6 +6495,37 @@ function selectFromHash() {
 selectFromHash();
 window.addEventListener('hashchange', selectFromHash);
 
+</script>
+
+<script>
+// ── Boot-loader (W5.1) ──────────────────────────────────────
+// Het app-script hierboven staat inert (type="text/plain") tot de graafdata er
+// is: live opgehaald via GET /api/graph_data, of — in de statische export — door
+// scripts/generate_viz.py ingebakken op de plek van de sentinel hieronder.
+// Evaluatie via een vers klassiek script-element houdt alle declaraties globaal,
+// zodat de inline onclick-handlers in de gerenderde HTML blijven werken.
+(function () {
+  const INGEBAKKEN = "%%DATA%%";
+  function start(data) {
+    window.__GRAAFDATA__ = data;
+    const app = document.createElement('script');
+    app.textContent = document.getElementById('appScript').textContent;
+    document.body.appendChild(app);  // voert de app synchroon uit
+    const scherm = document.getElementById('laadscherm');
+    if (scherm) scherm.remove();
+  }
+  function faal(err) {
+    console.error('Graafdata laden mislukte:', err);
+    document.getElementById('laadSpinner').hidden = true;
+    document.getElementById('laadTekst').hidden = true;
+    document.getElementById('laadFout').hidden = false;
+  }
+  if (typeof INGEBAKKEN === 'object' && INGEBAKKEN) { start(INGEBAKKEN); return; }
+  fetch('/api/graph_data')
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(start)
+    .catch(faal);
+})();
 </script>
 </body>
 </html>
