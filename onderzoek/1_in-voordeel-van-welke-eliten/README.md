@@ -37,7 +37,6 @@ in `../00_hoofdvragen-en-antwoord.md`; het volledige streng-1-antwoord in
 ```
 1_in-voordeel-van-welke-eliten/
 ├── README.md                          ← dit bestand: onderzoeksvraag + index + leeswijzer
-├── _sjabloon-onderzoeksnotitie.md     ← kopieer dit voor een nieuwe notitie
 ├── 00_centrale-vraag.md               ← MISSION GOAL: de vraag, prioritering (WIE>HOE), consensus-test
 ├── 00b_agenda-welke-elites-en-cases.md ← WERKLIJST: elite-taxonomie (E1–E12) + case studies (C1–C3)
 ├── 00c_hypotheses-consensus-divergentie.md ← HYPOTHESENREGISTER: consensus (A) vs. divergentie (B), gegrond in SCP-klassen
@@ -92,9 +91,9 @@ in `../00_hoofdvragen-en-antwoord.md`; het volledige streng-1-antwoord in
 - **te-verifiëren** — bevat claims die nog primair gecheckt moeten worden.
 
 ## Hoe je dit uitbreidt (de werkwijze — recursief)
-1. **Nieuwe notitie** → kopieer `_sjabloon-onderzoeksnotitie.md` naar de juiste laag-map met een
-   oplopend nummer. Vul de vaste kopjes (*Vraag · Bevindingen · Kernbronnen verbatim · Open vragen
-   · Koppeling met het model*).
+1. **Nieuwe notitie** → kopieer `../_sjabloon-onderzoeksnotitie.md` (top van `onderzoek/`) naar de
+   juiste laag-map met een oplopend nummer. Vul de vaste kopjes (*Vraag · Bevindingen · Kernbronnen
+   verbatim · Open vragen · Koppeling met het model*).
 2. **Nieuwe bron** → voeg toe aan `bronnen/bronnenregister.md` met een ID (`[P1]`, `[I4]`, `[F1]`…),
    volledige citatie, type/hardheid en verificatiestatus. Verwijs in notities met dat ID.
 3. **Subonderzoeksvraag** → krijgt een **eigen submap** met eigen `README.md` (eigen onderzoeksvraag) +
@@ -117,4 +116,4 @@ Het is onderzoek (vrije vorm), nog géén modelinhoud. Modelinhoud (bronnen, arg
 akkoord via het bijdragepad (`assistent`-token, alles `voorgesteld`). Zie `DOCUMENTATIE.md`,
 `missies/ideoloog_brief.md` en `politiek.py`.
 
-_Laatst bijgewerkt: 2026-06-29 (kopantwoord geharmoniseerd met het per-filter-bewijs: Sourcing/establishment centraal, Eigendom de zwakste route)._
+_Laatst bijgewerkt: 2026-07-02 (notitie-sjabloon verhuisd naar de top van `onderzoek/`; inhoudelijk ongewijzigd — kopantwoord geharmoniseerd 2026-06-29)._

@@ -54,7 +54,7 @@ ideologie-naar-bias/
    technocratie), en in wiens voordeel werkt ze? (`05_`; de media-belichaming = onderzoeksgat)
 
 ## Hoe je dit uitbreidt (recursief)
-Notities volgens `../../1_in-voordeel-van-welke-eliten/_sjabloon-onderzoeksnotitie.md`; groeit een deelvraag
+Notities volgens `../../_sjabloon-onderzoeksnotitie.md`; groeit een deelvraag
 uit, dan een eigen submap (zie `../../_sjabloon-onderzoeksvraag-map.md`).
 
 ## Eerlijkheidsregels (hard)

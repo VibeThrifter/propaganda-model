@@ -1,3 +1,11 @@
+---
+titel: Bronnenregister — ideologie-naar-bias
+laag: bronnen
+status: kerntekst
+laatst_bijgewerkt: 2026-06-29
+kernbronnen: []
+---
+
 # Bronnenregister — Ideologie-naar-bias (filter 5)
 
 Dit filter is grotendeels een **synthese** van zusterdossiers; de meeste bronnen leven in hun eigen

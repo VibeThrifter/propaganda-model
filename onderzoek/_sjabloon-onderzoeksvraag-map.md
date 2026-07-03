@@ -3,7 +3,7 @@
 Kopieer dit naar de `README.md` van een **nieuwe onderzoeksmap** (een streng of een submap). De regel:
 **een map = één onderzoeksvraag**, met een eigen README + eigen werkdocumenten + eventueel weer submappen
 (recursief, onbeperkt diep). Dit sjabloon is voor de *map-README*; voor een losse notitie ín de map gebruik
-je `_sjabloon-onderzoeksnotitie.md` (per streng meegeleverd).
+je `_sjabloon-onderzoeksnotitie.md` (naast dit sjabloon, in de top van `onderzoek/` — gedeeld door alle strengen).
 
 Vervang alles tussen `<…>` en verwijder de uitleg-regels (`>`-citaten).
 
@@ -34,7 +34,7 @@ over X?", nooit "zoek bewijs dat X waar is".>
 2. `01_<…>.md` — <…>
 
 ## Hoe je dit uitbreidt (recursief)
-- Nieuwe **notitie** → kopieer `_sjabloon-onderzoeksnotitie.md`, oplopend nummer.
+- Nieuwe **notitie** → kopieer `onderzoek/_sjabloon-onderzoeksnotitie.md`, oplopend nummer.
 - Nieuwe **subonderzoeksvraag** → eigen **submap** met een README volgens dít sjabloon + eigen
   werkdocumenten. Promoveer een notitie tot submap zodra ze een eigen deelvraag + eigen bronnen krijgt.
 - **Index bijwerken** in de boom hierboven én in de ouder-README.

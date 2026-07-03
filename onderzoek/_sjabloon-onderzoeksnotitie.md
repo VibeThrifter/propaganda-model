@@ -1,9 +1,9 @@
 ---
 titel: <korte titel>
-laag: <0–5 + naam, bv. "1 — Nationale elite-facties">
+laag: <streng/submap waar de notitie leeft, bv. "1 — Nationale elite-facties" of "3 — sourcing-naar-bias">
 status: concept            # kerntekst | concept | te-verifiëren
 laatst_bijgewerkt: JJJJ-MM-DD
-kernbronnen: []            # bron-ID's uit bronnen/bronnenregister.md, bv. [P1, S3]
+kernbronnen: []            # bron-ID's uit het dichtstbijzijnde bronnen/bronnenregister.md, bv. [P1, S3]
 ---
 
 # <Titel>

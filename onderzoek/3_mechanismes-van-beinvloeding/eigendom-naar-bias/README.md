@@ -1,20 +1,22 @@
-# Onderzoek — Kantelt de NL-berichtgeving via het Eigendom-filter naar de "merchant right"?
+# Mechanisme — Eigendom (filter 1) → bias
 
-Een tweede onderzoeksspoor, zustermap van `../../1_in-voordeel-van-welke-eliten/`. Waar dat dossier vraagt *naar wélke
-elite de bias wijst*, isoleert dit dossier één schakel: **eigendom → output-bias**. De vraag is niet
-"wie bezit de media" (dat is hard en gedocumenteerd) maar: **is er bewijs dat dat eigendom de
-nieuwsinhoud daadwerkelijk naar kapitaal/pro-markt kantelt — en houdt die claim stand tegen de
-Nederlandse checks-and-balances?**
+Submap van **streng 3** (`../README.md`, de mechanismes van het systeem). Dit is filter 1 van het
+propagandamodel (Herman & Chomsky 1988): **eigendom** — dit dossier isoleert één schakel:
+eigendom → output-bias. Niet *wie de media bezit* (dat is hard en gedocumenteerd, de bezitskaart),
+maar of dat bezit de inhoud stuurt.
+
+**Onderzoeksvraag:** is er bewijs dat media-eigendom de Nederlandse nieuwsinhoud daadwerkelijk
+kantelt (naar kapitaal/pro-markt of de eigenaarslijn) — en houdt die claim stand tegen de
+Nederlandse checks-and-balances?
 
 > Aanleiding (juni 2026): in het model staat de Eigendom-laag als een complete *bezitskaart*, maar
 > zónder bewijs dat die bezitsstructuur de berichtgeving stuurt. Dit dossier zoekt dat bewijs
 > **extern** (web/deep-research), niet in de modelscores.
 
-## Het korte antwoord
-**Eigendom kán inhoud causaal veranderen — maar (a) niet per se richting "merchant right", en (b)
-voor Nederland is de eigendom→bias-schakel nooit aangetoond én actief gedempt.** Via het Eigendom-
-filter alléén is dus *niet* vast te stellen dat de NL-bias naar kapitaal kantelt. Het is empirisch de
-**zwakste** route naar het elite-antwoord — zie `00_netto-oordeel.md`.
+**Antwoord in het kort:** eigendom **kán** inhoud causaal veranderen — maar (a) niet per se richting
+"merchant right", en (b) voor Nederland is de eigendom→bias-schakel nooit aangetoond én actief gedempt.
+Via het Eigendom-filter alléén is dus *niet* vast te stellen dat de NL-bias naar kapitaal kantelt. Het
+is empirisch de **zwakste** route naar het elite-antwoord — zie `00_netto-oordeel.md`.
 
 ## Mappenstructuur
 ```
@@ -38,4 +40,4 @@ Bevindingen komen uit een deep-research-run (28-06-2026): 5 zoekangles → 21 br
 een sessielimiet**; de montage hieronder is met de hand gedaan. Per claim staat de stemuitslag en of
 het bewijs **NL of niet-NL (analogie)** is. Quotes verbatim; niet-bevestigde claims dragen een vlag.
 
-_Laatst bijgewerkt: 2026-06-28._
+_Laatst bijgewerkt: 2026-07-02 (README geüniformeerd naar de streng-3-submapstijl; inhoud ongewijzigd sinds 2026-06-28)._

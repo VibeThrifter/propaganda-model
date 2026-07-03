@@ -29,6 +29,7 @@ onderwerp dat beide raakt wordt langs die lijn gesplitst — zo staan de transna
 onderzoek/
 ├── README.md                          ← dit bestand: de 3 strengen + de recursieve conventie
 ├── _sjabloon-onderzoeksvraag-map.md   ← SJABLOON: hoe een (sub)onderzoeksvraag een map wordt
+├── _sjabloon-onderzoeksnotitie.md     ← SJABLOON: een losse notitie ín een map (gedeeld door alle strengen)
 ├── 00_hoofdvragen-en-antwoord.md      ← HET CENTRALE ANTWOORD: de 3 hoofdvragen, elk met antwoord + link (extern onderbouwd)
 ├── 1_in-voordeel-van-welke-eliten/    ← STRENG 1: de begunstigde — wélke elites + de theorie (Piketty, SCP, transnationaal)
 ├── 2_wie-wordt-beinvloed/             ← STRENG 2: het publiek — het volk, de klassen, alle data + wie-moet-beïnvloed
@@ -45,8 +46,12 @@ Dit dossier is **fractaal**: een vraag is een map, en een *deel*vraag is een *su
   **antwoord-in-het-kort**, de **mappenstructuur**, de **leeswijzer**, en de **relatie** tot de
   bovenliggende/zustervragen.
 - **Werkdocumenten** in de map: genummerde notities (`00_`, `01_`, …) volgens het notitiesjabloon
-  (*Vraag · Bevindingen · Kernbronnen verbatim · Open vragen · Koppeling met het model*), plus een eigen
-  `bronnen/bronnenregister.md` waar nodig.
+  (`_sjabloon-onderzoeksnotitie.md`: *Vraag · Bevindingen · Kernbronnen verbatim · Open vragen ·
+  Koppeling met het model*), plus een eigen `bronnen/bronnenregister.md` waar nodig.
+- **Nummerconventie:** `00_` is het **kopdocument** van de map — de vraag (streng 1: `00_centrale-vraag`)
+  óf het antwoord (streng-3-submappen: `00_netto-oordeel`); extra kopdocumenten krijgen een letter
+  (`00b_`, `00c_`, …). `01_` en verder zijn de uitwerkingsnotities. Een map zonder `00_` (zoals streng 2)
+  draagt vraag + antwoord in haar `README.md`.
 - **Subonderzoeksvraag → submap.** Wordt een notitie te groot of krijgt een deelvraag een eigen leven, dan
   promoveert die tot een **submap met eigen `README.md` (eigen onderzoeksvraag) + eigen werkdocumenten +
   eventueel weer submappen**. Zo is `3_mechanismes-van-beinvloeding/` een streng met submappen per filter,
@@ -65,12 +70,12 @@ Dit dossier is **fractaal**: een vraag is een map, en een *deel*vraag is een *su
 3. `2_wie-wordt-beinvloed/` — streng 2: het volk in SCP-klassen + alle data (stemkracht, vermogen, de vier
    kapitalen) + de conclusie *wie moet beïnvloed worden* (managen/rekruteren/bedienen).
 4. `3_mechanismes-van-beinvloeding/` — streng 3: de empirische toetsing per propagandamodel-filter (Eigendom,
-   Advertentie, Sourcing, Flak, + transnationaal), elk met eigen netto-oordeel en bronnenregister.
+   Advertentie, Sourcing, Flak, Ideologie, + transnationaal), elk met eigen netto-oordeel en bronnenregister.
 
-## Status per streng (peildatum 2026-06-29)
+## Status per streng (peildatum 2026-07-02)
 - **Streng 1 (welke elites):** ✅ kerntekst — gelaagd machtsbouwwerk; kopantwoord geharmoniseerd met het bewijs (Sourcing/establishment centraal, Eigendom de zwakste route).
 - **Streng 2 (wie beïnvloed):** 🟡 concept/referentie — SCP-klassen + data hard; **twee doelwitten** (werkende kracht *gemanaged*, intellectuele kracht *gerekruteerd én geïndoctrineerd*); H1 (bandbreedte) nog te toetsen.
-- **Streng 3 (mechanismen):** Eigendom zwak · Advertentie zwak (pers) · Sourcing sterk (schakels) · Flak bestaan sterk/sturing begrensd · **Ideologie in onderzoek** · Transnationaal analogie sterk, NL onaf.
+- **Streng 3 (mechanismen):** Eigendom zwak · Advertentie zwak (pers) · Sourcing sterk (schakels) · Flak bestaan sterk/sturing begrensd · Ideologie matig (norm aanwezig, content-effect ongemeten) · Transnationaal analogie sterk, NL onaf.
 
 ## Eerlijkheidsregels (hard — voor het hele programma)
 - **Quotes verbatim of een ⚠️-vlag** (mirror/secundair/paywall/betwist); **nooit** een bron of citaat
@@ -80,4 +85,4 @@ Dit dossier is **fractaal**: een vraag is een map, en een *deel*vraag is een *su
 - **Dit is vrije-vorm onderzoek, géén modelinhoud.** Modelinhoud gaat ná akkoord via het bijdragepad
   (`assistent`-token, alles `voorgesteld`; ik stel voor, jij beslist). Zie `DOCUMENTATIE.md`.
 
-_Laatst bijgewerkt: 2026-06-29 (centraal antwoord-hub `00_hoofdvragen-en-antwoord.md`; kopantwoorden geharmoniseerd met het per-filter-bewijs; ideologie-filter in onderzoek)._
+_Laatst bijgewerkt: 2026-07-02 (structuuropruiming: notitie-sjabloon naar de top, nummerconventie `00_` gedocumenteerd, streng-3-submappen geüniformeerd, ideologie-status gesynct)._

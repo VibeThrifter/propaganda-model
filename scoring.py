@@ -859,14 +859,23 @@ def compute_income_composition(conn, include_voorgesteld=False):
     niet dekken, en het maakt meteen de propagandamodel-relevante splitsing zichtbaar:
     institutioneel/staat/fonds-geld versus publiek/markt-geld.
 
+    De EDGE maakt de samenstelling zichtbaar, het argument maakt haar meetbaar: ook
+    een `financiering`-relatie ZONDER aandeel-argument komt in het resultaat, als
+    'onbekend'-financier (share None) — zo toont een outlet met alleen ongemeten
+    funding-edges (PAX) tóch zijn financiers, met de uitnodiging het aandeel te
+    sourcen. Alleen `financiering` telt als potentieel-onbekende inkomstenbron;
+    adverteerder-edges zijn markt-inkomsten (het restpart) tot iemand er expliciet
+    een aandeel-argument aan hangt (elke edge mét argument telt, ongeacht type).
+
     Dogfood: een 'voorgesteld' aandeel-argument telt in NIETS tot een mens het merget;
-    include_voorgesteld=True toont ze voorlopig (viz-preview, zoals de kleurmeter).
+    include_voorgesteld=True toont ze voorlopig (viz-preview, zoals de kleurmeter) en
+    laat ook 'voorgesteld' financiering-edges als onbekend-financier meedoen.
     Verworpen/vervangen argumenten en vervangen relaties tellen nooit mee. Draagt één
     edge meerdere aandeel-argumenten (bijv. verschillende jaren), dan wint het recentste
     jaar (tiebreak: hoogste argument-id).
 
-    Retourneert {outlet_id: {outlet, slices:[…], som_institutioneel, residu, jaren,
-    bevat_voorgesteld}}. Geen institutionele edge → outlet komt niet voor (geen pie).
+    Retourneert {outlet_id: {outlet, slices:[…], onbekend:[…], som_institutioneel,
+    residu, jaren, bevat_voorgesteld}}. Geen financier-edge → outlet komt niet voor.
     """
     rows = conn.execute("""
         SELECT a.id, a.relation_id, a.property_value, a.status,
@@ -899,25 +908,55 @@ def compute_income_composition(conn, include_voorgesteld=False):
         if huidig is None or (jaar or 0, aid) > (huidig["jaar"] or 0, huidig["arg_id"]):
             per_edge[rid] = kandidaat
 
+    # Financiering-edges ZONDER (bruikbaar) aandeel-argument: de edge zelf maakt de
+    # financier zichtbaar, met aandeel 'onbekend'. Statusfilter spiegelt de argumenten:
+    # goedgekeurd telt altijd, voorgesteld alleen in preview, afgewezen nooit.
+    statussen = ("goedgekeurd", "voorgesteld") if include_voorgesteld else ("goedgekeurd",)
+    status_qs = ",".join("?" * len(statussen))
+    fin_rows = conn.execute(f"""
+        SELECT r.id, r.source_id, r.target_id, r.status, se.name, te.name
+        FROM relations r
+        JOIN entities se ON r.source_id = se.id
+        JOIN entities te ON r.target_id = te.id
+        WHERE r.relation_type = 'financiering'
+          AND NOT r.vervangen AND r.status IN ({status_qs})
+    """, statussen).fetchall()
+    onbekend_per_outlet = {}
+    for (rid, src, tgt, status, bron, outlet) in fin_rows:
+        if rid in per_edge:
+            continue  # deze edge heeft al een gemeten aandeel
+        onbekend_per_outlet.setdefault(tgt, []).append({
+            "relation_id": rid, "bron_id": src, "bron": bron, "outlet": outlet,
+            "relation_type": "financiering", "share": None, "jaar": None,
+            "voorgesteld": status == "voorgesteld",
+        })
+
     # Groeperen per outlet (target) en het restpart afleiden.
     per_outlet = {}
     for slice_ in per_edge.values():
         per_outlet.setdefault(slice_["outlet_id"], []).append(slice_)
 
     resultaat = {}
-    for oid, slices in per_outlet.items():
+    for oid in set(per_outlet) | set(onbekend_per_outlet):
+        slices = per_outlet.get(oid, [])
+        onbekend = sorted(onbekend_per_outlet.get(oid, []), key=lambda s: s["bron"] or "")
         slices.sort(key=lambda s: (-s["share"], s["bron"] or ""))
         som = sum(s["share"] for s in slices)
         jaren = sorted({s["jaar"] for s in slices if s["jaar"]})
+        outlet_naam = (slices[0]["outlet"] if slices else onbekend[0]["outlet"])
         resultaat[oid] = {
-            "outlet": slices[0]["outlet"],
+            "outlet": outlet_naam,
             "slices": [{k: s[k] for k in ("relation_id", "bron_id", "bron",
                         "relation_type", "share", "jaar", "voorgesteld")}
                        for s in slices],
+            "onbekend": [{k: s[k] for k in ("relation_id", "bron_id", "bron",
+                          "relation_type", "share", "jaar", "voorgesteld")}
+                         for s in onbekend],
             "som_institutioneel": round(som, 1),
             "residu": round(max(0.0, 100.0 - som), 1),
             "jaren": jaren,
-            "bevat_voorgesteld": any(s["voorgesteld"] for s in slices),
+            "bevat_voorgesteld": any(s["voorgesteld"] for s in slices) or
+                                 any(s["voorgesteld"] for s in onbekend),
         }
     return resultaat
 

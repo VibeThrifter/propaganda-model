@@ -193,11 +193,14 @@ def check_zichtbaarheid(conn):
 # ── Bewijs & status (Z2) ─────────────────────────────────────
 
 def check_bewijs(conn):
+    # Alleen roots: replies zijn beleidsconform bronloos (een ondergraving vergt
+    # reasoning, geen citatie — M1.1/M1.8) en dragen geen eigen bewijsplicht.
     zonder_citatie = [
         f"argument #{a['id']} ({a['stance']}): {a['claim'][:70]}"
         for a in conn.execute("""
             SELECT a.id, a.stance, a.claim FROM arguments a
             WHERE a.stance IN ('supporting', 'contradicting')
+              AND a.parent_argument_id IS NULL
               AND a.status != 'voorgesteld'
               AND NOT EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
             ORDER BY a.id
@@ -211,10 +214,11 @@ def check_bewijs(conn):
     totaal = sum(per_status.values())
     onbeoordeeld = totaal - per_status.get("geverifieerd", 0)
     return [
-        _bevinding("BEWIJS-CITATIE", "Voor/tegen-argumenten zonder citatie", "fout",
+        _bevinding("BEWIJS-CITATIE", "Voor/tegen-rootargumenten zonder citatie", "fout",
                    zonder_citatie,
-                   "Een supporting/contradicting-argument zonder bron drijft op de "
-                   "ondergrens-bronfactor; de citatiepoort (M0.3) voorkomt nieuwe gevallen."),
+                   "Een supporting/contradicting-rootargument zonder bron drijft op de "
+                   "ondergrens-bronfactor; de citatiepoort (M0.3) voorkomt nieuwe gevallen. "
+                   "Replies tellen niet mee: een ondergraving is bewust bronloos toegestaan."),
         _bevinding("BEWIJS-STATUS", "Statusachterstand (niet-geverifieerde argumenten)", "info",
                    achterstand,
                    f"{onbeoordeeld} van {totaal} argumenten zijn niet 'geverifieerd'.",
@@ -609,6 +613,7 @@ def kerngetallen(conn):
         "voor_tegen_zonder_citatie": een("""
             SELECT COUNT(*) FROM arguments a
             WHERE a.stance IN ('supporting', 'contradicting')
+              AND a.parent_argument_id IS NULL
               AND NOT EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)"""),
         "relaties_zonder_argumenten": een("""
             SELECT COUNT(*) FROM relations r

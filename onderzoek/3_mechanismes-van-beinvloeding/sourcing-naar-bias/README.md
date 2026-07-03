@@ -1,22 +1,25 @@
-# Onderzoek — Wijst de NL-mediabias via het Sourcing-filter naar de hoogopgeleide managerial / "Brahmin-left"-elite?
+# Mechanisme — Sourcing (filter 3) → bias
 
-Derde onderzoeksspoor (pijler 2 van het "welke-elite"-vraagstuk), zustermap van `../eigendom-naar-bias/`.
-Waar dat dossier de **eigendom**-route onderzocht, isoleert dit dossier de **Sourcing**-route: niet
-*wie bezit de media*, maar *wie komt aan het woord / wiens kader domineert via bronselectie* — en of
-dat empirisch de hoogopgeleide bestuurlijke/"Brahmin-left"-kaste (diplomademocratie) bevoordeelt.
+Submap van **streng 3** (`../README.md`, de mechanismes van het systeem). Dit is filter 3 van het
+propagandamodel (Herman & Chomsky 1988): **sourcing** — niet *wie de media bezit*
+(`../eigendom-naar-bias/`), maar *wie er aan het woord komt en wiens kader domineert via bronselectie*.
 
-> Aanleiding: nadat de eigendom-pijler zwak bleek, is Sourcing de logische volgende kandidaat voor
-> "welke elite". Bewijs **extern** gezocht (deep-research 28-06-2026), niet in de modelscores.
+**Onderzoeksvraag:** welke bronnen domineren de Nederlandse nieuwsproductie (persbureaus, officiële
+bronnen, experts) — en naar wélke elite wijst die bronselectie empirisch?
 
-## Het korte antwoord
-**Gedeeltelijk onderbouwd: sterk op de losse schakels, zwak op de samenstellende claim.** Hard zijn
-(1) de persbureau-/ANP-afhankelijkheid, (2) de bronhiërarchie (elite/officiële bronnen = "primary
-definers"), en (3) de diplomademocratie + journalist-homogeniteit (descriptief). Maar de **sprong**
-naar "bevoordeelt de Brahmin-*left*-elite" is grotendeels analogisch en **deels weersproken**:
-opleidingshomogeniteit ≠ ideologische homogeniteit, en journalisten percipiëren juist het **centrum
-(eerder centrum-rechts)** als bevoordeeld, niet "links". Netto: het Sourcing-filter wijst naar een
-**establishment/elite-bron-bias**, niet schoon naar een linkse managerial kaste. Zie
-`00_netto-oordeel.md`.
+> Aanleiding + starthypothese: nadat de eigendom-route zwak bleek, was Sourcing de logische volgende
+> kandidaat voor "welke elite", met als te toetsen hypothese dat het de hoogopgeleide managerial /
+> "Brahmin-left"-kaste (diplomademocratie) bevoordeelt — die toespitsing is onderweg **weersproken**
+> (zie het antwoord). Bewijs **extern** gezocht (deep-research 28-06-2026), niet in de modelscores.
+
+**Antwoord in het kort:** gedeeltelijk onderbouwd — **sterk op de losse schakels, zwak op de
+samenstellende claim.** Hard zijn (1) de persbureau-/ANP-afhankelijkheid, (2) de bronhiërarchie
+(elite/officiële bronnen = "primary definers"), en (3) de diplomademocratie + journalist-homogeniteit
+(descriptief). Maar de **sprong** naar "bevoordeelt de Brahmin-*left*-elite" is grotendeels analogisch
+en **deels weersproken**: opleidingshomogeniteit ≠ ideologische homogeniteit, en journalisten
+percipiëren juist het **centrum (eerder centrum-rechts)** als bevoordeeld, niet "links". Netto: het
+Sourcing-filter wijst naar een **establishment/elite-bron-bias**, niet schoon naar een linkse
+managerial kaste. Zie `00_netto-oordeel.md`.
 
 ## Mappenstructuur
 ```
@@ -44,4 +47,4 @@ geverifieerd → 23 bevestigd, 2 killed, 10 na synthese. Per claim staat de stem
 **Tijdsgevoeligheid:** het sterkste harde bewijs (Boumans/ANP) meet 2014; de structurele *richting*
 is robuust, exacte percentages niet één-op-één naar 2026 te projecteren. Quotes verbatim.
 
-_Laatst bijgewerkt: 2026-06-29 (Randstad-as `06_` toegevoegd; schakel-4 `05_`-notitie nog open)._
+_Laatst bijgewerkt: 2026-07-02 (README geüniformeerd naar de streng-3-submapstijl; voettekst gesynct: `05_` denktank/CPB, `06_` Randstad-as en `07_` lobby/achterkamer zijn alle drie gevuld)._

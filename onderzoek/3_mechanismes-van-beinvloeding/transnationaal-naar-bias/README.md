@@ -1,10 +1,12 @@
-# Onderzoek — Wijst de NL-buitenlandberichtgeving naar een Atlantisch/Westers establishment-frame?
+# Mechanisme — Transnationale route → bias
 
-Vierde onderzoeksspoor (pijler 3 van het "welke-elite"-vraagstuk), zustermap van
-`../eigendom-naar-bias/` en `../sourcing-naar-bias/`. Hier de **transnationale laag**: niet de
-binnenlandse eigenaar of poortwachter, maar de macht *boven* de natie — leunt het NL-buitenlandnieuws
-structureel op een Westers/Atlantisch consensuskader (via wire-afhankelijkheid, indexing op de
-regerings-/NAVO-lijn, en pro-Westerse framing)?
+Submap van **streng 3** (`../README.md`, de mechanismes van het systeem). Geen van de vijf klassieke
+filters, maar de **transnationale route**: niet de binnenlandse eigenaar of poortwachter, maar de
+macht *boven* de natie.
+
+**Onderzoeksvraag:** leunt het NL-buitenlandnieuws structureel op een Westers/Atlantisch
+consensuskader — via wire-afhankelijkheid, indexing op de regerings-/NAVO-lijn, en pro-Westerse
+framing?
 
 > **Scope (grens streng 1 ↔ 3).** Dit dossier behandelt het **mechanisme** (het *hóe*: wire-agency,
 > indexing, framing). De transnationale **elite** zelf — de Atlantische/Westerse orde als *begunstigde*,
@@ -15,8 +17,8 @@ regerings-/NAVO-lijn, en pro-Westerse framing)?
 > liepen op een sessiecap; **elke NL-specifieke claim strandde in beide runs** (0-0 abstain =
 > *te-verifiëren*, niet weerlegd). De analogie-laag is wél opgefirmd. Zie de status per claim.
 
-## Het korte antwoord (voorlopig, na twee runs)
-**Het mechanisme is sterk per analogie én nu genuanceerd; de NL-verificatie blijft dun en onaf.**
+**Antwoord in het kort** *(voorlopig, na twee runs)*:
+**het mechanisme is sterk per analogie én nu genuanceerd; de NL-verificatie blijft dun en onaf.**
 Internationaal hard: indexing op de elite-/regeringsconsensus (Aday — officieel 79% van de quotes)
 en "*radically dichotomised*" Westerse dekking + selectieve R2P-framing (Zollmann). **Nieuw
 tegenwicht:** indexing is in de literatuur zelf "in need of refinement" en deels event-driven
@@ -43,4 +45,4 @@ transnationaal-naar-bias/
   ook niet bevestigd. De re-verify-pass (29-06) draaide; de NL-claims strandden wéér → ze blijven
   te-verifiëren tot ze uit een primaire bron komen (zie `00_` Vervolg).
 
-_Laatst bijgewerkt: 2026-06-29 (na re-verify-pass)._
+_Laatst bijgewerkt: 2026-07-02 (README geüniformeerd naar de streng-3-submapstijl; inhoud ongewijzigd sinds de re-verify-pass van 2026-06-29)._

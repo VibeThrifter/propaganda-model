@@ -31,8 +31,8 @@ genummerde notities) en eigen `bronnen/bronnenregister.md`.
 | 5 | **Ideologie** (filter 5) → neoliberale/technocratische hegemonie | `ideologie-naar-bias/` | **Matig** — norm aanwezig (instituties + homogeen corps), maar content-effect ongemeten; deels weerlegd (populisme gemainstreamd) |
 | — | **Transnationaal** → Atlantisch/Westers establishment | `transnationaal-naar-bias/` | **Mechanisme sterk (analogie); NL onaf** — Zollmann/indexing hard, NL-verificatie gestrand (cap). *De transnationale elite zelf staat in streng 1.* |
 
-**Filter 5 — Ideologie** is nu uitgewerkt in de submap `ideologie-naar-bias/` (netto-oordeel + 4 deelvraag-
-notities). De arbeidsdeling: de ideologische/hegemonische **elite-laag**
+**Filter 5 — Ideologie** is nu uitgewerkt in de submap `ideologie-naar-bias/` (netto-oordeel + 5 deelvraag-
+notities + het studie-ontwerp `06_` dat het filter hard zou maken). De arbeidsdeling: de ideologische/hegemonische **elite-laag**
 (wélke wereldbeeld-orde, en dát ze de norm wordt) staat in streng 1
 (`../1_in-voordeel-van-welke-eliten/03_transnationale-structuren/3.6_neoliberale-hegemonie.md`); de
 **publiek-bewerking** (rekruteren/integreren van de intellectuele kracht) in streng 2
@@ -57,4 +57,4 @@ promoveert die tot eigen submap. Zie de conventie in `../_sjabloon-onderzoeksvra
 - **NL-content-analyse is de zwakste schakel** — markeer waar een oordeel op analogie i.p.v. NL-bewijs rust.
 - **Vrije-vorm onderzoek, géén modelinhoud** (bijdragen via `assistent`, alles `voorgesteld`).
 
-_Laatst bijgewerkt: 2026-06-29 (antwoord centraal; Sourcing-cel aangescherpt; ideologie-filter gevuld)._
+_Laatst bijgewerkt: 2026-07-02 (submap-README's geüniformeerd naar één stijl; ideologie-telling gesynct met de submap)._

@@ -154,6 +154,20 @@ def cmd_edit_arg(args, token, base):
     return _ok(st, p, f"argument #{args.id} bijgewerkt")
 
 
+def cmd_edit_rel(args, token, base):
+    body = {}
+    if args.mechanisme is not None:
+        body["mechanism_id"] = args.mechanisme
+    if args.beschrijving is not None:
+        body["description"] = args.beschrijving
+    if not body:
+        sys.exit("Geef minstens --mechanisme of --beschrijving.")
+    if args.motivatie:
+        body["motivatie"] = args.motivatie
+    st, p = _req("PATCH", f"/api/relations/{args.id}", token, base, body=body)
+    return _ok(st, p, f"relatie #{args.id} bijgewerkt ({', '.join(p.get('gewijzigd', []))})")
+
+
 def cmd_voorstel(args, token, base):
     return _ok(*_req("GET", f"/api/voorstellen/{args.id}", token, base))
 
@@ -190,6 +204,10 @@ def main():
     p.add_argument("-m", "--motivatie", required=True); p.set_defaults(fn=cmd_herkeuren)
     p = sub.add_parser("edit-arg", help="voorgesteld argument bijwerken"); p.add_argument("id", type=int)
     p.add_argument("--claim"); p.add_argument("--reasoning"); p.set_defaults(fn=cmd_edit_arg)
+
+    p = sub.add_parser("edit-rel", help="relatie direct bijwerken (o.a. mechanisme toewijzen)"); p.add_argument("id", type=int)
+    p.add_argument("--mechanisme", type=int, help="mechanisme-id (theorie-huis; wrapt PATCH /api/relations/<id>)")
+    p.add_argument("--beschrijving"); p.add_argument("-m", "--motivatie"); p.set_defaults(fn=cmd_edit_rel)
 
     p = sub.add_parser("voorstel", help="één RfC tonen"); p.add_argument("id", type=int); p.set_defaults(fn=cmd_voorstel)
     p = sub.add_parser("voorstel-akkoord", help="RfC goedkeuren (telt)"); p.add_argument("id", type=int)

@@ -64,6 +64,19 @@ het model in komt.
      Je rol-suggestie is net als de rest een **voorstel**: een maintainer bevestigt of
      corrigeert haar bij de review (PATCH `/api/entities/<id>`, `primary_role_id`).
    - optioneel `active_from`/`active_until` als de speler aantoonbaar tijdgebonden is.
+   - **Granulariteit — kies het niveau waarop het mechanisme grijpt**, niet het niveau
+     waarop de werkelijkheid administratief is onderverdeeld. Een subeenheid (opleiding,
+     afdeling, redactie-binnen-een-concern) wordt alleen een eigen knoop als een
+     mechanisme op dát niveau werkt. IJkvoorbeeld onderwijs (juli 2026):
+     journalistiek-opleidingen (School voor Journalistiek, UvA Journalistiek) zijn eigen
+     knopen omdat `academische_socialisatie` op opleidingsniveau werkt — de opleiding
+     vormt en levert de journalisten, niet de instelling als geheel. Financiering, flak
+     en `expert_legitimatie` werken juist op instellingsniveau (universiteit/hogeschool)
+     en blijven daar. Andere opleidingen (rechten, economie, …) krijgen **geen** eigen
+     knoop: hun invloed loopt al via de instelling of de individuele expert. Bestaan
+     beide niveaus als knoop, leg dan de koppel vast: één beschrijvende
+     `eigendom`-relatie instelling→opleiding (mechanisme-loos = kandidaat), zodat de
+     graaf ziet dat het één huis is (precedent: rel. 704/705).
 
    De entiteit landt als `voorgesteld` (onzichtbaar in viz/scores tot een reviewer
    haar goedkeurt). Stel **alleen** een knoop voor die je met een bron kunt staven;

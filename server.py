@@ -2826,6 +2826,34 @@ def _maintainer_patch(element_type):
                 return jsonify({"error": f"rol {nieuw_rid} is vervangen; kies de opvolger"}), 400
         if nieuw_rid != rij["primary_role_id"]:
             diff["primary_role_id"] = {"oud": rij["primary_role_id"], "nieuw": nieuw_rid}
+    # Relatie: een maintainer mag ook het theorie-huis (mechanism_id) (her)zetten —
+    # nodig voor goedgekeurde relaties van vóór de orphan-poort. Losmaken (null) kan
+    # alleen zolang de relatie niet goedgekeurd is: een goedgekeurde orphan is precies
+    # wat de poort in _modereer verhindert, dus die maken we hier niet alsnog.
+    if element_type == "relatie" and "mechanism_id" in d:
+        raw = d["mechanism_id"]
+        if raw in (None, "", 0, "0"):
+            nieuw_mid = None
+        else:
+            try:
+                nieuw_mid = int(raw)
+            except (ValueError, TypeError):
+                conn.close()
+                return jsonify({"error": "mechanism_id moet een mechanisme-id (geheel getal) of null zijn"}), 400
+            mech = conn.execute("SELECT vervangen FROM mechanisms WHERE id = ?", (nieuw_mid,)).fetchone()
+            if mech is None:
+                conn.close()
+                return jsonify({"error": f"mechanisme {nieuw_mid} bestaat niet"}), 400
+            if mech["vervangen"]:
+                conn.close()
+                return jsonify({"error": f"mechanisme {nieuw_mid} is vervangen; kies de opvolger"}), 400
+        if nieuw_mid is None and rij["mechanism_id"] is not None and rij["status"] == "goedgekeurd":
+            conn.close()
+            return jsonify({"error": "Een goedgekeurde relatie kan haar mechanisme niet verliezen "
+                                     "(orphan-poort): wijs een ander mechanisme toe, of zet de "
+                                     "relatie eerst terug naar 'voorgesteld'."}), 400
+        if nieuw_mid != rij["mechanism_id"]:
+            diff["mechanism_id"] = {"oud": rij["mechanism_id"], "nieuw": nieuw_mid}
     # Temporele velden (active_from/active_until) mag een maintainer (her)zetten op
     # elementen die ze dragen (entiteit/relatie/rol/mechanisme). Zonder dit pad is er
     # géén manier om een bestaande band te dateren — terwijl de timeline-/tijdbewuste
@@ -2841,6 +2869,7 @@ def _maintainer_patch(element_type):
     if not diff:
         conn.close()
         velden_hint = toegestaan + (["primary_role_id"] if element_type == "entiteit" else []) \
+            + (["mechanism_id"] if element_type == "relatie" else []) \
             + (["active_from", "active_until"] if element_type in ("entiteit", "relatie", "rol", "mechanisme") else [])
         return jsonify({"error": f"geen gewijzigd veld (toegestaan: {velden_hint})"}), 400
     if "name" in diff and voorstellen._naam_bestaat(conn, element_type, diff["name"]["nieuw"]):
@@ -2850,6 +2879,16 @@ def _maintainer_patch(element_type):
     try:
         for kol, v in diff.items():
             conn.execute(f"UPDATE {tabel} SET {kol} = ? WHERE id = ?", (v["nieuw"], eid))
+        # Klasse↔instantie-link meebewegen (zelfde regel als RfC-adoptie in
+        # voorstellen.py): zonder deze rij telt de relatie niet mee in de
+        # theoriescore van het mechanisme en trekt ze KOPPEL-REL-INST.
+        if "mechanism_id" in diff:
+            if diff["mechanism_id"]["oud"]:
+                conn.execute("DELETE FROM instantiations WHERE relation_id = ? AND mechanism_id = ?",
+                             (eid, diff["mechanism_id"]["oud"]))
+            if diff["mechanism_id"]["nieuw"]:
+                conn.execute("INSERT OR IGNORE INTO instantiations (mechanism_id, relation_id) "
+                             "VALUES (?, ?)", (diff["mechanism_id"]["nieuw"], eid))
         conn.execute("""
             INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
             VALUES (?, ?, 'updated', ?, ?, ?, ?)

@@ -4901,32 +4901,47 @@ function renderInkomsten(d) {
     label: s.bron, share: s.share, jaar: s.jaar, voorgesteld: s.voorgesteld,
     color: INK_PALET[i % INK_PALET.length],
   }));
-  if (ink.residu > 0) slices.push({
+  if (ink.residu > 0 && slices.length) slices.push({
     label: 'eigen inkomsten (leden / markt / overig)', share: ink.residu, color: '#454552',
   });
-  if (!slices.length) return '';
+  const onbekend = ink.onbekend || [];
+  if (!slices.length && !onbekend.length) return '';
   const R = 64, r = 40, cx = 74, cy = 74;
-  const pie = d3.pie().sort(null).value(s => s.share);
   const arc = d3.arc().innerRadius(r).outerRadius(R).padAngle(0.012).cornerRadius(2);
-  const paths = pie(slices).map(a => {
-    const s = a.data;
-    const tip = `${s.label}: ${pct(s.share)}%${s.jaar ? ' (' + s.jaar + ')' : ''}`;
-    const ghost = s.voorgesteld ? ' opacity="0.6" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2"' : '';
-    return `<path d="${arc(a)}" transform="translate(${cx},${cy})" fill="${s.color}"${ghost}><title>${tip}</title></path>`;
-  }).join('');
-  const center = `<text x="${cx}" y="${cy - 1}" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text)">${pct(ink.som_institutioneel)}%</text>
-    <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="7.5" letter-spacing=".06em" fill="var(--text-muted)">INSTITUTIONEEL</text>`;
+  let paths, center;
+  if (slices.length) {
+    const pie = d3.pie().sort(null).value(s => s.share);
+    paths = pie(slices).map(a => {
+      const s = a.data;
+      const tip = `${s.label}: ${pct(s.share)}%${s.jaar ? ' (' + s.jaar + ')' : ''}`;
+      const ghost = s.voorgesteld ? ' opacity="0.6" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2"' : '';
+      return `<path d="${arc(a)}" transform="translate(${cx},${cy})" fill="${s.color}"${ghost}><title>${tip}</title></path>`;
+    }).join('');
+    center = `<text x="${cx}" y="${cy - 1}" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text)">${pct(ink.som_institutioneel)}%</text>
+      <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="7.5" letter-spacing=".06em" fill="var(--text-muted)">INSTITUTIONEEL</text>`;
+  } else {
+    // Alleen ongemeten funding-edges: de ring toont dat er financiers ZIJN, het
+    // vraagteken dat hun aandeel nog niet gesourcet is.
+    paths = `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="#454552" stroke-width="${R - r}" stroke-dasharray="4 3" opacity="0.55"/>`;
+    center = `<text x="${cx}" y="${cy - 1}" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text-muted)">?</text>
+      <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="7.5" letter-spacing=".06em" fill="var(--text-muted)">AANDEEL ONBEKEND</text>`;
+  }
   const svg = `<svg width="148" height="148" viewBox="0 0 148 148" style="display:block;margin:2px auto 10px">${paths}${center}</svg>`;
   const legend = slices.map(s => `<div style="display:flex;align-items:center;gap:7px;font-size:11px;margin:3px 0">
     <span style="width:10px;height:10px;border-radius:2px;background:${s.color};flex:none${s.voorgesteld ? ';outline:1px dashed var(--accent);outline-offset:1px' : ''}"></span>
     <span style="flex:1;color:var(--text-dim)">${s.label}${s.jaar ? ` <span style="color:var(--text-muted)">${s.jaar}</span>` : ''}</span>
     <span style="color:var(--text);font-weight:600">${pct(s.share)}%</span>
   </div>`).join('');
+  const legendOnbekend = onbekend.map(s => `<div style="display:flex;align-items:center;gap:7px;font-size:11px;margin:3px 0">
+    <span style="width:10px;height:10px;border-radius:2px;background:transparent;border:1px dashed var(--text-muted);flex:none${s.voorgesteld ? ';outline:1px dashed var(--accent);outline-offset:1px' : ''}"></span>
+    <span style="flex:1;color:var(--text-dim)">${s.bron}</span>
+    <span style="color:var(--text-muted)">?%</span>
+  </div>`).join('');
   const note = `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5">
-    Afgeleid uit de inkomende financier-edges, elk met een gesourcet aandeel (zie <b>Discussie</b> op die relatie). Het restpart is wat die edges niet dekken — er is geen aparte leden-entiteit.${ink.bevat_voorgesteld ? ' <span style="color:var(--accent)">Streepjes = nog niet gereviewd (voorlopig).</span>' : ''}</div>`;
+    Afgeleid uit de inkomende financier-edges${slices.length ? ', elk met een gesourcet aandeel (zie <b>Discussie</b> op die relatie). Het restpart is wat die edges niet dekken — er is geen aparte leden-entiteit' : ''}.${onbekend.length ? ' <b>?%</b> = financiering-edge zonder gesourcet aandeel — voeg een <i>inkomensaandeel</i>-argument toe op die relatie om de taart te vullen.' : ''}${ink.bevat_voorgesteld ? ' <span style="color:var(--accent)">Streepjes = nog niet gereviewd (voorlopig).</span>' : ''}</div>`;
   const jaren = ink.jaren && ink.jaren.length ? ink.jaren.join('–') : null;
-  return collapsibleSection('Inkomstenbron', svg + legend + note,
-    { open: true, meta: ink.bevat_voorgesteld ? 'voorlopig' : jaren });
+  return collapsibleSection('Inkomstenbron', svg + legend + legendOnbekend + note,
+    { open: true, meta: ink.bevat_voorgesteld ? 'voorlopig' : (jaren || `${onbekend.length} onbekend`) });
 }
 
 function showInstanceDetail(d, content, color) {
