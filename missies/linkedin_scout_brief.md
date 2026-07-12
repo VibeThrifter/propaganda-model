@@ -81,6 +81,19 @@ als (zwakke, zelf-gerapporteerde) bron. Lees eerst `scout_brief.md`.
 - **Bron verplicht, verbatim.** Elke affiliatie draagt een `supporting`-argument met een
   citatie naar het profiel. Fabriceer geen quotes; gebruik de eigen tekst van het profiel.
 
+## Cadans (onbewaakt, C1) — bewust NIET op een 24/7-schema
+
+Anders dan de andere missies staat het LinkedIn-scrapen **bewust niet** op een
+onbewaakte systemd-timer/cron (beleid J4). De scrape-trap blijft **eigenaar-getriggerd
+en gericht**: headful, eigen sessie, pauze tussen requests, geen residentiële proxy's,
+geen 24/7-cron. De gewone `scout-agent`-cadans (per kwartaal, `agent-scout.timer`) draait
+de web-/registerronde; de LinkedIn-mapper draait de scout er alléén bij op verzoek,
+zolang `tools/linkedin/session.json` leeft. Is die sessie dood
+(`⚠ LINKEDIN-SESSIE VERLOPEN`), dan stopt zowel trap 1 als trap 2 en relay je het
+login-commando `python3 tools/linkedin/scrape_profile.py login` letterlijk aan de
+eigenaar — de scheduler herprobeert dit nooit in een lus (de interactieve login is
+mensenwerk).
+
 ## Wat de mapper NIET doet (bewust)
 
 - Geen `interests` (bedrijven die iemand *volgt*) als lidmaatschap — volgen ≠ lid zijn.

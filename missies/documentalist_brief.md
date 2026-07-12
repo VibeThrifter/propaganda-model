@@ -112,3 +112,23 @@ zet moet het een geldig brontype zijn (`boek`/`academisch_artikel`/`rapport`/
 - Nooit statuswijzigingen; nooit theorielaag-schrijven (dat is RfC-werk, M2.3).
 - Stance-balans en nieuwheid (nieuwe bronclusters vs. hercitaties) van je ronde
   komen in het log — een documentalist die alleen bevestiging binnenbrengt is meetbaar kapot.
+
+## Cadans (onbewaakt, C1)
+
+Deze missie draait onbewaakt op een vaste cadans — **wekelijks**, telkens één
+onderzoeksagenda-item — via de scheduler (`scripts/agent_runner.py`;
+`deploy/systemd/agent-documentalist.{service,timer}` en `deploy/crontab`). De runner
+start één headless `claude`-sessie onder `documentalist-agent`, injecteert de voorregel
+(eerst `GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
+`missies/logs/`. Onderwerp uit de top van `scripts/onderzoeksagenda.py` (het hoogst
+geprioriteerde item waarvoor nog geen ronde liep).
+
+**Exit-condities.** Lege oogst (geen staafbare bron gevonden) → afronden en het
+afwezigheidsrapport in het log zetten (nooit als `contextual` modelknoop). Rate-limit
+**429** → ronde stoppen en loggen, niet herproberen.
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_documentalist-agent_<ronde>.md`
+met de brief-blob-hash, élke query letterlijk, de oogst-id's, het
+negatieve-resultatenregister, de stance-balans en de nieuwheid; de runner voegt
+exit-code/duur/oogst als footer toe (C4-toezicht). Alles blijft `voorgesteld`, eigen
+token, geen statuswijzigingen.

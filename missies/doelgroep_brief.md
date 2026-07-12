@@ -54,3 +54,35 @@ bevindt zich bovengemiddeld vaak in sociale klasse AB1."* Zie ook het mechanisme
 
 Zie `doelgroep.py` (afleiding), `/api/doelgroep` (meter), en de viz-kleurmodus **Doelgroep** +
 detailpaneel **Welstandsmeter**. Log elke ronde in `missies/logs/`.
+
+## Zustermeter: bereik (publiek per jaar)
+
+Deze overlay draagt óók de **bereikmeter** — een parallelle, gesourcete overlay per
+media-entiteit: het **publieksbereik per jaar**. Codeer een bereik-signaal met
+`property='bereik'`, `property_value='<maat>:<aantal>:<jaar>'`, waarbij `<maat>` ∈
+`bereik.MATEN` (kijkers/luisteraars/oplage/bereik_totaal/online/invullers/volgers) en het
+**jaar verplicht** is (de tijdreeks is het punt). Regels als bij `doelgroepklasse`: één
+signaal = één cijfer uit één bron (geen gewogen gemiddelde; een fout cijfer weerleg je met
+een ondergraving), bron-gepoort (400 zonder echte citatie), telt in **niets** mee
+(`ASPECT_PROPERTIES`). Per jaar wint de **grootste publieksmaat** de weergave. Zie
+`bereik.py`, `/api/bereik`, de viz-grootte-maat **Mediabereik** en het detailpaneel
+**Bereik (publiek)**; report `scripts/bereik_meter.py`. Bereik-cijfers komen uit NOM/NMO,
+SKO, NLO, jaarverslagen en mediakits.
+
+## Cadans (onbewaakt, C1)
+
+Deze overlay (welstand + bereik) draait onbewaakt op een lage cadans — **maandelijks** —
+via de scheduler (`scripts/agent_runner.py --agent assistent --label doelgroep`; timer
+`deploy/systemd/agent-doelgroep.{service,timer}` en `deploy/crontab`), onder het staande
+account `assistent`. De runner injecteert de voorregel (eerst
+`GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
+`missies/logs/`.
+
+**Exit-condities.** Lege oogst (geen outlet met citeerbaar klasse-/bereik-materiaal) →
+afronden en loggen; een outlet **onbepaald** laten is correcter dan een geleende score.
+Rate-limit **429** of andere 4xx → een lus stoppen en loggen.
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_doelgroep_<ronde>.md` met de
+brief-blob-hash, élke query, per signaal het entity-/source-/argument-id + as/klasse/jaar
++ bron, de negatieve resultaten en de balans; de runner voegt exit-code/duur/oogst als
+footer toe. Alles blijft `voorgesteld`, eigen token, geen statuswijzigingen.

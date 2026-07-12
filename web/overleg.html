@@ -372,6 +372,7 @@ let reviewData = null;          // gecachete /api/review_queue zodat de segmente
 let adviesData = null;          // gecachet /api/review_advies — agent-advies naast elk item (reviewer+, los van het model)
 let afgewezenData = null;       // gecachet /api/afgewezen — afgewezen/ingetrokken inzendingen (reviewer+)
 let bronSuggestiesData = null;  // gecachet /api/bron_suggesties — door documentalist voorgestelde bronnen + check (reviewer+)
+let autoMergeData = null;       // gecachet /api/auto_merge_log — auto-merge-bucket + reden per argument (reviewer+, C4; los van het model, telt niet mee)
 let actiefVoorstelType = 'rfc'; // 'rfc' | 'argumenten' — welke lijst op het Voorstellen-tabblad
 let voorstelTypeGekozen = false;// heeft de gebruiker zelf gekozen? (anders auto-default op niet-leeg)
 // Toolbar-state: soort (groep), filter (de model-as), alleen-open, en welke
@@ -2047,16 +2048,18 @@ async function laadVoorstellen() {
   try {
     // De wachtrij + (reviewer-only) agent-advies parallel; advies faalt stil voor wie
     // geen reviewer is (401/403) → dan tonen we simpelweg geen paneel.
-    const [rq, adv, afg, bron] = await Promise.all([
+    const [rq, adv, afg, bron, am] = await Promise.all([
       fetch('/api/review_queue').then(r => r.json()),
       fetch('/api/review_advies').then(r => r.ok ? r.json() : null).catch(() => null),
       fetch('/api/afgewezen').then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/bron_suggesties').then(r => r.ok ? r.json() : null).catch(() => null)
+      fetch('/api/bron_suggesties').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/auto_merge_log').then(r => r.ok ? r.json() : null).catch(() => null)
     ]);
     reviewData = rq;
     adviesData = adv;
     afgewezenData = afg;
     bronSuggestiesData = bron;
+    autoMergeData = am;
     reviewGeladen = true;
     // Eerste keer: spring automatisch naar de eerste niet-lege lijst zodat je nooit op een lege view landt.
     if (!voorstelTypeGekozen) {
@@ -2138,11 +2141,36 @@ function bronSuggestiePaneel(key) {
     <div class="bronsug-bron">documentalist${s.bronnen.some(b => b.check) ? ' + reviewbeoordelaar-check' : ''} · suggestie, telt niet mee${datum}</div>
   </aside>`;
 }
-// Wikkel een kaart-HTML in een rij met de adviespanelen ernaast (rechts): het
-// reviewbeoordelaar-advies en/of de bron-suggesties. Zonder paneel blijft de kaart
-// op volle breedte staan.
+// Auto-merge-bucket (C4) rechts van een wachtrij-item. Komt uit /api/auto_merge_log —
+// het verdict dat de auto-merge-service per argument logde: auto-gemerged, geparkeerd
+// (twijfel) of geblokkeerd (hoog inzet, persoons-claim). Los van het model, telt nergens
+// mee; het is beslissteun zodat de eigenaar ziet waaróm iets wél/niet vanzelf mergde.
+// De aandacht-buckets (geparkeerd/geblokkeerd) krijgen een accentkleur en staan bovenaan
+// de rechterkolom.
+const AUTO_MERGE_BUCKET = {
+  'auto-gemerged':        ['✅ Auto-gemerged', 'var(--ok)'],
+  'geparkeerd-twijfel':   ['⏸ Geparkeerd — twijfel', 'var(--goud)'],
+  'geblokkeerd-hoog-inzet': ['⛔ Geblokkeerd — hoog inzet', 'var(--fout)'],
+  'mensenwerk':           ['👤 Mensenwerk', 'var(--text-dim)']
+};
+function autoMergePaneel(key) {
+  const a = autoMergeData ? autoMergeData[key] : null;
+  if (!a || !a.bucket) return '';
+  const [label, kleur] = AUTO_MERGE_BUCKET[a.bucket] || ['Auto-merge', 'var(--text-dim)'];
+  const redenen = (a.redenen || []).length
+    ? `<div class="advies-detail">${a.redenen.map(r => '• ' + esc(r)).join('<br>')}</div>` : '';
+  const ts = a.ts ? ` · ${esc(a.ts)}` : '';
+  return `<aside class="advies" style="border-left-color:${kleur}">` +
+    `<div class="advies-kop" style="color:${kleur}">${label}` +
+    ` <button type="button" class="uitleg" aria-label="Uitleg auto-merge-bucket" data-uitleg="Het oordeel van de auto-merge-service (C4): waaróm dit argument wél of niet vanzelf is gemerged. 'Geparkeerd — twijfel' en 'Geblokkeerd — hoog inzet' (bv. een persoons-claim) wachten op jouw akkoord. Advies, telt nergens mee.">ⓘ</button></div>` +
+    redenen +
+    `<div class="advies-bron">auto-merge-service · advies, telt niet mee${ts}</div></aside>`;
+}
+// Wikkel een kaart-HTML in een rij met de adviespanelen ernaast (rechts): de
+// auto-merge-bucket (C4), het reviewbeoordelaar-advies en/of de bron-suggesties. De
+// aandacht-buckets komen bovenaan. Zonder paneel blijft de kaart op volle breedte staan.
 function metAdvies(key, kaartHtml) {
-  const p = adviesPaneel(key) + bronSuggestiePaneel(key);
+  const p = autoMergePaneel(key) + adviesPaneel(key) + bronSuggestiePaneel(key);
   return p ? `<div class="kaart-rij">${kaartHtml}<div class="rechtkolom">${p}</div></div>` : kaartHtml;
 }
 // Admin voegt een bron-suggestie echt toe: registreer de bron (URL-vindplaats) en hang

@@ -151,3 +151,22 @@ te coderen.
 - Log je ronde in `missies/logs/` (`YYYY-MM-DD_ideoloog_<onderwerp>.md`): élke zoekopdracht
   (ook de lege), per signaal het entity-/source-/argument-id, as + pool + bron, en de
   stance-/pool-balans van de ronde.
+
+## Cadans (onbewaakt, C1)
+
+Deze overlay draait onbewaakt op een lage cadans — **maandelijks** — via de scheduler
+(`scripts/agent_runner.py --agent assistent --label ideoloog`; timer
+`deploy/systemd/agent-ideoloog.{service,timer}` en `deploy/crontab`). Ze draait onder
+het staande account `assistent` (label `ideoloog` in de logbestandsnaam), injecteert de
+voorregel (eerst `GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde
+naar `missies/logs/`.
+
+**Exit-condities.** Lege oogst (geen entiteit met citeerbaar richting-materiaal) →
+afronden en loggen; een entiteit **onbepaald** laten is correcter dan een geleende
+score. Rate-limit **429** → stoppen en loggen (het `assistent`-account is weliswaar
+rate-limit-vrij, maar stop bij welke 4xx dan ook een lus).
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_ideoloog_<ronde>.md` met de
+brief-blob-hash, élke query, per signaal het entity-/source-/argument-id + as/pool/bron,
+de negatieve resultaten en de pool-balans; de runner voegt exit-code/duur/oogst als
+footer toe. Alles blijft `voorgesteld`, eigen token, geen statuswijzigingen.

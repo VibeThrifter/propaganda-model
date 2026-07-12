@@ -1,0 +1,15 @@
+# Timer voor agent-voorspellingen-regen.service — Regenereert data/voorspellingen_kalibratie.json (Brier op /api/health) — leest alleen
+# OWNER-ACTION: sudo systemctl enable --now agent-voorspellingen-regen.timer
+[Unit]
+Description=Timer: Regenereert data/voorspellingen_kalibratie.json (Brier op /api/health) — leest alleen
+
+[Timer]
+OnCalendar=Mon *-*-* 06:30
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-voorspellingen-regen.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+# Timer voor agent-criticus.service — Kwartaal-adversarial ronde (M3.3)
+# OWNER-ACTION: sudo systemctl enable --now agent-criticus.timer
+[Unit]
+Description=Timer: Kwartaal-adversarial ronde (M3.3)
+
+[Timer]
+OnCalendar=*-01,04,07,10-08 04:00
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-criticus.service
+
+[Install]
+WantedBy=timers.target

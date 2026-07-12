@@ -1,0 +1,15 @@
+# Timer voor agent-reviewbeoordelaar.service — Dagelijks review-advies (alleen-lezen, meebewegend met de wachtrij)
+# OWNER-ACTION: sudo systemctl enable --now agent-reviewbeoordelaar.timer
+[Unit]
+Description=Timer: Dagelijks review-advies (alleen-lezen, meebewegend met de wachtrij)
+
+[Timer]
+OnCalendar=*-*-* 06:00
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-reviewbeoordelaar.service
+
+[Install]
+WantedBy=timers.target

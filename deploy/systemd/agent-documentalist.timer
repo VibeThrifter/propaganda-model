@@ -1,0 +1,15 @@
+# Timer voor agent-documentalist.service — Bronronde per onderzoeksagenda-item (M1.9)
+# OWNER-ACTION: sudo systemctl enable --now agent-documentalist.timer
+[Unit]
+Description=Timer: Bronronde per onderzoeksagenda-item (M1.9)
+
+[Timer]
+OnCalendar=Wed *-*-* 03:30
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-documentalist.service
+
+[Install]
+WantedBy=timers.target

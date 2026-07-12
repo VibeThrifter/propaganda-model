@@ -60,9 +60,27 @@ server weigert een tweede reactie sowieso met 409.
 - Doel van de ronde: de stance-balans van de top-20 is daarna geen ~98/2 meer;
   de ronde is herhaalbaar (zelfde doelwittenlijst-procedure, nieuwe ronde).
 
-## Ritme & menselijke kant (eigenaarsacties, geen agent-werk)
+## Cadans (onbewaakt, C1)
 
-Ritme: per kwartaal één ronde, of na elke modelrelease (M3.1). De uitnodiging
-aan een externe criticus van het propagandamodel als co-reviewer (§6.5,
-adversarial collaboration) loopt via de eigenaar; bevindingen van die reviewer
-volgen dezelfde route als de jouwe.
+Deze missie draait onbewaakt op een vaste cadans — **per kwartaal** (8 jan/apr/jul/okt),
+of na een modelrelease (M3.1) — via de scheduler (`scripts/agent_runner.py`;
+`deploy/systemd/agent-criticus.{service,timer}` en `deploy/crontab`). De runner start
+één headless `claude`-sessie onder `criticus-agent`, injecteert de voorregel (eerst
+`GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
+`missies/logs/`.
+
+**Exit-condities.** Lege oogst (na serieus zoeken géén eerlijk tegenbewijs) →
+afwezigheidsrapport in het log, nooit als `contextual` modelknoop. Rate-limit **429** →
+ronde stoppen en loggen, niet herproberen.
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_criticus-agent_<ronde>.md` met
+de brief-blob-hash, élke zoekopdracht, de oogst per doelwit, de negatieve resultaten en
+de stance-balans; de runner voegt exit-code/duur/oogst als footer toe (C4-toezicht).
+Doel: de stance-balans van de top-20 is daarna geen ~98/2 meer; de ronde is
+herhaalbaar. Alles blijft `voorgesteld`, eigen token, geen statuswijzigingen.
+
+## Menselijke kant (eigenaarsactie, geen agent-werk)
+
+De uitnodiging aan een externe criticus van het propagandamodel als co-reviewer (§6.5,
+adversarial collaboration) loopt via de eigenaar; bevindingen van die reviewer volgen
+dezelfde route als de jouwe.

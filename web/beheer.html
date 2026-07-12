@@ -44,6 +44,30 @@ a { color: var(--text-dim); }
          align-items: end; }
 .nieuw label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
 .nieuw input, .nieuw select { width: 100%; }
+/* ── Toezicht-paneel (C4) ─────────────────────────────────────────────── */
+.tz-tegels { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tegel { background: var(--bg-inzet); border: 1px solid var(--border); border-radius: 9px;
+         padding: 13px 14px; display: flex; flex-direction: column; gap: 3px; }
+.tegel .t-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.tegel .t-lab { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.tegel .t-sub { font-size: 11px; color: var(--text-muted); }
+.t-num.goud { color: var(--goud); } .t-num.groen { color: var(--groen); }
+.t-num.rood { color: var(--rood); } .t-num.blauw { color: var(--accent); }
+.t-num.grijs { color: var(--text-dim); }
+.tz-blok { margin-top: 18px; }
+.tz-blok h3 { font-size: 12px; margin: 0 0 8px; color: var(--text-dim);
+              text-transform: uppercase; letter-spacing: 0.04em; }
+.tz-lijst { list-style: none; margin: 0; padding: 0; }
+.tz-lijst li { padding: 8px 0; border-bottom: 1px solid var(--border-zwak); font-size: 12.5px; }
+.tz-lijst li:last-child { border-bottom: none; }
+.tz-claim { color: var(--text); }
+.tz-meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+.tz-redenen { color: var(--text-dim); font-size: 11.5px; margin-top: 2px; }
+.tz-leeg { color: var(--text-muted); font-size: 12px; font-style: italic; }
+.tz-balk { height: 7px; border-radius: 4px; background: var(--bg-inzet); overflow: hidden; margin-top: 5px; }
+.tz-balk > span { display: block; height: 100%; background: var(--groen); }
+.prog-num { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px;
+            background: rgba(224,99,95,0.16); color: var(--rood); margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -85,6 +109,11 @@ async function laad() {
       <b>${esc(me.username)}</b> (maintainer).</div>
     <div class="fout" id="fout"></div>
 
+    <h2>Toezicht
+      <button type="button" class="uitleg" aria-label="Uitleg toezicht"
+        data-uitleg="Privé kalibratie-overzicht (C4): jij stuurt op de meta-laag — steekproef van auto-merges, gevlagde twijfel-/hoog-inzet-items, verlopen voorspellingen + Brier, validatiefouten en archiveer-voortgang — i.p.v. de doorvoer-merge-knop te bedienen.">ⓘ</button></h2>
+    <div class="kaart"><div id="toezicht">Laden…</div></div>
+
     <h2>Nieuwe gebruiker</h2>
     <div class="kaart">
       <form class="nieuw" id="nieuwForm">
@@ -114,7 +143,114 @@ async function laad() {
     document.getElementById('nAgentVeld').style.display = agent ? '' : 'none';
   });
   document.getElementById('nieuwForm').addEventListener('submit', maakNieuw);
+  laadToezicht();   // los; blokkeert het accountbeheer niet
   await tekenTabel();
+}
+
+// ── Toezicht-paneel (C4) ──────────────────────────────────────────────────
+// Haalt het dunne samenvattingsendpoint GET /api/toezicht op en toont de zes
+// meta-signalen + een steekproef van recente auto-merges. Het endpoint kan leeg
+// zijn/ontbreken zolang de auto-merge-service (C2) nog niet draait → nette lege staat.
+function tzTegel(num, label, kleur, sub) {
+  return `<div class="tegel"><div class="t-num ${kleur}">${num}</div>` +
+    `<div class="t-lab">${esc(label)}</div>` +
+    (sub ? `<div class="t-sub">${esc(sub)}</div>` : '') + `</div>`;
+}
+async function laadToezicht() {
+  const el = document.getElementById('toezicht');
+  if (!el) return;
+  let d;
+  try {
+    const r = await fetch('/api/toezicht');
+    if (r.status === 404) {
+      el.innerHTML = `<div class="tz-leeg">Toezicht-service (C4) nog niet actief — geen /api/toezicht.
+        Zodra de auto-merge-service draait verschijnen hier de kalibratie-signalen.</div>`;
+      return;
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    d = await r.json();
+  } catch (e) {
+    el.innerHTML = `<div class="tz-leeg">Kon het toezichtoverzicht niet laden (${esc(e.message)}).</div>`;
+    return;
+  }
+  if (!d || typeof d !== 'object' || !Object.keys(d).length) {
+    el.innerHTML = `<div class="tz-leeg">Nog geen toezichtdata beschikbaar.</div>`;
+    return;
+  }
+  const am = d.auto_merge || {};
+  const vs = d.voorspellingen || {};
+  const val = d.validatie || {};
+  const verlopen = vs.open_verlopen || [];
+  const geblokkeerd = am.geblokkeerd_items || [];   // optioneel: lijst persoons-claims
+  const runs = d.agent_runs || null;                 // optioneel: vastgelopen/lege runs
+
+  // Archiefdekking kan een fractie (0–1), percentage of object zijn — defensief.
+  let dekPct = null, dekSub = '';
+  const ad = d.archief_dekking;
+  if (ad != null) {
+    if (typeof ad === 'object') {
+      if (ad.pct != null) dekPct = ad.pct > 1 ? ad.pct : ad.pct * 100;
+      else if (ad.totaal) { dekPct = 100 * (ad.gearchiveerd || 0) / ad.totaal; dekSub = `${ad.gearchiveerd || 0}/${ad.totaal}`; }
+    } else { dekPct = ad > 1 ? ad : ad * 100; }
+  }
+  const nVal = num => (num == null ? 0 : num);
+  const foutN = nVal(val.fouten);
+
+  // (1) auto-gemerged vs geparkeerd sinds gisteren · (2) hoog-inzet-blokkades ·
+  // (3) vastgelopen/lege runs · (4) verlopen voorspellingen + Brier ·
+  // (5) validatiefouten boven baseline · (6) archiveer-voortgang.
+  const tegels = [
+    tzTegel(nVal(am.gemerged_24u), 'auto-gemerged (24u)', 'blauw'),
+    tzTegel(nVal(am.geparkeerd), 'geparkeerd — twijfel', 'goud', 'sinds gisteren'),
+    tzTegel(nVal(am.geblokkeerd), 'geblokkeerd — hoog inzet', 'goud', 'wacht op akkoord'),
+    tzTegel(verlopen.length, 'voorspellingen verlopen', verlopen.length ? 'goud' : 'groen',
+            vs.brier != null ? `Brier ${Number(vs.brier).toFixed(3)}` : 'nog geen Brier'),
+    tzTegel(foutN, 'validatiefouten > baseline', foutN ? 'rood' : 'groen',
+            [val.waarschuwingen != null ? val.waarschuwingen + ' waarsch.' : null,
+             val.info != null ? val.info + ' info' : null].filter(Boolean).join(' · ')),
+    tzTegel(dekPct != null ? Math.round(dekPct) + '%' : '—', 'archiefdekking', 'blauw', dekSub || null),
+  ];
+  if (runs != null) {
+    const rn = typeof runs === 'number' ? runs : (runs.vastgelopen != null ? runs.vastgelopen : (runs.length || 0));
+    tegels.push(tzTegel(rn, 'vastgelopen/lege agent-runs', rn ? 'rood' : 'groen'));
+  }
+
+  let h = `<div class="tz-tegels">${tegels.join('')}</div>`;
+  if (dekPct != null) h += `<div class="tz-balk"><span style="width:${Math.max(0, Math.min(100, dekPct))}%"></span></div>`;
+
+  // Steekproef van recent auto-gemergede items — kalibreer de auto-merge-kwaliteit
+  // zonder alles te lezen.
+  const steek = d.steekproef || [];
+  h += `<div class="tz-blok"><h3>Steekproef auto-merges
+    <button type="button" class="uitleg" aria-label="Uitleg steekproef"
+      data-uitleg="Willekeurige greep uit recent auto-gemergede argumenten (merged_by='merge-service'). Lees een paar om de auto-merge-lat te ijken; keur er een af via de admin-CLI om 'm terug te sturen ter herkeuring.">ⓘ</button></h3>`;
+  h += steek.length
+    ? `<ul class="tz-lijst">${steek.map(s =>
+        `<li><div class="tz-claim">${esc(s.claim || '(zonder claim)')}</div>
+         <div class="tz-meta">${s.arg_id != null ? '#' + esc(s.arg_id) : ''}${s.target ? ' · ' + esc(s.target) : ''}${s.merged_at ? ' · ' + esc(s.merged_at) : ''}</div></li>`).join('')}</ul>`
+    : `<div class="tz-leeg">Nog geen auto-merges om te steekproeven.</div>`;
+  h += `</div>`;
+
+  // Hoog-inzet-blokkades die op akkoord wachten — de énige items die de eigenaar nog
+  // handmatig beoordeelt (persoons-claims). De volledige beoordeling gebeurt op /overleg.
+  if (geblokkeerd.length) {
+    h += `<div class="tz-blok"><h3>Hoog-inzet — wacht op akkoord</h3><ul class="tz-lijst">` +
+      geblokkeerd.map(g =>
+        `<li><div class="tz-claim">${esc(g.claim || '(zonder claim)')}</div>
+         <div class="tz-redenen">${(g.redenen || []).map(esc).join(' · ')}</div>
+         <div class="tz-meta">${g.arg_id != null ? '#' + esc(g.arg_id) : ''} · beoordeel op <a href="/overleg">/overleg</a></div></li>`).join('') +
+      `</ul></div>`;
+  }
+
+  // Verlopen open voorspellingen — resolveer ze zodat de Brier-reeks loopt (A4).
+  if (verlopen.length) {
+    h += `<div class="tz-blok"><h3>Voorspellingen te resolven</h3><ul class="tz-lijst">` +
+      verlopen.map(v =>
+        `<li><div class="tz-claim">${esc(v.claim || v.titel || '(voorspelling)')}</div>
+         <div class="tz-meta">${v.id != null ? '#' + esc(v.id) : ''}${v.deadline ? ' · deadline ' + esc(v.deadline) : ''}${v.kans != null ? ' · kans ' + esc(v.kans) : ''}</div></li>`).join('') +
+      `</ul><div class="t-sub" style="margin-top:6px">Resolveer via <code>PATCH /api/predictions/&lt;id&gt;/uitkomst</code> (reviewer+, berekent Brier).</div></div>`;
+  }
+  el.innerHTML = h;
 }
 
 async function tekenTabel() {

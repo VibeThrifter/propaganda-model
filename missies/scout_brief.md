@@ -146,8 +146,28 @@ naar wat het bewijs ís (zie `missies/monitor_brief.md`).
   aangemaakte source-/entity-/relation-/argument-id's, negatieve resultaten,
   stance-balans en de nieuwheid (nieuwe knopen/edges vs. hercitaties).
 
-## Ritme
+## Cadans (onbewaakt, C1)
 
-Per kwartaal één ronde, of na een modelrelease (M3.1) wanneer de onderzoeksagenda
-verschuift. Doel van een ronde: het netwerk is meetbaar rijker geworden (n nieuwe
-knopen + n nieuwe edges, elk met bron), zónder dat de stance-balans is scheefgetrokken.
+Deze missie draait onbewaakt op een vaste cadans — **per kwartaal** (1 jan/apr/jul/okt),
+of na een modelrelease (M3.1) wanneer de onderzoeksagenda verschuift — via de scheduler
+(`scripts/agent_runner.py`; `deploy/systemd/agent-scout.{service,timer}` en
+`deploy/crontab`). De runner start één headless `claude`-sessie onder `scout-agent`,
+injecteert de voorregel (eerst `GET /api/agent/reeds_gereageerd`, sla die id's over) en
+tee't de ronde naar `missies/logs/`. Onderwerp uit de top van
+`data/onderzoeksagenda.json` (`python3 scripts/onderzoeksagenda.py`).
+
+**Exit-condities.** Lege oogst (geen nieuwe, staafbare knoop/edge) → afronden en
+loggen, geen projectie indienen. Rate-limit **429** → ronde stoppen en loggen, niet
+herproberen. **LinkedIn-scrapen staat NIET op deze cadans** (beleid J4,
+eigenaar-getriggerd); draai je de LinkedIn-mapper en is de sessie dood
+(`⚠ LINKEDIN-SESSIE VERLOPEN`) → stoppen, het login-commando
+`python3 tools/linkedin/scrape_profile.py login` relayen aan de eigenaar, niet
+herproberen (`missies/linkedin_scout_brief.md`).
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_scout-agent_<ronde>.md` met de
+brief-blob-hash, élke query letterlijk, per vondst de aangemaakte
+source-/entity-/relation-/argument-id's, de negatieve resultaten (alléén in het log),
+de stance-balans én de nieuwheid (nieuwe knopen/edges vs. hercitaties). Doel van een
+ronde: het netwerk is meetbaar rijker geworden, zónder dat de stance-balans scheef is
+getrokken. Niets aan het agent-contract verandert: alles blijft `voorgesteld`, eigen
+token, geen statuswijzigingen.

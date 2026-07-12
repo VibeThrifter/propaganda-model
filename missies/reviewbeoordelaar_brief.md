@@ -201,3 +201,18 @@ Per item exact één verdict:
   wereld. Het web mag je inzetten om te checken of een bron de claim *zoals geciteerd*
   dekt (en of hij echt bestaat); maar of de wereld-claim zelf waar is, en het zoeken
   van nieuw bewijs daarvoor, blijft documentalist-/criticus-werk en is geen afwijsgrond.
+
+## Cadans (onbewaakt, C1)
+
+Deze agent draait onbewaakt en **meebewegend met de drukte in de wachtrij** —
+standaard **dagelijks** — via de scheduler, tokenloos
+(`scripts/agent_runner.py --geen-token --label reviewbeoordelaar`; timer
+`deploy/systemd/agent-reviewbeoordelaar.{service,timer}` en `deploy/crontab`). Zonder
+token kan hij niets in het model schrijven; zijn enige uitvoer blijft het leesbare log +
+`data/review_advies.json` (adviserend, telt nergens mee). Er is geen `reeds_gereageerd`-
+voorregel (hij reageert nergens op; hij beoordeelt de hele wachtrij opnieuw).
+
+**Exit-condities.** Lege wachtrij → een korte "niets te beoordelen"-notitie in het log,
+geen leeg advies forceren. De runner voegt exit-code/duur als footer toe; oogst is 0
+(hij schrijft niets in het model). Blijft binnen de harde grenzen hieronder: geen token,
+geen schrijfacties, alleen lezen + rapporteren.

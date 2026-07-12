@@ -159,6 +159,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 
 ### A4 — Voorspellingsregister als kalibratie-hoeksteen · Fase 3 · M
 
+> **Fase-3 status (branch `monetisatie-bouw`, 12 juli 2026):** ✅ `/api/health` draagt `voorspellingen_kalibratie` (Brier); `GET /api/predictions/resolutie_voorstellen`; `missies/voorspelling_resolutie_brief.md` (tokenloos, schrijft voorstellen, scoort nooit zelf). 🧑 OWNER-ACTION: de 13 bestaande voorspellingen van toekomst-deadlines voorzien + de resolutie-agent draaien.
+
 **Als** eigenaar **wil ik** dat falsifieerbare voorspellingen doorlopend geregistreerd én op hun deadline afgerekend worden **zodat** de Brier-score groeit tot het enige externe, onomkoopbare ijkpunt — en het externe verkoopverhaal ("gekalibreerd model, Brier X").
 
 **Waarom.** Nu 13 voorspellingen, 0 opgelost = belofte, geen bewijs. Het register (`POST /api/predictions`, `PATCH …/uitkomst`, `scripts/voorspellingen.py`) bestaat al; wat ontbreekt is de *lopende* motor: agents registreren, een cadans dwingt resolutie af, Brier wordt zichtbaar. Let op de eerlijke grens: de Brier-*rekensom* is deterministisch, maar het *uitkomstoordeel* is niet veilig te automatiseren — dat blijft eigenaarswerk (`self_scored`-vlag bestaat juist daarvoor).
@@ -255,6 +257,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 ---
 
 ### A7 — De auto-merge-poort (predikaat) · Fase 3 · L
+
+> **Fase-3 status:** ✅ `auto_merge_toegestaan`-predikaat + `POST /api/arguments/<id>/auto_merge` (reviewer+, kill-switch `PROPAGANDA_AUTO_MERGE`) + account `merge-service`; conservatieve smaad-firewall (élke persoon-rakende claim geblokkeerd, ongeacht stance); `scripts/test_auto_merge.py` groen.
 
 **Als** systeem **wil ik** dat een root alleen automatisch merget als A1 ∧ A2 ∧ A6 ∧ citatiepoort ∧ hoge jury-confidence allemaal waar zijn **zodat** de handmatige merge-flessenhals verdwijnt zonder dat ongecontroleerd bewijs binnenglipt — met de mens op de uitzonderingen.
 
@@ -761,6 +765,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 ### C1 — Geplande onbewaakte agent-runs  ·  Fase 3  ·  L
 
+> **Fase-3 status:** ✅ `scripts/agent_runner.py` + `deploy/systemd/*`-timers + `deploy/crontab`; `monitor_agents.py` delta-signaal; alle 11 briefs herschreven voor onbewaakte cadans. 🧑 OWNER-ACTION: de timers op de VPS installeren + inschakelen (start geen live `claude`-runs zonder dat).
+
 **Als** systeemaccount (missie-agent) **wil ik** op een vast schema onbewaakt draaien onder mijn eigen token **zodat** het model zich vult zonder dat de eigenaar elke ronde met de hand start.
 
 **Waarom.** Het plan (§2, §C1) constateert dat dit nu géén zelfdraaiende machine is: "de 'autonome' agents draaiden nauwelijks onbewaakt (84% is eigenaar-gesuperviseerde `assistent`-sessies)". C1 schedulet scout/monitor/documentalist/criticus/ideoloog/doelgroep/bereik/linkedin onder hun eigen tokens; spend = AI-tokens (§Investering).
@@ -800,6 +806,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 ---
 
 ### C2 — De auto-merge-service  ·  Fase 3  ·  L
+
+> **Fase-3 status:** ✅ `scripts/auto_merge_service.py` (loop, dag-plafond, faal-veilig, kill-switch, `--dry-run`). 🧑 OWNER-ACTION: de service draaien op de VPS na sign-off (auto-merge blijft veilig dicht zolang er geen immuun-oordelen zijn).
 
 **Als** reviewer-tier systeemaccount **wil ik** de `voorgesteld`-wachtrij in een achtergrond-loop automatisch mergen zodra het A7-predikaat klopt **zodat** de handmatige merge-flessenhals (2.449 merges, wachtrij ~640) verdwijnt met de mens alleen nog op de uitzonderingen.
 
@@ -876,6 +884,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 ---
 
 ### C4 — Eigenaarsrol verschuift naar kalibratie-toezicht  ·  Fase 3  ·  L
+
+> **Fase-3 status:** ✅ `GET /api/toezicht` + `GET /api/auto_merge_log`; toezicht-paneel op `/beheer` (6 signalen + steekproef) + auto-merge-buckets op `/overleg`. Eigenaars-veto via herkeuren/heropenen.
 
 **Als** maintainer/eigenaar **wil ik** een privé-toezichtoverzicht i.p.v. de merge-knop **zodat** ik op de meta-laag stuur (steekproef, gevlagde twijfel, voorspellingen, drempels) i.p.v. de doorvoer te zijn.
 

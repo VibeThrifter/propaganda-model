@@ -1,0 +1,15 @@
+# Timer voor agent-monitor.service — Wekelijkse logica-/drogredencontrole (M1.8)
+# OWNER-ACTION: sudo systemctl enable --now agent-monitor.timer
+[Unit]
+Description=Timer: Wekelijkse logica-/drogredencontrole (M1.8)
+
+[Timer]
+OnCalendar=Mon *-*-* 03:00
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-monitor.service
+
+[Install]
+WantedBy=timers.target

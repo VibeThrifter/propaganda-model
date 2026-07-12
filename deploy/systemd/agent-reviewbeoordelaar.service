@@ -1,0 +1,24 @@
+# Dagelijks review-advies (alleen-lezen, meebewegend met de wachtrij)
+# Onbewaakte missie-/onderhoudsronde (C1). Plaats als
+# /etc/systemd/system/agent-reviewbeoordelaar.service; geactiveerd door agent-reviewbeoordelaar.timer.
+# OWNER-ACTION: pas User/Group/WorkingDirectory/venv-pad aan (zie propaganda.service).
+[Unit]
+Description=Dagelijks review-advies (alleen-lezen, meebewegend met de wachtrij)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=propaganda
+Group=propaganda
+WorkingDirectory=/opt/propaganda-model
+Environment=PROPAGANDA_DATA_DIR=/opt/propaganda-model/data
+EnvironmentFile=-/etc/propaganda.env
+# Harde stuck-detectie: een ronde die langer draait dan dit wordt gedood (SIGKILL);
+# de timer rapporteert de mislukte unit (C4-toezicht).
+TimeoutStartSec=1800
+ExecStart=/opt/propaganda-model/.venv/bin/python3 scripts/agent_runner.py --geen-token --label reviewbeoordelaar --brief missies/reviewbeoordelaar_brief.md --timeout 1800
+# Bescheiden hardening; data/ blijft schrijfbaar voor het logbestand + run-record.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full

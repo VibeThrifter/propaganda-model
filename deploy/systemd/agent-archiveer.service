@@ -1,0 +1,24 @@
+# Wayback-archivering van url-bronnen zonder archive_url (C3)
+# Onbewaakte missie-/onderhoudsronde (C1). Plaats als
+# /etc/systemd/system/agent-archiveer.service; geactiveerd door agent-archiveer.timer.
+# OWNER-ACTION: pas User/Group/WorkingDirectory/venv-pad aan (zie propaganda.service).
+[Unit]
+Description=Wayback-archivering van url-bronnen zonder archive_url (C3)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=propaganda
+Group=propaganda
+WorkingDirectory=/opt/propaganda-model
+Environment=PROPAGANDA_DATA_DIR=/opt/propaganda-model/data
+EnvironmentFile=-/etc/propaganda.env
+# Harde stuck-detectie: een ronde die langer draait dan dit wordt gedood (SIGKILL);
+# de timer rapporteert de mislukte unit (C4-toezicht).
+TimeoutStartSec=3600
+ExecStart=/opt/propaganda-model/.venv/bin/python3 scripts/archiveer_bronnen.py
+# Bescheiden hardening; data/ blijft schrijfbaar voor het logbestand + run-record.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full

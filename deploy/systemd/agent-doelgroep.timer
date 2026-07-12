@@ -1,0 +1,15 @@
+# Timer voor agent-doelgroep.service — Maandelijkse welstand-/bereik-overlay (assistent)
+# OWNER-ACTION: sudo systemctl enable --now agent-doelgroep.timer
+[Unit]
+Description=Timer: Maandelijkse welstand-/bereik-overlay (assistent)
+
+[Timer]
+OnCalendar=*-*-06 05:00
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-doelgroep.service
+
+[Install]
+WantedBy=timers.target

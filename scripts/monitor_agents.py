@@ -10,11 +10,19 @@ schrijfacties. Leest alleen; verandert niets. Draai zo vaak je wilt:
 Let op: `arguments.contributed_by` en `edit_log.changed_by` bevatten de
 gebruikersnaam (string), niet een id — vandaar de directe filter op naam.
 """
+import datetime
+import json
 import sqlite3
 from pathlib import Path
 
 DB = Path(__file__).parent.parent / "data" / "propaganda_model.db"
-AGENTS = ("monitor-agent", "documentalist-agent", "criticus-agent", "scout-agent")
+STATE = Path(__file__).parent.parent / "data" / "monitor_agents_state.json"
+AGENTS = ("monitor-agent", "documentalist-agent", "criticus-agent", "scout-agent",
+          "verificatie-agent", "aanklager-agent")
+
+# Afwijkingssignaal (C4-toezicht): 0 inzendingen sinds de vorige monitor-run kan een
+# vastgelopen/lege ronde betekenen; meer dan de drempel kan een op-hol-geslagen lus zijn.
+DREMPEL_HOOG = 100
 
 
 def main():
@@ -86,7 +94,48 @@ def main():
                   f'{r["action"]:<8} {r["table_name"]}#{r["record_id"]}')
     else:
         print("  (nog geen schrijfacties)")
+
+    afwijkingssignaal(conn)
     conn.close()
+
+
+def afwijkingssignaal(conn):
+    """Per-ronde-delta sinds de vorige monitor-run (C4-toezicht).
+
+    Leest alleen het model; de enige schrijfactie is een klein state-sidecar
+    (data/monitor_agents_state.json, gitignored) dat de vorige telling bewaart.
+    """
+    huidig = {a: conn.execute(
+        "SELECT COUNT(*) FROM edit_log WHERE changed_by = ?", (a,)).fetchone()[0]
+        for a in AGENTS}
+
+    vorig = {}
+    if STATE.exists():
+        try:
+            vorig = json.loads(STATE.read_text()).get("tellingen", {})
+        except (ValueError, OSError):
+            vorig = {}
+
+    print("\n=== Afwijkingssignaal (delta sinds vorige monitor-run) ===")
+    if not vorig:
+        print("  (geen eerdere run — dit is de basismeting; delta volgt de volgende keer)")
+    else:
+        for a in AGENTS:
+            delta = huidig[a] - vorig.get(a, 0)
+            vlag = ""
+            if delta == 0:
+                vlag = "  ⚠ 0 — mogelijk vastgelopen of lege ronde"
+            elif delta > DREMPEL_HOOG:
+                vlag = f"  ⚠ > {DREMPEL_HOOG} — mogelijk op-hol-lus"
+            print(f'  {a:<18} +{delta}{vlag}')
+
+    try:
+        STATE.write_text(json.dumps(
+            {"tellingen": huidig,
+             "opgeslagen": datetime.datetime.now().isoformat(timespec="seconds")},
+            ensure_ascii=False, indent=2))
+    except OSError:
+        print("  (kon state-bestand niet schrijven; delta blijft t.o.v. de vorige keer)")
 
 
 if __name__ == "__main__":

@@ -121,3 +121,24 @@ archief of live, tijdstip, gelukt/mislukt), per argument het anker (id · doel �
 **verdict-balans** (n `klopt` / n `twijfel` / n `klopt-niet`): schrijf je alleen
 `klopt`, vraag je dan af of je te mild her-verifieert (zelfde tweezijdigheidsplicht als
 de andere missies). Geen tokens of secrets in het log.
+
+## Cadans (onbewaakt, C1)
+
+Deze missie draait onbewaakt en frequent — **dagelijks**, meebewegend met de instroom in
+de wachtrij — via de scheduler (`scripts/agent_runner.py`;
+`deploy/systemd/agent-verificatie.{service,timer}` en `deploy/crontab`). De runner start
+één headless `claude`-sessie onder `verificatie-agent`, injecteert de voorregel (eerst
+`GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
+`missies/logs/`.
+
+**Exit-condities.** Lege wachtrij (geen nieuwe `voorgesteld` evidentiële root) →
+afronden en loggen, niets forceren. Onbereikbare bron → verdict `twijfel`
+(procesmetadata), nooit een boomnode. Rate-limit **429** → ronde stoppen en loggen,
+niet herproberen in een lus.
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_verificatie-agent_<ronde>.md`
+met de brief-blob-hash, élke fetch letterlijk (archief/live, tijdstip, gelukt/mislukt),
+per argument het anker + verdict + `verbatim_span`, de negatieve resultaten en de
+verdict-balans; de runner voegt exit-code/duur/oogst als footer toe (C4-toezicht). Het
+verdict telt nergens in de score — alleen de auto-merge-poort (A7). Alles blijft binnen
+het agent-contract: eigen token, geen statuswijzigingen.

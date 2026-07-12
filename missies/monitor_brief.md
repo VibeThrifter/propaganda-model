@@ -51,3 +51,22 @@ claim niet) · `overig`.
 - Alles wat je indient landt als `voorgesteld` (M2.2) en telt in niets mee tot een
   mens het merget; je logt je ronde in `missies/logs/` (zie `missies/README.md`)
   zodat de vals-positief-ratio gemeten kan worden (doel: < 50%).
+
+## Cadans (onbewaakt, C1)
+
+Deze missie draait onbewaakt op een vaste cadans — **wekelijks** — via de scheduler
+(`scripts/agent_runner.py`, aangeroepen door een systemd-timer/cron;
+`deploy/systemd/agent-monitor.{service,timer}` en `deploy/crontab`). De runner start
+één headless `claude`-sessie onder `monitor-agent`, injecteert de voorregel (eerst
+`GET /api/agent/reeds_gereageerd`, sla die argument-id's over) en tee't de ronde naar
+`missies/logs/`.
+
+**Exit-condities.** Lege oogst (geen rake ondergraving te vinden — dat is prima, je
+bent terughoudend) → afronden en loggen, geen vage vulling indienen. Rate-limit **429**
+→ ronde stoppen en loggen, niet herproberen in een lus.
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_monitor-agent_<ronde>.md` met
+de brief-blob-hash, élke query letterlijk, de oogst-id's, de negatieve resultaten
+(alléén in het log) en de stance-balans; de runner voegt exit-code/duur/oogst als
+footer toe (C4-toezicht via `scripts/monitor_agents.py`). Niets aan het agent-contract
+verandert: alles blijft `voorgesteld`, eigen token, geen statuswijzigingen.

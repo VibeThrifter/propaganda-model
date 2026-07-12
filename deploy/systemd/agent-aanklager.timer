@@ -1,0 +1,15 @@
+# Timer voor agent-aanklager.service — Dagelijkse gedecorreleerde tegenspraak (A2)
+# OWNER-ACTION: sudo systemctl enable --now agent-aanklager.timer
+[Unit]
+Description=Timer: Dagelijkse gedecorreleerde tegenspraak (A2)
+
+[Timer]
+OnCalendar=*-*-* 02:30
+# Loop een gemiste ronde na herstart/downtime alsnog in.
+Persistent=true
+# Spreid de last zodat niet elke agent op de seconde tegelijk start.
+RandomizedDelaySec=600
+Unit=agent-aanklager.service
+
+[Install]
+WantedBy=timers.target

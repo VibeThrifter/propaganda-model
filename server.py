@@ -41,6 +41,8 @@ SECRET_KEY_PATH = Path(os.environ.get("PROPAGANDA_SECRET_KEY_PATH", str(DATA_DIR
 BRIDGING_PATH = DATA_DIR / "bridging.json"
 REVIEW_ADVIES_PATH = DATA_DIR / "review_advies.json"
 BRON_SUGGESTIES_PATH = DATA_DIR / "bron_suggesties.json"
+VOORSPELLING_VOORSTELLEN_PATH = DATA_DIR / "voorspelling_voorstellen.json"
+AUTO_MERGE_LOG_PATH = DATA_DIR / "auto_merge_log.json"
 RELEASES_PATH = ROOT / "releases"
 
 app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
@@ -96,10 +98,11 @@ ROLE_ORDER = {"bijdrager": 1, "reviewer": 2, "maintainer": 3}
 RATE_LIMITS = {"bijdrager": 30, "reviewer": 60, "maintainer": 120}
 RATE_WINDOW = 60.0
 _rate_emmers = {}
-# Vrijgesteld van de rate limit: de maintainer-rol (admin — bewuste mensbesluiten) en het
-# vaste bijdrage-account 'assistent'. Overige bijdragers/agents houden hun trap-limiet als
-# flood-rem tegen een doorgeslagen agent-lus.
-RATE_LIMIT_VRIJGESTELD = {"assistent"}
+# Vrijgesteld van de rate limit: de maintainer-rol (admin — bewuste mensbesluiten), het
+# vaste bijdrage-account 'assistent', en het reviewer-tier systeemaccount 'merge-service'
+# (A7/C2: de auto-merge-service pace't zelf; de 60/min-limiet zou anders de doorvoer knellen).
+# Overige bijdragers/agents houden hun trap-limiet als flood-rem tegen een doorgeslagen agent-lus.
+RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service"}
 
 
 def _rate_limit_ok(user) -> bool:
@@ -1602,6 +1605,58 @@ def update_bezwaar_resolutie(arg_id):
     return jsonify({"id": arg_id, "bezwaar_resolutie": actie, "overrule": overrule})
 
 
+def _merge_core(conn, arg, merged_by, *, reason=None):
+    """Gedeelde merge-kern (M2.2): de statusberekening (citatiepoort), de UPDATE +
+    'merged'-edit_log-rij, en de revisie-supersede. Hergebruikt door merge_argument
+    (menselijke reviewer) én auto_merge_argument (A7-immuunpoort). Commit blijft bij
+    de caller. ``reason`` overschrijft de edit_log-reden (auto-merge zet er
+    'auto-merge (immuunpoort)'); None → de bestaande zelf-merge-label-logica.
+    Retourneert (nieuwe_status, self_merged, vervangt)."""
+    arg_id = arg["id"]
+    # Citatiepoort (M0.3), zachte variant: een supporting/contradicting ROOT zonder
+    # ÉCHTE bron (citatie met quote óf vindplaats — een kale titel-stub telt niet)
+    # landt op 'bronvermelding_nodig' (statusfactor 0,40 i.p.v. 0,50: score-straf,
+    # geen block). Zo blijven ware-maar-nog-ongesourcete claims behouden — het
+    # gewicht van het bewijs beslist, niet een harde poort.
+    n_echt = conn.execute("""
+        SELECT COUNT(*) FROM citations c WHERE c.argument_id = ? AND (
+            (c.quote IS NOT NULL AND TRIM(c.quote) <> '')
+            OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id))
+        """, (arg_id,)).fetchone()[0]
+    if (arg["parent_argument_id"] is None
+            and arg["stance"] in ("supporting", "contradicting") and not n_echt):
+        nieuwe_status = "bronvermelding_nodig"
+    else:
+        nieuwe_status = "ongecontroleerd"
+    self_merged = arg["contributed_by"] == merged_by
+    edit_reason = reason if reason is not None else ("zelf-merge (n=1)" if self_merged else None)
+
+    conn.execute("UPDATE arguments SET status = ?, merged_by = ?, self_merged = ? WHERE id = ?",
+                 (nieuwe_status, merged_by, self_merged, arg_id))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('arguments', ?, 'merged', ?, ?, ?, ?)
+    """, (arg_id, merged_by,
+          json.dumps({"status": "voorgesteld"}),
+          json.dumps({"status": nieuwe_status}),
+          edit_reason))
+
+    # Revisie (Fase C): mergt deze rij een ouder argument weg? Dan supersedet ze het —
+    # het oude gaat op 'verouderd' + vervangen = 1 (scoring/influence/viz slaan het over),
+    # de opvolging blijft herleidbaar via reviseert_id + edit_log.
+    vervangt = arg["reviseert_id"]
+    if vervangt is not None:
+        conn.execute("UPDATE arguments SET status = 'verouderd', vervangen = 1 WHERE id = ?",
+                     (vervangt,))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
+        """, (vervangt, merged_by, json.dumps({"vervangen": False}),
+              json.dumps({"vervangen": True, "status": "verouderd"}),
+              f"vervangen door revisie #{arg_id}"))
+    return nieuwe_status, self_merged, vervangt
+
+
 @app.route("/api/arguments/<int:arg_id>/merge", methods=["POST"])
 @require_user()
 def merge_argument(arg_id):
@@ -1623,46 +1678,7 @@ def merge_argument(arg_id):
         return jsonify({"error": "Mergen vereist reviewer of hoger "
                                  "(globaal of voor het filter van dit doel)"}), 403
 
-    # Citatiepoort (M0.3), zachte variant: een supporting/contradicting ROOT zonder
-    # ÉCHTE bron (citatie met quote óf vindplaats — een kale titel-stub telt niet)
-    # landt op 'bronvermelding_nodig' (statusfactor 0,40 i.p.v. 0,50: score-straf,
-    # geen block). Zo blijven ware-maar-nog-ongesourcete claims behouden — het
-    # gewicht van het bewijs beslist, niet een harde poort.
-    n_echt = conn.execute("""
-        SELECT COUNT(*) FROM citations c WHERE c.argument_id = ? AND (
-            (c.quote IS NOT NULL AND TRIM(c.quote) <> '')
-            OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id))
-        """, (arg_id,)).fetchone()[0]
-    if (arg["parent_argument_id"] is None
-            and arg["stance"] in ("supporting", "contradicting") and not n_echt):
-        nieuwe_status = "bronvermelding_nodig"
-    else:
-        nieuwe_status = "ongecontroleerd"
-    self_merged = arg["contributed_by"] == g.user["username"]
-
-    conn.execute("UPDATE arguments SET status = ?, merged_by = ?, self_merged = ? WHERE id = ?",
-                 (nieuwe_status, g.user["username"], self_merged, arg_id))
-    conn.execute("""
-        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
-        VALUES ('arguments', ?, 'merged', ?, ?, ?, ?)
-    """, (arg_id, g.user["username"],
-          json.dumps({"status": "voorgesteld"}),
-          json.dumps({"status": nieuwe_status}),
-          "zelf-merge (n=1)" if self_merged else None))
-
-    # Revisie (Fase C): mergt deze rij een ouder argument weg? Dan supersedet ze het —
-    # het oude gaat op 'verouderd' + vervangen = 1 (scoring/influence/viz slaan het over),
-    # de opvolging blijft herleidbaar via reviseert_id + edit_log.
-    vervangt = arg["reviseert_id"]
-    if vervangt is not None:
-        conn.execute("UPDATE arguments SET status = 'verouderd', vervangen = 1 WHERE id = ?",
-                     (vervangt,))
-        conn.execute("""
-            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
-            VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
-        """, (vervangt, g.user["username"], json.dumps({"vervangen": False}),
-              json.dumps({"vervangen": True, "status": "verouderd"}),
-              f"vervangen door revisie #{arg_id}"))
+    nieuwe_status, self_merged, vervangt = _merge_core(conn, arg, g.user["username"])
     conn.commit()
     conn.close()
     return jsonify({"id": arg_id, "status": nieuwe_status,
@@ -1793,6 +1809,199 @@ def tegenspraak(arg_id):
     conn.close()
     return jsonify({"id": oid, "argument_id": arg_id, "fase": "tegenspraak",
                     "verdict": verdict, "detail": detail}), 201
+
+
+# ── Auto-merge-poort (A7): het immuunpoort-predikaat + endpoint ──
+# Een root merget alleen automatisch als A1 ∧ A2 ∧ A6 ∧ citatiepoort ∧ jury-
+# onafhankelijkheid allemaal waar zijn, én het geen theorie-/aspect-doel of een
+# negatieve persoons-claim is. De C2-service (aparte lane) draait dit over de
+# wachtrij; het endpoint checkt het predikaat ZELF (defense-in-depth) zodat een bug
+# in de loop nooit ongated kan mergen. Bewuste, geaudite uitzondering op "mergen is
+# mensenwerk" (§A7): niet mens-only maar reviewer-tier, begrensd door dit predikaat.
+
+# Duplicaat-drempels (spiegelt create_argument, M0.3/A6).
+AUTO_MERGE_DIFFLIB_DREMPEL = 0.85
+AUTO_MERGE_DEDUP_DREMPEL = 0.80
+
+
+def _open_ondergraving_in_boom(conn, root_id) -> bool:
+    """Is er een niet-'opgelost' ondergraving (contradicting reply) in de boom onder
+    ``root_id``? Alleen mee-tellende ondergravingen: gemerged (niet 'voorgesteld'/
+    'verworpen'), niet vervangen, bezwaar_resolutie ≠ 'opgelost' (open/herzien/blijft
+    dempen de σ nog)."""
+    n = conn.execute("""
+        WITH RECURSIVE keten(id) AS (
+            SELECT id FROM arguments WHERE id = ?
+            UNION ALL
+            SELECT a.id FROM arguments a JOIN keten k ON a.parent_argument_id = k.id
+        )
+        SELECT COUNT(*) FROM arguments ond
+        JOIN keten k ON k.id = ond.id
+        WHERE ond.parent_argument_id IS NOT NULL
+          AND ond.stance = 'contradicting'
+          AND COALESCE(ond.bezwaar_resolutie, 'open') <> 'opgelost'
+          AND NOT ond.vervangen
+          AND ond.status NOT IN ('voorgesteld', 'verworpen')
+    """, (root_id,)).fetchone()[0]
+    return n > 0
+
+
+def _semantisch_duplicaat(conn, arg) -> bool:
+    """A6: bestaat er al een GEMERGEDE root met (bijna) dezelfde claim op hetzelfde
+    praktijk-doel? max(difflib, dedup.gelijkenis) ≥ de drempel → duplicaat."""
+    doelkol, doelid = None, None
+    if arg["relation_id"]:
+        doelkol, doelid = "relation_id", arg["relation_id"]
+    elif arg["entity_id"]:
+        doelkol, doelid = "entity_id", arg["entity_id"]
+    if doelkol is None:
+        return False
+    claim = arg["claim"] or ""
+    rijen = conn.execute(f"""
+        SELECT claim FROM arguments
+        WHERE id <> ? AND parent_argument_id IS NULL AND NOT vervangen
+          AND status NOT IN ('voorgesteld', 'verworpen')
+          AND {doelkol} = ?
+    """, (arg["id"], doelid)).fetchall()
+    for r in rijen:
+        ander = r["claim"] or ""
+        difflib_ratio = difflib.SequenceMatcher(None, claim, ander).ratio()
+        dedup_ratio = dedup.gelijkenis(claim, ander) if dedup is not None else 0.0
+        if (difflib_ratio >= AUTO_MERGE_DIFFLIB_DREMPEL
+                or dedup_ratio >= AUTO_MERGE_DEDUP_DREMPEL):
+            return True
+    return False
+
+
+def auto_merge_toegestaan(conn, arg_id):
+    """A7-immuunpoort: mag dit argument automatisch mergen?
+
+    Retourneert (ok, redenen, bucket). ``ok`` is True (bucket 'auto-gemerged')
+    ALLEEN als álle condities gelden; anders False met de gefaalde reden(en) en een
+    bucket:
+      - 'mensenwerk'            — buiten scope (reply/contextual/aspect/theorie-doel)
+      - 'geblokkeerd-hoog-inzet'— negatieve feitelijke claim over een natuurlijk persoon
+      - 'geparkeerd-twijfel'    — in scope, maar één of meer signalen ontbreken
+    """
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if not arg:
+        return (False, ["Argument niet gevonden"], "mensenwerk")
+
+    # (1) Scope — alleen een 'voorgesteld' evidentiële root op de praktijk-laag.
+    if arg["status"] != "voorgesteld":
+        return (False, [f"status is '{arg['status']}', niet 'voorgesteld'"], "mensenwerk")
+    if arg["parent_argument_id"] is not None:
+        return (False, ["reactie (geen root) — replies mergen niet automatisch"], "mensenwerk")
+    if arg["stance"] not in ("supporting", "contradicting"):
+        return (False, ["contextual-root (duiding) — mensenwerk"], "mensenwerk")
+    if arg["property"] not in (None, "influence"):
+        return (False, [f"aspect-root (property='{arg['property']}') — classificatie is mensenwerk"],
+                "mensenwerk")
+    if arg["role_id"] or arg["mechanism_id"] or arg["emergent_effect_id"]:
+        return (False, ["theorie-doel — loopt via RfC (twee menselijke akkoorden)"], "mensenwerk")
+    if not (arg["relation_id"] or arg["entity_id"]):
+        return (False, ["geen praktijk-doel (relatie/entiteit)"], "mensenwerk")
+
+    # (7) Hoog-inzet-blokkade — de conservatieve smaad-firewall (Laag 3, D2.3):
+    # ELKE claim die een natuurlijk persoon raakt merget NOOIT automatisch, ongeacht
+    # stance en ongeacht de bron. "Raken" = het doel is (a) een 'persoon'-entiteit,
+    # óf (b) een relatie waarvan de bron- óf doel-entiteit een 'persoon' is. Bij
+    # "alles publiek" + auto-merge is elke persoon-rakende claim mensenwerk; org↔org /
+    # org↔media / mechanisme-claims blijven wél auto-mergebaar.
+    if arg["entity_id"]:
+        ent = conn.execute("SELECT type FROM entities WHERE id = ?",
+                           (arg["entity_id"],)).fetchone()
+        if ent and ent["type"] == "persoon":
+            return (False, ["claim raakt een genoemd natuurlijk persoon (entiteit-doel; "
+                            "smaad-firewall) — altijd mensbeoordeling"],
+                    "geblokkeerd-hoog-inzet")
+    if arg["relation_id"]:
+        n_persoon = conn.execute("""
+            SELECT COUNT(*) FROM relations r
+            JOIN entities e ON e.id IN (r.source_id, r.target_id)
+            WHERE r.id = ? AND e.type = 'persoon'""", (arg["relation_id"],)).fetchone()[0]
+        if n_persoon:
+            return (False, ["claim raakt een genoemd natuurlijk persoon (via de relatie; "
+                            "smaad-firewall) — altijd mensbeoordeling"],
+                    "geblokkeerd-hoog-inzet")
+
+    redenen = []
+
+    # (2) Citatiepoort — een echte citatie (quote óf vindplaats).
+    n_echt = conn.execute("""
+        SELECT COUNT(*) FROM citations c WHERE c.argument_id = ? AND (
+            (c.quote IS NOT NULL AND TRIM(c.quote) <> '')
+            OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id))
+        """, (arg_id,)).fetchone()[0]
+    if not n_echt:
+        redenen.append("citatiepoort: geen echte bron (quote óf vindplaats)")
+
+    auteur = arg["contributed_by"]
+
+    # (3) A1 — nieuwste her-verificatie-oordeel = 'klopt', door een ander account.
+    a1 = conn.execute("""
+        SELECT verdict, door, model_familie FROM immuun_oordelen
+        WHERE argument_id = ? AND fase = 'herverificatie'
+        ORDER BY id DESC LIMIT 1""", (arg_id,)).fetchone()
+    if a1 is None:
+        redenen.append("A1: geen bron-herverificatie-oordeel")
+    else:
+        if a1["verdict"] != "klopt":
+            redenen.append(f"A1: nieuwste herverificatie is '{a1['verdict']}' (niet 'klopt')")
+        if a1["door"] == auteur:
+            redenen.append("A1: her-verificatie door de auteur zelf (geen onafhankelijk oordeel)")
+
+    # (4) A2 — nieuwste tegenspraak-certificaat = 'overleefd' én geen openstaande ondergraving.
+    a2 = conn.execute("""
+        SELECT verdict, door, model_familie FROM immuun_oordelen
+        WHERE argument_id = ? AND fase = 'tegenspraak'
+        ORDER BY id DESC LIMIT 1""", (arg_id,)).fetchone()
+    if a2 is None:
+        redenen.append("A2: geen tegenspraak-certificaat")
+    else:
+        if a2["verdict"] != "overleefd":
+            redenen.append(f"A2: nieuwste tegenspraak is '{a2['verdict']}' (niet 'overleefd')")
+        if a2["door"] == auteur:
+            redenen.append("A2: tegenspraak door de auteur zelf (geen gedecorreleerde aanklager)")
+    if _open_ondergraving_in_boom(conn, arg_id):
+        redenen.append("A2: openstaande (niet-'opgelost') ondergraving in de boom")
+
+    # (6) Jury-onafhankelijkheid — A1 en A2 door verschillende accounts (elk ≠ auteur).
+    if a1 is not None and a2 is not None and a1["door"] == a2["door"]:
+        redenen.append("jury-onafhankelijkheid: A1 en A2 door hetzelfde account")
+
+    # (5) A6 — geen semantisch duplicaat t.o.v. bestaande gemergede roots op dit doel.
+    if _semantisch_duplicaat(conn, arg):
+        redenen.append("A6: semantisch duplicaat van een bestaande gemergede root op dit doel")
+
+    if redenen:
+        return (False, redenen, "geparkeerd-twijfel")
+    return (True, [], "auto-gemerged")
+
+
+@app.route("/api/arguments/<int:arg_id>/auto_merge", methods=["POST"])
+@require_user("reviewer")
+def auto_merge_argument(arg_id):
+    """A7 — auto-merge via de immuunpoort (bedoeld voor het reviewer-tier
+    systeemaccount 'merge-service'). Checkt ``auto_merge_toegestaan`` ALTIJD zelf
+    (defense-in-depth). Kill-switch: env PROPAGANDA_AUTO_MERGE=0 → 503. Predikaat ok
+    → hergebruikt de merge-kern (merged_by = het aanroepende account, edit_log-reden
+    'auto-merge (immuunpoort)') en geeft 200; niet ok → 409 + bucket + redenen."""
+    if os.environ.get("PROPAGANDA_AUTO_MERGE", "1") == "0":
+        return jsonify({"error": "auto-merge uitgeschakeld"}), 503
+    conn = get_db()
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if not arg:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    ok, redenen, bucket = auto_merge_toegestaan(conn, arg_id)
+    if not ok:
+        conn.close()
+        return jsonify({"merged": False, "bucket": bucket, "redenen": redenen}), 409
+    _merge_core(conn, arg, g.user["username"], reason="auto-merge (immuunpoort)")
+    conn.commit()
+    conn.close()
+    return jsonify({"merged": True, "bucket": "auto-gemerged"}), 200
 
 
 @app.route("/api/arguments/<int:arg_id>/score_diff")
@@ -4175,6 +4384,99 @@ def bron_suggesties():
         return jsonify({"error": f"Bron-suggestiebestand onleesbaar: {e}", "items": {}}), 500
 
 
+@app.route("/api/predictions/resolutie_voorstellen")
+@require_user("reviewer")
+def resolutie_voorstellen():
+    """A4 — resolutievoorstellen van de voorspelling-resolutie-agent: per verlopen open
+    voorspelling een voorgestelde uitkomst + status + bron. Read-only beslissteun BUITEN
+    het model (adviserend, telt nergens mee, mirrors review_advies.json). De agent kan
+    NIET scoren (geen reviewer-rol); de eigenaar bevestigt via PATCH …/uitkomst. Reviewer+
+    only. Leeg tot de agent een ronde draaide (missies/voorspelling_resolutie_brief.md)."""
+    if not VOORSPELLING_VOORSTELLEN_PATH.exists():
+        return jsonify({"gegenereerd": None, "agent": None, "items": []})
+    try:
+        return jsonify(json.loads(VOORSPELLING_VOORSTELLEN_PATH.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Resolutie-voorstelbestand onleesbaar: {e}", "items": []}), 500
+
+
+@app.route("/api/auto_merge_log")
+@require_user("reviewer")
+def auto_merge_log():
+    """C4 — het auto-merge-verdictlogboek dat de C2-service schrijft: per arg:<id> de
+    bucket ('auto-gemerged'/'geparkeerd-twijfel'/'geblokkeerd-hoog-inzet') + de gefaalde
+    redenen + tijdstempel. Read-only toezicht-materiaal BUITEN het model (mirrors
+    review_advies.json). Reviewer+ only. Leeg tot de service een ronde draaide."""
+    if not AUTO_MERGE_LOG_PATH.exists():
+        return jsonify({})
+    try:
+        return jsonify(json.loads(AUTO_MERGE_LOG_PATH.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Auto-merge-logboek onleesbaar: {e}"}), 500
+
+
+@app.route("/api/toezicht")
+@require_user("reviewer")
+def toezicht():
+    """C4 — dun kalibratie-toezicht-aggregaat voor de eigenaar (reviewer+): bundelt de
+    auto-merge-doorvoer (uit edit_log merged_by='merge-service' + auto_merge_log.json),
+    een steekproef recente service-merges, de voorspellingen-kalibratie (open+verlopen +
+    Brier), de validatie-kerngetallen en de archiefdekking. Aggregator, geen zware nieuwe
+    logica — de UI-lane (C4) consumeert dit."""
+    conn = get_db()
+
+    # Auto-merge-doorvoer: gemerged (24u) uit edit_log; geparkeerd/geblokkeerd uit het logboek.
+    gemerged_24u = conn.execute("""
+        SELECT COUNT(*) FROM edit_log
+        WHERE action = 'merged' AND changed_by = 'merge-service'
+          AND created_at >= datetime('now', '-1 day')""").fetchone()[0]
+    steekproef = [dict(r) for r in conn.execute("""
+        SELECT record_id AS argument_id, created_at, reason FROM edit_log
+        WHERE action = 'merged' AND changed_by = 'merge-service'
+        ORDER BY id DESC LIMIT 20""")]
+
+    logboek = {}
+    if AUTO_MERGE_LOG_PATH.exists():
+        try:
+            logboek = json.loads(AUTO_MERGE_LOG_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            logboek = {}
+    buckets = {"auto-gemerged": 0, "geparkeerd-twijfel": 0, "geblokkeerd-hoog-inzet": 0}
+    for v in logboek.values():
+        b = (v or {}).get("bucket")
+        if b in buckets:
+            buckets[b] += 1
+
+    # Voorspellingen: open-verlopen (zelfde populatie als VOORSPELLING-DEADLINE) + Brier.
+    open_verlopen = conn.execute("""
+        SELECT COUNT(*) FROM predictions
+        WHERE status = 'open' AND deadline < date('now')""").fetchone()[0]
+    briers = [r["brier"] for r in conn.execute(
+        "SELECT brier FROM predictions WHERE brier IS NOT NULL")]
+    brier_gem = round(sum(briers) / len(briers), 4) if briers else None
+
+    # Validatie-kerngetallen (gedeeld met de CLI/health).
+    rapport = validation.run_all(conn)
+    conn.close()
+    totalen = rapport.get("totalen", {})
+    archief = rapport.get("kerngetallen", {}).get("archief_dekking")
+
+    return jsonify({
+        "auto_merge": {
+            "gemerged_24u": gemerged_24u,
+            "geparkeerd": buckets["geparkeerd-twijfel"],
+            "geblokkeerd": buckets["geblokkeerd-hoog-inzet"],
+        },
+        "steekproef": steekproef,
+        "voorspellingen": {"open_verlopen": open_verlopen, "brier": brier_gem,
+                           "n_gescoord": len(briers)},
+        "validatie": {"fouten": totalen.get("fout", 0),
+                      "waarschuwingen": totalen.get("waarschuwing", 0),
+                      "info": totalen.get("info", 0)},
+        "archief_dekking": archief,
+    })
+
+
 @app.route("/api/afgewezen")
 @require_user("reviewer")
 def afgewezen_queue():
@@ -4956,14 +5258,16 @@ def get_health():
     dus de cijfers hier zijn per constructie identiek aan scripts/validate_model.py.
     (Zonder linkrot-check; die blijft CLI-only achter --network.)
 
-    Als scripts/analyse_gevoeligheid.py (M1.6) of scripts/onderzoeksagenda.py
-    (M3.2) een rapport heeft geschreven, komt dat mee onder 'gevoeligheid'
-    resp. 'onderzoeksagenda'; de nieuwste release (M3.1) onder 'release'."""
+    Als scripts/analyse_gevoeligheid.py (M1.6), scripts/onderzoeksagenda.py
+    (M3.2) of scripts/voorspellingen.py (A4, Brier) een rapport heeft geschreven,
+    komt dat mee onder 'gevoeligheid' resp. 'onderzoeksagenda' resp.
+    'voorspellingen_kalibratie'; de nieuwste release (M3.1) onder 'release'."""
     conn = get_db()
     rapport = validation.run_all(conn)
     conn.close()
     for sleutel, bestand in (("gevoeligheid", "gevoeligheid.json"),
-                             ("onderzoeksagenda", "onderzoeksagenda.json")):
+                             ("onderzoeksagenda", "onderzoeksagenda.json"),
+                             ("voorspellingen_kalibratie", "voorspellingen_kalibratie.json")):
         pad = Path(__file__).parent / "data" / bestand
         if pad.exists():
             try:

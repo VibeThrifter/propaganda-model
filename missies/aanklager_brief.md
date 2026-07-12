@@ -130,3 +130,24 @@ stance) + de gekozen route (weerlegging/ondergraving/certificaat) + het aangemaa
 argument-id of certificaat, de negatieve resultaten (breed gezocht, niets gevonden —
 alléén in het log), en de **stance-balans van de ronde**. Geen tokens of secrets in het
 log.
+
+## Cadans (onbewaakt, C1)
+
+Deze missie draait onbewaakt en frequent — **dagelijks**, meebewegend met de instroom in
+de wachtrij — via de scheduler (`scripts/agent_runner.py`;
+`deploy/systemd/agent-aanklager.{service,timer}` en `deploy/crontab`). De runner start
+één headless `claude`-sessie onder `aanklager-agent`, injecteert de voorregel (eerst
+`GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
+`missies/logs/`.
+
+**Exit-condities.** Lege wachtrij (geen nieuwe score-dragende claim om aan te vallen) →
+afronden en loggen. Een `overleefd`-certificaat is procesmetadata, nooit een
+`contextual` "ik zocht en vond niets"-node. Rate-limit **429** → ronde stoppen en
+loggen, niet herproberen in een lus.
+
+**Logging-plicht per ronde.** `missies/logs/YYYY-MM-DD_aanklager-agent_<ronde>.md` met
+de brief-blob-hash, élke zoekopdracht letterlijk, per claim het anker + de gekozen route
+(weerlegging/ondergraving/certificaat) + het aangemaakte id, de negatieve resultaten en
+de stance-balans; de runner voegt exit-code/duur/oogst als footer toe (C4-toezicht). Een
+ronde die alléén `overleefd` schrijft is meetbaar te mild. Alles blijft binnen het
+agent-contract: eigen token, geen statuswijzigingen.

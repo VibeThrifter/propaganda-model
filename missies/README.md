@@ -7,14 +7,39 @@ Bearer-token van hun agent-account (`data/tokens/<naam>.token`, aangemaakt via
 gebruiker, maar verdient zijn gewicht** — provenance verplicht, elke claim herleidbaar
 naar een door mensen controleerbare bron, nooit directe statuswijzigingen.
 
-## Een missie starten
+## Een missie starten — onbewaakt, op cadans (C1)
 
-1. Open een Claude Code sessie (of background agent) in deze repo.
-2. Geef als opdracht: *"Voer de missie uit in `missies/monitor_brief.md`
-   (of `documentalist_brief.md` / `scout_brief.md`), als agent-account
-   `monitor-agent`/`documentalist-agent`/`scout-agent`."*
-3. De agent logt zijn ronde in `missies/logs/` (zie hieronder) en dient alle
-   bevindingen in via de API; een mens reviewt daarna.
+De missies draaien **onbewaakt op een vaste cadans**, niet met de hand. Een
+systemd-timer (of cron-entry) roept de wrapper `scripts/agent_runner.py` aan; die
+laadt het agent-token, bouwt de missie-prompt (verwijzing naar de brief + het account
++ de vaste voorregel hieronder) en start **één headless `claude -p`-sessie** per ronde,
+die naar `missies/logs/` tee't. De agent *is* een Claude Code-sessie, dus "schedulen"
+= per ronde één headless invocatie plannen — geen aparte daemon.
+
+- **Cadans & installatie:** `deploy/systemd/` (per agent een `.service` + `.timer`,
+  met de cadans-tabel in `deploy/systemd/README.md`) of de frictieloze fallback
+  `deploy/crontab`. LinkedIn-scrapen staat **bewust niet** op een 24/7-schema (beleid
+  J4, eigenaar-getriggerd).
+- **Droogloop (post niets):**
+  `python3 scripts/agent_runner.py --agent monitor-agent --brief missies/monitor_brief.md --dry-run`
+  toont het exacte `claude`-commando + tokenpad.
+- **Handmatig één ronde forceren** kan met hetzelfde commando zónder `--dry-run`.
+
+Elke ronde: de agent logt in `missies/logs/` (zie hieronder) en dient alle
+bevindingen in via de API; een mens reviewt/merget daarna. De runner voegt exit-code,
+duur en oogst (edit_log-delta) als footer aan het log toe en schrijft een run-record
+naar `data/agent_runs.jsonl` (gitignored, C4-toezicht).
+
+**Exit-condities (elke agent).** Lege oogst → afronden en loggen, geen vulling
+indienen. Rate-limit **429** (bijdrager 30/min) → ronde stoppen en loggen, niet in een
+lus herproberen. Dode LinkedIn-sessie (`⚠ LINKEDIN-SESSIE VERLOPEN`) → stoppen, het
+login-commando relayen aan de eigenaar, niet herproberen — de runner detecteert die
+exit apart.
+
+**Stuck-detectie & toezicht (C4).** Elke `.service` heeft een harde
+`TimeoutStartSec=` die een vastgelopen ronde doodt; `scripts/monitor_agents.py`
+(read-only) toont per agent de delta sinds de vorige run met een afwijkingssignaal
+(0 inzendingen = mogelijk vastgelopen/lege ronde; boven de drempel = mogelijk op-hol).
 
 ## Reageer niet twee keer op hetzelfde argument
 
@@ -63,6 +88,7 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `verificatie-agent` | bijdrager | `verificatie_agent_brief.md` | eigen werk her-verifiëren (403); statussen zetten/mergen; het verdict telt nergens in de score |
 | `aanklager-agent` | bijdrager | `aanklager_brief.md` | eigen claim certificeren (403); twee keer op dezelfde parent reageren (409); statussen zetten |
 | _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
+| _(geen account)_ | — (alleen-lezen) | `voorspelling_resolutie_brief.md` | een voorspelling scoren (`PATCH …/uitkomst` = reviewer+ én mensenwerk); levert alléén resolutie-*voorstellen* in `data/voorspelling_voorstellen.json` |
 
 **Het immuunsysteem (A1/A2, Deel A).** De `verificatie-agent` her-verifieert elke
 `voorgesteld` supporting/contradicting-root onafhankelijk tegen de echte bron
