@@ -3,6 +3,7 @@
 Start: python3 server.py
 Open:  http://localhost:5000
 """
+import csv
 import datetime
 import difflib
 import functools
@@ -11,8 +12,10 @@ import hmac
 import html
 import json
 import os
+import io
 import re
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -47,6 +50,14 @@ BRON_SUGGESTIES_PATH = DATA_DIR / "bron_suggesties.json"
 VOORSPELLING_VOORSTELLEN_PATH = DATA_DIR / "voorspelling_voorstellen.json"
 AUTO_MERGE_LOG_PATH = DATA_DIR / "auto_merge_log.json"
 RELEASES_PATH = ROOT / "releases"
+# E1 (data-feed): de map met API-keys voor de gemeterde feed-namespace. Spiegelt
+# data/tokens/ — één JSON-bestand per key, alléén de sha256-hash opgeslagen.
+API_KEYS_DIR = Path(os.environ.get("PROPAGANDA_API_KEYS_DIR", str(DATA_DIR / "api_keys")))
+
+# E1: gedeelde bouwer van de VERKOCHTE data-slice (neutraliteits-afbakening op één
+# plek). Dient zowel de CSV-export (scripts/export_dataset.py) als de feed-API hier.
+sys.path.insert(0, str(ROOT / "scripts"))
+import export_dataset  # noqa: E402
 
 app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
 
@@ -162,6 +173,78 @@ def _rate_limit_ok(user) -> bool:
         return False
     emmer.append(nu)
     return True
+
+
+# ── API-key-gating + lees-metering (E1, data-feed) ───────────
+# Hergebruikt het write-side rate-limit-patroon (emmer per RATE_WINDOW), maar dan
+# op een LEES-quotum en op een APARTE feed-namespace (/api/feed/*). De publieke
+# /api/graph_data + de metriek-endpoints blijven open en ongemeterd — de portal-
+# loader hangt eraan. Sleutel-opslag spiegelt data/tokens/: één JSON per key
+# (`{"naam","tier","key_hash"}`), alléén de sha256-hash op schijf (auth.hash_token).
+FEED_QUOTA = {"proef": 20, "feed": 240, "onbeperkt": None}  # leesverzoeken per RATE_WINDOW
+_read_emmers = {}
+
+
+def _api_keys_map() -> dict:
+    """{key_hash: {"naam","tier"}} uit data/api_keys/*.json. Per-request gescand
+    (weinig keys); een onbekende/ongeldige tier valt terug op 'feed'."""
+    out = {}
+    if not API_KEYS_DIR.exists():
+        return out
+    for p in API_KEYS_DIR.glob("*.json"):
+        try:
+            d = json.loads(p.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        kh = d.get("key_hash")
+        if kh:
+            tier = d.get("tier") if d.get("tier") in FEED_QUOTA else "feed"
+            out[kh] = {"naam": d.get("naam", p.stem), "tier": tier}
+    return out
+
+
+def _lees_api_key() -> str:
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        return header[len("Bearer "):].strip()
+    return (request.args.get("key") or "").strip()
+
+
+def _read_meter_ok(key_hash, tier) -> bool:
+    limiet = FEED_QUOTA.get(tier)
+    if limiet is None:                       # 'onbeperkt'-tier
+        return True
+    nu = time.monotonic()
+    emmer = _read_emmers.setdefault(key_hash, [])
+    emmer[:] = [t for t in emmer if nu - t < RATE_WINDOW]
+    if len(emmer) >= limiet:
+        return False
+    emmer.append(nu)
+    return True
+
+
+def require_api_key(min_tier=None):
+    """Poort voor de betaalde feed-namespace. Geen key → 401; onbekende key → 401;
+    boven het lees-quotum van de tier → 429 (zelfde meldingsvorm als de write-side)."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            key = _lees_api_key()
+            if not key:
+                return jsonify({"error": "API-key vereist: Authorization: Bearer "
+                                         "<key> of ?key=<key>"}), 401
+            kh = auth.hash_token(key)
+            rec = _api_keys_map().get(kh)
+            if rec is None:
+                return jsonify({"error": "Ongeldige API-key"}), 401
+            if not _read_meter_ok(kh, rec["tier"]):
+                return jsonify({"error": "Lees-quotum bereikt: maximaal "
+                                         f"{FEED_QUOTA.get(rec['tier'])} feed-verzoeken "
+                                         f"per {int(RATE_WINDOW)} s"}), 429
+            g.api_key = rec
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def _filterrollen(conn, user_id) -> dict:
@@ -305,6 +388,13 @@ def methode_page():
     verklaring, de disclaimer en de art. 43-UAVG-grondslag. Openbaar (geen gate) —
     dit is het juridische schild en moet vindbaar zijn vanaf de voordeur."""
     return send_file(WEB_PATH / "methode.html")
+
+
+@app.route("/docs/openapi.yaml")
+def openapi_spec():
+    """OpenAPI-beschrijving van de PUBLIEKE + VERKOCHTE GET-vormen van de data-feed
+    (E1). Bevat bewust NIET /api/kleurmeter of /api/machtsvalentie (uitgesloten laag)."""
+    return send_file(ROOT / "docs" / "openapi.yaml", mimetype="application/yaml")
 
 
 @app.route("/robots.txt")
@@ -5480,6 +5570,48 @@ def get_bereik():
     res = bereik.compute_bereik(conn, include_voorgesteld=preview)
     conn.close()
     return jsonify(res)
+
+
+# ── Betaalde data-feed (E1): gemeterde namespace achter een API-key ──────────
+# De VERKOCHTE slice (structuurgraaf + geldstroom/bereik/welstand) uit de gedeelde
+# bouwer export_dataset.verzamel — mechanisch ZONDER de politieke-positie-laag en
+# machtsvalentie (neutraliteit + art. 9-AVG). Alléén status='goedgekeurd'. Gated
+# + gemeterd; de open /api/graph_data blijft ongemeterd voor de portal.
+
+@app.route("/api/feed/graph")
+@require_api_key()
+def feed_graph():
+    """De verkochte data-slice als JSON: {versie, tabellen:{tabel:{kolommen,rijen}}}.
+    Zelfde bron als de CSV-export (scripts/export_dataset.py) — de politieke laag en
+    machtsvalentie zitten er per constructie NIET in."""
+    conn = get_db()
+    try:
+        data = export_dataset.verzamel(conn)
+    finally:
+        conn.close()
+    return jsonify({"versie": export_dataset.laatste_versie(), "tabellen": data})
+
+
+@app.route("/api/feed/export/<tabel>.csv")
+@require_api_key()
+def feed_export_csv(tabel):
+    """Eén verkochte tabel als CSV-download (entities/relations/sources/
+    source_locations/income_composition/bereik/doelgroep)."""
+    conn = get_db()
+    try:
+        kolommen, rijen = export_dataset.tabel(conn, tabel)
+    except KeyError:
+        return jsonify({"error": f"onbekende tabel: {tabel}",
+                        "beschikbaar": list(export_dataset.SLICE_TABELLEN)}), 404
+    finally:
+        conn.close()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(kolommen)
+    w.writerows(rijen)
+    return app.response_class(
+        buf.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{tabel}.csv"'})
 
 
 # ── Agent-geheugen: waar heeft dit account al op gereageerd? ──

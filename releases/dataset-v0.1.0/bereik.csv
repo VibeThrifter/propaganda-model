@@ -1,0 +1,271 @@
+entity_id,entity,type,maat,aantal,jaar,arg_id,status
+3,AD (Algemeen Dagblad),mediaorganisatie,bereik_totaal,927000,2023,3165,ongecontroleerd
+3,AD (Algemeen Dagblad),mediaorganisatie,oplage,337319,2015,3166,ongecontroleerd
+3,AD (Algemeen Dagblad),mediaorganisatie,bereik_totaal,1123000,2020,3320,ongecontroleerd
+170,AP (Associated Press),persbureau,bereik_totaal,4000000000,2024,3180,ongecontroleerd
+170,AP (Associated Press),persbureau,online,2600000000,2024,3324,ongecontroleerd
+561,AT5,omroep,kijkers,561538,2026,3269,ongecontroleerd
+561,AT5,omroep,online,1634323,2026,3270,ongecontroleerd
+141,AVROTROS,omroep,volgers,800000,2014,3222,ongecontroleerd
+141,AVROTROS,omroep,volgers,400000,2019,3354,ongecontroleerd
+454,BN DeStem,mediaorganisatie,oplage,71369,2022,3188,ongecontroleerd
+454,BN DeStem,mediaorganisatie,oplage,100712,2012,3332,ongecontroleerd
+139,BNNVARA,omroep,volgers,470000,2019,3397,ongecontroleerd
+351,BNR Nieuwsradio,mediaorganisatie,luisteraars,1100000,2025,3233,ongecontroleerd
+674,Bar Laat,mediaorganisatie,kijkers,600000,2024,3152,ongecontroleerd
+674,Bar Laat,mediaorganisatie,kijkers,514000,2025,3312,ongecontroleerd
+677,Beau,mediaorganisatie,kijkers,1037000,2020,3146,ongecontroleerd
+677,Beau,mediaorganisatie,kijkers,666000,2025,3308,ongecontroleerd
+825,Binnenlands Bestuur,mediaorganisatie,oplage,40000,2026,3217,ongecontroleerd
+825,Binnenlands Bestuur,mediaorganisatie,bereik_totaal,300000,2026,3218,ongecontroleerd
+825,Binnenlands Bestuur,mediaorganisatie,online,220000,2026,3350,ongecontroleerd
+526,Blckbx,mediaorganisatie,volgers,200000,2025,3273,ongecontroleerd
+450,Brabants Dagblad,mediaorganisatie,oplage,85537,2022,3184,ongecontroleerd
+450,Brabants Dagblad,mediaorganisatie,oplage,117885,2012,3327,ongecontroleerd
+87,Brandpunt,omroep,kijkers,327000,2018,3242,ongecontroleerd
+476,Buitenhof,mediaorganisatie,kijkers,601000,2021,3129,ongecontroleerd
+530,Café Weltschmerz,mediaorganisatie,volgers,100000,2020,3274,ongecontroleerd
+530,Café Weltschmerz,mediaorganisatie,online,500000,2026,3275,ongecontroleerd
+1,DPG Media,mediaorganisatie,online,9700000,2019,3176,ongecontroleerd
+1,DPG Media,mediaorganisatie,volgers,4400000,2025,3177,ongecontroleerd
+456,Dagblad van het Noorden,mediaorganisatie,bereik_totaal,174000,2023,3190,ongecontroleerd
+456,Dagblad van het Noorden,mediaorganisatie,oplage,83000,2018,3191,ongecontroleerd
+456,Dagblad van het Noorden,mediaorganisatie,oplage,183000,2000,3334,ongecontroleerd
+744,De Avondshow met Arjen Lubach,mediaorganisatie,kijkers,1600000,2022,3142,ongecontroleerd
+744,De Avondshow met Arjen Lubach,mediaorganisatie,kijkers,1056000,2024,3306,ongecontroleerd
+13,De Correspondent,mediaorganisatie,volgers,63000,2026,3213,ongecontroleerd
+13,De Correspondent,mediaorganisatie,volgers,60500,2018,3346,ongecontroleerd
+13,De Correspondent,mediaorganisatie,volgers,18933,2013,3347,ongecontroleerd
+462,De Gooi- en Eemlander,mediaorganisatie,bereik_totaal,45000,2023,3199,ongecontroleerd
+264,De Groene Amsterdammer,mediaorganisatie,oplage,31093,2025,3207,ongecontroleerd
+264,De Groene Amsterdammer,mediaorganisatie,bereik_totaal,116000,2025,3208,ongecontroleerd
+264,De Groene Amsterdammer,mediaorganisatie,oplage,20000,2013,3339,ongecontroleerd
+461,De Limburger,mediaorganisatie,bereik_totaal,220000,2023,3197,ongecontroleerd
+461,De Limburger,mediaorganisatie,oplage,120000,2019,3198,ongecontroleerd
+461,De Limburger,mediaorganisatie,oplage,135000,2006,3336,ongecontroleerd
+89,De Morgen,mediaorganisatie,bereik_totaal,483500,2024,3403,ongecontroleerd
+249,De Nieuwe Wereld,mediaorganisatie,online,1000000,2026,3276,ongecontroleerd
+249,De Nieuwe Wereld,mediaorganisatie,kijkers,250000,2025,3277,ongecontroleerd
+747,De Oranjewinter,mediaorganisatie,kijkers,1000000,2024,3112,ongecontroleerd
+484,De Oranjezomer,mediaorganisatie,kijkers,808000,2025,3111,ongecontroleerd
+484,De Oranjezomer,mediaorganisatie,kijkers,866000,2025,3294,ongecontroleerd
+484,De Oranjezomer,mediaorganisatie,kijkers,713000,2023,3295,ongecontroleerd
+9,De Telegraaf,mediaorganisatie,bereik_totaal,710000,2023,3161,ongecontroleerd
+9,De Telegraaf,mediaorganisatie,oplage,416318,2015,3162,ongecontroleerd
+9,De Telegraaf,mediaorganisatie,bereik_totaal,1049000,2020,3318,ongecontroleerd
+994,De Waarheid,mediaorganisatie,oplage,300000,1945,3283,ongecontroleerd
+994,De Waarheid,mediaorganisatie,oplage,6000,1990,3387,ongecontroleerd
+680,De Wereld Draait Door,mediaorganisatie,kijkers,3200000,2020,3130,ongecontroleerd
+680,De Wereld Draait Door,mediaorganisatie,kijkers,2151000,2015,3301,ongecontroleerd
+580,Dumpert,mediaorganisatie,online,2500000,2017,3272,ongecontroleerd
+138,EO,omroep,volgers,476169,2004,3224,ongecontroleerd
+138,EO,omroep,volgers,439293,2009,3357,ongecontroleerd
+138,EO,omroep,volgers,300000,2019,3358,ongecontroleerd
+491,EW (Elsevier Weekblad),mediaorganisatie,oplage,140000,2007,3209,ongecontroleerd
+491,EW (Elsevier Weekblad),mediaorganisatie,oplage,80000,2015,3340,ongecontroleerd
+491,EW (Elsevier Weekblad),mediaorganisatie,oplage,60000,2019,3341,ongecontroleerd
+486,EenVandaag,mediaorganisatie,kijkers,767000,2010,3236,ongecontroleerd
+486,EenVandaag,mediaorganisatie,kijkers,1000000,2026,3372,ongecontroleerd
+455,Eindhovens Dagblad,mediaorganisatie,oplage,75711,2022,3189,ongecontroleerd
+455,Eindhovens Dagblad,mediaorganisatie,oplage,99178,2012,3333,ongecontroleerd
+482,Eva (praatprogramma),mediaorganisatie,kijkers,1019000,2024,3117,ongecontroleerd
+482,Eva (praatprogramma),mediaorganisatie,kijkers,1096000,2024,3298,ongecontroleerd
+748,Even tot hier,mediaorganisatie,kijkers,2479000,2024,3159,ongecontroleerd
+748,Even tot hier,mediaorganisatie,kijkers,1800000,2025,3316,ongecontroleerd
+748,Even tot hier,mediaorganisatie,kijkers,2953000,2025,3317,ongecontroleerd
+257,Follow the Money,mediaorganisatie,volgers,50000,2025,3214,ongecontroleerd
+257,Follow the Money,mediaorganisatie,volgers,44000,2024,3348,ongecontroleerd
+257,Follow the Money,mediaorganisatie,volgers,25000,2021,3349,ongecontroleerd
+569,Friesch Dagblad,mediaorganisatie,bereik_totaal,31000,2023,3201,ongecontroleerd
+569,Friesch Dagblad,mediaorganisatie,oplage,8000,2023,3202,ongecontroleerd
+569,Friesch Dagblad,mediaorganisatie,oplage,20000,1995,3337,ongecontroleerd
+342,GeenStijl,mediaorganisatie,online,1000000,2017,3271,ongecontroleerd
+342,GeenStijl,mediaorganisatie,online,1000000,2018,3384,ongecontroleerd
+90,Gezond Verstand,mediaorganisatie,oplage,1000000,2020,3278,ongecontroleerd
+90,Gezond Verstand,mediaorganisatie,oplage,100000,2020,3385,ongecontroleerd
+675,Goedenavond Nederland,mediaorganisatie,kijkers,531000,2025,3120,ongecontroleerd
+675,Goedenavond Nederland,mediaorganisatie,kijkers,449000,2025,3299,ongecontroleerd
+679,HLF8,mediaorganisatie,kijkers,423000,2021,3148,ongecontroleerd
+679,HLF8,mediaorganisatie,kijkers,457000,2023,3309,ongecontroleerd
+494,HP/De Tijd,mediaorganisatie,oplage,20048,2026,3211,ongecontroleerd
+494,HP/De Tijd,mediaorganisatie,oplage,25000,2015,3344,ongecontroleerd
+494,HP/De Tijd,mediaorganisatie,oplage,36000,1998,3345,ongecontroleerd
+1059,HUMAN (omroep),omroep,volgers,50000,2019,3229,ongecontroleerd
+1059,HUMAN (omroep),omroep,volgers,82833,2024,3366,ongecontroleerd
+459,Haarlems Dagblad,mediaorganisatie,bereik_totaal,47000,2023,3195,ongecontroleerd
+195,Het Financieele Dagblad,mediaorganisatie,oplage,46741,2015,3172,ongecontroleerd
+195,Het Financieele Dagblad,mediaorganisatie,volgers,100000,2020,3402,ongecontroleerd
+6,Het Parool,mediaorganisatie,oplage,46822,2015,3171,ongecontroleerd
+993,Het Vrije Volk,mediaorganisatie,oplage,325000,1956,3398,ongecontroleerd
+993,Het Vrije Volk,mediaorganisatie,oplage,167000,1972,3399,ongecontroleerd
+463,IJmuider Courant,mediaorganisatie,bereik_totaal,10000,2023,3200,ongecontroleerd
+681,Jinek,mediaorganisatie,kijkers,1700000,2020,3137,ongecontroleerd
+681,Jinek,mediaorganisatie,kijkers,470000,2023,3304,ongecontroleerd
+140,KRO-NCRV,omroep,volgers,500000,2019,3221,ongecontroleerd
+140,KRO-NCRV,omroep,volgers,287503,2024,3352,ongecontroleerd
+140,KRO-NCRV,omroep,volgers,264720,2025,3353,ongecontroleerd
+574,Kassa (consumentenprogramma),mediaorganisatie,kijkers,975000,2018,3239,ongecontroleerd
+574,Kassa (consumentenprogramma),mediaorganisatie,kijkers,536000,2025,3375,ongecontroleerd
+575,Keuringsdienst van Waarde,mediaorganisatie,kijkers,951000,2023,3240,ongecontroleerd
+673,Khalid & Sophie,mediaorganisatie,kijkers,352000,2021,3150,ongecontroleerd
+673,Khalid & Sophie,mediaorganisatie,kijkers,600000,2021,3310,ongecontroleerd
+673,Khalid & Sophie,mediaorganisatie,kijkers,730000,2022,3311,ongecontroleerd
+872,Kieskompas,denktank,invullers,2500000,2021,3286,ongecontroleerd
+872,Kieskompas,denktank,invullers,1600000,2021,3390,ongecontroleerd
+523,L1,omroep,kijkers,350000,2026,3264,ongecontroleerd
+523,L1,omroep,online,1300000,2026,3265,ongecontroleerd
+523,L1,omroep,luisteraars,506000,2026,3383,ongecontroleerd
+457,Leeuwarder Courant,mediaorganisatie,bereik_totaal,128000,2023,3192,ongecontroleerd
+457,Leeuwarder Courant,mediaorganisatie,oplage,64639,2017,3193,ongecontroleerd
+457,Leeuwarder Courant,mediaorganisatie,oplage,110000,1995,3335,ongecontroleerd
+460,Leidsch Dagblad,mediaorganisatie,bereik_totaal,50000,2023,3196,ongecontroleerd
+2,Mediahuis,mediaorganisatie,volgers,1800000,2024,3178,ongecontroleerd
+2,Mediahuis,mediaorganisatie,volgers,1800000,2025,3322,ongecontroleerd
+2,Mediahuis,mediaorganisatie,volgers,1000000,2025,3323,ongecontroleerd
+795,Medisch Contact,mediaorganisatie,oplage,48500,2026,3216,ongecontroleerd
+101,Metro,mediaorganisatie,bereik_totaal,4300000,2018,3173,ongecontroleerd
+101,Metro,mediaorganisatie,oplage,432510,2015,3174,ongecontroleerd
+519,NH,omroep,kijkers,298000,2024,3256,ongecontroleerd
+519,NH,omroep,luisteraars,165000,2024,3257,ongecontroleerd
+519,NH,omroep,kijkers,302000,2023,3381,ongecontroleerd
+11,NOS,omroep,kijkers,1500000,2024,3219,ongecontroleerd
+11,NOS,omroep,online,3400000,2024,3220,ongecontroleerd
+11,NOS,omroep,kijkers,2800000,2020,3351,ongecontroleerd
+823,NPO Radio 1,mediaorganisatie,luisteraars,2100000,2026,3234,ongecontroleerd
+823,NPO Radio 1,mediaorganisatie,luisteraars,2200000,2022,3370,ongecontroleerd
+10,NRC,mediaorganisatie,bereik_totaal,426000,2020,3167,ongecontroleerd
+10,NRC,mediaorganisatie,oplage,143027,2015,3168,ongecontroleerd
+7,NU.nl,mediaorganisatie,online,5961000,2023,3175,ongecontroleerd
+7,NU.nl,mediaorganisatie,online,7000000,2018,3321,ongecontroleerd
+563,Nederlands Dagblad,mediaorganisatie,bereik_totaal,79000,2023,3205,ongecontroleerd
+563,Nederlands Dagblad,mediaorganisatie,oplage,26000,2023,3206,ongecontroleerd
+799,Nieuws van de Dag (SBS6),mediaorganisatie,kijkers,533000,2025,3124,ongecontroleerd
+472,Nieuwsuur,mediaorganisatie,kijkers,660000,2015,3235,ongecontroleerd
+472,Nieuwsuur,mediaorganisatie,kijkers,400000,2023,3371,ongecontroleerd
+458,Noordhollands Dagblad,mediaorganisatie,bereik_totaal,229000,2023,3194,ongecontroleerd
+522,Omroep Brabant,omroep,luisteraars,255000,2022,3263,ongecontroleerd
+517,Omroep Flevoland,omroep,luisteraars,26000,2022,3252,ongecontroleerd
+516,Omroep Gelderland,omroep,kijkers,248000,2026,3250,ongecontroleerd
+516,Omroep Gelderland,omroep,online,1800000,2026,3251,ongecontroleerd
+516,Omroep Gelderland,omroep,luisteraars,112000,2026,3380,ongecontroleerd
+143,Omroep MAX,omroep,volgers,65155,2004,3225,ongecontroleerd
+143,Omroep MAX,omroep,volgers,238770,2009,3359,ongecontroleerd
+143,Omroep MAX,omroep,volgers,426682,2024,3360,ongecontroleerd
+520,Omroep West,omroep,kijkers,438300,2023,3258,ongecontroleerd
+520,Omroep West,omroep,luisteraars,262980,2023,3259,ongecontroleerd
+520,Omroep West,omroep,online,2300000,2023,3260,ongecontroleerd
+206,Omroep ZWART,omroep,volgers,37214,2024,3404,ongecontroleerd
+524,Omroep Zeeland,omroep,kijkers,158000,2026,3266,ongecontroleerd
+524,Omroep Zeeland,omroep,luisteraars,113970,2026,3267,ongecontroleerd
+524,Omroep Zeeland,omroep,online,1024133,2026,3268,ongecontroleerd
+513,Omrop Fryslân,omroep,kijkers,109000,2026,3244,ongecontroleerd
+513,Omrop Fryslân,omroep,luisteraars,102000,2026,3378,ongecontroleerd
+205,Ongehoord Nederland,omroep,volgers,50000,2020,3228,ongecontroleerd
+205,Ongehoord Nederland,omroep,volgers,38818,2024,3365,ongecontroleerd
+174,Op1,mediaorganisatie,kijkers,1300000,2020,3114,ongecontroleerd
+174,Op1,mediaorganisatie,kijkers,669000,2023,3296,ongecontroleerd
+174,Op1,mediaorganisatie,kijkers,470000,2024,3297,ongecontroleerd
+743,Pauw,mediaorganisatie,kijkers,2300000,2019,3135,ongecontroleerd
+743,Pauw,mediaorganisatie,kijkers,1347000,2019,3303,ongecontroleerd
+224,Pauw & De Wit,mediaorganisatie,kijkers,805000,2025,3157,ongecontroleerd
+224,Pauw & De Wit,mediaorganisatie,kijkers,837000,2025,3315,ongecontroleerd
+682,Pauw & Witteman,mediaorganisatie,kijkers,1000000,2013,3133,ongecontroleerd
+682,Pauw & Witteman,mediaorganisatie,kijkers,989000,2014,3302,ongecontroleerd
+826,Platform RAAM,mediaorganisatie,online,160000,2020,3400,ongecontroleerd
+826,Platform RAAM,mediaorganisatie,volgers,3000,2020,3401,ongecontroleerd
+145,PowNed,omroep,volgers,52249,2009,3227,ongecontroleerd
+145,PowNed,omroep,volgers,25000,2019,3363,ongecontroleerd
+145,PowNed,omroep,volgers,50000,2020,3364,ongecontroleerd
+453,Provinciale Zeeuwse Courant (PZC),mediaorganisatie,oplage,39183,2022,3187,ongecontroleerd
+453,Provinciale Zeeuwse Courant (PZC),mediaorganisatie,oplage,50537,2012,3331,ongecontroleerd
+497,Quote,mediaorganisatie,oplage,28620,2023,3212,ongecontroleerd
+786,RT (Russia Today),mediaorganisatie,kijkers,43000000,2017,3291,ongecontroleerd
+786,RT (Russia Today),mediaorganisatie,kijkers,100000000,2017,3396,ongecontroleerd
+742,RTL Late Night,mediaorganisatie,kijkers,1300000,2018,3140,ongecontroleerd
+742,RTL Late Night,mediaorganisatie,kijkers,250000,2019,3305,ongecontroleerd
+8,RTL Nederland,omroep,volgers,1616000,2024,3230,ongecontroleerd
+8,RTL Nederland,omroep,volgers,1221000,2022,3367,ongecontroleerd
+88,RTL Nieuws,omroep,kijkers,811000,2025,3231,ongecontroleerd
+88,RTL Nieuws,omroep,kijkers,1700000,2020,3368,ongecontroleerd
+678,RTL Tonight,mediaorganisatie,kijkers,897000,2025,3154,ongecontroleerd
+678,RTL Tonight,mediaorganisatie,kijkers,239000,2025,3313,ongecontroleerd
+678,RTL Tonight,mediaorganisatie,kijkers,403000,2026,3314,ongecontroleerd
+514,RTV Drenthe,omroep,kijkers,150000,2026,3245,ongecontroleerd
+514,RTV Drenthe,omroep,online,8000000,2026,3246,ongecontroleerd
+514,RTV Drenthe,omroep,luisteraars,80000,2026,3379,ongecontroleerd
+512,RTV Noord,omroep,kijkers,188000,2026,3243,ongecontroleerd
+512,RTV Noord,omroep,luisteraars,92000,2026,3376,ongecontroleerd
+512,RTV Noord,omroep,kijkers,170000,2017,3377,ongecontroleerd
+515,RTV Oost,omroep,kijkers,517000,2026,3247,ongecontroleerd
+515,RTV Oost,omroep,luisteraars,229000,2026,3248,ongecontroleerd
+515,RTV Oost,omroep,online,1400000,2026,3249,ongecontroleerd
+521,RTV Rijnmond,omroep,kijkers,876000,2026,3261,ongecontroleerd
+521,RTV Rijnmond,omroep,online,14700000,2026,3262,ongecontroleerd
+521,RTV Rijnmond,omroep,luisteraars,336000,2026,3382,ongecontroleerd
+518,RTV Utrecht,omroep,kijkers,331806,2020,3253,ongecontroleerd
+518,RTV Utrecht,omroep,luisteraars,201182,2020,3254,ongecontroleerd
+518,RTV Utrecht,omroep,online,103500000,2020,3255,ongecontroleerd
+573,Radar (consumentenprogramma),mediaorganisatie,kijkers,1400000,2022,3238,ongecontroleerd
+573,Radar (consumentenprogramma),mediaorganisatie,kijkers,525000,2023,3374,ongecontroleerd
+576,Rambam,mediaorganisatie,kijkers,252000,2016,3241,ongecontroleerd
+566,Reformatorisch Dagblad,mediaorganisatie,oplage,44000,2025,3203,ongecontroleerd
+566,Reformatorisch Dagblad,mediaorganisatie,bereik_totaal,103000,2023,3204,ongecontroleerd
+566,Reformatorisch Dagblad,mediaorganisatie,oplage,49520,2012,3338,ongecontroleerd
+676,Renze,mediaorganisatie,kijkers,682000,2022,3122,ongecontroleerd
+676,Renze,mediaorganisatie,kijkers,808000,2025,3300,ongecontroleerd
+169,Reuters,persbureau,bereik_totaal,1000000000,2017,3179,ongecontroleerd
+525,SBS6,omroep,kijkers,864000,2020,3232,ongecontroleerd
+525,SBS6,omroep,kijkers,485000,2022,3369,ongecontroleerd
+160,Snapchat,platform,online,4000000,2025,3290,ongecontroleerd
+160,Snapchat,platform,online,3800000,2024,3395,ongecontroleerd
+1047,StemWijzer,platform,invullers,9100000,2023,3285,ongecontroleerd
+1047,StemWijzer,platform,invullers,7800000,2021,3388,ongecontroleerd
+1047,StemWijzer,platform,invullers,8000000,2025,3389,ongecontroleerd
+528,ThePostOnline (TPO),mediaorganisatie,online,1200000,2016,3280,ongecontroleerd
+42,TikTok,platform,online,4700000,2026,3289,ongecontroleerd
+42,TikTok,platform,online,4400000,2025,3394,ongecontroleerd
+5,Trouw,mediaorganisatie,bereik_totaal,246000,2023,3169,ongecontroleerd
+5,Trouw,mediaorganisatie,oplage,89957,2015,3170,ongecontroleerd
+995,VARA,omroep,volgers,419998,2004,3405,ongecontroleerd
+995,VARA,omroep,volgers,360356,2009,3406,ongecontroleerd
+142,VPRO,omroep,volgers,362340,2009,3223,ongecontroleerd
+142,VPRO,omroep,volgers,300000,2019,3355,ongecontroleerd
+142,VPRO,omroep,volgers,240001,2024,3356,ongecontroleerd
+175,Vandaag Inside,mediaorganisatie,kijkers,1129000,2025,3109,ongecontroleerd
+175,Vandaag Inside,mediaorganisatie,kijkers,1100000,2023,3292,ongecontroleerd
+175,Vandaag Inside,mediaorganisatie,kijkers,1460000,2022,3293,ongecontroleerd
+499,Villamedia,mediaorganisatie,online,120000,2026,3215,ongecontroleerd
+265,Vrij Nederland,mediaorganisatie,oplage,13170,2023,3210,ongecontroleerd
+265,Vrij Nederland,mediaorganisatie,oplage,23000,2015,3342,ongecontroleerd
+265,Vrij Nederland,mediaorganisatie,oplage,70000,1998,3343,ongecontroleerd
+144,WNL,omroep,volgers,59501,2009,3226,ongecontroleerd
+144,WNL,omroep,volgers,50000,2019,3361,ongecontroleerd
+144,WNL,omroep,volgers,50000,2020,3362,ongecontroleerd
+480,WNL op Zondag,mediaorganisatie,kijkers,615000,2023,3126,ongecontroleerd
+282,Wegener,mediaorganisatie,oplage,1700000,2001,3181,ongecontroleerd
+282,Wegener,mediaorganisatie,oplage,600000,1992,3325,ongecontroleerd
+824,Wynia's Week,mediaorganisatie,online,400000,2025,3281,ongecontroleerd
+824,Wynia's Week,mediaorganisatie,volgers,24000,2025,3282,ongecontroleerd
+159,X (Twitter),platform,online,2700000,2026,3287,ongecontroleerd
+159,X (Twitter),platform,online,2800000,2025,3391,ongecontroleerd
+159,X (Twitter),platform,online,3200000,2024,3392,ongecontroleerd
+751,YouTube,platform,online,10600000,2026,3288,ongecontroleerd
+751,YouTube,platform,online,10200000,2025,3393,ongecontroleerd
+571,Zembla,mediaorganisatie,kijkers,853000,2008,3237,ongecontroleerd
+571,Zembla,mediaorganisatie,kijkers,453000,2016,3373,ongecontroleerd
+745,Zondag met Lubach,mediaorganisatie,kijkers,2000000,2020,3144,ongecontroleerd
+745,Zondag met Lubach,mediaorganisatie,kijkers,1900000,2021,3307,ongecontroleerd
+228,banken.nl,mediaorganisatie,online,500000,2026,3284,ongecontroleerd
+449,de Gelderlander,mediaorganisatie,oplage,108052,2022,3182,ongecontroleerd
+449,de Gelderlander,mediaorganisatie,bereik_totaal,300000,2024,3183,ongecontroleerd
+449,de Gelderlander,mediaorganisatie,oplage,135541,2012,3326,ongecontroleerd
+451,de Stentor,mediaorganisatie,oplage,92414,2022,3185,ongecontroleerd
+451,de Stentor,mediaorganisatie,oplage,119258,2012,3328,ongecontroleerd
+451,de Stentor,mediaorganisatie,oplage,100000,2016,3329,ongecontroleerd
+452,de Twentsche Courant Tubantia,mediaorganisatie,oplage,79369,2022,3186,ongecontroleerd
+452,de Twentsche Courant Tubantia,mediaorganisatie,oplage,106152,2012,3330,ongecontroleerd
+4,de Volkskrant,mediaorganisatie,bereik_totaal,737000,2023,3163,ongecontroleerd
+4,de Volkskrant,mediaorganisatie,oplage,223778,2015,3164,ongecontroleerd
+4,de Volkskrant,mediaorganisatie,bereik_totaal,665000,2020,3319,ongecontroleerd
+248,de andere krant,mediaorganisatie,oplage,500000,2020,3279,ongecontroleerd
+248,de andere krant,mediaorganisatie,oplage,50000,2018,3386,ongecontroleerd

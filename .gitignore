@@ -34,3 +34,6 @@ data/auto_merge_state.json
 data/voorspelling_voorstellen.json
 data/agent_runs.jsonl
 data/monitor_agents_state.json
+
+# Fase 6: feed-API-keys (alleen sha256-hash, nooit committen)
+data/api_keys/

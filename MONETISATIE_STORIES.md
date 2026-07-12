@@ -300,6 +300,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 
 ### A8 — DF-QuAD → likelihood-ratio's (optioneel, later) · Fase 6 · L
 
+> **Fase-6 status:** UITGESTELD (wacht op kalibratiedata) — vergt een gevulde `voorspellingen_kalibratie.json` (nu 0 gescoorde voorspellingen). Bouwen zou de golden snapshot op arbitraire getallen rebaselinen; uitstellen tot de Brier-reeks groeit.
+
 **Als** onderzoeker **wil ik** de heuristische DF-QuAD-aggregatie evolueren naar expliciete P(bewijs|claim waar) vs P(bewijs|claim onwaar) per bewijsstuk **zodat** confidence Bayesiaans koppelt aan de Brier-lus (A4): zelfde knopen, betere wiskunde.
 
 **Waarom.** DF-QuAD is een heuristiek; likelihood-ratio's maken elke bewijsbijdrage expliciet en toetsbaar tegen de gerealiseerde uitkomsten (A4). `scoring.py` is ~95% pure functies, dus de aggregatiefunctie is inwisselbaar zonder herbouw. **Optioneel/later** — niet op het kritieke pad, en het herschrijft bewust de golden snapshot.
@@ -1197,6 +1199,8 @@ Opportunistisch, ná de portal-bouw: **E1** maakt van het ene verouderde release
 
 ### E1 — Data-feed: `releases/` formaliseren tot een licentieerbaar dataproduct  ·  Fase 6  ·  L
 
+> **Fase-6 status (branch `monetisatie-bouw`, 12 juli 2026):** DONE — `scripts/export_dataset.py` (7 CSV's, 0 politieke/machtsvalentie-rijen), `docs/DATA_DICTIONARY.md` + `docs/openapi.yaml` + `docs/LICENSE-DATA.md`, gemeterde `/api/feed/*` achter `require_api_key` (keys in `data/api_keys/`), `/api/graph_data` blijft open. OWNER-ACTION: een feed-key minten + de release-cadans koppelen.
+
 **Als** onderzoeker/journalist of AI-grounding-klant **wil ik** een gedocumenteerde, geversioneerde export van de netwerk/eigendom/geldstroom-graaf met een stabiele API en heldere licentie **zodat** ik de data betrouwbaar in mijn eigen analyse of model kan opnemen zonder de live site te scrapen.
 
 **Waarom.** `/api/graph_data` + de 7 metriek-endpoints zijn al schone, open JSON en `releases/` is al een versie-mechanisme, maar het is nu één verouderde snapshot (`model-v0.1.0.json`, juni 2026) zonder data-dictionary, zonder tabel-export, zonder toegangscontrole. Dit is technisch het dichtst bij klaar (plan §3, Deel E) — een tweede, opportunistische stroom, geen anker. De kopersmarkt voor een NL-media-machtsgraaf is klein, dus de investering blijft licht en hergebruikt bestaande bouwstenen.
@@ -1232,6 +1236,8 @@ Opportunistisch, ná de portal-bouw: **E1** maakt van het ene verouderde release
 ---
 
 ### E2 — Motor op een tweede, commercieel sterker domein (repoint-punchlist)  ·  Fase 6  ·  L
+
+> **Fase-6 status:** UITGESTELD (owner-beslissing) — vergt een gekozen commercieel domein met bewezen betaalbereidheid + een verse tweede DB/seed. De repoint-punchlist staat klaar in deze story; bewust niet gebouwd.
 
 **Als** maintainer/eigenaar **wil ik** de bestaande motor op een tweede domein met echte kopers richten (bedrijfs-eigendom/lobby/due-diligence-transparantie) **zodat** ik het grote omzetplafond aanboor zonder de infrastructuur opnieuw te bouwen.
 

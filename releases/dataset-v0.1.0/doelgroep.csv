@@ -1,0 +1,32 @@
+outlet_id,outlet,type,positie,klasse_label,as_soort,vertrouwen,n_signalen
+3,AD (Algemeen Dagblad),mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+454,BN DeStem,mediaorganisatie,0.0,B2/C (standaard),opgave,0.367,2
+450,Brabants Dagblad,mediaorganisatie,0.0,B2/C (standaard),opgave,0.367,2
+456,Dagblad van het Noorden,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+462,De Gooi- en Eemlander,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+264,De Groene Amsterdammer,mediaorganisatie,1.0,A (kapitaalkrachtig),opgave,0.224,1
+461,De Limburger,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+9,De Telegraaf,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+491,EW (Elsevier Weekblad),mediaorganisatie,1.0,A (kapitaalkrachtig),opgave,0.224,1
+455,Eindhovens Dagblad,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+569,Friesch Dagblad,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+494,HP/De Tijd,mediaorganisatie,1.0,A (kapitaalkrachtig),opgave,0.224,1
+459,Haarlems Dagblad,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+195,Het Financieele Dagblad,mediaorganisatie,1.0,A (kapitaalkrachtig),opgave,0.224,1
+6,Het Parool,mediaorganisatie,0.5,B1 (hogere middenklasse),opgave,0.224,1
+463,IJmuider Courant,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+457,Leeuwarder Courant,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+460,Leidsch Dagblad,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+101,Metro,mediaorganisatie,0.0,B2/C (standaard),meting,0.224,1
+11,NOS,omroep,0.0,B2/C (standaard),meting,0.224,1
+10,NRC,mediaorganisatie,1.0,A (kapitaalkrachtig),opgave,0.224,1
+563,Nederlands Dagblad,mediaorganisatie,0.5,B1 (hogere middenklasse),opgave,0.224,1
+458,Noordhollands Dagblad,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+453,Provinciale Zeeuwse Courant (PZC),mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+525,SBS6,omroep,-0.5,C (praktisch),opgave,0.224,1
+5,Trouw,mediaorganisatie,0.5,B1 (hogere middenklasse),opgave,0.224,1
+265,Vrij Nederland,mediaorganisatie,0.5,B1 (hogere middenklasse),opgave,0.224,1
+449,de Gelderlander,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+451,de Stentor,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+452,de Twentsche Courant Tubantia,mediaorganisatie,0.0,B2/C (standaard),opgave,0.224,1
+4,de Volkskrant,mediaorganisatie,0.5,B1 (hogere middenklasse),opgave,0.224,1

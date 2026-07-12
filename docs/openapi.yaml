@@ -1,0 +1,257 @@
+openapi: 3.0.3
+info:
+  title: Propagandamodel — data-feed (NL-mediamachtsgraaf)
+  version: 0.1.0
+  description: >
+    Geversioneerde, gedocumenteerde export van de structuur-, eigendoms- en
+    geldstroomgraaf van het Nederlandse mediasysteem (propagandamodel, Herman &
+    Chomsky toegepast op Nederland). Twee soorten endpoints:
+
+    (1) OPEN + ONGEMETERD — dezelfde data die de publieke portal-visualisatie
+    laadt. Geen key nodig.
+
+    (2) FEED (/api/feed/*) — de licentieerbare, gemeterde slice achter een
+    API-key. Bewust UITGESLOTEN uit deze feed-doc en uit elke export: de
+    politieke-positie-laag (/api/kleurmeter, art. 9-AVG) en machtsvalentie
+    (/api/machtsvalentie). Zie docs/DATA_DICTIONARY.md en docs/LICENSE-DATA.md.
+
+    Scores zijn afgeleid, geen meting: elke relatie draagt twee onafhankelijke
+    assen — certainty ("bestaat de relatie?") en influence ("hoe sterk stuurt ze
+    berichtgeving?") — met een guilty-until-proven ondergrens van 0,05 voor
+    onbewezen priors. Lees ze niet als exacte metingen.
+  contact:
+    name: Propagandamodel
+    url: https://example.org/methode
+  license:
+    name: Data-licentie (bronvermelding verplicht, geen doorverkoop)
+    url: https://example.org/docs/LICENSE-DATA.md
+
+servers:
+  - url: http://localhost:5000
+    description: Lokale ontwikkelserver
+  - url: https://example.org
+    description: Productie (vul in bij deploy, B1)
+
+tags:
+  - name: open
+    description: Publiek en ongemeterd — geen key nodig (portal-reads).
+  - name: feed
+    description: Licentieerbare, gemeterde slice achter een API-key.
+
+paths:
+  /api/graph_data:
+    get:
+      tags: [open]
+      operationId: getGraphData
+      summary: Volledige viz-datastructuur (open, ongemeterd)
+      description: >
+        De complete graafdata die de portal-visualisatie laadt: entiteiten,
+        relaties, theorielaag, discussiebomen en afgeleide scores. Open en
+        ongemeterd (de pagina-loader hangt eraan). Bevat, anders dan de feed,
+        wél de kleurmeter/machtsvalentie-overlays.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/scores:
+    get:
+      tags: [open]
+      operationId: getScores
+      summary: Alle afgeleide scores (open)
+      description: >
+        De volledige scoringsketen: per relatie/entiteit/rol/mechanisme de
+        afgeleide geloofwaardigheid (certainty-as) + 95%-interval, plus de
+        afgeleide invloed. Zie DATA_DICTIONARY.md voor de twee-assen-uitleg en
+        de 0,05-vloer.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/inkomsten:
+    get:
+      tags: [open]
+      operationId: getInkomsten
+      summary: Inkomstensamenstelling per outlet (open)
+      description: >
+        De geldstroom-"pie" per nieuwsoutlet, afgeleid uit de financier-edges
+        met een gesourcet aandeel (property inkomensaandeel) plus een restpart
+        eigen/markt-inkomsten.
+      parameters:
+        - $ref: "#/components/parameters/preview"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/bereik:
+    get:
+      tags: [open]
+      operationId: getBereik
+      summary: Publieksbereik per jaar per media-entiteit (open)
+      description: >
+        Gesourcet publieksbereik (kijkers/luisteraars/oplage/online/…) per jaar.
+        Eén signaal = één cijfer uit één bron; per jaar wint de grootste
+        publieksmaat.
+      parameters:
+        - $ref: "#/components/parameters/preview"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/doelgroep:
+    get:
+      tags: [open]
+      operationId: getDoelgroep
+      summary: Getargette welstandsklasse per outlet (open)
+      description: >
+        De welstandsmeter: per nieuwsoutlet de getargette marketing-/
+        welstandsklasse (hoog A ↔ laag D), bron-gewogen uit gesourcete
+        doelgroepklasse-signalen.
+      parameters:
+        - $ref: "#/components/parameters/preview"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/feed/graph:
+    get:
+      tags: [feed]
+      operationId: getFeedGraph
+      summary: De verkochte data-slice als JSON (gated + gemeterd)
+      description: >
+        De licentieerbare slice als één JSON-object
+        {versie, tabellen:{tabel:{kolommen, rijen}}}. Zelfde bron als de
+        CSV-export. Bevat per constructie GEEN politieke-positie- of
+        machtsvalentie-afgeleide en alleen status=goedgekeurd.
+      security:
+        - ApiKeyBearer: []
+        - ApiKeyQuery: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versie:
+                    type: string
+                    example: "0.1.0"
+                  tabellen:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        kolommen:
+                          type: array
+                          items: { type: string }
+                        rijen:
+                          type: array
+                          items:
+                            type: array
+        "401":
+          $ref: "#/components/responses/GeenKey"
+        "429":
+          $ref: "#/components/responses/QuotumOp"
+
+  /api/feed/export/{tabel}.csv:
+    get:
+      tags: [feed]
+      operationId: getFeedExportCsv
+      summary: Eén verkochte tabel als CSV-download (gated + gemeterd)
+      security:
+        - ApiKeyBearer: []
+        - ApiKeyQuery: []
+      parameters:
+        - name: tabel
+          in: path
+          required: true
+          description: De te downloaden tabel.
+          schema:
+            type: string
+            enum:
+              - entities
+              - relations
+              - sources
+              - source_locations
+              - income_composition
+              - bereik
+              - doelgroep
+      responses:
+        "200":
+          description: OK — CSV-stroom
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/GeenKey"
+        "404":
+          description: Onbekende tabel
+          content:
+            application/json:
+              schema:
+                type: object
+        "429":
+          $ref: "#/components/responses/QuotumOp"
+
+components:
+  parameters:
+    preview:
+      name: preview
+      in: query
+      required: false
+      description: >
+        1/true telt nog-voorgestelde (ongemergde) signalen voorlopig mee; standaard
+        alleen door een mens gemergde data.
+      schema:
+        type: string
+        enum: ["1", "true", "ja"]
+
+  responses:
+    GeenKey:
+      description: Geen of ongeldige API-key
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+    QuotumOp:
+      description: Lees-quotum van de tier bereikt (rate limit)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+
+  securitySchemes:
+    ApiKeyBearer:
+      type: http
+      scheme: bearer
+      description: "Authorization: Bearer <api-key>"
+    ApiKeyQuery:
+      type: apiKey
+      in: query
+      name: key
+      description: "?key=<api-key> (alternatief voor de Bearer-header)"

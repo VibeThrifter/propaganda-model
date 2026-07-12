@@ -1,0 +1,174 @@
+outlet_id,outlet,soort,bron_id,bron,relation_type,relation_id,share_pct,jaar,som_institutioneel,residu_pct
+1,DPG Media,onbekend,154,EIB (Europese Investeringsbank),financiering,395,,,0,100.0
+1,DPG Media,onbekend,40,Google,financiering,396,,,0,100.0
+4,de Volkskrant,onbekend,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,571,,,0,100.0
+11,NOS,onbekend,131,NPO,financiering,679,,,0,100.0
+12,ANP,onbekend,1,DPG Media,financiering,1988,,,0,100.0
+13,De Correspondent,aandeel,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,560,1.8,2023,1.8,98.2
+13,De Correspondent,onbekend,1112,Leden van De Correspondent,financiering,1982,,,1.8,98.2
+43,Clingendael Instituut,onbekend,77,ASML,financiering,1539,,,0,100.0
+43,Clingendael Instituut,onbekend,155,Europese Commissie,financiering,1195,,,0,100.0
+43,Clingendael Instituut,onbekend,838,Foundation Open Society Institute (FOSI),financiering,1536,,,0,100.0
+43,Clingendael Instituut,onbekend,837,ING Groep,financiering,1541,,,0,100.0
+43,Clingendael Instituut,onbekend,821,Ministerie van Binnenlandse Zaken en Koninkrijksrelaties,financiering,1533,,,0,100.0
+43,Clingendael Instituut,onbekend,86,Ministerie van Buitenlandse Zaken,financiering,154,,,0,100.0
+43,Clingendael Instituut,onbekend,85,Ministerie van Defensie,financiering,153,,,0,100.0
+43,Clingendael Instituut,onbekend,819,Ministerie van Economische Zaken,financiering,1534,,,0,100.0
+43,Clingendael Instituut,onbekend,585,Ministerie van Justitie en Veiligheid,financiering,1532,,,0,100.0
+43,Clingendael Instituut,onbekend,840,Ministry of Foreign Affairs of Saudi Arabia,financiering,1537,,,0,100.0
+43,Clingendael Instituut,onbekend,81,NAVO,financiering,64,,,0,100.0
+43,Clingendael Instituut,onbekend,615,RVO (Rijksdienst voor Ondernemend Nederland),financiering,1196,,,0,100.0
+43,Clingendael Instituut,onbekend,835,Royal Dutch Shell,financiering,1538,,,0,100.0
+43,Clingendael Instituut,onbekend,839,Stichting Porticus,financiering,1535,,,0,100.0
+43,Clingendael Instituut,onbekend,836,Tata Steel Nederland,financiering,1540,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,813,"Foreign, Commonwealth & Development Office (FCDO)",financiering,1489,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,814,Generalitat de Catalunya (Catalaanse regionale overheid),financiering,1491,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1194,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,85,Ministerie van Defensie,financiering,152,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,81,NAVO,financiering,40,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,84,Politie,financiering,1197,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,815,TNO,financiering,1490,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,812,Taipei Representative Office in the Netherlands,financiering,1488,,,0,100.0
+44,HCSS (The Hague Centre for Strategic Studies),onbekend,811,US Department of Defence,financiering,1487,,,0,100.0
+45,Nationale DenkTank,onbekend,841,APG,financiering,1557,,,0,100.0
+45,Nationale DenkTank,onbekend,80,McKinsey,financiering,41,,,0,100.0
+45,Nationale DenkTank,onbekend,346,Rabobank,financiering,1556,,,0,100.0
+46,Teldersstichting,onbekend,53,VVD,financiering,700,,,0,100.0
+47,Wiardi Beckman Stichting,onbekend,56,PvdA,financiering,701,,,0,100.0
+49,WRR (Wetenschappelijke Raad voor het Regeringsbeleid),onbekend,582,Ministerie van Algemene Zaken,financiering,1509,,,0,100.0
+53,VVD,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,692,,,0,100.0
+54,CDA,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,697,,,0,100.0
+56,PvdA,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,696,,,0,100.0
+57,SP,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,698,,,0,100.0
+68,Free Press Unlimited,aandeel,86,Ministerie van Buitenlandse Zaken,financiering,691,40.5,2024,40.5,59.5
+68,Free Press Unlimited,onbekend,39,Postcode Loterij,financiering,745,,,40.5,59.5
+82,RIVM,onbekend,586,Ministerie van VWS,financiering,1578,,,0,100.0
+83,CPB (Centraal Planbureau),onbekend,819,Ministerie van Economische Zaken,financiering,1496,,,0,100.0
+94,NSC (Nieuw Sociaal Contract),onbekend,156,Ministerie van Binnenlandse Zaken,financiering,694,,,0,100.0
+103,Radboud Universiteit,onbekend,132,Ministerie van OCW,financiering,478,,,0,100.0
+103,Radboud Universiteit,onbekend,196,NWO (Nederlandse Organisatie voor Wetenschappelijk Onderzoek),financiering,479,,,0,100.0
+130,Stichting Democratie en Media,onbekend,317,Adessium Foundation,financiering,637,,,0,100.0
+130,Stichting Democratie en Media,onbekend,318,Stichting DOEN,financiering,638,,,0,100.0
+131,NPO,aandeel,132,Ministerie van OCW,financiering,678,92.0,2024,92.0,8.0
+132,Ministerie van OCW,onbekend,133,Ster,financiering,373,,,0,100.0
+137,NTR,onbekend,131,NPO,financiering,680,,,0,100.0
+138,EO,onbekend,131,NPO,financiering,683,,,0,100.0
+139,BNNVARA,onbekend,131,NPO,financiering,682,,,0,100.0
+140,KRO-NCRV,onbekend,131,NPO,financiering,684,,,0,100.0
+141,AVROTROS,onbekend,131,NPO,financiering,681,,,0,100.0
+142,VPRO,onbekend,131,NPO,financiering,686,,,0,100.0
+143,Omroep MAX,onbekend,131,NPO,financiering,685,,,0,100.0
+144,WNL,onbekend,131,NPO,financiering,687,,,0,100.0
+145,PowNed,onbekend,131,NPO,financiering,688,,,0,100.0
+152,D66,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,693,,,0,100.0
+153,GroenLinks,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,695,,,0,100.0
+154,EIB (Europese Investeringsbank),onbekend,162,ECB (Europese Centrale Bank),financiering,409,,,0,100.0
+194,PAX,aandeel,86,Ministerie van Buitenlandse Zaken,financiering,469,53.6,2024,53.6,46.4
+200,NIDV,onbekend,907,Damen Shipyards Group,financiering,1703,,,0,100.0
+200,NIDV,onbekend,911,GKN Fokker,financiering,1704,,,0,100.0
+200,NIDV,onbekend,942,Royal IHC,financiering,1706,,,0,100.0
+200,NIDV,onbekend,784,Thales Nederland,financiering,1641,,,0,100.0
+200,NIDV,onbekend,941,VDL Groep,financiering,1705,,,0,100.0
+205,Ongehoord Nederland,onbekend,131,NPO,financiering,689,,,0,100.0
+206,Omroep ZWART,onbekend,131,NPO,financiering,690,,,0,100.0
+218,Forum voor Democratie,onbekend,156,Ministerie van Binnenlandse Zaken,financiering,699,,,0,100.0
+248,de andere krant,onbekend,256,Hugo Jansen,financiering,563,,,0,100.0
+248,de andere krant,onbekend,255,Jan Rijkeboer,financiering,562,,,0,100.0
+253,Stimuleringsfonds voor de Journalistiek (SVDJ),onbekend,132,Ministerie van OCW,financiering,672,,,0,100.0
+257,Follow the Money,aandeel,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,564,3.0,2025,3.0,97.0
+258,Investico,aandeel,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,565,10.1,2024,10.1,89.9
+258,Investico,onbekend,317,Adessium Foundation,financiering,747,,,10.1,89.9
+258,Investico,onbekend,130,Stichting Democratie en Media,financiering,651,,,10.1,89.9
+259,The Investigative Desk,aandeel,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,566,31.8,2025,31.8,68.2
+260,Onderzoekscollectief SPIT,aandeel,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,567,55.8,2024,55.8,44.2
+261,Bureau Spotlight,onbekend,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,568,,,0,100.0
+262,Spot On Stories,onbekend,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,569,,,0,100.0
+263,Vers Beton,onbekend,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,570,,,0,100.0
+264,De Groene Amsterdammer,onbekend,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,572,,,0,100.0
+265,Vrij Nederland,onbekend,253,Stimuleringsfonds voor de Journalistiek (SVDJ),financiering,573,,,0,100.0
+266,Media Development Investment Fund (MDIF),onbekend,130,Stichting Democratie en Media,financiering,574,,,0,100.0
+267,Stichting Persvrijheidsfonds,onbekend,130,Stichting Democratie en Media,financiering,575,,,0,100.0
+268,European Press Prize,onbekend,130,Stichting Democratie en Media,financiering,576,,,0,100.0
+288,ProDemos,onbekend,821,Ministerie van Binnenlandse Zaken en Koninkrijksrelaties,financiering,1857,,,0,100.0
+307,De Nederlandsche Bank (DNB),onbekend,584,Ministerie van Financiën,financiering,1592,,,0,100.0
+310,Bits of Freedom,onbekend,161,Open Society Foundations,financiering,749,,,0,100.0
+310,Bits of Freedom,onbekend,130,Stichting Democratie en Media,financiering,649,,,0,100.0
+311,Universiteit van Amsterdam,onbekend,47,Wiardi Beckman Stichting,financiering,1530,,,0,100.0
+321,Stichting Platform Islamitische Organisaties Rijnmond (SPIOR),onbekend,130,Stichting Democratie en Media,financiering,642,,,0,100.0
+322,Stichting Stem op een Vrouw,onbekend,130,Stichting Democratie en Media,financiering,643,,,0,100.0
+323,New Urban Collective,onbekend,130,Stichting Democratie en Media,financiering,644,,,0,100.0
+324,Transnational Institute (TNI),onbekend,161,Open Society Foundations,financiering,752,,,0,100.0
+324,Transnational Institute (TNI),onbekend,130,Stichting Democratie en Media,financiering,645,,,0,100.0
+325,Stichting Keti Koti Tafel,onbekend,130,Stichting Democratie en Media,financiering,646,,,0,100.0
+326,Bureau Clara Wichmann,onbekend,130,Stichting Democratie en Media,financiering,647,,,0,100.0
+327,OneWorld,onbekend,130,Stichting Democratie en Media,financiering,648,,,0,100.0
+328,European Digital Rights (EDRi),onbekend,161,Open Society Foundations,financiering,751,,,0,100.0
+328,European Digital Rights (EDRi),onbekend,130,Stichting Democratie en Media,financiering,650,,,0,100.0
+329,Meld Islamofobie,onbekend,130,Stichting Democratie en Media,financiering,652,,,0,100.0
+330,Controle Alt Delete,onbekend,130,Stichting Democratie en Media,financiering,653,,,0,100.0
+331,Open State Foundation,onbekend,130,Stichting Democratie en Media,financiering,654,,,0,100.0
+332,Public Interest Litigation Project (PILP),onbekend,317,Adessium Foundation,financiering,748,,,0,100.0
+332,Public Interest Litigation Project (PILP),onbekend,161,Open Society Foundations,financiering,750,,,0,100.0
+332,Public Interest Litigation Project (PILP),onbekend,130,Stichting Democratie en Media,financiering,655,,,0,100.0
+338,NCDO,onbekend,86,Ministerie van Buitenlandse Zaken,financiering,720,,,0,100.0
+602,CBS (Centraal Bureau voor de Statistiek),onbekend,819,Ministerie van Economische Zaken,financiering,1560,,,0,100.0
+622,World Resources Institute,onbekend,628,Ministerie van I&W,financiering,1200,,,0,100.0
+776,Institute for the Study of War (ISW),onbekend,834,Foundation for Defense of Democracies (FDD),financiering,1504,,,0,100.0
+776,Institute for the Study of War (ISW),onbekend,830,General Dynamics,financiering,1500,,,0,100.0
+776,Institute for the Study of War (ISW),onbekend,832,Northrop Grumman,financiering,1502,,,0,100.0
+776,Institute for the Study of War (ISW),onbekend,833,Palantir Technologies,financiering,1503,,,0,100.0
+776,Institute for the Study of War (ISW),onbekend,831,Raytheon (RTX),financiering,1501,,,0,100.0
+815,TNO,onbekend,819,Ministerie van Economische Zaken,financiering,1575,,,0,100.0
+827,SCP (Sociaal en Cultureel Planbureau),onbekend,820,"Ministerie van Volksgezondheid, Welzijn en Sport",financiering,1514,,,0,100.0
+828,Rathenau Instituut,onbekend,132,Ministerie van OCW,financiering,1519,,,0,100.0
+829,Atlantische Commissie,onbekend,980,German Marshall Fund of the United States (GMF),financiering,1749,,,0,100.0
+829,Atlantische Commissie,onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1552,,,0,100.0
+829,Atlantische Commissie,onbekend,85,Ministerie van Defensie,financiering,1750,,,0,100.0
+829,Atlantische Commissie,onbekend,132,Ministerie van OCW,financiering,1751,,,0,100.0
+865,Planbureau voor de Leefomgeving (PBL),onbekend,628,Ministerie van I&W,financiering,1563,,,0,100.0
+866,KNAW (Koninklijke Nederlandse Akademie van Wetenschappen),onbekend,132,Ministerie van OCW,financiering,1566,,,0,100.0
+867,Nibud (Nationaal Instituut voor Budgetvoorlichting),onbekend,863,Ministerie van Sociale Zaken en Werkgelegenheid,financiering,1570,,,0,100.0
+868,RaboResearch,onbekend,346,Rabobank,financiering,1583,,,0,100.0
+869,ING Research / ING Economisch Bureau,onbekend,76,ING,financiering,1588,,,0,100.0
+869,ING Research / ING Economisch Bureau,onbekend,837,ING Groep,financiering,1842,,,0,100.0
+870,Ipsos I&O,onbekend,11,NOS,financiering,1596,,,0,100.0
+870,Ipsos I&O,onbekend,472,Nieuwsuur,financiering,1597,,,0,100.0
+870,Ipsos I&O,onbekend,4,de Volkskrant,financiering,1598,,,0,100.0
+872,Kieskompas,onbekend,5,Trouw,financiering,1604,,,0,100.0
+875,ICCT (International Centre for Counter-Terrorism),onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1620,,,0,100.0
+875,ICCT (International Centre for Counter-Terrorism),onbekend,172,NCTV (Nationaal Coördinator Terrorismebestrijding en Veiligheid),financiering,1621,,,0,100.0
+876,SEO Economisch Onderzoek,onbekend,624,ABU,financiering,1625,,,0,100.0
+876,SEO Economisch Onderzoek,onbekend,819,Ministerie van Economische Zaken,financiering,1626,,,0,100.0
+902,ABN AMRO Group Economics,onbekend,306,ABN AMRO,financiering,1631,,,0,100.0
+904,Nederlandse Defensie Academie (NLDA),onbekend,85,Ministerie van Defensie,financiering,1638,,,0,100.0
+905,Nederlands Instituut voor Militaire Historie (NIMH),onbekend,85,Ministerie van Defensie,financiering,1639,,,0,100.0
+906,Institute of Security and Global Affairs (Universiteit Leiden),onbekend,85,Ministerie van Defensie,financiering,1640,,,0,100.0
+931,The Hague Program on International Cyber Security,onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1691,,,0,100.0
+933,MARIN (Maritime Research Institute Netherlands),onbekend,85,Ministerie van Defensie,financiering,1696,,,0,100.0
+934,Koninklijk NLR (Nederlands Lucht- en Ruimtevaartcentrum),onbekend,819,Ministerie van Economische Zaken,financiering,1699,,,0,100.0
+935,The Hague Security Delta (HSD),onbekend,819,Ministerie van Economische Zaken,financiering,1701,,,0,100.0
+936,Berenschot,onbekend,819,Ministerie van Economische Zaken,financiering,1707,,,0,100.0
+976,Atlantic Council,onbekend,984,Airbus,financiering,1733,,,0,100.0
+976,Atlantic Council,onbekend,940,Boeing,financiering,1732,,,0,100.0
+976,Atlantic Council,onbekend,938,Lockheed Martin,financiering,1730,,,0,100.0
+976,Atlantic Council,onbekend,85,Ministerie van Defensie,financiering,1734,,,0,100.0
+976,Atlantic Council,onbekend,81,NAVO,financiering,1729,,,0,100.0
+976,Atlantic Council,onbekend,832,Northrop Grumman,financiering,1731,,,0,100.0
+976,Atlantic Council,onbekend,811,US Department of Defence,financiering,1727,,,0,100.0
+976,Atlantic Council,onbekend,983,US Department of State,financiering,1728,,,0,100.0
+978,European Council on Foreign Relations (ECFR),onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1741,,,0,100.0
+978,European Council on Foreign Relations (ECFR),onbekend,161,Open Society Foundations,financiering,1742,,,0,100.0
+978,European Council on Foreign Relations (ECFR),onbekend,985,Stiftung Mercator,financiering,1743,,,0,100.0
+979,Carnegie Europe,onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1744,,,0,100.0
+979,Carnegie Europe,onbekend,811,US Department of Defence,financiering,1746,,,0,100.0
+979,Carnegie Europe,onbekend,983,US Department of State,financiering,1745,,,0,100.0
+980,German Marshall Fund of the United States (GMF),onbekend,86,Ministerie van Buitenlandse Zaken,financiering,1748,,,0,100.0
+980,German Marshall Fund of the United States (GMF),onbekend,81,NAVO,financiering,1747,,,0,100.0
+1014,Ecorys,onbekend,1015,NVDE (Nederlandse Vereniging Duurzame Energie),financiering,1806,,,0,100.0
+1014,Ecorys,onbekend,1016,Netbeheer Nederland,financiering,1807,,,0,100.0
+1017,Oxford Economics,onbekend,835,Royal Dutch Shell,financiering,1808,,,0,100.0
+1019,Panteia,onbekend,1018,Transport en Logistiek Nederland (TLN),financiering,1810,,,0,100.0
+1019,Panteia,onbekend,1020,evofenedex,financiering,1811,,,0,100.0
+1021,Decisio,onbekend,423,NDP Nieuwsmedia,financiering,1812,,,0,100.0
+1114,Ivo van Woerden,onbekend,1113,Fonds Bijzondere Journalistieke Projecten,financiering,1979,,,0,100.0
+1116,Edelman,onbekend,836,Tata Steel Nederland,financiering,1992,,,0,100.0

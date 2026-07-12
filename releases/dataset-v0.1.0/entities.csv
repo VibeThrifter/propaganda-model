@@ -1,0 +1,1111 @@
+id,name,type,primary_role_id,primary_role,active_from,active_until,active
+1,DPG Media,mediaorganisatie,1,mediaeigenaar,1987,,1
+2,Mediahuis,mediaorganisatie,1,mediaeigenaar,2013,,1
+3,AD (Algemeen Dagblad),mediaorganisatie,2,mediaorganisatie,1946,,1
+4,de Volkskrant,mediaorganisatie,2,mediaorganisatie,1919,,1
+5,Trouw,mediaorganisatie,2,mediaorganisatie,1943,,1
+6,Het Parool,mediaorganisatie,2,mediaorganisatie,1940,,1
+7,NU.nl,mediaorganisatie,2,mediaorganisatie,1999,,1
+8,RTL Nederland,omroep,2,mediaorganisatie,1989,,1
+9,De Telegraaf,mediaorganisatie,2,mediaorganisatie,1893,,1
+10,NRC,mediaorganisatie,2,mediaorganisatie,1970,,1
+11,NOS,omroep,2,mediaorganisatie,1969,,1
+12,ANP,persbureau,8,persbureau,1934,,1
+13,De Correspondent,mediaorganisatie,,,2013,,1
+14,Christian Van Thillo,persoon,1,mediaeigenaar,1962,,1
+15,Thomas Leysen,persoon,1,mediaeigenaar,1960,,1
+16,Familie Baert,persoon,1,mediaeigenaar,,,1
+17,Familie Van Puijenbroek,persoon,1,mediaeigenaar,,,1
+18,Chris Oomen,persoon,1,mediaeigenaar,,,1
+19,John de Mol,persoon,1,mediaeigenaar,1955,,1
+20,Bilderberg Groep,elite_netwerk,15,elite_forum,1954,,1
+21,Trilaterale Commissie,elite_netwerk,15,elite_forum,1973,,1
+22,European Round Table of Industrialists,elite_netwerk,15,elite_forum,1983,,1
+23,World Economic Forum,elite_netwerk,15,elite_forum,1971,,1
+24,European Publishers Council,elite_netwerk,15,elite_forum,1991,,1
+25,Groupe Bruxelles Lambert,elite_netwerk,3,aandeelhouder,1902,,1
+26,Epifin,bedrijf,24,overnamevehikel,,,1
+27,VP Exploitatie,bedrijf,24,overnamevehikel,,,1
+28,Concentra,bedrijf,24,overnamevehikel,1880,,1
+29,BlackRock,vermogensbeheerder,3,aandeelhouder,1988,,1
+30,Vanguard,vermogensbeheerder,3,aandeelhouder,1975,,1
+31,Talpa Network,bedrijf,1,mediaeigenaar,2004,,1
+32,Albert Heijn,bedrijf,5,adverteerder,1887,,1
+33,Lidl,bedrijf,5,adverteerder,1930,,1
+34,Bol.com,bedrijf,5,adverteerder,1999,,1
+35,Procter & Gamble,bedrijf,5,adverteerder,1837,,1
+36,Unilever,bedrijf,5,adverteerder,1929,,1
+37,A.S. Watson (Kruidvat),bedrijf,5,adverteerder,1975,,1
+38,Nederlandse Loterij,bedrijf,5,adverteerder,2016,,1
+39,Postcode Loterij,bedrijf,5,adverteerder,1989,,1
+40,Google,platform,18,techplatform,1998,,1
+41,Meta (Facebook/Instagram),platform,18,techplatform,2004,,1
+42,TikTok,platform,18,techplatform,2016,,1
+43,Clingendael Instituut,denktank,28,denktank,1983,,1
+44,HCSS (The Hague Centre for Strategic Studies),denktank,28,denktank,2007,,1
+45,Nationale DenkTank,denktank,28,denktank,2006,,1
+46,Teldersstichting,denktank,28,denktank,1954,,1
+47,Wiardi Beckman Stichting,denktank,28,denktank,1945,,1
+48,ACM (Autoriteit Consument & Markt),toezichthouder,19,toezichthouder,2013,,1
+49,WRR (Wetenschappelijke Raad voor het Regeringsbeleid),overheidsinstelling,41,gezagsinstituut,1972,,1
+50,CvdM (Commissariaat voor de Media),toezichthouder,19,toezichthouder,1988,,1
+51,Raad voor de Journalistiek,toezichthouder,19,toezichthouder,1960,,1
+52,Belastingdienst,overheidsinstelling,41,gezagsinstituut,,,1
+53,VVD,partij,45,partij,1948,,1
+54,CDA,partij,45,partij,1980,,1
+55,PVV,partij,45,partij,2006,,1
+56,PvdA,partij,45,partij,1946,,1
+57,SP,partij,45,partij,1972,,1
+58,Pieter Omtzigt,persoon,17,klokkenluider,1974,,1
+59,Renske Leijten,persoon,17,klokkenluider,1979,,1
+60,Peter R. de Vries,persoon,36,onderzoeksjournalist,1956,2021,0
+61,Maarten van Rossem,persoon,32,columnist_opiniemaker,1943,,1
+62,Rob de Wijk,persoon,28,denktank,1954,,1
+63,Ron Fresen,persoon,26,journalist,,,1
+68,Free Press Unlimited,ngo,25,vakbond_media,2011,,1
+69,NVJ (Nederlandse Vereniging van Journalisten),vakbond,25,vakbond_media,1884,,1
+70,BOinK,burgerinitiatief,35,publiek,2001,,1
+71,Koningshuis,overheidsinstelling,41,gezagsinstituut,1815,,1
+72,Unibet,bedrijf,5,adverteerder,1997,,1
+73,KBC Groep,bedrijf,3,aandeelhouder,1998,,1
+74,Umicore,bedrijf,3,aandeelhouder,1989,,1
+75,Shell,bedrijf,5,adverteerder,1907,,1
+76,ING,bedrijf,3,aandeelhouder,1991,,1
+77,ASML,bedrijf,3,aandeelhouder,1984,,1
+78,Philips,bedrijf,3,aandeelhouder,1891,,1
+79,dsm-firmenich,bedrijf,3,aandeelhouder,2023,,1
+80,McKinsey,bedrijf,39,belanghebbende,1926,,1
+81,NAVO,overheidsinstelling,15,elite_forum,1949,,1
+82,RIVM,overheidsinstelling,41,gezagsinstituut,1910,,1
+83,CPB (Centraal Planbureau),overheidsinstelling,41,gezagsinstituut,1945,,1
+84,Politie,overheidsinstelling,41,gezagsinstituut,,,1
+85,Ministerie van Defensie,overheidsinstelling,41,gezagsinstituut,1798,,1
+86,Ministerie van Buitenlandse Zaken,overheidsinstelling,41,gezagsinstituut,1798,,1
+87,Brandpunt,omroep,2,mediaorganisatie,1962,2017,0
+88,RTL Nieuws,omroep,2,mediaorganisatie,1989,,1
+89,De Morgen,mediaorganisatie,2,mediaorganisatie,1978,,1
+90,Gezond Verstand,mediaorganisatie,,,2020,,1
+93,Mediahuis Partners,bedrijf,24,overnamevehikel,,,1
+94,NSC (Nieuw Sociaal Contract),partij,45,partij,2023,,1
+95,Adidas,bedrijf,3,aandeelhouder,1949,,1
+96,PCM Uitgevers,bedrijf,1,mediaeigenaar,1965,2009,0
+97,Sanoma Nederland,bedrijf,1,mediaeigenaar,1999,2020,0
+98,VNU Media,bedrijf,1,mediaeigenaar,1964,2007,0
+99,TMG (Telegraaf Media Groep),bedrijf,1,mediaeigenaar,1893,2020,0
+100,NRC Media,bedrijf,1,mediaeigenaar,2010,2015,0
+101,Metro,mediaorganisatie,2,mediaorganisatie,1999,2020,0
+102,Imerys,bedrijf,3,aandeelhouder,1880,,1
+103,Radboud Universiteit,onderwijsinstelling,43,kennisinstituut,1923,,1
+104,UvA Journalistiek,onderwijsinstelling,43,kennisinstituut,,,1
+106,OMT (Outbreak Management Team),overheidsinstelling,41,gezagsinstituut,2020,2023,0
+107,Tweede Kamer,overheidsinstelling,23,parlementair_controleur,1815,,1
+108,De Persgroep,bedrijf,1,mediaeigenaar,1945,2019,0
+109,Hans Hillen,persoon,33,politicus,1947,,1
+110,Jack de Vries,persoon,20,lobbyist,1968,,1
+111,Wouter Bos,persoon,33,politicus,1963,,1
+112,Jan Peter Balkenende,persoon,33,politicus,1956,,1
+113,Camiel Eurlings,persoon,33,politicus,1973,,1
+114,Neelie Kroes,persoon,33,politicus,1941,,1
+115,Frank Heemskerk,persoon,33,politicus,1969,,1
+116,Bart de Liefde,persoon,33,politicus,1976,,1
+117,Raymond Knops,persoon,33,politicus,1971,,1
+118,Tijs van den Brink,persoon,33,politicus,1976,,1
+119,Paul Sneijder,persoon,27,voorlichter,,,1
+120,Afke Schaart,persoon,20,lobbyist,1973,,1
+121,Eeke van der Veen,persoon,33,politicus,1948,,1
+122,Hill+Knowlton,pr_bureau,20,lobbyist,1927,,1
+123,KPMG,bedrijf,39,belanghebbende,1987,,1
+124,Ernst & Young,bedrijf,39,belanghebbende,1989,,1
+125,KLM,bedrijf,39,belanghebbende,1919,,1
+126,Uber,bedrijf,39,belanghebbende,2009,,1
+127,Royal HaskoningDHV,bedrijf,39,belanghebbende,2012,,1
+128,Microsoft,bedrijf,39,belanghebbende,1975,,1
+129,Stichting Administratiekantoor Epifin,stichting,44,administratiekantoor,,,1
+130,Stichting Democratie en Media,stichting,40,borgingsstichting,,,1
+131,NPO,stichting,46,omroepkoepel,2014,,1
+132,Ministerie van OCW,overheidsinstelling,41,gezagsinstituut,,,1
+133,Ster,stichting,39,belanghebbende,1967,,1
+134,Frederieke Leeflang,persoon,19,toezichthouder,,,1
+135,Tjibbe Joustra,persoon,19,toezichthouder,,,1
+136,Shula Rijxman,persoon,33,politicus,,,1
+137,NTR,omroep,2,mediaorganisatie,2010,,1
+138,EO,omroep,47,ledenomroep,1967,,1
+139,BNNVARA,omroep,47,ledenomroep,2014,,1
+140,KRO-NCRV,omroep,47,ledenomroep,2014,,1
+141,AVROTROS,omroep,47,ledenomroep,2014,,1
+142,VPRO,omroep,47,ledenomroep,1926,,1
+143,Omroep MAX,omroep,47,ledenomroep,2005,,1
+144,WNL,omroep,47,ledenomroep,2009,,1
+145,PowNed,omroep,47,ledenomroep,2009,,1
+146,NOS-hoofdredactie,mediaorganisatie,34,redactie,,,1
+147,EO-redactie,mediaorganisatie,34,redactie,,,1
+148,Kathleen Ferrier,persoon,33,politicus,,,1
+149,Arjan el Fassed,persoon,33,politicus,,,1
+150,Rob van Gijzel,persoon,33,politicus,,,1
+151,Frits Huffnagel,persoon,33,politicus,,,1
+152,D66,partij,45,partij,,,1
+153,GroenLinks,partij,45,partij,,,1
+154,EIB (Europese Investeringsbank),overheidsinstelling,39,belanghebbende,,,1
+155,Europese Commissie,overheidsinstelling,41,gezagsinstituut,,,1
+156,Ministerie van Binnenlandse Zaken,overheidsinstelling,41,gezagsinstituut,,,1
+159,X (Twitter),platform,18,techplatform,,,1
+160,Snapchat,platform,18,techplatform,,,1
+161,Open Society Foundations,ngo,58,maatschappelijke_organisatie,,,1
+162,ECB (Europese Centrale Bank),overheidsinstelling,41,gezagsinstituut,,,1
+164,VNO-NCW,lobbygroep,20,lobbyist,,,1
+165,WHO (Wereldgezondheidsorganisatie),overheidsinstelling,41,gezagsinstituut,1948,,1
+166,RVS (Raad voor Volksgezondheid en Samenleving),overheidsinstelling,41,gezagsinstituut,,,1
+167,Ernst Kuipers,persoon,33,politicus,,,1
+168,Jet Bussemaker,persoon,33,politicus,,,1
+169,Reuters,persbureau,8,persbureau,1851,,1
+170,AP (Associated Press),persbureau,8,persbureau,,,1
+171,AFP (Agence France-Presse),persbureau,8,persbureau,1944,,1
+172,NCTV (Nationaal Coördinator Terrorismebestrijding en Veiligheid),overheidsinstelling,41,gezagsinstituut,2012,,1
+173,AIVD (Algemene Inlichtingen- en Veiligheidsdienst),overheidsinstelling,41,gezagsinstituut,2002,,1
+174,Op1,mediaorganisatie,2,mediaorganisatie,2020,,1
+175,Vandaag Inside,mediaorganisatie,2,mediaorganisatie,2022,,1
+176,Talitha Muusse,persoon,32,columnist_opiniemaker,2020,,1
+177,Nationaal Media Onderzoek (NMO),stichting,43,kennisinstituut,2022,,1
+178,Mirjam Sterk,persoon,33,politicus,,,1
+179,Abdeluheb Choho,persoon,33,politicus,,,1
+180,Bruno Bruins,persoon,33,politicus,,,1
+181,Eric van der Burg,persoon,33,politicus,,,1
+182,Loek Hermans,persoon,33,politicus,,,1
+183,Bas Eenhoorn,persoon,33,politicus,,,1
+184,Pieter Broertjes,persoon,29,hoofdredacteur,,,1
+185,André van der Louw,persoon,33,politicus,,,1
+186,Gerrit-Jan Wolffensperger,persoon,33,politicus,,,1
+187,Harm Bruins Slot,persoon,33,politicus,,,1
+188,IKON,omroep,2,mediaorganisatie,,2016-01-01,1
+190,Paul Rosenmöller,persoon,33,politicus,,,1
+191,Marcel van Dam,persoon,33,politicus,,,1
+194,PAX,ngo,58,maatschappelijke_organisatie,,,1
+195,Het Financieele Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+196,NWO (Nederlandse Organisatie voor Wetenschappelijk Onderzoek),overheidsinstelling,,,,,1
+198,Cora van Nieuwenhuizen,persoon,33,politicus,,,1
+199,Energie-Nederland,lobbygroep,20,lobbyist,,,1
+200,NIDV,lobbygroep,20,lobbyist,,,1
+201,Angelien Eijsink,persoon,33,politicus,,,1
+202,Kajsa Ollongren,persoon,33,politicus,,,1
+203,Yalta European Strategy,elite_netwerk,15,elite_forum,,,1
+204,Viktor Pinchuk,persoon,39,belanghebbende,,,1
+205,Ongehoord Nederland,omroep,47,ledenomroep,2022,,1
+206,Omroep ZWART,omroep,47,ledenomroep,2022,,1
+207,Sarah Bakker,persoon,26,journalist,,,1
+208,Dominique Weesie,persoon,49,directie,,,1
+209,Rutger Castricum,persoon,26,journalist,,,1
+210,Wierd Duk,persoon,26,journalist,2017-11-01,,1
+211,Bas Erlings,persoon,27,voorlichter,,,1
+212,Klaas Dijkhoff,persoon,33,politicus,,,1
+213,Arnold Karskens,persoon,49,directie,,,1
+214,Bouke Geersing,persoon,48,raad_van_commissarissen,,,1
+215,Jonathan Krispijn,persoon,26,journalist,,,1
+216,Sue & The Alchemists,pr_bureau,20,lobbyist,2021,,1
+217,Voor Ons Nederland,stichting,58,maatschappelijke_organisatie,2025,,1
+218,Forum voor Democratie,partij,45,partij,2016-09-25,,1
+219,Krispijnpunt,mediaorganisatie,21,alternatief_medium,2025,,1
+220,Thom de Graaf,persoon,33,politicus,,,1
+221,Henk Kummeling,persoon,42,gezagsexpert,,,1
+222,Kiesraad,toezichthouder,19,toezichthouder,,,1
+223,Raad van State,overheidsinstelling,41,gezagsinstituut,,,1
+224,Pauw & De Wit,mediaorganisatie,2,mediaorganisatie,,,1
+225,Gert-Jan Segers,persoon,33,politicus,,,1
+226,Dijkhoff & Segers (podcast),mediaorganisatie,2,mediaorganisatie,,,1
+227,Farah Karimi,persoon,33,politicus,,,1
+228,banken.nl,mediaorganisatie,2,mediaorganisatie,,,1
+229,Gemeente Amsterdam,overheidsinstelling,41,gezagsinstituut,,,1
+230,Stichting de Volkskrant,stichting,40,borgingsstichting,,,1
+231,Stichting Het Nieuwe Parool,stichting,40,borgingsstichting,,,1
+232,Stichting NU.nl,stichting,40,borgingsstichting,,,1
+233,DPG Media Group NV,bedrijf,1,mediaeigenaar,,,1
+234,Stichting ter Bevordering van de Christelijke Pers in Nederland,stichting,40,borgingsstichting,,,1
+235,Stichting RTL Nieuws,stichting,40,borgingsstichting,,,1
+236,DPG Media Services NV,bedrijf,24,overnamevehikel,,,1
+237,Ludwig Criel,persoon,48,raad_van_commissarissen,,,1
+238,Ieko Sevinga,persoon,48,raad_van_commissarissen,,,1
+239,Christophe Convent,persoon,49,directie,,,1
+240,Bernadette de Bethune,persoon,49,directie,,,1
+241,Emmanuel Van Thillo,persoon,1,mediaeigenaar,,,1
+242,Jan Louis Burggraaf,persoon,49,directie,,,1
+243,Jeanine van der Vlist,persoon,48,raad_van_commissarissen,,,1
+244,Jan van Dun,persoon,49,directie,,,1
+245,Anita Nijboer,persoon,48,raad_van_commissarissen,,,1
+246,Annetje Ottow,persoon,48,raad_van_commissarissen,,,1
+247,Erik Roddenhof,persoon,49,directie,2020-03-01,,1
+248,de andere krant,mediaorganisatie,,,,,1
+249,De Nieuwe Wereld,mediaorganisatie,,,,,1
+250,Sander Compagner,persoon,32,columnist_opiniemaker,,,1
+251,Karel Beckman,persoon,29,hoofdredacteur,2021-10-01,,1
+252,Jelle van Baardewijk,persoon,32,columnist_opiniemaker,,,1
+253,Stimuleringsfonds voor de Journalistiek (SVDJ),overheidsinstelling,39,belanghebbende,,,1
+254,Stichting KnowledgeMatters,stichting,39,belanghebbende,,,1
+255,Jan Rijkeboer,persoon,39,belanghebbende,,,1
+256,Hugo Jansen,persoon,39,belanghebbende,,,1
+257,Follow the Money,mediaorganisatie,2,mediaorganisatie,,,1
+258,Investico,stichting,2,mediaorganisatie,,,1
+259,The Investigative Desk,stichting,2,mediaorganisatie,,,1
+260,Onderzoekscollectief SPIT,stichting,2,mediaorganisatie,,,1
+261,Bureau Spotlight,stichting,2,mediaorganisatie,,,1
+262,Spot On Stories,stichting,2,mediaorganisatie,,,1
+263,Vers Beton,stichting,2,mediaorganisatie,,,1
+264,De Groene Amsterdammer,mediaorganisatie,2,mediaorganisatie,,,1
+265,Vrij Nederland,mediaorganisatie,2,mediaorganisatie,,,1
+266,Media Development Investment Fund (MDIF),vermogensbeheerder,39,belanghebbende,,,1
+267,Stichting Persvrijheidsfonds,stichting,39,belanghebbende,,,1
+268,European Press Prize,stichting,39,belanghebbende,,,1
+269,Maike Olij,persoon,48,raad_van_commissarissen,,,1
+270,Harold Rimmelzwaan,persoon,48,raad_van_commissarissen,,,1
+271,Yael de Haan,persoon,48,raad_van_commissarissen,,,1
+272,Martijn Bennis,persoon,48,raad_van_commissarissen,,,1
+273,Lily Knibbeler,persoon,48,raad_van_commissarissen,,,1
+274,Nienke Venema,persoon,49,directie,,,1
+275,Yvonne Zonderop,persoon,48,raad_van_commissarissen,,,1
+276,Ernestine Comvalius,persoon,48,raad_van_commissarissen,,,1
+277,Aartie Hoeblal,persoon,48,raad_van_commissarissen,,,1
+278,Ot van Daalen,persoon,48,raad_van_commissarissen,,,1
+279,European Broadcasting Union (EBU),ngo,58,maatschappelijke_organisatie,,,1
+280,Nederlands Uitgeversverbond (NUV),lobbygroep,20,lobbyist,,,1
+281,Malmberg,bedrijf,58,maatschappelijke_organisatie,,,1
+282,Wegener,mediaorganisatie,2,mediaorganisatie,,,1
+283,Hogeschool Utrecht,onderwijsinstelling,43,kennisinstituut,,,1
+284,Rijksuniversiteit Groningen,onderwijsinstelling,43,kennisinstituut,,,1
+285,Stichting Nederlandse Lokale Publieke Omroepen,stichting,58,maatschappelijke_organisatie,,,1
+286,European Communication Research and Education Association (ECREA),ngo,58,maatschappelijke_organisatie,,,1
+287,Use The News,stichting,58,maatschappelijke_organisatie,,,1
+288,ProDemos,stichting,58,maatschappelijke_organisatie,,,1
+289,ECP | Platform voor de InformatieSamenleving,ngo,58,maatschappelijke_organisatie,,,1
+290,Koninklijke Bibliotheek (KB),overheidsinstelling,43,kennisinstituut,,,1
+291,Internationaal Instituut voor Sociale Geschiedenis (IISG),denktank,43,kennisinstituut,,,1
+292,Allard Pierson,ngo,58,maatschappelijke_organisatie,,,1
+293,Stichting Jaarlijkse Literatuurprijs,stichting,58,maatschappelijke_organisatie,,,1
+294,Prins Bernhard Cultuurfonds,stichting,58,maatschappelijke_organisatie,,,1
+295,Humanity in Action,ngo,58,maatschappelijke_organisatie,,,1
+296,Nederlandse Unesco Commissie,overheidsinstelling,58,maatschappelijke_organisatie,,,1
+297,Bijlmer Parktheater,ngo,58,maatschappelijke_organisatie,,,1
+298,The Black Archives,ngo,58,maatschappelijke_organisatie,,,1
+299,Read my World,ngo,58,maatschappelijke_organisatie,,,1
+300,Hiphophuis,ngo,58,maatschappelijke_organisatie,,,1
+301,Theater Rotterdam,ngo,58,maatschappelijke_organisatie,,,1
+302,Nederlandse Toneeljury (VSCD),ngo,58,maatschappelijke_organisatie,,,1
+303,LOSON,ngo,58,maatschappelijke_organisatie,,,1
+304,MN,vermogensbeheerder,58,maatschappelijke_organisatie,,,1
+305,Optimix Vermogensbeheer,vermogensbeheerder,58,maatschappelijke_organisatie,,,1
+306,ABN AMRO,bedrijf,58,maatschappelijke_organisatie,,,1
+307,De Nederlandsche Bank (DNB),toezichthouder,19,toezichthouder,,,1
+308,SER Topvrouwen,ngo,58,maatschappelijke_organisatie,,,1
+309,Women in Financial Services (WIFS),ngo,58,maatschappelijke_organisatie,,,1
+310,Bits of Freedom,ngo,58,maatschappelijke_organisatie,,,1
+311,Universiteit van Amsterdam,onderwijsinstelling,43,kennisinstituut,,,1
+312,Root Legal,bedrijf,58,maatschappelijke_organisatie,,,1
+313,Rechtbank Den Haag,rechterlijke_macht,41,gezagsinstituut,,,1
+314,"ILP Lab (Information, Law & Policy Lab)",denktank,43,kennisinstituut,,,1
+315,De Brauw Blackstone Westbroek,bedrijf,58,maatschappelijke_organisatie,,,1
+316,Autoriteit Persoonsgegevens,toezichthouder,19,toezichthouder,,,1
+317,Adessium Foundation,stichting,58,maatschappelijke_organisatie,,,1
+318,Stichting DOEN,stichting,58,maatschappelijke_organisatie,,,1
+319,IBS Capital Allies,vermogensbeheerder,58,maatschappelijke_organisatie,,,1
+320,Northern Trust,vermogensbeheerder,58,maatschappelijke_organisatie,,,1
+321,Stichting Platform Islamitische Organisaties Rijnmond (SPIOR),ngo,58,maatschappelijke_organisatie,,,1
+322,Stichting Stem op een Vrouw,ngo,58,maatschappelijke_organisatie,,,1
+323,New Urban Collective,ngo,58,maatschappelijke_organisatie,,,1
+324,Transnational Institute (TNI),denktank,28,denktank,,,1
+325,Stichting Keti Koti Tafel,ngo,58,maatschappelijke_organisatie,,,1
+326,Bureau Clara Wichmann,ngo,58,maatschappelijke_organisatie,,,1
+327,OneWorld,mediaorganisatie,21,alternatief_medium,,,1
+328,European Digital Rights (EDRi),ngo,58,maatschappelijke_organisatie,,,1
+329,Meld Islamofobie,ngo,58,maatschappelijke_organisatie,,,1
+330,Controle Alt Delete,ngo,58,maatschappelijke_organisatie,,,1
+331,Open State Foundation,ngo,58,maatschappelijke_organisatie,,,1
+332,Public Interest Litigation Project (PILP),ngo,58,maatschappelijke_organisatie,,,1
+333,CIDI,lobbygroep,20,lobbyist,,,1
+334,Argos,omroep,36,onderzoeksjournalist,,,1
+335,Willem Oltmans,persoon,26,journalist,1925,2004,1
+336,School voor Journalistiek,onderwijsinstelling,43,kennisinstituut,1966-10-03,,1
+337,Novum Nieuws,persbureau,8,persbureau,,2015-01-01,1
+338,NCDO,stichting,1,mediaeigenaar,,2018-12-31,1
+339,Stichting Groene Beheer,stichting,40,borgingsstichting,,,1
+340,Pluralis B.V.,vermogensbeheerder,3,aandeelhouder,2021-01-01,,1
+341,Fontys Hogeschool Journalistiek,onderwijsinstelling,43,kennisinstituut,1980,,1
+342,GeenStijl,mediaorganisatie,2,mediaorganisatie,2003-04-10,,1
+343,Stichting Weekbladpers,stichting,40,borgingsstichting,,,1
+344,PwC,bedrijf,39,belanghebbende,,,1
+345,Allen & Overy,bedrijf,39,belanghebbende,,,1
+346,Rabobank,bedrijf,39,belanghebbende,,,1
+347,Van Lanschot Kempen,bedrijf,39,belanghebbende,,,1
+348,Bank Degroof Petercam,bedrijf,39,belanghebbende,,,1
+349,HAL Investments,bedrijf,3,aandeelhouder,,,1
+350,FD Mediagroep,bedrijf,1,mediaeigenaar,,,1
+351,BNR Nieuwsradio,mediaorganisatie,2,mediaorganisatie,,,1
+352,KIT,bedrijf,43,kennisinstituut,,,1
+353,Hemingway Professional Governance,bedrijf,39,belanghebbende,,,1
+354,Ver.iD,bedrijf,39,belanghebbende,,,1
+357,NJR,bedrijf,58,maatschappelijke_organisatie,,,1
+358,Radboudumc,bedrijf,43,kennisinstituut,,,1
+359,AmsterdamDiner Foundation,bedrijf,58,maatschappelijke_organisatie,,,1
+360,Johan Cruijff ArenA - Stichting Administratiekantoor,bedrijf,39,belanghebbende,,,1
+361,Prix Europa,bedrijf,58,maatschappelijke_organisatie,,,1
+362,INSEAD,onderwijsinstelling,43,kennisinstituut,,,1
+363,Harvard Business School,onderwijsinstelling,43,kennisinstituut,,,1
+364,Universitat de Barcelona,onderwijsinstelling,43,kennisinstituut,,,1
+365,Faculdade de Direito do Recife da Universidade Federal de Pernambuco,onderwijsinstelling,43,kennisinstituut,,,1
+367,de Persgroep Nederland,bedrijf,1,mediaeigenaar,,,1
+368,Vattenfall,bedrijf,39,belanghebbende,,,1
+369,Nuon,bedrijf,39,belanghebbende,,,1
+370,KPN Mobile,bedrijf,39,belanghebbende,,,1
+371,ISIE / Harvard Barcelona,onderwijsinstelling,43,kennisinstituut,,,1
+372,East Carolina University,onderwijsinstelling,43,kennisinstituut,,,1
+375,Huawei,bedrijf,39,belanghebbende,,,1
+376,MKB-Nederland,lobbygroep,20,lobbyist,,,1
+377,Hague Corporate Affairs,lobbygroep,20,lobbyist,,,1
+378,Oxfam Novib,ngo,58,maatschappelijke_organisatie,,,1
+379,ChristenUnie,partij,45,partij,2000,,1
+380,Eerste Kamer,overheidsinstelling,23,parlementair_controleur,,,1
+381,VO-raad,lobbygroep,20,lobbyist,,,1
+382,Deloitte,bedrijf,39,belanghebbende,,,1
+383,Erasmus MC,overheidsinstelling,43,kennisinstituut,,,1
+384,TU Delft,overheidsinstelling,43,kennisinstituut,,,1
+385,KPN,bedrijf,39,belanghebbende,,,1
+386,Agis Zorgverzekeringen,bedrijf,39,belanghebbende,,,1
+387,Zorgbelang Nederland,ngo,58,maatschappelijke_organisatie,,,1
+388,Victor Pinchuk Foundation,stichting,58,maatschappelijke_organisatie,,,1
+389,Azor,bedrijf,39,belanghebbende,,,1
+390,Nieuwspoort (Internationaal Perscentrum),elite_netwerk,59,journalistiek_beroepsnetwerk,1962,,1
+391,Remco Meijer,persoon,26,journalist,,,1
+392,Paul van Meenen,persoon,33,politicus,,,1
+393,Avinash Bhikhie,persoon,26,journalist,,,1
+394,Friso Fennema,persoon,27,voorlichter,,,1
+395,Andre Bosman,persoon,20,lobbyist,,,1
+396,Nederlands Genootschap van Hoofdredacteuren,elite_netwerk,59,journalistiek_beroepsnetwerk,1959,,1
+397,Corine de Vries,persoon,29,hoofdredacteur,,,1
+398,Kamran Ullah,persoon,29,hoofdredacteur,,,1
+399,Perry Feenstra,persoon,29,hoofdredacteur,,,1
+400,Ilse Openneer,persoon,29,hoofdredacteur,,,1
+401,Edwin de Kort,persoon,29,hoofdredacteur,,,1
+402,Hilmar Mulder,persoon,29,hoofdredacteur,,,1
+403,Giselle van Cann,persoon,29,hoofdredacteur,,,1
+404,Vereniging van Onderzoeksjournalisten (VVOJ),vakbond,59,journalistiek_beroepsnetwerk,2002,,1
+405,Débora Votquenne,persoon,36,onderzoeksjournalist,,,1
+406,Willemijn Sneep,persoon,36,onderzoeksjournalist,,,1
+407,Marcia Nieuwenhuis,persoon,36,onderzoeksjournalist,,,1
+408,Mira Sys,persoon,36,onderzoeksjournalist,,,1
+409,Margo Smit,persoon,36,onderzoeksjournalist,,,1
+411,Ad Verbrugge,persoon,1,mediaeigenaar,,,1
+412,Paul van Liempt,persoon,26,journalist,,,1
+413,David van Overbeek,persoon,1,mediaeigenaar,,,1
+414,Madeleine Klinkhamer,persoon,1,mediaeigenaar,,,1
+415,Rens van der Bulck,persoon,1,mediaeigenaar,,,1
+416,Akwasi Ansah,persoon,1,mediaeigenaar,,,1
+417,Gianni Lieuw-A-Soe,persoon,1,mediaeigenaar,,,1
+418,Eric Smit,persoon,36,onderzoeksjournalist,,,1
+419,Mark Koster,persoon,26,journalist,,,1
+420,Arne van der Wal,persoon,1,mediaeigenaar,,,1
+421,Romke Spierdijk,persoon,26,journalist,,,1
+422,Arne Biesma,persoon,26,journalist,,,1
+423,NDP Nieuwsmedia,lobbygroep,39,belanghebbende,,,1
+424,Marjolein van der Linden,persoon,29,hoofdredacteur,,,1
+425,Philippe Remarque,persoon,29,hoofdredacteur,,,1
+426,Jeroen van Dijk,persoon,49,directie,,,1
+427,Cornell Heutink,persoon,49,directie,,,1
+428,Harry Lensink,persoon,29,hoofdredacteur,,,1
+429,Jan-Willem Sanders,persoon,49,directie,,,1
+430,Pieter Elshout,persoon,49,directie,,,1
+431,Thomas Muntz,persoon,29,hoofdredacteur,,,1
+432,Hans Laroes,persoon,29,hoofdredacteur,,,1
+433,Xandra Schutte,persoon,29,hoofdredacteur,,,1
+434,Parlementaire Persvereniging,elite_netwerk,59,journalistiek_beroepsnetwerk,,,1
+435,De Tegel (Stichting Jaarprijzen voor de Journalistiek),stichting,59,journalistiek_beroepsnetwerk,2006,,1
+436,Martha Riemsma,persoon,49,directie,,,1
+437,Buitenlandse Persvereniging in Nederland,elite_netwerk,59,journalistiek_beroepsnetwerk,1925,,1
+438,Imane Rachidi,persoon,26,journalist,,,1
+439,Annette Birschel,persoon,26,journalist,,,1
+440,Gemeente Hilversum,overheidsinstelling,41,gezagsinstituut,,,1
+441,Jildou van der Bijl,persoon,29,hoofdredacteur,2025-04,,1
+442,Michiel Couzy,persoon,29,hoofdredacteur,2025-04,,1
+443,Lindsay Mossink,persoon,29,hoofdredacteur,2023-09,,1
+444,Marc Adriani,persoon,29,hoofdredacteur,2024-11-01,,1
+445,Sander Heijne,persoon,29,hoofdredacteur,2024-04-01,,1
+446,Sarah Sylbing,persoon,29,hoofdredacteur,,,1
+447,Seada Nourhussen,persoon,29,hoofdredacteur,2018-02,,1
+448,Jan Slagter,persoon,49,directie,2005,,1
+449,de Gelderlander,mediaorganisatie,2,mediaorganisatie,,,1
+450,Brabants Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+451,de Stentor,mediaorganisatie,2,mediaorganisatie,,,1
+452,de Twentsche Courant Tubantia,mediaorganisatie,2,mediaorganisatie,,,1
+453,Provinciale Zeeuwse Courant (PZC),mediaorganisatie,2,mediaorganisatie,,,1
+454,BN DeStem,mediaorganisatie,2,mediaorganisatie,,,1
+455,Eindhovens Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+456,Dagblad van het Noorden,mediaorganisatie,2,mediaorganisatie,,,1
+457,Leeuwarder Courant,mediaorganisatie,2,mediaorganisatie,,,1
+458,Noordhollands Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+459,Haarlems Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+460,Leidsch Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+461,De Limburger,mediaorganisatie,2,mediaorganisatie,,,1
+462,De Gooi- en Eemlander,mediaorganisatie,2,mediaorganisatie,,,1
+463,IJmuider Courant,mediaorganisatie,2,mediaorganisatie,,,1
+464,Pieter Klok,persoon,29,hoofdredacteur,,,1
+465,Patricia Veldhuis,persoon,29,hoofdredacteur,,,1
+466,Wendelmoet Boersema,persoon,29,hoofdredacteur,,,1
+467,Karel Smouter,persoon,29,hoofdredacteur,,,1
+468,Somajeh Ghaeminia,persoon,29,hoofdredacteur,,,1
+469,Rennie Rijpma,persoon,29,hoofdredacteur,,,1
+470,Esther Wemmers,persoon,29,hoofdredacteur,,,1
+471,Amarins de Boer,persoon,29,hoofdredacteur,,,1
+472,Nieuwsuur,mediaorganisatie,34,redactie,,,1
+473,Pieter Klein,persoon,29,hoofdredacteur,,,1
+474,Mariëlle Tweebeeke,persoon,26,journalist,,,1
+475,Jeroen Wollaars,persoon,26,journalist,,,1
+476,Buitenhof,mediaorganisatie,34,redactie,,,1
+477,Maaike Schoon,persoon,26,journalist,,,1
+478,Twan Huys,persoon,26,journalist,,,1
+479,Joost Vullings,persoon,26,journalist,,,1
+480,WNL op Zondag,mediaorganisatie,34,redactie,,,1
+481,Rick Nieman,persoon,26,journalist,,,1
+482,Eva (praatprogramma),mediaorganisatie,34,redactie,2024-09-02,,1
+483,Eva Jinek,persoon,26,journalist,,,1
+484,De Oranjezomer,mediaorganisatie,34,redactie,,,1
+485,Hélène Hendriks,persoon,26,journalist,,,1
+486,EenVandaag,mediaorganisatie,34,redactie,,,1
+487,René van Brakel,persoon,29,hoofdredacteur,,,1
+488,Jeroen Pauw,persoon,26,journalist,,,1
+489,Tim de Wit,persoon,26,journalist,,,1
+490,Roos Moggré,persoon,26,journalist,,,1
+491,EW (Elsevier Weekblad),mediaorganisatie,2,mediaorganisatie,,,1
+492,Roularta Media Group,bedrijf,1,mediaeigenaar,,,1
+493,Hella Hueck,persoon,29,hoofdredacteur,,,1
+494,HP/De Tijd,mediaorganisatie,2,mediaorganisatie,,,1
+495,Stichting Het Vrije Woord,stichting,1,mediaeigenaar,,,1
+496,Tom Kellerhuis,persoon,29,hoofdredacteur,,,1
+497,Quote,mediaorganisatie,2,mediaorganisatie,,,1
+498,Hearst,bedrijf,1,mediaeigenaar,,,1
+499,Villamedia,mediaorganisatie,26,journalist,,,1
+500,PersVeilig,ngo,25,vakbond_media,,,1
+501,Rogier van Vliet,persoon,48,raad_van_commissarissen,2005,,1
+502,Rogier van der Weerd,persoon,49,directie,,,1
+503,Carol Gribnau,persoon,49,directie,2021,,1
+504,Annemarieke Nierop,persoon,49,directie,2025,,1
+505,Marjolein Moorman,persoon,48,raad_van_commissarissen,,,1
+506,Marc Ernst,persoon,49,directie,,,1
+507,Patrick van Schie,persoon,49,directie,,,1
+508,Remy Amkreutz,persoon,29,hoofdredacteur,2022-03,,1
+509,Roland Duong,persoon,29,hoofdredacteur,2026-05,,1
+510,Lise Straatsma,persoon,29,hoofdredacteur,2026-05,,1
+511,Stichting RPO (Regionale Publieke Omroep),stichting,46,omroepkoepel,,,1
+512,RTV Noord,omroep,2,mediaorganisatie,,,1
+513,Omrop Fryslân,omroep,2,mediaorganisatie,,,1
+514,RTV Drenthe,omroep,2,mediaorganisatie,,,1
+515,RTV Oost,omroep,2,mediaorganisatie,,,1
+516,Omroep Gelderland,omroep,2,mediaorganisatie,,,1
+517,Omroep Flevoland,omroep,2,mediaorganisatie,,,1
+518,RTV Utrecht,omroep,2,mediaorganisatie,,,1
+519,NH,omroep,2,mediaorganisatie,,,1
+520,Omroep West,omroep,2,mediaorganisatie,,,1
+521,RTV Rijnmond,omroep,2,mediaorganisatie,,,1
+522,Omroep Brabant,omroep,2,mediaorganisatie,,,1
+523,L1,omroep,2,mediaorganisatie,,,1
+524,Omroep Zeeland,omroep,2,mediaorganisatie,,,1
+525,SBS6,omroep,2,mediaorganisatie,,,1
+526,Blckbx,mediaorganisatie,21,alternatief_medium,,,1
+527,Flavio Pasquino,persoon,26,journalist,,,1
+528,ThePostOnline (TPO),mediaorganisatie,21,alternatief_medium,,,1
+529,Bert Brussen,persoon,26,journalist,,,1
+530,Café Weltschmerz,mediaorganisatie,21,alternatief_medium,,,1
+531,Max von Kreyfelt,persoon,26,journalist,,,1
+532,Nieuws.nl,mediaorganisatie,2,mediaorganisatie,,,1
+533,Nort Groep,bedrijf,1,mediaeigenaar,,,1
+534,Rob Wijnberg,persoon,29,hoofdredacteur,2013,2026,1
+535,Lonneke van der Zee,persoon,49,directie,,,1
+536,Arie Koornneef,persoon,49,directie,2025-09,,1
+537,Taco Zimmerman,persoon,49,directie,2024-03,,1
+538,Arjan Lock,persoon,49,directie,2008,,1
+539,Kees Berghuis,persoon,29,hoofdredacteur,,,1
+540,Sheila Sitalsing,persoon,32,columnist_opiniemaker,2011,,1
+541,Frits Wester,persoon,26,journalist,,,1
+542,Wouter de Winther,persoon,32,columnist_opiniemaker,,,1
+543,Xander van der Wulp,persoon,29,hoofdredacteur,2008,,1
+544,Freek Staps,persoon,29,hoofdredacteur,2019-09,,1
+545,Jet de Ranitz,persoon,49,directie,,,1
+546,Lucien Brouwer,persoon,49,directie,,,1
+547,Hélène Vletter-van Dort,persoon,48,raad_van_commissarissen,,,1
+548,Maarten van Beek,persoon,48,raad_van_commissarissen,,,1
+549,Susan van Geenen,persoon,48,raad_van_commissarissen,,,1
+550,Kenaad Tewarie,persoon,48,raad_van_commissarissen,,,1
+551,Thomas Steffens,persoon,48,raad_van_commissarissen,,,1
+552,Joris Gerritsen,persoon,29,hoofdredacteur,,,1
+553,André Trompers,persoon,29,hoofdredacteur,,,1
+554,Sylvia Cools,persoon,29,hoofdredacteur,,,1
+555,Ronald van Geenen,persoon,29,hoofdredacteur,,,1
+556,Jamaica Vink,persoon,29,hoofdredacteur,,,1
+557,Joris Roes,persoon,29,hoofdredacteur,,,1
+558,Evert van Dijk,persoon,29,hoofdredacteur,,,1
+559,Maarten Pennewaard,persoon,29,hoofdredacteur,,,1
+560,Bjorn Oostra,persoon,29,hoofdredacteur,,,1
+561,AT5,omroep,2,mediaorganisatie,,,1
+562,Judith Zilversmit,persoon,29,hoofdredacteur,,,1
+563,Nederlands Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+564,Nico de Fijter,persoon,29,hoofdredacteur,,,1
+565,Vincenza La Porta,persoon,49,directie,,,1
+566,Reformatorisch Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+567,Erdee Media Groep,bedrijf,1,mediaeigenaar,,,1
+568,Steef de Bruijn,persoon,29,hoofdredacteur,,,1
+569,Friesch Dagblad,mediaorganisatie,2,mediaorganisatie,,,1
+570,Ria Kraa,persoon,29,hoofdredacteur,,,1
+571,Zembla,mediaorganisatie,36,onderzoeksjournalist,,,1
+572,Pointer,mediaorganisatie,36,onderzoeksjournalist,,,1
+573,Radar (consumentenprogramma),mediaorganisatie,34,redactie,,,1
+574,Kassa (consumentenprogramma),mediaorganisatie,34,redactie,,,1
+575,Keuringsdienst van Waarde,mediaorganisatie,34,redactie,,,1
+576,Rambam,mediaorganisatie,36,onderzoeksjournalist,,,1
+577,De Monitor,mediaorganisatie,36,onderzoeksjournalist,2015,2020,1
+578,Hollandse Hoogte,persbureau,8,persbureau,,,1
+579,Mediahuis Nederland,bedrijf,1,mediaeigenaar,,,1
+580,Dumpert,mediaorganisatie,2,mediaorganisatie,,,1
+581,Rijksvoorlichtingsdienst (RVD),overheidsinstelling,27,voorlichter,,,1
+582,Ministerie van Algemene Zaken,overheidsinstelling,41,gezagsinstituut,,,1
+583,Voorlichtingsraad (VoRa),overheidsinstelling,27,voorlichter,,,1
+584,Ministerie van Financiën,overheidsinstelling,41,gezagsinstituut,,,1
+585,Ministerie van Justitie en Veiligheid,overheidsinstelling,41,gezagsinstituut,,,1
+586,Ministerie van VWS,overheidsinstelling,41,gezagsinstituut,,,1
+587,Ministerie van LNV,overheidsinstelling,41,gezagsinstituut,,,1
+588,Openbaar Ministerie,overheidsinstelling,41,gezagsinstituut,,,1
+589,WODC,overheidsinstelling,43,kennisinstituut,,,1
+590,Sylvester Eijffinger,persoon,42,gezagsexpert,,,1
+591,Lans Bovenberg,persoon,42,gezagsexpert,,,1
+592,Sweder van Wijnbergen,persoon,42,gezagsexpert,,,1
+593,Lex Hoogduin,persoon,42,gezagsexpert,,,1
+594,Arnoud Boot,persoon,42,gezagsexpert,,,1
+595,Mathijs Bouman,persoon,42,gezagsexpert,,,1
+596,Barbara Baarsma,persoon,42,gezagsexpert,,,1
+597,Coen Teulings,persoon,42,gezagsexpert,,,1
+598,Sandra Phlippen,persoon,42,gezagsexpert,,,1
+599,Marieke Blom,persoon,42,gezagsexpert,,,1
+600,Peter Hein van Mulligen,persoon,42,gezagsexpert,,,1
+601,Tilburg University,onderwijsinstelling,43,kennisinstituut,,,1
+602,CBS (Centraal Bureau voor de Statistiek),overheidsinstelling,41,gezagsinstituut,,,1
+603,Diederik Gommers,persoon,42,gezagsexpert,,,1
+604,Marion Koopmans,persoon,42,gezagsexpert,,,1
+605,Ab Osterhaus,persoon,42,gezagsexpert,,,1
+606,Jaap van Dissel,persoon,42,gezagsexpert,,,1
+607,Mart de Kruif,persoon,42,gezagsexpert,,,1
+608,Peter Wijninga,persoon,42,gezagsexpert,,,1
+609,Raymond Mens,persoon,42,gezagsexpert,,,1
+610,Pretium Telecom,bedrijf,39,belanghebbende,,,1
+611,Willem Blijdorp,persoon,39,belanghebbende,,,1
+612,Clare Locke,bedrijf,39,belanghebbende,,,1
+613,Peter Olsthoorn,persoon,36,onderzoeksjournalist,,,1
+614,Universiteit Leiden,onderwijsinstelling,43,kennisinstituut,,,1
+615,RVO (Rijksdienst voor Ondernemend Nederland),overheidsinstelling,41,gezagsinstituut,,,1
+616,Menno Snel,persoon,33,politicus,,,1
+617,Stientje van Veldhoven,persoon,33,politicus,,,1
+618,Helma Lodders,persoon,33,politicus,,,1
+619,Mark Harbers,persoon,33,politicus,,,1
+620,Halbe Zijlstra,persoon,33,politicus,,,1
+621,Element NL (NOGEPA),lobbygroep,20,lobbyist,,,1
+622,World Resources Institute,ngo,58,maatschappelijke_organisatie,,,1
+623,VNLOK,lobbygroep,20,lobbyist,,,1
+624,ABU,lobbygroep,20,lobbyist,,,1
+625,Techniek Nederland,lobbygroep,20,lobbyist,,,1
+626,VolkerWessels,bedrijf,39,belanghebbende,,,1
+627,Transparency International Nederland,ngo,58,maatschappelijke_organisatie,,,1
+628,Ministerie van I&W,overheidsinstelling,41,gezagsinstituut,,,1
+629,Jan Kluytmans,persoon,42,gezagsexpert,,,1
+630,Han ten Broeke,persoon,33,politicus,,,1
+631,Maxime Verhagen,persoon,33,politicus,,,1
+632,Bouwend Nederland,lobbygroep,20,lobbyist,,,1
+633,Ab Klink,persoon,33,politicus,,,1
+634,Coöperatie VGZ,bedrijf,39,belanghebbende,,,1
+635,Gerard Schouw,persoon,33,politicus,,,1
+636,Vereniging Innovatieve Geneesmiddelen,lobbygroep,20,lobbyist,,,1
+637,Bunq,bedrijf,,,,,1
+638,Stichting Voorzij,stichting,58,maatschappelijke_organisatie,,,1
+639,Stichting Viruswaarheid,stichting,58,maatschappelijke_organisatie,,,1
+640,Geert Wilders,persoon,33,politicus,,,1
+641,Raisa Blommestijn,persoon,60,publieke_stem,,,1
+642,Rogier Kahlmann,persoon,60,publieke_stem,,,1
+643,Paula van Manen,persoon,60,publieke_stem,,,1
+644,Hans Teeuwen,persoon,60,publieke_stem,,,1
+645,Gregorius Nekschot,persoon,60,publieke_stem,,,1
+646,Jan Roos,persoon,60,publieke_stem,,,1
+647,Theater Koningsduyn (Castricum),bedrijf,,,,,1
+648,ROC Nijmegen,onderwijsinstelling,,,,,1
+649,Willem Engel,persoon,60,publieke_stem,,,1
+650,Gideon van Meijeren,persoon,33,politicus,,,1
+651,Pepijn van Houwelingen,persoon,33,politicus,,,1
+652,"Man uit Kampen (majesteitsschennis, 2016)",persoon,60,publieke_stem,,,1
+653,Paul Cliteur,persoon,42,gezagsexpert,,,1
+654,Ruud Koopmans,persoon,42,gezagsexpert,,,1
+655,Laurens Buijs,persoon,42,gezagsexpert,,,1
+656,Jaap Dieleman,persoon,60,publieke_stem,,,1
+657,Elke de Klerk,persoon,60,publieke_stem,,,1
+658,Rob Elens,persoon,60,publieke_stem,,,1
+659,"Twitteraar Sliedrecht (AZC-tweets, 2016)",persoon,60,publieke_stem,,,1
+660,Mollie,bedrijf,,,,,1
+661,Triodos Bank,bedrijf,,,,,1
+662,Pakhuis de Zwijger,ngo,,,,,1
+663,Uitgeverij De Blauwe Tijger,bedrijf,21,alternatief_medium,,,1
+664,Regionaal Tuchtcollege voor de Gezondheidszorg,overheidsinstelling,,,,,1
+665,Thierry Baudet,persoon,33,politicus,,,1
+666,CIDI (Centrum Informatie en Documentatie Israel),ngo,,,,,1
+667,Maurice de Hond,persoon,60,publieke_stem,,,1
+668,Younes El Harouchi,persoon,60,publieke_stem,,,1
+669,Nouraldin Alsweirki,persoon,60,publieke_stem,,,1
+670,Dienst Justitiele Inrichtingen (DJI),overheidsinstelling,,,,,1
+671,Speakap BV,bedrijf,,,,,1
+672,Ira Helsloot,persoon,42,gezagsexpert,,,1
+673,Khalid & Sophie,mediaorganisatie,34,redactie,2021-08-30,2024-06-01,1
+674,Bar Laat,mediaorganisatie,34,redactie,2024-08-26,2025-05-22,1
+675,Goedenavond Nederland,mediaorganisatie,34,redactie,2025-05-26,,1
+676,Renze,mediaorganisatie,34,redactie,2022-07-04,,1
+677,Beau,mediaorganisatie,34,redactie,2019-09-02,2025-04-11,1
+678,RTL Tonight,mediaorganisatie,34,redactie,2025-08-31,2026-06-12,1
+679,HLF8,mediaorganisatie,34,redactie,2021-09-06,2023-04-07,1
+680,De Wereld Draait Door,mediaorganisatie,34,redactie,2005-10-10,2020-03-27,1
+681,Jinek,mediaorganisatie,34,redactie,2013-09-09,2023-06-23,1
+682,Pauw & Witteman,mediaorganisatie,34,redactie,2006-09-04,2014-05-23,1
+683,Sophie Hilbrand,persoon,26,journalist,,,1
+684,Khalid Kasem,persoon,26,journalist,,,1
+685,Welmoed Sijtsma,persoon,26,journalist,,,1
+686,Sam Hagens,persoon,26,journalist,,,1
+687,Renze Klamer,persoon,26,journalist,,,1
+688,Beau van Erven Dorens,persoon,26,journalist,,,1
+689,Humberto Tan,persoon,26,journalist,,,1
+690,Leonie ter Braak,persoon,26,journalist,,,1
+691,Johnny de Mol,persoon,26,journalist,,,1
+692,Matthijs van Nieuwkerk,persoon,26,journalist,,,1
+693,Paul Witteman,persoon,26,journalist,,,1
+694,Fidan Ekiz,persoon,32,columnist_opiniemaker,,,1
+695,Jort Kelder,persoon,32,columnist_opiniemaker,,,1
+696,Tom Staal,persoon,26,journalist,,,1
+697,Mats Akkerman,persoon,26,journalist,,,1
+698,Tessa van Viegen,persoon,26,journalist,,,1
+699,Jaïr Ferwerda,persoon,26,journalist,,,1
+700,Gijs Rademaker,persoon,42,gezagsexpert,,,1
+701,Anna Gimbrère,persoon,26,journalist,,,1
+702,Ahmed Aboutaleb,persoon,33,politicus,,,1
+703,Albert Verlinde,persoon,26,journalist,,,1
+704,Michiel Vos,persoon,26,journalist,,,1
+705,Saskia Belleman,persoon,26,journalist,,,1
+706,Prem Radhakishun,persoon,32,columnist_opiniemaker,,,1
+707,Hugo Borst,persoon,32,columnist_opiniemaker,,,1
+708,Özcan Akyol,persoon,32,columnist_opiniemaker,,,1
+709,Rosanne Hertzberger,persoon,32,columnist_opiniemaker,,,1
+710,Jan Mulder,persoon,32,columnist_opiniemaker,,,1
+711,Martin Bril,persoon,32,columnist_opiniemaker,,,1
+712,Sylvana Simons,persoon,32,columnist_opiniemaker,,,1
+713,Gerdi Verbeet,persoon,33,politicus,,,1
+714,Nico Dijkshoorn,persoon,32,columnist_opiniemaker,,,1
+715,Floor Bremer,persoon,26,journalist,,,1
+716,Marcel Levi,persoon,42,gezagsexpert,,,1
+717,Wilfred Genee,persoon,26,journalist,,,1
+718,Johan Derksen,persoon,32,columnist_opiniemaker,,,1
+719,René van der Gijp,persoon,32,columnist_opiniemaker,,,1
+720,Valentijn Driessen,persoon,26,journalist,,,1
+721,Job Knoester,persoon,42,gezagsexpert,,,1
+722,Pieter Cobelens,persoon,42,gezagsexpert,,,1
+723,Goedele Liekens,persoon,42,gezagsexpert,,,1
+724,Tina Nijkamp,persoon,42,gezagsexpert,,,1
+725,Thomas van Groningen,persoon,26,journalist,,,1
+726,Marcel van Roosmalen,persoon,32,columnist_opiniemaker,,,1
+727,Laila Frank,persoon,26,journalist,,,1
+728,Marleen de Rooy,persoon,26,journalist,,,1
+729,Tom van 't Einde,persoon,26,journalist,,,1
+730,Max Pam,persoon,32,columnist_opiniemaker,,,1
+731,Naema Tahir,persoon,32,columnist_opiniemaker,,,1
+732,Jos de Beus,persoon,32,columnist_opiniemaker,,,1
+733,Désanne van Brederode,persoon,32,columnist_opiniemaker,,,1
+734,Syp Wynia,persoon,32,columnist_opiniemaker,,,1
+735,Ronald Plasterk,persoon,32,columnist_opiniemaker,,,1
+736,Maarten Asscher,persoon,32,columnist_opiniemaker,,,1
+737,Wim Pijbes,persoon,32,columnist_opiniemaker,,,1
+738,Petra Stienen,persoon,42,gezagsexpert,,,1
+739,Victor Vlam,persoon,26,journalist,,,1
+740,Merel Ek,persoon,26,journalist,,,1
+741,Frank van Leeuwen,persoon,26,journalist,,,1
+742,RTL Late Night,mediaorganisatie,34,redactie,2013-08-26,2019-03-04,1
+743,Pauw,mediaorganisatie,34,redactie,2014-09-01,2019-12-20,1
+744,De Avondshow met Arjen Lubach,mediaorganisatie,34,redactie,2022-02-21,2024-10-31,1
+745,Zondag met Lubach,mediaorganisatie,34,redactie,2014-11-09,2021-03-28,1
+746,Arjen Lubach,persoon,26,journalist,,,1
+747,De Oranjewinter,mediaorganisatie,34,redactie,2021,,1
+748,Even tot hier,mediaorganisatie,34,redactie,2019-03-16,,1
+749,Niels van der Laan,persoon,26,journalist,,,1
+750,Jeroen Woe,persoon,26,journalist,,,1
+751,YouTube,platform,18,techplatform,,,1
+752,Sid Lukkassen,persoon,60,publieke_stem,,,1
+753,Douwe Bob,persoon,35,publiek,,,1
+754,Hans Janmaat,persoon,60,publieke_stem,1982,1998,1
+755,Koninklijke Grolsch,bedrijf,5,adverteerder,,,1
+756,GroupM,bedrijf,5,adverteerder,,,1
+757,LinkedIn,platform,18,techplatform,,,1
+758,PayPal,platform,18,techplatform,,,1
+759,Lange Frans,persoon,60,publieke_stem,,,1
+760,Wybren van Haga,persoon,33,politicus,,,1
+761,Gerrit Zalm,persoon,33,politicus,,,1
+762,Pim Fortuyn,persoon,33,politicus,,2002,1
+763,Yasmina Haifi,persoon,60,publieke_stem,,,1
+764,"Huisarts (corona-uitlatingen, berisping 2025)",persoon,60,publieke_stem,,,1
+765,Ferris van H. (financieel adviseur),persoon,39,belanghebbende,,,1
+766,Stichting Federatie Islamitische Organisaties (FIO),stichting,58,maatschappelijke_organisatie,,,1
+767,Thuiszorg Naborgh,bedrijf,39,belanghebbende,,,1
+768,Rabee Hammi (Accuraat),persoon,39,belanghebbende,,,1
+769,TaXeCo (belastingadviseurs),bedrijf,39,belanghebbende,,,1
+770,Gerard Reve,persoon,60,publieke_stem,,,1
+771,De Waalboog,bedrijf,,,,,1
+772,"Zorgmedewerkster De Waalboog (corona-posts, ontslag 2021)",persoon,60,publieke_stem,,,1
+773,Geert Mak,persoon,32,columnist_opiniemaker,,,1
+774,Ayaan Hirsi Ali,persoon,33,politicus,,,1
+775,NL PLAN,partij,45,partij,,,1
+776,Institute for the Study of War (ISW),denktank,28,denktank,,,1
+777,Patrick Bolder,persoon,42,gezagsexpert,,,1
+778,Frank van Kappen,persoon,42,gezagsexpert,,,1
+779,Danny Pronk,persoon,42,gezagsexpert,,,1
+780,Dick Berlijn,persoon,42,gezagsexpert,,,1
+781,Peter van Uhm,persoon,42,gezagsexpert,,,1
+782,Rob Bauer,persoon,42,gezagsexpert,,,1
+783,Tom Middendorp,persoon,42,gezagsexpert,,,1
+784,Thales Nederland,bedrijf,39,belanghebbende,,,1
+785,Jules Calis,persoon,26,journalist,,,1
+786,RT (Russia Today),mediaorganisatie,2,mediaorganisatie,,,1
+787,Sputnik (nieuwsdienst),mediaorganisatie,2,mediaorganisatie,,,1
+788,Stichting Artsen Covid Collectief,stichting,58,maatschappelijke_organisatie,2020-12,,1
+789,Hugo de Jonge,persoon,33,politicus,,,1
+790,Attje Kuiken (PvdA),persoon,33,politicus,,,1
+791,Wieke Paulusma (D66),persoon,33,politicus,,,1
+792,IGJ (Inspectie Gezondheidszorg en Jeugd),toezichthouder,41,gezagsinstituut,,,1
+793,Vereniging tegen de Kwakzalverij,ngo,58,maatschappelijke_organisatie,,,1
+794,Stichting Skepsis (Kloptdatwel),stichting,58,maatschappelijke_organisatie,,,1
+795,Medisch Contact,mediaorganisatie,,,,,1
+796,Zorgvisie,mediaorganisatie,,,,,1
+797,Evelien Peeters,persoon,42,gezagsexpert,,,1
+798,UMC Utrecht,bedrijf,,,,,1
+799,Nieuws van de Dag (SBS6),mediaorganisatie,34,redactie,2025,,1
+800,Jolle Demmers,persoon,42,gezagsexpert,,,1
+801,Propaganda,mediaorganisatie,,,,,1
+802,Jaap Hanekamp,persoon,42,gezagsexpert,,,1
+803,Ronald Meester,persoon,42,gezagsexpert,,,1
+804,Maarten Keulemans,persoon,26,journalist,,,1
+805,Kees van der Pijl,persoon,60,publieke_stem,,,1
+806,De Vrijdagavond,mediaorganisatie,2,mediaorganisatie,,,1
+807,Andreas Umland,persoon,42,gezagsexpert,,,1
+808,NAM (Nederlandse Aardolie Maatschappij),bedrijf,,,,,1
+809,Meent van der Sluis,persoon,42,gezagsexpert,,,1
+810,Tim Sweijs,persoon,,,,,1
+811,US Department of Defence,overheidsinstelling,,,,,1
+812,Taipei Representative Office in the Netherlands,overheidsinstelling,,,,,1
+813,"Foreign, Commonwealth & Development Office (FCDO)",overheidsinstelling,,,,,1
+814,Generalitat de Catalunya (Catalaanse regionale overheid),overheidsinstelling,,,,,1
+815,TNO,overheidsinstelling,,,,,1
+816,Michel Rademaker,persoon,,,,,1
+817,Laura Birkman,persoon,,,,,1
+818,Jesse Frederik,persoon,26,journalist,2013,,1
+819,Ministerie van Economische Zaken,overheidsinstelling,,,,,1
+820,"Ministerie van Volksgezondheid, Welzijn en Sport",overheidsinstelling,,,,,1
+821,Ministerie van Binnenlandse Zaken en Koninkrijksrelaties,overheidsinstelling,,,,,1
+822,SER (Sociaal-Economische Raad),overheidsinstelling,15,elite_forum,,,1
+823,NPO Radio 1,mediaorganisatie,2,mediaorganisatie,,,1
+824,Wynia's Week,mediaorganisatie,2,mediaorganisatie,,,1
+825,Binnenlands Bestuur,mediaorganisatie,2,mediaorganisatie,,,1
+826,Platform RAAM,mediaorganisatie,2,mediaorganisatie,,,1
+827,SCP (Sociaal en Cultureel Planbureau),overheidsinstelling,,,,,1
+828,Rathenau Instituut,denktank,,,,,1
+829,Atlantische Commissie,denktank,,,,,1
+830,General Dynamics,bedrijf,,,,,1
+831,Raytheon (RTX),bedrijf,,,,,1
+832,Northrop Grumman,bedrijf,,,,,1
+833,Palantir Technologies,bedrijf,,,,,1
+834,Foundation for Defense of Democracies (FDD),denktank,,,,,1
+835,Royal Dutch Shell,bedrijf,,,,,1
+836,Tata Steel Nederland,bedrijf,,,,,1
+837,ING Groep,bedrijf,,,,,1
+838,Foundation Open Society Institute (FOSI),stichting,,,,,1
+839,Stichting Porticus,stichting,,,,,1
+840,Ministry of Foreign Affairs of Saudi Arabia,overheidsinstelling,,,,,1
+841,APG,vermogensbeheerder,,,,,1
+842,Pieter Hasekamp,persoon,,,,,1
+843,Laura van Geest,persoon,,,,,1
+844,Corien Prins,persoon,,,,,1
+845,Godfried Engbersen,persoon,,,,,1
+846,Karen van Oudenhoven-van der Zee,persoon,,,,,1
+847,Kim Putters,persoon,,,,,1
+848,Eefje Cuppen,persoon,,,,,1
+849,Rinie van Est,persoon,,,,,1
+850,Anna van Zoest,persoon,,,,,1
+851,Kimberly Kagan,persoon,,,,,1
+852,Frederick Kagan,persoon,,,,,1
+853,Alexander Rinnooy Kan,persoon,,,,,1
+854,Saskia Selen,persoon,,,,,1
+855,Tim 'S Jongers,persoon,,,,,1
+856,Monika Sie Dhian Ho,persoon,,,,,1
+857,Ko Colijn,persoon,,,,,1
+858,Bob Deen,persoon,,,,,1
+859,Erwin van Veen,persoon,,,,,1
+860,Louise van Schaik,persoon,,,,,1
+861,Bart van den Berg,persoon,,,,,1
+862,Adriaan Schout,persoon,,,,,1
+863,Ministerie van Sociale Zaken en Werkgelegenheid,overheidsinstelling,41,gezagsinstituut,,,1
+864,Vrije Universiteit Amsterdam,onderwijsinstelling,43,kennisinstituut,,,1
+865,Planbureau voor de Leefomgeving (PBL),overheidsinstelling,43,kennisinstituut,,,1
+866,KNAW (Koninklijke Nederlandse Akademie van Wetenschappen),overheidsinstelling,43,kennisinstituut,,,1
+867,Nibud (Nationaal Instituut voor Budgetvoorlichting),stichting,28,denktank,,,1
+868,RaboResearch,denktank,28,denktank,,,1
+869,ING Research / ING Economisch Bureau,denktank,28,denktank,,,1
+870,Ipsos I&O,denktank,28,denktank,,,1
+871,Peil.nl,denktank,28,denktank,,,1
+872,Kieskompas,denktank,28,denktank,,,1
+873,FNV (Federatie Nederlandse Vakbeweging),vakbond,58,maatschappelijke_organisatie,,,1
+874,Consumentenbond,ngo,58,maatschappelijke_organisatie,,,1
+875,ICCT (International Centre for Counter-Terrorism),denktank,28,denktank,,,1
+876,SEO Economisch Onderzoek,denktank,28,denktank,,,1
+877,Marko Hekkert,persoon,42,gezagsexpert,,,1
+878,Marileen Dogterom,persoon,42,gezagsexpert,,,1
+879,André Nollkaemper,persoon,42,gezagsexpert,,,1
+880,Arjan Vliegenthart,persoon,42,gezagsexpert,,,1
+881,Mattias Gijsbertsen,persoon,42,gezagsexpert,,,1
+882,André Faaij,persoon,42,gezagsexpert,,,1
+883,Jacco Wallinga,persoon,42,gezagsexpert,,,1
+884,Otto Raspe,persoon,42,gezagsexpert,,,1
+885,Stefan Groot,persoon,42,gezagsexpert,,,1
+886,Maurice van Sante,persoon,42,gezagsexpert,,,1
+887,Klaas Knot,persoon,42,gezagsexpert,,,1
+888,Olaf Sleijpen,persoon,42,gezagsexpert,,,1
+889,Peter Kanne,persoon,42,gezagsexpert,,,1
+890,Sjoerd van Heck,persoon,42,gezagsexpert,,,1
+891,André Krouwel,persoon,42,gezagsexpert,,,1
+892,Ingrid Thijssen,persoon,42,gezagsexpert,,,1
+893,Tuur Elzinga,persoon,42,gezagsexpert,,,1
+894,Zakaria Boufangacha,persoon,42,gezagsexpert,,,1
+895,Jacco Vonhof,persoon,42,gezagsexpert,,,1
+896,Sandra Molenaar,persoon,42,gezagsexpert,,,1
+897,Babs van der Staak,persoon,42,gezagsexpert,,,1
+898,Thomas Renard,persoon,42,gezagsexpert,,,1
+899,Liesbeth van der Heide,persoon,42,gezagsexpert,,,1
+900,Bas ter Weel,persoon,42,gezagsexpert,,,1
+901,Arjan Heyma,persoon,42,gezagsexpert,,,1
+902,ABN AMRO Group Economics,denktank,28,denktank,,,1
+903,Philip Bokeloh,persoon,42,gezagsexpert,,,1
+904,Nederlandse Defensie Academie (NLDA),onderwijsinstelling,43,kennisinstituut,,,1
+905,Nederlands Instituut voor Militaire Historie (NIMH),overheidsinstelling,43,kennisinstituut,,,1
+906,Institute of Security and Global Affairs (Universiteit Leiden),onderwijsinstelling,43,kennisinstituut,,,1
+907,Damen Shipyards Group,bedrijf,41,gezagsinstituut,,,1
+908,Rheinmetall Defence Nederland,bedrijf,41,gezagsinstituut,,,1
+909,Robin Radar Systems,bedrijf,41,gezagsinstituut,,,1
+910,Defenture,bedrijf,41,gezagsinstituut,,,1
+911,GKN Fokker,bedrijf,41,gezagsinstituut,,,1
+912,Kees Homan,persoon,42,gezagsexpert,,,1
+913,Frans Osinga,persoon,42,gezagsexpert,,,1
+914,Han Bouwmeester,persoon,42,gezagsexpert,,,1
+915,Martijn Kitzen,persoon,42,gezagsexpert,,,1
+916,Rémy Limpach,persoon,42,gezagsexpert,,,1
+917,Beatrice de Graaf,persoon,42,gezagsexpert,,,1
+918,Edwin Bakker,persoon,42,gezagsexpert,,,1
+919,Isabelle Duyvesteyn,persoon,42,gezagsexpert,,,1
+920,Jelle van Buuren,persoon,42,gezagsexpert,,,1
+921,Bibi van Ginkel,persoon,42,gezagsexpert,,,1
+922,Peter Knoope,persoon,42,gezagsexpert,,,1
+923,Rob Bertholee,persoon,42,gezagsexpert,,,1
+924,Erik Akerboom,persoon,42,gezagsexpert,,,1
+925,Arend Jan Boekestijn,persoon,42,gezagsexpert,,,1
+926,Hans Huigen,persoon,42,gezagsexpert,,,1
+927,Coen van Leeuwen,persoon,42,gezagsexpert,,,1
+928,Arnout Damen,persoon,42,gezagsexpert,,,1
+929,Siete Hamminga,persoon,42,gezagsexpert,,,1
+930,Rijnmond,mediaorganisatie,2,mediaorganisatie,,,1
+931,The Hague Program on International Cyber Security,onderwijsinstelling,43,kennisinstituut,,,1
+932,COT Instituut voor Veiligheids- en Crisismanagement,bedrijf,43,kennisinstituut,,,1
+933,MARIN (Maritime Research Institute Netherlands),overheidsinstelling,43,kennisinstituut,,,1
+934,Koninklijk NLR (Nederlands Lucht- en Ruimtevaartcentrum),overheidsinstelling,43,kennisinstituut,,,1
+935,The Hague Security Delta (HSD),platform,43,kennisinstituut,,,1
+936,Berenschot,bedrijf,28,denktank,,,1
+937,MSS Defence,bedrijf,41,gezagsinstituut,,,1
+938,Lockheed Martin,bedrijf,41,gezagsinstituut,,,1
+939,Raytheon / RTX,bedrijf,41,gezagsinstituut,,,1
+940,Boeing,bedrijf,41,gezagsinstituut,,,1
+941,VDL Groep,bedrijf,41,gezagsinstituut,,,1
+942,Royal IHC,bedrijf,41,gezagsinstituut,,,1
+943,Nevesbu,bedrijf,41,gezagsinstituut,,,1
+944,Dick Zandee,persoon,42,gezagsexpert,,,1
+945,Sico van der Meer,persoon,42,gezagsexpert,,,1
+946,Kars de Bruijne,persoon,42,gezagsexpert,,,1
+947,Niels Drost,persoon,42,gezagsexpert,,,1
+948,Adája Stoetman,persoon,42,gezagsexpert,,,1
+949,Julia Soldatiuk-Westerveld,persoon,42,gezagsexpert,,,1
+950,Jan Rood,persoon,42,gezagsexpert,,,1
+951,Frank Bekkers,persoon,42,gezagsexpert,,,1
+952,Davis Ellison,persoon,42,gezagsexpert,,,1
+953,Bart Schuurman,persoon,42,gezagsexpert,,,1
+954,Dennis Broeders,persoon,42,gezagsexpert,,,1
+955,Bibi van den Berg,persoon,42,gezagsexpert,,,1
+956,Marco Zannoni,persoon,42,gezagsexpert,,,1
+957,Yvonne Koldenhof,persoon,42,gezagsexpert,,,1
+958,Jacco Dominicus,persoon,42,gezagsexpert,,,1
+959,Joris den Bruinen,persoon,42,gezagsexpert,,,1
+960,Patrick Cammaert,persoon,42,gezagsexpert,,,1
+961,Climate Intelligence Foundation (Clintel),denktank,28,denktank,2019,,1
+962,Marcel Crok,persoon,42,gezagsexpert,,,1
+963,Guus Berkhout,persoon,42,gezagsexpert,,,1
+964,Niek Sandmann,persoon,39,belanghebbende,,,1
+965,Delphi Consortium,bedrijf,43,kennisinstituut,1982,,1
+966,Center for Global Socio-Economic Change (CFGSEC),stichting,28,denktank,2014,,1
+967,Presidium van de Tweede Kamer,overheidsinstelling,41,gezagsinstituut,,,1
+968,Left Laser,mediaorganisatie,21,alternatief_medium,,,1
+969,Timo Koster,persoon,42,gezagsexpert,,,1
+970,Rem Korteweg,persoon,42,gezagsexpert,,,1
+971,Caroline de Gruyter,persoon,42,gezagsexpert,,,1
+972,Yoeri Albrecht,persoon,42,gezagsexpert,,,1
+973,Elmar Hellendoorn,persoon,42,gezagsexpert,,,1
+974,René Cuperus,persoon,42,gezagsexpert,,,1
+975,Jaap de Hoop Scheffer,persoon,42,gezagsexpert,,,1
+976,Atlantic Council,denktank,28,denktank,,,1
+977,Chatham House,denktank,28,denktank,,,1
+978,European Council on Foreign Relations (ECFR),denktank,28,denktank,,,1
+979,Carnegie Europe,denktank,28,denktank,,,1
+980,German Marshall Fund of the United States (GMF),denktank,28,denktank,,,1
+981,IMCCS (International Military Council on Climate and Security),denktank,28,denktank,,,1
+982,AIV (Adviesraad Internationale Vraagstukken),overheidsinstelling,41,gezagsinstituut,,,1
+983,US Department of State,overheidsinstelling,41,gezagsinstituut,,,1
+984,Airbus,bedrijf,39,belanghebbende,,,1
+985,Stiftung Mercator,stichting,39,belanghebbende,,,1
+986,Air France-KLM,bedrijf,39,belanghebbende,,,1
+987,Ben Knapen,persoon,29,hoofdredacteur,,,1
+988,Marc Chavannes,persoon,32,columnist_opiniemaker,,,1
+989,Tom-Jan Meeus,persoon,26,journalist,,,1
+990,Jan Kleinnijenhuis,persoon,36,onderzoeksjournalist,,,1
+991,Cannon,bedrijf,5,adverteerder,,1995,1
+992,CPN (Communistische Partij van Nederland),partij,45,partij,1909,1991,1
+993,Het Vrije Volk,mediaorganisatie,2,mediaorganisatie,1945,1991,1
+994,De Waarheid,mediaorganisatie,2,mediaorganisatie,1940,1990,1
+995,VARA,omroep,47,ledenomroep,1925,2014,1
+996,Egeria,vermogensbeheerder,3,aandeelhouder,1997,,1
+997,Radio-omroep Controle Commissie,overheidsinstelling,19,toezichthouder,1930,1940,1
+998,Noam Chomsky,persoon,60,publieke_stem,1928,,1
+999,C.P.M. Romme,persoon,33,politicus,1896,1980,1
+1000,KVP (Katholieke Volkspartij),partij,45,partij,1945,1980,1
+1001,LPF (Lijst Pim Fortuyn),partij,45,partij,2002,2008,1
+1002,Mecom,bedrijf,3,aandeelhouder,2000,2015,1
+1003,Vaz Dias,persbureau,8,persbureau,1904,1934,1
+1004,NPM Capital,vermogensbeheerder,3,aandeelhouder,,,1
+1005,Gimv,vermogensbeheerder,3,aandeelhouder,,,1
+1006,V-Ventures,vermogensbeheerder,3,aandeelhouder,,,1
+1007,Verian,denktank,28,denktank,,,1
+1008,Luc Aben,persoon,42,gezagsexpert,,,1
+1009,Carsten Brzeski,persoon,42,gezagsexpert,,,1
+1010,Han de Jong,persoon,42,gezagsexpert,,,1
+1011,Edin Mujagić,persoon,42,gezagsexpert,,,1
+1012,Hoofbosch,bedrijf,39,belanghebbende,,,1
+1013,AFM (Autoriteit Financiële Markten),toezichthouder,19,toezichthouder,,,1
+1014,Ecorys,denktank,28,denktank,,,1
+1015,NVDE (Nederlandse Vereniging Duurzame Energie),lobbygroep,39,belanghebbende,,,1
+1016,Netbeheer Nederland,lobbygroep,39,belanghebbende,,,1
+1017,Oxford Economics,denktank,28,denktank,,,1
+1018,Transport en Logistiek Nederland (TLN),lobbygroep,39,belanghebbende,,,1
+1019,Panteia,denktank,28,denktank,,,1
+1020,evofenedex,lobbygroep,39,belanghebbende,,,1
+1021,Decisio,denktank,28,denktank,,,1
+1022,AWVN (Algemene Werkgeversvereniging Nederland),lobbygroep,39,belanghebbende,,,1
+1023,CNV (Christelijk Nationaal Vakverbond),vakbond,58,maatschappelijke_organisatie,,,1
+1024,Anne Megens,persoon,42,gezagsexpert,,,1
+1025,Raymond Puts,persoon,42,gezagsexpert,,,1
+1026,Piet Fortuin,persoon,42,gezagsexpert,,,1
+1027,Hans van den Heuvel,persoon,42,gezagsexpert,,,1
+1028,Bas Jacobs,persoon,42,gezagsexpert,,,1
+1029,ESB (Economisch Statistische Berichten),denktank,28,denktank,,,1
+1030,Ivo Arnold,persoon,42,gezagsexpert,,,1
+1031,Erasmus Universiteit Rotterdam,onderwijsinstelling,43,kennisinstituut,,,1
+1032,Nyenrode Business Universiteit,onderwijsinstelling,43,kennisinstituut,,,1
+1033,Raymond Gradus,persoon,42,gezagsexpert,,,1
+1034,Dirk Schoenmaker,persoon,42,gezagsexpert,,,1
+1035,Ewald Engelen,persoon,42,gezagsexpert,,,1
+1036,Dirk Bezemer,persoon,42,gezagsexpert,,,1
+1037,Rens van Tilburg,persoon,42,gezagsexpert,,,1
+1038,Sustainable Finance Lab,denktank,28,denktank,,,1
+1039,Harald Benink,persoon,42,gezagsexpert,,,1
+1040,Wimar Bolhuis,persoon,42,gezagsexpert,,,1
+1041,Eric Stokkink,persoon,,,,,1
+1042,Willem Blanken,persoon,,,,,1
+1043,Ronald van Raak,persoon,,,,,1
+1044,Ank Bijleveld-Schouten,persoon,,,,,1
+1045,Matthijs van Tuijl,persoon,,,,,1
+1046,Nederlandse kiezers,burgerinitiatief,35,publiek,,,1
+1047,StemWijzer,platform,,,,,1
+1048,Anne Valkering,persoon,,,,,1
+1049,Aldi,bedrijf,5,adverteerder,,,1
+1050,Bette Dam,persoon,26,journalist,,,1
+1051,Kamilla Leupen,persoon,29,hoofdredacteur,,,1
+1052,Haya van Someren Stichting,stichting,43,kennisinstituut,,,1
+1053,De Amsterdamsche Kring,elite_netwerk,15,elite_forum,,,1
+1054,Yordan Kutiyski,persoon,,,,,1
+1055,Bob Scholte,persoon,26,journalist,2022-08-22,,1
+1056,Willem Wagenaar,persoon,42,gezagsexpert,,,1
+1057,Anne Frank Stichting,stichting,43,kennisinstituut,,,1
+1058,Medialogica,mediaorganisatie,2,mediaorganisatie,,,1
+1059,HUMAN (omroep),omroep,47,ledenomroep,,,1
+1060,Vincent Verweij,persoon,36,onderzoeksjournalist,,,1
+1061,LIMC (Land Information Manoeuvre Centre),overheidsinstelling,41,gezagsinstituut,2020-03,2020-12,1
+1062,Robert Jensen,persoon,60,publieke_stem,,,1
+1063,De Balie,stichting,58,maatschappelijke_organisatie,,,1
+1064,Volt Nederland,partij,45,partij,2018-06-23,,1
+1065,DENK,partij,45,partij,2015-02-09,,1
+1066,BIJ1,partij,45,partij,2016-12-24,,1
+1067,Laurens Dassen,persoon,33,politicus,,,1
+1068,Reinier van Lanschot,persoon,33,politicus,,,1
+1069,Tunahan Kuzu,persoon,33,politicus,,,1
+1070,Stephan van Baarle,persoon,33,politicus,,,1
+1071,Partij voor de Dieren,partij,45,partij,2002-10-28,,1
+1072,SGP,partij,45,partij,1918-04-24,,1
+1073,GroenLinks-PvdA,partij,45,partij,2023,,1
+1074,Marianne Thieme,persoon,33,politicus,,,1
+1075,Esther Ouwehand,persoon,33,politicus,,,1
+1076,Kees van der Staaij,persoon,33,politicus,,,1
+1077,Chris Stoffer,persoon,33,politicus,,,1
+1078,Frans Timmermans,persoon,33,politicus,,,1
+1079,Jesse Klaver,persoon,33,politicus,,,1
+1080,BBB (BoerBurgerBeweging),partij,45,partij,2019-11-01,,1
+1081,JA21,partij,45,partij,2020-12-18,,1
+1082,50PLUS,partij,45,partij,2009,,1
+1083,ReMarkAble Communicatie,pr_bureau,20,lobbyist,,,1
+1084,Caroline van der Plas,persoon,33,politicus,,,1
+1085,Henk Vermeer,persoon,33,politicus,,,1
+1086,Joost Eerdmans,persoon,33,politicus,,,1
+1087,Annabel Nanninga,persoon,33,politicus,,,1
+1088,Jan Nagel,persoon,33,politicus,,,1
+1089,Henk Krol,persoon,33,politicus,,,1
+1090,Mediacore,bedrijf,24,overnamevehikel,,,1
+1091,Cecan,bedrijf,24,overnamevehikel,,,1
+1092,De Eik,bedrijf,24,overnamevehikel,,,1
+1093,Vedesta,bedrijf,24,overnamevehikel,,,1
+1094,Stichting De Zeven Eycken,stichting,44,administratiekantoor,,,1
+1095,Katholieke Impuls- en Mediafonds,stichting,24,overnamevehikel,,,1
+1096,Familie Vlerick Sap,persoon,1,mediaeigenaar,,,1
+1097,Familie Van Waeyenberge,persoon,1,mediaeigenaar,,,1
+1098,Familie Van De Steen,persoon,1,mediaeigenaar,,,1
+1099,Ackermans & van Haaren,bedrijf,24,overnamevehikel,,,1
+1100,Tradicor,bedrijf,24,overnamevehikel,,,1
+1101,Koning Boudewijnstichting,stichting,15,elite_forum,,,1
+1102,Gert Ysebaert,persoon,49,directie,,,1
+1103,Rien van Beemen,persoon,49,directie,,,1
+1104,Nederlandse jongeren,burgerinitiatief,35,publiek,,,1
+1105,Mark Rutte,persoon,33,politicus,2010-10-14,,1
+1106,Ruben Brekelmans,persoon,33,politicus,2021,,1
+1107,De 5 Uur Show,mediaorganisatie,34,redactie,2020,,1
+1108,Mr. Hans van Mierlo Stichting,denktank,28,denktank,1972-01-01,,1
+1109,Ad Bos,persoon,17,klokkenluider,,,1
+1110,NRC-redactieraad,mediaorganisatie,34,redactie,,,1
+1111,Ledenraad BNNVARA,burgerinitiatief,35,publiek,,,1
+1112,Leden van De Correspondent,burgerinitiatief,35,publiek,2013-09-30,,1
+1113,Fonds Bijzondere Journalistieke Projecten,stichting,40,borgingsstichting,1990-01-01,,1
+1114,Ivo van Woerden,persoon,36,onderzoeksjournalist,,,1
+1115,Gerard van der Wulp,persoon,27,voorlichter,,,1
+1116,Edelman,pr_bureau,20,lobbyist,,,1
+1117,NDC mediagroep,bedrijf,2,mediaorganisatie,,,1
+1118,Dienst Publiek en Communicatie (DPC),overheidsinstelling,5,adverteerder,,,1
+1119,Sylvia Witteman,persoon,32,columnist_opiniemaker,,,1
+1120,Stichting Administratiekantoor van aandelen Telegraaf Media Groep,stichting,44,administratiekantoor,,,1
+1121,Raad van Commissarissen TMG,bedrijf,48,raad_van_commissarissen,,,1
+1122,Joop Wijn,persoon,33,politicus,,,1
+1123,Hans Wijers,persoon,33,politicus,,,1
+1124,DSB Bank,bedrijf,39,belanghebbende,,,1
+1125,Adyen,bedrijf,39,belanghebbende,,,1
+1126,AkzoNobel,bedrijf,39,belanghebbende,,,1
+1127,Boston Consulting Group,bedrijf,39,belanghebbende,,,1
+1128,Heineken,bedrijf,39,belanghebbende,,,1
+1129,Boskalis,bedrijf,39,belanghebbende,,,1
+1130,Telegraaf Media Groep (TMG),bedrijf,1,mediaeigenaar,,,1
