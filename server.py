@@ -814,6 +814,19 @@ def relatie_page(rid):
     return _ssr_respond(res)
 
 
+@app.route("/overzicht")
+def overzicht_page():
+    """Publiek blader-overzicht (index) van alle entiteiten + mechanismen, elk gelinkt
+    naar hun SSR-pagina — de menselijke ingang tot de longtail-pagina's (die anders
+    alleen via de sitemap/zoekmachine bereikbaar zijn). Gelinkt vanuit de voettekst."""
+    conn = get_db()
+    try:
+        html = paginas.render_overzicht(conn, request.url_root)
+    finally:
+        conn.close()
+    return html
+
+
 @app.route("/sitemap.xml")
 def sitemap_xml_route():
     conn = get_db()

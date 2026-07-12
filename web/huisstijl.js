@@ -25,8 +25,8 @@
 // hernoemen. De viz heeft z'n eigen topbar (web/template.html) en de <title>/OG-
 // meta staan in de HTML — die spiegelen deze naam, dus verander ze mee. Sleutels,
 // API en DB blijven ongewijzigd (puur een weergavelaag, zoals weergaveNaam()).
-const HS_MERK = 'Wie bezit de Nederlandse media';
-const HS_MERK_SUB = 'eigendom, geldstromen & netwerk — gesourcet';
+const HS_MERK = 'Propagandamodel';
+const HS_MERK_SUB = 'Nederlandse politiek & media';
 
 // ── Identiteit (één keer opgehaald, gedeeld met de pagina) ──────────────
 let _hsMePromise = null;
@@ -97,6 +97,7 @@ async function hsBouwTopbal() {
 // <body data-geen-voet>. De viz (web/template.html) stylet 'm compact (zie
 // huisstijl.css .hs-voet + de viz-override).
 const HS_VOET_LINKS = [
+  ['Overzicht', '/overzicht'],
   ['Methode', '/methode'],
   ['Over', '/methode#verantwoording'],
   ['Rectificatie', '/rectificatie'],   // placeholder tot J2 (Fase 5)

@@ -670,3 +670,64 @@ def sitemap_xml(conn, base_url):
 def _iso_date(ts):
     import datetime
     return datetime.date.fromtimestamp(ts).isoformat() if ts else "1970-01-01"
+
+
+def render_overzicht(conn, base_url):
+    """Publiek blader-overzicht: alle goedgekeurde entiteiten (gegroepeerd op type)
+    + mechanismen, elk gelinkt naar hun SSR-pagina. Geeft mensen (en crawlers) een
+    ingang tot de longtail-pagina's die anders alleen via de sitemap/zoekmachine
+    bereikbaar zijn. Hergebruikt de gedeelde huisstijl (topbal + voettekst)."""
+    from xml.sax.saxutils import escape
+    base = (base_url or "").rstrip("/")
+    idx = _index(conn)
+    per_type = {}
+    for e in idx["entities"].values():
+        if e.get("status") == "goedgekeurd":
+            per_type.setdefault(e.get("type") or "overig", []).append(e)
+    secties = []
+    for t, lst in sorted(per_type.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        lst.sort(key=lambda e: (e.get("name") or "").lower())
+        links = "".join(
+            f'<li><a href="{escape(_pad_entiteit(e))}">{escape(e.get("name") or "?")}</a></li>'
+            for e in lst)
+        secties.append(f'<section><h2>{escape(weergave_naam(t))} '
+                       f'<span class="n">{len(lst)}</span></h2><ul class="cols">{links}</ul></section>')
+    mechs = sorted(idx["mechanisms"].values(), key=lambda m: (m.get("name") or "").lower())
+    mech_links = "".join(
+        f'<li><a href="/mechanisme/{escape(maak_slug(m["id"], m["name"]))}">{escape(m.get("name") or "?")}</a></li>'
+        for m in mechs)
+    secties.append(f'<section><h2>Mechanismen <span class="n">{len(mechs)}</span></h2>'
+                   f'<ul class="cols">{mech_links}</ul></section>')
+    n_ent = sum(len(v) for v in per_type.values())
+    body = "\n".join(secties)
+    return f"""<!doctype html>
+<html lang="nl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overzicht — alle entiteiten &amp; mechanismen | {escape(MERK)}</title>
+<meta name="description" content="Bladeroverzicht van alle {n_ent} in kaart gebrachte entiteiten en {len(mechs)} mechanismen in het Nederlandse medialandschap.">
+<link rel="canonical" href="{escape(base)}/overzicht">
+<link rel="stylesheet" href="/static/huisstijl.css">
+<style>
+  main {{ max-width: 1040px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }}
+  .intro {{ color: var(--text-muted); max-width: 62ch; line-height: 1.5; }}
+  section {{ margin-top: 1.6rem; }}
+  section h2 {{ font-size: 1.02rem; margin: 0 0 .4rem; border-bottom: 1px solid var(--border); padding-bottom: .25rem; }}
+  section h2 .n {{ color: var(--text-dim); font-weight: 400; font-size: .85rem; }}
+  ul.cols {{ list-style: none; padding: 0; margin: 0; columns: 3; column-gap: 1.5rem; }}
+  ul.cols li {{ break-inside: avoid; margin: .12rem 0; font-size: .9rem; }}
+  ul.cols a {{ color: var(--accent); text-decoration: none; }}
+  ul.cols a:hover {{ text-decoration: underline; }}
+  @media (max-width: 780px) {{ ul.cols {{ columns: 2; }} }}
+  @media (max-width: 480px) {{ ul.cols {{ columns: 1; }} }}
+</style>
+</head><body>
+<header class="topbal"></header>
+<main>
+  <h1>Overzicht</h1>
+  <p class="intro">Alle {n_ent} in kaart gebrachte entiteiten en {len(mechs)} mechanismen, elk met een eigen pagina.
+  Of verken ze in samenhang in de <a href="/">interactieve graaf</a>.</p>
+  {body}
+</main>
+<script src="/static/huisstijl.js"></script>
+</body></html>"""

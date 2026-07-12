@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wie bezit de Nederlandse media — eigendom, geldstromen &amp; netwerk, gesourcet</title>
+<title>Propagandamodel — eigendom, geldstromen &amp; netwerk van de Nederlandse media</title>
 <meta name="description" content="Een open onderzoeksdatabase naar de structuur achter het Nederlandse medialandschap: wie bezit de media, welke geldstromen en netwerken lopen eronder, en hoe die de nieuwsvoorziening vormgeven — elk verband gesourcet en toetsbaar.">
 <link rel="canonical" href="https://voorbeeld.tld/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Wie bezit de Nederlandse media">
+<meta property="og:title" content="Propagandamodel — Nederlandse media doorgelicht">
 <meta property="og:description" content="Open onderzoeksdatabase: eigendom, geldstromen & netwerk van de Nederlandse media, gesourcet en toetsbaar.">
 <meta property="og:url" content="https://voorbeeld.tld/">
 <meta property="og:image" content="https://voorbeeld.tld/static/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Wie bezit de Nederlandse media">
+<meta name="twitter:title" content="Propagandamodel — Nederlandse media doorgelicht">
 <meta name="twitter:description" content="Open onderzoeksdatabase: eigendom, geldstromen & netwerk van de Nederlandse media, gesourcet en toetsbaar.">
 <!-- B2: canonical/OG-URL's dragen een placeholder-domein (voorbeeld.tld); de eigenaar
      vervangt het bij deploy. og-image is optioneel (nog niet aanwezig). -->
@@ -733,8 +733,8 @@ footer.hs-voet .hs-voet-merk { display: none; }
 <header id="topbar">
   <button type="button" id="zijbalkKnop" aria-expanded="false" aria-label="Filters en instellingen"
           title="Filters en instellingen (zijbalk)">☰</button>
-  <h1>Wie bezit de Nederlandse media</h1>
-  <span class="subtitle">eigendom, geldstromen &amp; netwerk — gesourcet</span>
+  <h1>Propagandamodel</h1>
+  <span class="subtitle">Nederlandse politiek &amp; media</span>
   <div class="model-toggle" id="modelToggle">
     <button data-model="instance">Praktijk Model</button>
     <button class="active" data-model="theory">Theoretisch Model</button>
@@ -5279,7 +5279,10 @@ function showInstanceDetail(d, content, color) {
       <div class="entity-type" style="color:${color}">${weergaveNaam(d.type)}</div>
       <h2>${overlegTitel('entity_id', d.id, d.name)}</h2>
       ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
-      <div style="margin-top:6px"><a href="/tip?betreft=entity:${d.id}" rel="nofollow"
+      <div style="margin-top:6px"><a href="/${d.type === 'persoon' ? 'persoon' : 'entiteit'}/${d.id}"
+        style="font-size:12px;font-weight:600;color:var(--accent)"
+        title="Open de volledige, deelbare pagina van ${esc(d.name)} (met samenvatting, bronnen en scores)">↗ Bekijk volledige pagina</a></div>
+      <div style="margin-top:4px"><a href="/tip?betreft=entity:${d.id}" rel="nofollow"
         style="font-size:11px;color:var(--text-muted)"
         title="Meld een feitelijke onjuistheid of draag een bron aan (eenrichting, geen account nodig)">⚑ Onjuistheid melden / bron voorstellen</a></div>
     </div>
