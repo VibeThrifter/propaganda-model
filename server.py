@@ -413,6 +413,17 @@ def beheer_page():
     return send_file(WEB_PATH / "beheer.html")
 
 
+@app.route("/beheer/acties")
+@require_user_page("maintainer")
+def acties_page():
+    """Owner-acties-overzicht: de hand-offs uit de gefaseerde monetisatie-bouw
+    (fase 1-6) die bewust aan de eigenaar zijn overgelaten — deploy, agents/timers
+    aanzetten, auto-merge inschakelen, prose/archivering draaien, ads activeren,
+    feed-key minten. Statisch checklist (afvinken lokaal bewaard) + een live
+    systeemstatus-strip uit /api/toezicht. Maintainer-only, achter de B3-gate."""
+    return send_file(WEB_PATH / "acties.html")
+
+
 @app.route("/werkbank")
 @require_user_page("bijdrager")
 def werkbank_page():

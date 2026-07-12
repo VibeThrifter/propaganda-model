@@ -1,0 +1,203 @@
+<!-- Owner-acties-overzicht (privé, maintainer-gated achter B3).
+     Verzamelt alle hand-offs uit de gefaseerde monetisatie-bouw (fase 1-6):
+     de dingen die de machine bewust aan de eigenaar overlaat. Auto-merge,
+     publieke intake en de agent-scheduler zijn GEBOUWD maar staan UIT tot
+     de eigenaar ze hier aanzet. Afvinken wordt lokaal bewaard (localStorage). -->
+<link rel="stylesheet" href="/static/huisstijl.css">
+<title>Owner-acties — beheer</title>
+<style>
+  main { max-width: 920px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  .kop-rij { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .intro { color: var(--text-muted); max-width: 62ch; line-height: 1.5; }
+  .voortgang { min-width: 220px; }
+  .balk { height: 8px; border-radius: 99px; background: var(--border); overflow: hidden; margin-top: .35rem; }
+  .balk > i { display:block; height:100%; background: var(--goud, #c99700); width:0; transition: width .3s; }
+  .statusstrip { display:flex; flex-wrap:wrap; gap:.5rem; margin:.75rem 0 0; }
+  .stat { background: var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:.5rem .7rem; font-size:.82rem; }
+  .stat b { display:block; font-size:1.05rem; }
+  .groep-kop { margin: 1.6rem 0 .5rem; display:flex; align-items:center; gap:.5rem; }
+  .groep-kop h2 { margin:0; font-size:1.05rem; }
+  .prio { font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; padding:.12rem .45rem; border-radius:99px; font-weight:600; }
+  .prio.nu   { background:#fdecec; color:#b3261e; }
+  .prio.aan  { background:#fff6e0; color:#8a6100; }
+  .prio.later{ background:#eef1f4; color:#5b6570; }
+  @media (prefers-color-scheme: dark){
+    .prio.nu{background:#3a1d1c;color:#ff8b80} .prio.aan{background:#3a300f;color:#f0c86a} .prio.later{background:#26303a;color:#9fb0be}
+  }
+  .actie { border:1px solid var(--border); border-radius:12px; padding:.85rem 1rem; margin:.55rem 0; background:var(--bg-card); }
+  .actie.af { opacity:.55; }
+  .actie-kop { display:flex; align-items:flex-start; gap:.6rem; }
+  .actie-kop input { margin-top:.25rem; width:18px; height:18px; flex:0 0 auto; cursor:pointer; }
+  .actie-kop .titel { font-weight:600; }
+  .actie.af .titel { text-decoration: line-through; }
+  .actie .body { margin:.5rem 0 0 1.6rem; font-size:.9rem; line-height:1.5; }
+  .actie .body p { margin:.25rem 0; }
+  .actie .label { color:var(--text-muted); font-weight:600; font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; }
+  .actie code, .actie pre { font-family: ui-monospace, Menlo, monospace; }
+  .actie pre { background: var(--code-bg, rgba(127,127,127,.1)); padding:.5rem .6rem; border-radius:8px; overflow-x:auto; font-size:.82rem; margin:.3rem 0; }
+  .actie a { color: var(--accent, #1a66c9); }
+  .terug { display:inline-block; margin-top:1.5rem; }
+  .waarsch { background:#fff6e0; border:1px solid #e6c65c; color:#6b5200; border-radius:10px; padding:.6rem .8rem; font-size:.86rem; margin:.8rem 0; }
+  @media (prefers-color-scheme: dark){ .waarsch{background:#332a10;border-color:#7a6320;color:#e8cf86} }
+</style>
+
+<header class="topbal" data-actief="beheer"></header>
+
+<main>
+  <div class="kop-rij">
+    <div>
+      <h1>Openstaande owner-acties</h1>
+      <p class="intro">De monetisatie-bouw (fase 1–6) is klaar en getest, maar draagt bewust een aantal
+      beslissingen aan jou over. <strong>Auto-merge, de publieke intake en de agent-scheduler zijn
+      gebouwd maar staan uit</strong> tot je ze hieronder aanzet — niets in het model is autonoom
+      gewijzigd. Vink af wat je hebt gedaan (lokaal bewaard in deze browser).</p>
+    </div>
+    <div class="voortgang">
+      <div><b id="teller">0 / 0</b> afgerond</div>
+      <div class="balk"><i id="balk"></i></div>
+      <div class="statusstrip" id="statusstrip"></div>
+    </div>
+  </div>
+
+  <div class="waarsch">⚠ Zet auto-merge en de agent-runs pas aan <em>nadat</em> de hosting staat en je
+  de eerste ronde met de hand hebt gecontroleerd. De kill-switch is de env-vlag
+  <code>PROPAGANDA_AUTO_MERGE=0</code>.</div>
+
+  <div id="lijst"></div>
+
+  <a class="terug knop" href="/beheer">← Terug naar beheer</a>
+</main>
+
+<script src="/static/huisstijl.js"></script>
+<script>
+const ACTIES = [
+ { groep: "Live gaan — fundament (fase 1)", prio: "nu", items: [
+   { id:"vps", titel:"VPS opzetten + de app deployen",
+     wat:"Er is nog geen productie-hosting; lokaal draait alleen <code>flask run</code>. Alle deploy-artefacten staan klaar.",
+     waarom:"Zonder HTTPS-adres kan geen crawler indexeren en geen advertentienetwerk meelopen — prerequisite voor alles.",
+     hoe:"Een goedkope VPS volstaat (DB is ~9 MB). Volg <code>deploy/README.md</code>; kern:\n<pre>pip install -r requirements.txt\n# systemd: deploy/propaganda.service (server:app via gunicorn)\n# reverse-proxy + auto-HTTPS: deploy/Caddyfile</pre>" },
+   { id:"dns", titel:"DNS + domein + HTTPS",
+     wat:"Domein registreren en in de <code>Caddyfile</code> zetten (nu <code>voorbeeld.tld</code>).",
+     waarom:"Caddy regelt automatisch TLS; de canonical-/OG-meta moeten naar het echte domein wijzen.",
+     hoe:"Vervang <code>voorbeeld.tld</code> in <code>deploy/Caddyfile</code> en de <code>&lt;link rel=canonical&gt;</code>/OG-URL's in <code>web/template.html</code> + <code>paginas.py</code>." },
+   { id:"merk", titel:"Definitieve merknaam + domein kiezen",
+     wat:"Nu staat de werk-default <em>“Wie bezit de Nederlandse media”</em>.",
+     waarom:"Eén bron van waarheid — de naam dekt automatisch alle pagina's + de voettekst.",
+     hoe:"Pas <code>HS_MERK</code>/<code>HS_MERK_SUB</code> boven in <code>web/huisstijl.js</code> aan (+ de viz-topbar in <code>web/template.html</code> en de OG-meta)." },
+ ]},
+ { groep: "Immuunsysteem & autonomie aanzetten (fase 2/3/5)", prio: "aan", items: [
+   { id:"agents", titel:"De verificatie-agents daadwerkelijk draaien",
+     wat:"Accounts staan klaar met bewust verschillende modelfamilies (decorrelatie): <code>verificatie-agent</code>, <code>aanklager-agent</code>, <code>lead-corroboratie-agent</code>.",
+     waarom:"Zij vullen de <code>immuun_oordelen</code>-achterstand (~3200) die de auto-merge-poort leest — zonder oordelen merget er niets.",
+     hoe:"Per agent één ronde:\n<pre>python3 scripts/agent_runner.py --agent verificatie-agent \\\n  --brief missies/verificatie_agent_brief.md</pre>Zie de briefs in <code>missies/</code>." },
+   { id:"timers", titel:"De systemd-timers installeren",
+     wat:"Onbewaakte cadans voor alle missie-agents + de archiveer- en Brier-taken.",
+     waarom:"Maakt de machine zelfdraaiend; stuck-detectie via <code>TimeoutStartSec=</code>.",
+     hoe:"Kopieer <code>deploy/systemd/agent-*.{service,timer}</code> naar de VPS en <code>systemctl enable --now</code>. Cadans-tabel: <code>deploy/systemd/README.md</code>. (LinkedIn blijft eigenaar-getriggerd, geen timer.)" },
+   { id:"automerge", titel:"De auto-merge-service aanzetten (na sign-off)",
+     wat:"De reviewer-tier <code>merge-service</code> merget de wachtrij achter de immuunpoort.",
+     waarom:"Vervangt de handmatige merge-flessenhals; mens alleen nog op de uitzonderingen.",
+     hoe:"Eerst een dry-run, dan pas live:\n<pre>python3 scripts/auto_merge_service.py --dry-run --once\n# aanzetten: PROPAGANDA_AUTO_MERGE=1 (default) + de service draaien</pre>Persoon-rakende claims mergen nooit auto (smaad-firewall)." },
+   { id:"voorspel", titel:"Voorspellingen van deadlines voorzien + resolveren",
+     wat:"13 voorspellingen, 0 opgelost. De Brier is het externe ijkpunt (en het verkoopverhaal).",
+     waarom:"Zonder gescoorde voorspellingen blijft de kalibratie leeg (en blokkeert A8).",
+     hoe:"Geef ze een toekomst-deadline; laat de resolutie-agent voorstellen schrijven; bevestig zelf via <code>PATCH /api/predictions/&lt;id&gt;/uitkomst</code>." },
+ ]},
+ { groep: "Monetiseren (fase 4)", prio: "aan", items: [
+   { id:"prose", titel:"De volledige AI-prose-batch draaien",
+     wat:"2 sample-samenvattingen gegenereerd; de rest van de elementen wacht.",
+     waarom:"Google's helpful-content-signaal beloont leesbare prose i.p.v. dunne datadumps.",
+     hoe:"<pre>python3 scripts/genereer_prose.py --type entiteit\npython3 scripts/genereer_prose.py --type mechanisme</pre>Kost AI-tokens; idempotent (slaat verse hashes over)." },
+   { id:"wayback", titel:"De lange Wayback-archiveringspas draaien",
+     wat:"Nu ~4% gearchiveerd; het immuunsysteem + de “linkrot-vrij”-claim leunen erop.",
+     waarom:"A1 verifieert tegen een onveranderlijke kopie.",
+     hoe:"Gebatcht over dagen (Wayback rate-limit):\n<pre>python3 scripts/archiveer_bronnen.py --save --limit 50</pre>" },
+   { id:"ads", titel:"Advertenties activeren (AdSense/Ad Manager)",
+     wat:"De ad-slots + consent-banner + pad-gescopede CSP staan klaar maar leeg → er laadt niets externs.",
+     waarom:"Pas met een account + publisher-ID komt er inkomen; de viz blijft ad-vrij.",
+     hoe:"Vul <code>AD_CLIENT</code> + <code>AD_SCRIPT_URL</code> in <code>web/huisstijl.js</code> en de <code>AD_CSP_*</code>-domeinen in <code>server.py</code>; vermeld de cookies in de privacyverklaring." },
+ ]},
+ { groep: "Publieke intake harden (fase 5)", prio: "aan", items: [
+   { id:"laag0", titel:"Laag-0 hardening afronden",
+     wat:"De HMAC-tijdstempel-challenge werkt; PoW/Turnstile is een haak.",
+     waarom:"Denial-of-wallet-verweer: goedkope filters vóór dure agent-tokens.",
+     hoe:"Zet PoW of Cloudflare Turnstile aan in <code>_lead_poort()</code>; onder de proxy: vertrouw <code>X-Forwarded-For</code> (ProxyFix) zodat de per-IP-limiet niet op <code>127.0.0.1</code> sleutelt; breid <code>SPAM_DOMEINEN</code> uit." },
+ ]},
+ { groep: "Data-feed & later (fase 6)", prio: "later", items: [
+   { id:"feedkey", titel:"Een feed-API-key minten",
+     wat:"De gemeterde feed <code>/api/feed/*</code> draait; er is nog geen key.",
+     waarom:"Klanten (onderzoekers/AI-grounding) hebben een key nodig; <code>/api/graph_data</code> blijft open.",
+     hoe:"Zie het recept in <code>docs/DATA_DICTIONARY.md</code> § “API-keys aanmaken” — een JSON in <code>data/api_keys/</code> met alleen de sha256-hash." },
+   { id:"e2", titel:"E2 — tweede domein (bewust uitgesteld)",
+     wat:"De motor op een commercieel sterker domein (bedrijfs-eigendom/lobby/due-diligence).",
+     waarom:"Grootste omzetplafond, maar vergt eerst een gekozen domein met bewezen betaalbereidheid + een verse tweede DB/seed.",
+     hoe:"Beslis het domein; volg dan de repoint-punchlist (story E2 in <code>MONETISATIE_STORIES.md</code>)." },
+   { id:"a8", titel:"A8 — likelihood-ratio's (wacht op kalibratiedata)",
+     wat:"DF-QuAD evolueren naar expliciete likelihood-ratio's, gekalibreerd tegen de Brier.",
+     waarom:"Zonder gescoorde voorspellingen zou dit de golden snapshot op arbitraire getallen rebaselinen.",
+     hoe:"Uitstellen tot <code>data/voorspellingen_kalibratie.json</code> gevuld is (zie “voorspellingen resolveren” hierboven)." },
+ ]},
+ { groep: "Afronden", prio: "later", items: [
+   { id:"merge", titel:"Branch reviewen + naar main mergen",
+     wat:"Alle werk staat op <code>monetisatie-bouw</code> (6 commits, fase 1–6), nog niet gemerged.",
+     waarom:"Ik merge niet ongevraagd naar main.",
+     hoe:"Review de commits/diff; merge of open een PR wanneer je tevreden bent." },
+ ]},
+];
+
+const SLEUTEL = "owner-acties-v1";
+function laadStatus(){ try { return JSON.parse(localStorage.getItem(SLEUTEL) || "{}"); } catch { return {}; } }
+function bewaarStatus(s){ localStorage.setItem(SLEUTEL, JSON.stringify(s)); }
+
+function render(){
+  const status = laadStatus();
+  const lijst = document.getElementById("lijst");
+  let totaal = 0, af = 0;
+  lijst.innerHTML = ACTIES.map(g => {
+    const items = g.items.map(a => {
+      totaal++; const gedaan = !!status[a.id]; if (gedaan) af++;
+      return `<div class="actie ${gedaan?'af':''}" data-id="${a.id}">
+        <div class="actie-kop">
+          <input type="checkbox" ${gedaan?'checked':''} aria-label="afgerond" data-check="${a.id}">
+          <span class="titel">${a.titel}</span>
+        </div>
+        <div class="body">
+          <p><span class="label">Wat</span> — ${a.wat}</p>
+          <p><span class="label">Waarom</span> — ${a.waarom}</p>
+          <p><span class="label">Hoe</span> — ${a.hoe}</p>
+        </div></div>`;
+    }).join("");
+    return `<div class="groep-kop"><span class="prio ${g.prio}">${g.prio==='nu'?'nu nodig':g.prio==='aan'?'aanzetten':'later'}</span><h2>${g.groep}</h2></div>${items}`;
+  }).join("");
+  document.getElementById("teller").textContent = `${af} / ${totaal}`;
+  document.getElementById("balk").style.width = totaal ? `${Math.round(100*af/totaal)}%` : "0";
+  lijst.querySelectorAll("[data-check]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const s = laadStatus(); s[cb.dataset.check] = cb.checked; bewaarStatus(s); render();
+    });
+  });
+}
+
+async function laadSysteemstatus(){
+  const strip = document.getElementById("statusstrip");
+  try {
+    const r = await fetch("/api/toezicht", { headers: { "Accept":"application/json" } });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const dek = d.archief_dekking || {};
+    const pct = typeof dek.percentage === "number" ? dek.percentage.toFixed(1)+"%" : "—";
+    const am = d.auto_merge || {};
+    const vs = d.voorspellingen || {};
+    strip.innerHTML = `
+      <div class="stat">archiefdekking<b>${pct}</b></div>
+      <div class="stat">auto-gemerged 24u<b>${am.gemerged_24u ?? 0}</b></div>
+      <div class="stat">Brier<b>${vs.brier == null ? "—" : vs.brier}</b></div>
+      <div class="stat">validatie-fouten<b>${(d.validatie||{}).fouten ?? "—"}</b></div>`;
+  } catch (e) {
+    strip.innerHTML = `<div class="stat">systeemstatus: niet beschikbaar<br><small>(toezicht-endpoint vereist login of draait niet)</small></div>`;
+  }
+}
+
+render();
+laadSysteemstatus();
+</script>
