@@ -535,6 +535,8 @@ page-gate-helper die naar `/login` redirect. *nieuw/uitbreiding:* `robots.txt`-D
 
 ### B4 — Programmatic-SEO-pagina's: één crawlbare pagina per element  ·  Fase 4  ·  L
 
+> **Fase-4 status (branch `monetisatie-bouw`, 12 juli 2026):** DONE SSR-paginas /entiteit|/persoon|/mechanisme|/relatie (`paginas.py` + `web/pagina_element.html`), id-geprefixte slugs (301/404), `/sitemap.xml` (3205 urls), `robots.txt` uitgebreid, prose/ad-slot-hooks. Rollen bewust overgeslagen.
+
 **Als** crawler/zoekmachine **wil ik** per entiteit/persoon/mechanisme/relatie een eigen, server-gerenderde
 pagina met unieke titel/meta/canonical/OG/H1, leesbare prose en interne links **zodat** de longtail aan
 media-machtsstructuur indexeerbaar wordt en organisch verkeer aantrekt — de eigenlijke SEO-motor.
@@ -630,6 +632,8 @@ leesbare labels/prose). `template.html:7020` (`selectFromHash` → slug-permalin
 
 ### B5 — Content-diepte via gecachete AI-prose  ·  Fase 4  ·  M
 
+> **Fase-4 status:** DONE `afgeleide_prose`-cache + `scripts/genereer_prose.py` (dependency-vrij via `claude -p`, harde neutraliteits-guardrail, staleness-fingerprint); `paginas.py` leest de cache, toont prose + eerste zin als meta-description. OWNER-ACTION: de volledige prose-batch draaien (tokenkost; 2 sample-entiteiten gegenereerd).
+
 **Als** bezoeker/zoekmachine **wil ik** per pagina een korte, leesbare Nederlandse samenvatting van wat de
 data zegt **zodat** de pagina Google's helpful-content-signaal beloont in plaats van als dunne datadump te
 worden gestraft.
@@ -686,6 +690,8 @@ fingerprint-helper (staleness). *Niet* in het request-pad (kost/latency).
 ---
 
 ### B6 — Advertentie/affiliate op de longtail-pagina's  ·  Fase 4  ·  M
+
+> **Fase-4 status:** DONE ad-slots op element-paginas (uit by default), pad-gescopede CSP (viz ongemoeid, bevestigd), gedeelde consent-banner. OWNER-ACTION: AdSense/Ad Manager-account + publisher-ID + CMP + `AD_CLIENT`/`AD_CSP_*`-config invullen om te activeren.
 
 **Als** eigenaar/adverteerder **wil ik** advertentie-slots op de per-entiteit-pagina's (met nette
 cookie-consent) **zodat** het organische SEO-verkeer passief inkomen genereert — zonder de interactieve viz of

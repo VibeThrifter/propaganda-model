@@ -15,6 +15,9 @@
 //      rij actieknoppen (W3.2); Esc sluit met focus terug, pijltjes ↑/↓.
 //   6. Toetsenbord-bedienbaarheid: elk [onclick]-element krijgt automatisch
 //      tabindex + role="button" en reageert op Enter/spatie.
+//   7. Advertentie-consent (B6): op ad-dragende pagina's (<body data-ads>) een
+//      lichte cookie-consent-banner die de ad-tag pas ná toestemming laadt.
+//      Standaard UIT (AD_CLIENT leeg) — dan geen banner en niets extern.
 
 // ── Merk (B2) — ÉÉN bron van waarheid voor de weergavenaam ──────────────
 // Eigenaar-verwisselbaar: pas alleen deze twee strings aan om de héle voorkant
@@ -380,9 +383,97 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ── Advertenties + cookie-consent (B6) — SCAFFOLD, standaard UIT ────────
+// LET OP: dit is de éérste plek waar de app ooit een *extern* script/cookie
+// zou introduceren. Standaard gebeurt dat NIET: AD_CLIENT is leeg, dus er
+// laadt geen ad-script, er wordt geen consent-banner getoond en er komen geen
+// cookies bij — alleen de gereserveerde placeholder in de .ad-slot blijft staan.
+// De eigenaar activeert door AD_CLIENT + AD_SCRIPT_URL in te vullen (OWNER-
+// ACTION; zet dan óók de bijpassende AD_CSP_*-domeinen in server.py). Ads laden
+// pas ná expliciete toestemming; bij weigeren komen er geen ad-cookies.
+// De banner verschijnt alléén op ad-dragende pagina's (<body data-ads>) — dus
+// op de element-pagina's, nooit op de viz (/) of de redactie-routes.
+const AD_CLIENT = '';        // bv. 'ca-pub-XXXXXXXXXXXXXXXX' (AdSense) — leeg = uit
+const AD_SCRIPT_URL = '';    // bv. 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-…'
+const AD_CONSENT_KEY = 'hs-ad-consent';   // localStorage: 'ja' = geaccepteerd, 'nee' = geweigerd
+
+function _hsAdConfig() {
+  // Ads zijn pas "actief te maken" als de pagina ad-dragend is én de eigenaar
+  // een publisher-ID + script-URL heeft ingevuld. Zonder dat: pure scaffold.
+  return document.body && document.body.hasAttribute('data-ads') && AD_CLIENT && AD_SCRIPT_URL;
+}
+function _hsAdConsent() {
+  try { return localStorage.getItem(AD_CONSENT_KEY); } catch (e) { return null; }
+}
+function _hsZetAdConsent(waarde) {
+  try { localStorage.setItem(AD_CONSENT_KEY, waarde); } catch (e) { /* private mode: sla stil over */ }
+}
+
+// Injecteert de ad-tag ná toestemming. Generiek AdSense-vormig sjabloon: de
+// eigenaar past het aan het gekozen netwerk aan. Draait nooit zonder consent.
+let _hsAdsGeladen = false;
+function hsLaadAdvertenties() {
+  if (_hsAdsGeladen || !_hsAdConfig()) return;
+  _hsAdsGeladen = true;
+  const s = document.createElement('script');
+  s.src = AD_SCRIPT_URL;
+  s.async = true;
+  s.crossOrigin = 'anonymous';
+  s.setAttribute('data-ad-client', AD_CLIENT);
+  document.head.appendChild(s);
+  document.querySelectorAll('.ad-slot').forEach(slot => {
+    slot.innerHTML = '';
+    slot.classList.add('ad-actief');
+    const ins = document.createElement('ins');
+    ins.className = 'adsbygoogle';
+    ins.style.display = 'block';
+    ins.setAttribute('data-ad-client', AD_CLIENT);
+    ins.setAttribute('data-ad-format', 'auto');
+    ins.setAttribute('data-full-width-responsive', 'true');
+    slot.appendChild(ins);
+    try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) { /* netwerk laadt nog */ }
+  });
+}
+
+function _hsBouwConsentBanner() {
+  if (document.querySelector('.hs-consent')) return;
+  const bak = document.createElement('div');
+  bak.className = 'hs-consent';
+  bak.setAttribute('role', 'dialog');
+  bak.setAttribute('aria-live', 'polite');
+  bak.setAttribute('aria-label', 'Cookie-toestemming');
+  bak.innerHTML = `
+    <div class="hs-consent-tekst">
+      Deze pagina toont advertenties die cookies plaatsen. We laden ze pas met
+      jouw toestemming. Weiger je, dan komen er geen advertentie-cookies.
+      <a href="/methode#privacy">Meer over privacy</a>.
+    </div>
+    <div class="hs-consent-acties">
+      <button type="button" class="hs-consent-weiger">Weigeren</button>
+      <button type="button" class="prim hs-consent-akkoord">Advertenties toestaan</button>
+    </div>`;
+  const sluit = () => bak.remove();
+  bak.querySelector('.hs-consent-akkoord').addEventListener('click', () => {
+    _hsZetAdConsent('ja'); sluit(); hsLaadAdvertenties();
+  });
+  bak.querySelector('.hs-consent-weiger').addEventListener('click', () => {
+    _hsZetAdConsent('nee'); sluit();   // geen ad-tag, geen ad-cookies
+  });
+  document.body.appendChild(bak);
+}
+
+function hsConsentEnAds() {
+  if (!_hsAdConfig()) return;   // scaffold-staat: geen banner, geen externe scripts
+  const keuze = _hsAdConsent();
+  if (keuze === 'ja') hsLaadAdvertenties();
+  else if (keuze === 'nee') { /* respecteer weigering, toon niets opnieuw */ }
+  else _hsBouwConsentBanner();
+}
+
 function _hsInit() {
   hsBouwTopbal();
   hsBouwVoet();
+  hsConsentEnAds();
   hsMaakFocusbaar();
   new MutationObserver(_hsFocusGepland).observe(document.body, { childList: true, subtree: true });
 }

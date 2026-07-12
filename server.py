@@ -24,6 +24,7 @@ import bereik  # bereikmeter: gesourcet publieksbereik (kijkers/lezers/invullers
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
+import paginas  # programmatic-SEO: server-gerenderde pagina per element (B4)
 try:
     import dedup  # A6: semantische (paraphrase-)dedup bovenop difflib; aparte stdlib-module
 except ImportError:  # de module wordt parallel gebouwd — val terug op alleen difflib
@@ -47,6 +48,22 @@ RELEASES_PATH = ROOT / "releases"
 
 app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
 
+# ── Advertentie-CSP (B6) — SCAFFOLD, standaard leeg/uit ──────────────────
+# De site draait volledig self-contained (geen externe scripts/cookies). Een
+# advertentienetwerk is de éérste externe afhankelijkheid en krijgt daarom een
+# eigen, PAD-GESCOPEDE Content-Security-Policy: alléén de element-pagina's (de
+# SEO-longtail) mogen ad-/consent-domeinen laden. De viz (/) en de redactie-
+# routes (/overleg, /beheer, /werkbank) blijven strikt self — een GLOBALE CSP
+# zou de viz breken (die leunt zwaar op inline scripts). Leeg = de scaffold-
+# staat: infra klaar, niets extern toegestaan. De eigenaar vult hieronder de
+# domeinen van het gekozen netwerk in om te activeren (OWNER-ACTION). AdSense
+# vergt daarbij doorgaans óók "'unsafe-inline'" in AD_CSP_SCRIPT_DOMEINEN.
+AD_CSP_PADEN = ("/entiteit/", "/persoon/", "/mechanisme/", "/relatie/")
+AD_CSP_SCRIPT_DOMEINEN = ()   # bv. "https://pagead2.googlesyndication.com", "https://*.googlesyndication.com", "'unsafe-inline'"
+AD_CSP_FRAME_DOMEINEN = ()    # bv. "https://googleads.g.doubleclick.net", "https://*.safeframe.googlesyndication.com"
+AD_CSP_IMG_DOMEINEN = ()      # bv. "https://*.g.doubleclick.net", "https://*.googlesyndication.com"
+AD_CSP_CONNECT_DOMEINEN = ()  # bv. "https://*.google.com", "https://*.googlesyndication.com"
+
 
 @app.after_request
 def _no_cache_html(resp):
@@ -56,6 +73,34 @@ def _no_cache_html(resp):
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         resp.headers["Pragma"] = "no-cache"
         resp.headers["Expires"] = "0"
+    return resp
+
+
+@app.after_request
+def _csp_element_paginas(resp):
+    # Content-Security-Policy UITSLUITEND op de B6-element-pagina's (zie de
+    # AD_CSP_*-constanten hierboven). KRITISCH: nooit op / (viz — inline scripts)
+    # of de redactie-routes; die krijgen géén CSP-wijziging. Standaard (lege
+    # domein-tuples) is dit een strikte self-CSP die de element-pagina's precies
+    # zo laat werken als nu (eigen /static-scripts + inline <style> + self-fonts),
+    # met de ad-/consent-domeinen als uit-geconfigureerde uitbreidingspunten.
+    pad = request.path or ""
+    if resp.mimetype != "text/html" or not any(pad.startswith(p) for p in AD_CSP_PADEN):
+        return resp
+    script = " ".join(("'self'",) + tuple(AD_CSP_SCRIPT_DOMEINEN))
+    img = " ".join(("'self'", "data:") + tuple(AD_CSP_IMG_DOMEINEN))
+    frame = " ".join(("'self'",) + tuple(AD_CSP_FRAME_DOMEINEN))
+    connect = " ".join(("'self'",) + tuple(AD_CSP_CONNECT_DOMEINEN))
+    resp.headers["Content-Security-Policy"] = "; ".join([
+        "default-src 'self'",
+        f"script-src {script}",
+        "style-src 'self' 'unsafe-inline'",  # de pagina heeft een inline <style>-blok
+        f"img-src {img}",
+        f"frame-src {frame}",
+        f"connect-src {connect}",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ])
     return resp
 
 
@@ -610,6 +655,70 @@ def graph_data():
         entry = (sleutel, json.dumps(data, ensure_ascii=False, separators=(",", ":")))
         _graph_cache["entry"] = entry
     return app.response_class(entry[1], mimetype="application/json")
+
+
+# ── Programmatic-SEO: server-gerenderde pagina per element (B4) ──────────────
+# Publiek, geen auth-gate: dit is de crawlbare leessurface. Elk element krijgt een
+# stabiele, id-geprefixte URL met unieke <title>/<meta>/<canonical>/OG/H1 + interne
+# links. De renderkost wordt gedempt met dezelfde mtime-cache als /api/graph_data
+# (paginas.py). Een niet-canonieke tekst-slug → 301; onbekend/vervangen/afgewezen → 404.
+
+def _ssr_respond(res):
+    if res is None:
+        return ("Niet gevonden.", 404)
+    if isinstance(res, paginas.Redirect):
+        return redirect(res.pad, code=301)
+    return res  # HTML-string → Flask levert text/html
+
+
+@app.route("/entiteit/<slug>")
+def entiteit_page(slug):
+    conn = get_db()
+    try:
+        res = paginas.render_entiteit(conn, slug, request.url_root, soort="entiteit")
+    finally:
+        conn.close()
+    return _ssr_respond(res)
+
+
+@app.route("/persoon/<slug>")
+def persoon_page(slug):
+    conn = get_db()
+    try:
+        res = paginas.render_entiteit(conn, slug, request.url_root, soort="persoon")
+    finally:
+        conn.close()
+    return _ssr_respond(res)
+
+
+@app.route("/mechanisme/<slug>")
+def mechanisme_page(slug):
+    conn = get_db()
+    try:
+        res = paginas.render_mechanisme(conn, slug, request.url_root)
+    finally:
+        conn.close()
+    return _ssr_respond(res)
+
+
+@app.route("/relatie/<int:rid>")
+def relatie_page(rid):
+    conn = get_db()
+    try:
+        res = paginas.render_relatie(conn, rid, request.url_root)
+    finally:
+        conn.close()
+    return _ssr_respond(res)
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml_route():
+    conn = get_db()
+    try:
+        xml = paginas.sitemap_xml(conn, request.url_root)
+    finally:
+        conn.close()
+    return app.response_class(xml, mimetype="application/xml")
 
 
 # ── Argumenten API ───────────────────────────────────────────

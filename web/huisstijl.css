@@ -366,3 +366,34 @@ button.uitleg:hover, button.uitleg[aria-expanded="true"] {
 .hs-menu-knop:hover, .hs-menu-knop[aria-expanded="true"] {
   color: var(--text); border-color: var(--border); background: rgba(255,255,255,.05);
 }
+
+/* ── Cookie-consent-banner (B6, hsConsentEnAds in huisstijl.js) ────────── */
+/* Verschijnt alléén op ad-dragende pagina's (<body data-ads>) én pas als de
+   eigenaar AD_CLIENT heeft ingevuld — dan laadt de ad-tag pas ná toestemming.
+   Onder de dialogen (z-index 900) maar boven de gewone pagina. */
+.hs-consent {
+  position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 850;
+  max-width: 720px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  background: #16161f; border: 1px solid var(--border-light);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 18px; animation: toost-in 0.24s ease-out;
+}
+.hs-consent-tekst { flex: 1 1 300px; font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.hs-consent-tekst a { color: var(--accent); }
+.hs-consent-acties { display: flex; gap: 8px; flex-shrink: 0; }
+.hs-consent button {
+  font: inherit; font-size: 12.5px; cursor: pointer;
+  padding: 7px 14px; border-radius: var(--radius-k);
+  border: 1px solid var(--border); background: var(--bg-inzet); color: var(--text-dim);
+}
+.hs-consent button:hover { color: var(--text); border-color: var(--border-light); }
+.hs-consent button.prim {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text);
+}
+.hs-consent button.prim:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+@media (max-width: 560px) {
+  .hs-consent { flex-direction: column; align-items: stretch; }
+  .hs-consent-acties { justify-content: flex-end; }
+}

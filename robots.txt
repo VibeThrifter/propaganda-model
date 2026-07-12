@@ -1,4 +1,10 @@
 User-agent: *
+# Publieke leessurface — expliciet indexeerbaar (B4: de SEO-motor).
+Allow: /entiteit/
+Allow: /persoon/
+Allow: /mechanisme/
+Allow: /relatie/
+Allow: /methode
 # Redactie-/accountsurface hoort niet in de zoekindex (B3).
 Disallow: /overleg
 Disallow: /beheer
@@ -9,3 +15,5 @@ Disallow: /login
 # (feed-verhaal E1).
 Disallow: /api/
 Allow: /api/graph_data
+
+Sitemap: /sitemap.xml

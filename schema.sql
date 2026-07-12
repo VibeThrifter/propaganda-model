@@ -572,6 +572,29 @@ CREATE TABLE immuun_oordelen (
 );
 
 --------------------------------------------------------------
+-- AFGELEIDE_PROSE (B5): gecachete, LLM-gegenereerde leesbare NL-samenvatting per
+-- model-element (entiteit/mechanisme) voor de programmatic-SEO-pagina's (paginas.py).
+-- AFGELEIDE COPY, GÉÉN ARGUMENT: gaat NIET door de bijdrage-/argumentpijplijn en telt
+-- NERGENS in de score mee (net als de meter-JSON's data/doelgroep.json e.d.). Volledig
+-- regenereerbaar uit de DB via scripts/genereer_prose.py (batch, buiten het webrequest;
+-- daar valt de token-kost, nooit in het request-pad). invoer_hash = fingerprint van de
+-- prose-inputs (elementnaam + relatie-id's/typen/scores + kleurmeter-/bereikpositie,
+-- paginas.prose_fingerprint); bij mismatch is de prose stale en toont paginas.py 'm niet
+-- (graceful degradation, geen LLM-call bij render). Aangelegd via schema.sql (verse build)
+-- én scripts/migrate_prose.py (bestaande DB, backup-then-migrate).
+--------------------------------------------------------------
+
+CREATE TABLE afgeleide_prose (
+    element_type TEXT NOT NULL,           -- 'entiteit' | 'mechanisme'
+    element_id INTEGER NOT NULL,
+    prose TEXT NOT NULL,                  -- de gecachete NL-samenvatting (2–5 zinnen)
+    invoer_hash TEXT NOT NULL,            -- fingerprint van de prose-inputs (staleness)
+    model TEXT,                           -- welk model de prose genereerde
+    gegenereerd_at TEXT,                  -- ISO-timestamp van generatie
+    PRIMARY KEY (element_type, element_id)
+);
+
+--------------------------------------------------------------
 -- USERS (identiteit-licht, verbeterplan M0.6)
 -- Mensen én agents; schrijf-endpoints vereisen een account. Wachtwoord
 -- alleen voor mensen (scrypt-hash); het API-token staat als sha256-hash —
