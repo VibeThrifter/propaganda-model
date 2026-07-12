@@ -130,16 +130,9 @@ header.topbal { position: static; }
   background: rgba(0,0,0,.18); }
 .reviewthread .kop { font-size: 11px; color: var(--text-muted); margin: 4px 0; }
 .revisie-noot { font-size: 12px; color: var(--accent); margin: 2px 0 6px; }
-/* ratings (community-notes-laag, M2.5): mens telt, agent = advies */
+/* status-regels op een argument (bezwaar-/veto-badge); de 👍/👎-ratinglaag is geschrapt (A3) */
 .ratings { display: flex; gap: 8px; align-items: center; margin: 5px 0 2px; font-size: 11.5px; }
-.rate-tel, .rate-knop { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.rate-knop { cursor: pointer; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--border); }
-.rate-knop:hover { color: var(--text); border-color: rgba(255,255,255,.28); }
-.rate-knop.aan { color: var(--text); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.32); }
 .eigen-werk { color: var(--text-muted); font-style: italic; }
-.bridging-hint { font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,.03);
-  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; margin: 0 0 14px; line-height: 1.5; }
-.bridging-hint.verouderd { border-color: color-mix(in srgb, #e0a23a 30%, transparent); }
 /* permalinks + round-trip naar de graaf */
 .permalink { font-size: 11px; color: var(--text-muted); text-decoration: none; margin-left: 6px; }
 .permalink:hover { color: var(--accent); }
@@ -349,7 +342,6 @@ function selectOpties(lijst, huidig) {
   const waarden = lijst.includes(huidig) || !huidig ? lijst.slice() : [huidig, ...lijst];
   return waarden.map(v => `<option value="${esc(v)}"${v === huidig ? ' selected' : ''}>${esc(v)}</option>`).join('');
 }
-let BRIDGING = null;      // bridging-status (M2.5): wanneer telt een rating mee in de score?
 let indexData = null;
 let huidig = null;        // {param, id, label}
 let ARG_BY_ID = new Map();// argumenten van de geopende thread (voor bewerk/reviseer-formulieren)
@@ -523,7 +515,6 @@ async function init() {
     ME = meResp.ok ? await meResp.json() : null;
   } catch (e) { ME = null; }
   try { ROLLEN = await (await fetch('/api/roles')).json(); } catch (e) { ROLLEN = []; }
-  try { BRIDGING = await (await fetch('/api/bridging')).json(); } catch (e) { BRIDGING = null; }
   // Voorstellen-tab enkel voor reviewer+; anders de knop verbergen (server weigert de data toch).
   const tabV = document.getElementById('tabVoorstellen');
   if (tabV) tabV.style.display = magReview() ? '' : 'none';
@@ -834,40 +825,26 @@ function rendNode(a, ck) {
   h += `</div>`;
   return h;
 }
-// Ratings = de community-notes-laag (M2.5): je beoordeelt onderbouwing/relevantie/
-// eerlijkheid, nooit waarheid. Mens telt mee in bridging; agent is zichtbaar advies.
-// Review-verdict v2: 'Argument klopt' = lichte endorsement (nuttig-rating; telt niet in de
-// score, voedt hooguit later bridging). 'Argument klopt niet' = onderbouwd bezwaar = een
-// ondergraving (opent het bezwaarformulier) die de score van dit argument dempt tot ze
-// is opgelost. De kale, redenloze downvote bestaat niet meer. Van een ADMIN (maintainer)
-// is zo'n ondergraving een VETO: de parent telt voor 0 tot het bezwaar is opgelost of
-// met review is weerlegd (scoring.py, juli 2026).
-// Het oordeel-paar: één gebalanceerd duo dat de SOUNDNESS van het argument beoordeelt.
-// '✓ Argument klopt' = lichte endorsement (rating, geen knoop, voedt hooguit bridging).
-// '✗ Argument klopt niet' = onderbouwd bezwaar → opent dezelfde reageer-composer met '− Tegen'
-// voorgekozen (een ondergraving die de kracht dempt tot ze is opgelost). De twee horen visueel
-// bij elkaar (apart van 'reageren') en wegen even zwaar — geen schreeuwend rood naast grijs.
+// Het oordeel over een argument: de enige reactie is '✗ Argument klopt niet' — een
+// onderbouwd bezwaar dat de reageer-composer opent met '− Tegen' voorgekozen (een
+// ondergraving die de kracht van dit argument dempt tot ze is opgelost). De 👍/👎-
+// endorsement-rating (de M2.5-bridging-laag) is bij de solo+agents-kanteling geschrapt (A3):
+// bij n=1 was die mens-diversiteit-laag toch al inert. Van een ADMIN (maintainer) is de
+// ondergraving een VETO: de parent telt voor 0 tot ze is opgelost of met review is weerlegd
+// (scoring.py, juli 2026). Het saldo toont nog het aantal gehandhaafde ondergravingen.
 function ratingRegel(a, ck) {
   ck = ck || '';
-  const r = a.ratings || { mens: { nuttig: 0 }, agent: { nuttig: 0 } };
-  // Bridging-saldo: +1 per endorsement ('argument klopt'), −1 per gehandhaafde ondergraving
-  // (contradicting reply-kind dat niet 'opgelost' is en niet vervangen/verworpen).
-  const plus = (r.mens.nuttig || 0) + (r.agent.nuttig || 0);
   const min = (a._kids || []).filter(k => k.stance === 'contradicting'
     && k.bezwaar_resolutie && k.bezwaar_resolutie !== 'opgelost'
     && !k.vervangen && k.status !== 'verworpen').length;
-  const net = plus - min;
-  const saldoTekst = net > 0 ? `+${net}` : (net < 0 ? `−${-net}` : '0');
-  const saldo = `<span class="oordeel-saldo" title="saldo: ${plus} × ‘argument klopt’ (endorsement) − ${min} gehandhaafde ondergraving(en)">${saldoTekst}</span>`;
-  const eigen = ME && a.contributed_by === ME.username;
-  const actief = a.mijn_oordeel === 'nuttig';
-  const eens = (!ME || eigen)
-    ? `<span class="oordeel eens stat" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Argument klopt</span>`
-    : `<span class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief},'${ck}')" title="Het argument klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Argument klopt</span>`;
+  const saldo = min > 0
+    ? `<span class="oordeel-saldo" title="${min} gehandhaafde ondergraving(en) — dempt de kracht van dit argument">−${min}</span>`
+    : '';
   const oneens = (ME && !a.vervangen)
     ? `<span class="oordeel oneens knop" onclick="toonReply(${a.id},'contradicting',true,'${ck}')" title="Onderbouwd bezwaar: zeg WAAROM het argument niet klopt. Geen bron nodig. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Argument klopt niet</span>`
     : '';
-  return `<div class="oordeel-rij">${eens}${oneens}${saldo}</div>`;
+  if (!oneens && !saldo) return '';
+  return `<div class="oordeel-rij">${oneens}${saldo}</div>`;
 }
 // Resolutielus-badge op een ondergraving — puur status; de overgangsacties
 // (herzien/opgelost/blijft/overrule) zitten in het ⋯-menu van de knoop (W3.2).
@@ -897,36 +874,6 @@ function vetoRegelO(a) {
   if ((a._kids || []).some(actiefVetoO)) return `<div class="ratings" style="gap:10px"><span style="color:#e0635f;font-weight:600" ` +
     `title="Een admin oordeelde ‘argument klopt niet’: dit argument telt voor 0 tot het bezwaar is opgelost of met review is weerlegd (een gemergede tegen-reactie op het bezwaar).">⛔ door admin ongedaan gemaakt — telt voor 0</span></div>`;
   return '';
-}
-// Eerlijk over rating-latentie: een duim is zichtbaar advies en beweegt de score pas
-// zodra de beoordelaarspool de bridging-drempel haalt én scripts/bridging.py opnieuw draait.
-function bridgingHint() {
-  const b = BRIDGING;
-  if (!b) return '';
-  const v = b.vloer || {}, live = b.live || {};
-  let tekst;
-  if (b.actief) {
-    const pct = Math.round((b.gem_vertrouwen || 0) * 100);
-    tekst = `Bridging weegt mee in het argumentgewicht: 'Argument klopt' (+) en gehandhaafde ` +
-      `ondergravingen (−) bepalen het gezindheids-onafhankelijke gewicht. Vertrouwen groeit ` +
-      `vloeiend met het aantal oordelen (nu gem. ~${pct}%), geen harde grens.`;
-    if (b.verouderd) tekst += ` Nieuwe oordelen tellen mee na de eerstvolgende bridging-run.`;
-  } else {
-    tekst = `Bridging schuift vloeiend in zodra er meer oordelen zijn — nu nog te weinig om ` +
-      `gezindheid te schatten (${live.n_raters || 0} beoordelaars, ${live.n_ratings || 0} oordelen; ` +
-      `fit-vloer ≥${v.min_raters}/≥${v.min_ratings}). Tot dan: neutraal gewicht 1,0, geen klif.`;
-  }
-  return `<div class="bridging-hint${b.verouderd ? ' verouderd' : ''}" title="Bridging (M2.5): het gewicht van een argument groeit/daalt met gezindheids-onafhankelijke oordelen — endorsement (+) en onderbouwde ondergraving (−). Geen drempel-klif: krimp naar neutraal 1,0.">${esc(tekst)}</div>`;
-}
-async function rateArg(id, oordeel, wasActief, ck) {
-  try {
-    const resp = wasActief
-      ? await fetch(`/api/arguments/${id}/ratings`, { method: 'DELETE' })
-      : await fetch(`/api/arguments/${id}/ratings`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oordeel }) });
-    if (!resp.ok) { const j = await resp.json().catch(() => ({})); melding(j.error || 'Kon niet beoordelen', 'fout'); return; }
-    ctxHerlaad(ck);
-  } catch (e) { melding('Netwerkfout: ' + e.message, 'fout'); }
 }
 // param (relation_id…) -> sel-type voor de viz-permalink (/#sel=relation:42).
 const PARAM_SEL = { relation_id: 'relation', entity_id: 'entity', role_id: 'role',
@@ -958,7 +905,6 @@ async function toonThread(param, id, label) {
     let h = `<h2 style="font-size:16px;margin:0 0 4px">${esc(label)}</h2>` +
       (sel ? `<a class="graaf-link" href="/#sel=${sel}:${id}" title="Selecteer dit element in de netwerkvisualisatie">↗ bekijk in de graaf</a>` : '') +
       `<div style="font-size:11px;color:var(--text-muted);margin-bottom:16px">${args.length} argument(en) in deze thread · doel: <code>${esc(param)}=${id}</code></div>`;
-    if (roots.length) h += bridgingHint();
     h += roots.length ? roots.map(r => rendNode(r)).join('')
       : '<div class="leeg">Nog geen argumenten — voeg het eerste toe.</div>';
     h += ME ? formHtml({ param, id }) :
@@ -1721,14 +1667,8 @@ function doelBadge(a) {
     `<span class="doel-type">${esc(a.doel_type)}</span> <b>${esc(naam)}</b>${reply}${graaf}</div>`;
 }
 // Read-only thread-render voor de reviewkaart (Fase A): toon de hele thread in context,
-// markeer het te beoordelen argument, en laat de 👍/👎-stand (community-signaal) zien
-// vóór de poort-klik. Read-only → geen knoppen/ids die met de Threads-tab botsen.
-function ratingTellingRO(a) {
-  const r = a.ratings || { mens: { nuttig: 0, niet_nuttig: 0 }, agent: { nuttig: 0, niet_nuttig: 0 } };
-  const tel = o => r.mens[o] + (r.agent[o] ? `+${r.agent[o]}` : '');
-  return `<div class="ratings"><span class="rate-tel" title="mens telt · agent = advies">👍 ${tel('nuttig')}</span>` +
-    `<span class="rate-tel">👎 ${tel('niet_nuttig')}</span></div>`;
-}
+// markeer het te beoordelen argument. Read-only → geen knoppen/ids die met de Threads-tab
+// botsen. (De 👍/👎-ratinglaag is bij de solo+agents-kanteling geschrapt — A3.)
 function rendNodeRO(a, hlId) {
   const [sym, kleur] = STANCE[a.stance] || ['•', '#888'];
   const dit = a.id === hlId;
@@ -1742,7 +1682,6 @@ function rendNodeRO(a, hlId) {
   if (a.reviseert_id) m.push('revisie van #' + a.reviseert_id);
   h += `<div class="arg-meta">${m.filter(Boolean).join(' · ')}</div>`;
   h += (a.citations || []).map(citeHtml).join('');
-  h += ratingTellingRO(a);
   (a._kids || []).forEach(k => { h += rendNodeRO(k, hlId); });
   h += `</div>`;
   return h;

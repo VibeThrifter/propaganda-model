@@ -8,7 +8,7 @@ Dekt de klaar-wanneer-criteria:
   M2.3  een nieuw theorie-element ontstaat alleen via een RfC (2 menselijke reviewers;
         agent-oordeel telt nooit)
   M2.4  duplicaat gesignaleerd bij indienen; recent-changes-feed + watchlist; rate limit
-  M2.5  ratings (nooit eigen werk; agent = advies)
+  M2.5  vervallen — de 👍/👎-ratinglaag (bridging) is bij de solo+agents-kanteling geschrapt (A3)
   M2.6  één samenvoeging en één splitsing end-to-end via het voorstelpad, met lege
         hertriage-restlijst, werkende oude id's (lineage) en herberekende scores
         zonder dubbeltelling
@@ -152,20 +152,9 @@ def main():
     eis(r.status_code == 201, "negeer_duplicaten dient alsnog in")
     arg_dup = r.get_json()["id"]
 
-    print("4. M2.5 — ratings: nooit eigen werk; agent = advies")
-    r = c.post(f"/api/arguments/{arg1}/ratings", headers=kop["bij"],
-               json={"oordeel": "nuttig"})
-    eis(r.status_code == 403, "eigen werk raten kan niet")
-    r = c.post(f"/api/arguments/{arg1}/ratings", headers=kop["r1"],
-               json={"oordeel": "nuttig", "reden": "sterke_onderbouwing"})
-    eis(r.status_code == 201, "menselijke rating geaccepteerd")
-    r = c.post(f"/api/arguments/{arg1}/ratings", headers=kop["bot"],
-               json={"oordeel": "nuttig"})
-    eis(r.status_code == 201 and r.get_json()["advies"] is True,
-        "agent-rating is zichtbaar advies")
-    t = c.get(f"/api/arguments/{arg1}/ratings").get_json()["telling"]
-    eis(t["mens"]["nuttig"] == 1 and t["agent"]["nuttig"] == 1,
-        "telling splitst mens en agent")
+    # De 👍/👎-ratinglaag (M2.5-bridging) is bij de solo+agents-kanteling geschrapt (A3):
+    # bij n=1 was die mens-diversiteit-laag inert. De endpoints /api/arguments/<id>/ratings
+    # en /api/bridging bestaan niet meer; de tabel argument_ratings blijft bevroren (audit).
 
     print("5. M2.4 — watchlist + recent-changes-feed")
     r = c.post("/api/watchlist", headers=kop["r2"],

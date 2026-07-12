@@ -1243,7 +1243,6 @@ const pathClaims = {};      // 'bronRolId>doelRolId' → [root arguments]: eindc
                             // afgeleide pijl als geheel onderbouwen (property 'indirecte_invloed_op')
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
-let bridgingStatus = null;  // M2.5: wanneer telt een rating mee in de score? (lui via /api/bridging)
 const SOURCE_TYPES = ['boek','academisch_artikel','rapport','nieuwsartikel','transcript',
                       'interview','dataset','wetgeving','persbericht','website','overig'];
 const roleIdByName = {};
@@ -1398,30 +1397,6 @@ function countStances(args) {
   return { sup, con, ctx, total: sup + con + ctx };
 }
 
-// Eerlijk over rating-latentie (M2.5): een duim is zichtbaar advies en beweegt de score
-// pas zodra de beoordelaarspool de bridging-drempel haalt én scripts/bridging.py opnieuw draait.
-function bridgingHint() {
-  const b = bridgingStatus;
-  if (!b) return '';
-  const v = b.vloer || {}, live = b.live || {};
-  let tekst;
-  if (b.actief) {
-    const pct = Math.round((b.gem_vertrouwen || 0) * 100);
-    tekst = `Bridging weegt mee in het argumentgewicht: 'Argument klopt' (+) en gehandhaafde `
-      + `ondergravingen (−) bepalen het gezindheids-onafhankelijke gewicht. Vertrouwen groeit `
-      + `vloeiend met het aantal oordelen (nu gemiddeld ~${pct}%), geen harde grens.`;
-    if (b.verouderd) tekst += ' Nieuwe oordelen tellen mee na de eerstvolgende bridging-run.';
-  } else {
-    tekst = `Bridging schuift vloeiend in zodra er meer oordelen zijn — nu nog te weinig om `
-      + `gezindheid te schatten (${live.n_raters || 0} beoordelaars, ${live.n_ratings || 0} oordelen; `
-      + `fit-vloer ≥${v.min_raters}/≥${v.min_ratings}). Tot dan: neutraal gewicht 1,0, geen klif.`;
-  }
-  return `<div style="font-size:10px;color:var(--text-muted);background:rgba(255,255,255,.03);`
-    + `border:1px solid ${b.verouderd ? 'color-mix(in srgb,#e0a23a 30%,transparent)' : 'var(--border)'};`
-    + `border-radius:6px;padding:5px 8px;margin:0 0 8px;line-height:1.5"`
-    + ` title="Bridging (M2.5): het gewicht van een argument groeit/daalt met gezindheids-onafhankelijke oordelen — endorsement (+) en onderbouwde ondergraving (−). Geen drempel-klif: krimp naar neutraal 1,0.">${tekst}</div>`;
-}
-
 function renderArgTree(args) {
   if (!args || !args.length) return '';
   const counts = countStances(args);
@@ -1432,7 +1407,6 @@ function renderArgTree(args) {
     <span><span class="count con">${counts.con}</span> tegen</span>
     <span><span class="count ctx">${counts.ctx}</span> context</span>
   </div>`;
-  html += bridgingHint();
   html += '<div class="arg-tree">';
   args.forEach(a => { html += renderArgNode(a, 0); });
   html += '</div>';
@@ -1490,9 +1464,9 @@ function renderArgNode(arg, depth) {
     html += `<div class="arg-weight">${parts.join(' · ')}</div>`;
   }
 
-  // M2.5: ratings — je beoordeelt onderbouwing/relevantie/eerlijkheid, nooit waarheid;
-  // eigen werk raten weigert de server; agent-ratings zijn zichtbaar advies.
-  html += `<div id="ratings-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingRegel(arg)}</div>`;
+  // Oordeel-regel: alléén de onderbouwde ondergraving ('argument klopt niet').
+  // De 👍-endorsement-rating (bridging) is geschrapt (A3) — dit is een reply, geen rating.
+  html += `<div id="oordeel-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingRegel(arg)}</div>`;
   html += bezwaarRegel(arg);
   html += vetoRegel(arg);
 
@@ -1527,37 +1501,15 @@ function renderArgNode(arg, depth) {
   return html;
 }
 
-// M2.5: ratings-helpers (mens telt mee in bridging zodra de pool het toelaat;
-// agent-ratings zijn advies en tellen nooit onderling)
-function ratingTekst(rt) {
-  if (!rt) return '';
-  const deel = (label, m, a) => `${label} ${m}${a ? ` (+${a} agent)` : ''}`;
-  return deel('👍', rt.mens.nuttig, rt.agent.nuttig) + ' · '
-       + deel('👎', rt.mens.niet_nuttig, rt.agent.niet_nuttig) + ' · ';
-}
-
-// De duim-regel: tellingen + twee toggle-links. Je eigen stem krijgt een vinkje +
-// accentkleur; nogmaals erop klikken trekt 'm in (un-vote). `telling` overschrijft
-// arg.ratings na een verse fetch.
-// Review-verdict v2: 'Argument klopt' = lichte endorsement (nuttig-rating; telt niet als
-// bewijs of in de score, voedt hooguit later bridging). 'Argument klopt niet' = een
-// onderbouwd bezwaar = een ondergraving (opent het bezwaarformulier) die de score van
-// dit argument dempt tot ze is opgelost. De kale, redenloze downvote bestaat niet meer.
-// Van een ADMIN (maintainer) is de ondergraving een VETO: de parent telt voor 0 tot het
-// bezwaar is opgelost of met review is weerlegd (scoring.py, juli 2026).
-function ratingRegel(arg, telling) {
-  const rt = telling || arg.ratings;
-  const nuttig = rt ? (rt.mens.nuttig + (rt.agent.nuttig ? `+${rt.agent.nuttig}` : '')) : 0;
-  const eigen = authUser && arg.contributed_by === authUser.username;
-  const actief = (arg.mijn_oordeel === 'nuttig');
-  // Gebalanceerd oordeel-paar (samen, even zwaar): ✓ = lichte endorsement (rating);
-  // ✗ = onderbouwd bezwaar → opent de bezwaar-composer met '− Tegen' vast
-  // (een ondergraving die de kracht dempt tot ze is opgelost; bronloos).
-  const eens = eigen
-    ? `<span class="oordeel eens stat" title="je beoordeelt eigen werk niet">✓ Argument klopt${nuttig ? ` (${nuttig})` : ''}</span>`
-    : `<a href="#" class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'Het argument klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">✓ Argument klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
+// De oordeel-regel op een argument. De 👍/👎-endorsement-rating (M2.5 bridging) is
+// geschrapt (A3); wat blijft is de onderbouwde ondergraving — een reply, geen rating.
+// 'Argument klopt niet' opent het bezwaarformulier en wordt een '− Tegen'-reactie
+// (ondergraving) die de kracht van dit argument dempt tot ze is opgelost. Van een ADMIN
+// (maintainer) is die ondergraving een VETO: de parent telt voor 0 tot het bezwaar is
+// opgelost of met review is weerlegd (scoring.py, juli 2026).
+function ratingRegel(arg) {
   const oneens = `<a href="#" class="oordeel oneens knop" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM het argument niet klopt. Geen bron nodig. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Argument klopt niet</a>`;
-  return `<span class="oordeel-rij">${eens}${oneens}</span>`;
+  return `<span class="oordeel-rij">${oneens}</span>`;
 }
 
 // De resolutielus van een ONDERGRAVING: hier alleen de status-badge; de overgangs-
@@ -1629,34 +1581,6 @@ function argMenuItemsViz(arg) {
 function argMenuViz(id, knop) {
   const a = argsById.get(id);
   if (a) hsMenu(knop, argMenuItemsViz(a));
-}
-
-async function rateArgument(argId, oordeel) {
-  const el = document.getElementById('ratings-' + argId);
-  const arg = argsById.get(argId) || { id: argId };
-  try {
-    // Lees mijn huidige stem van de server (waarheid), zodat un-voten ook na
-    // herladen klopt: nogmaals op je eigen stem klikken = intrekken.
-    const voor = await (await fetch(`/api/arguments/${argId}/ratings`)).json();
-    const mijnRij = (voor.ratings || []).find(r => authUser && r.rater === authUser.username);
-    const unvote = (mijnRij ? mijnRij.oordeel : null) === oordeel;
-    const resp = unvote
-      ? await fetch(`/api/arguments/${argId}/ratings`, { method: 'DELETE' })
-      : await fetch(`/api/arguments/${argId}/ratings`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oordeel }),
-        });
-    const j = await resp.json();
-    if (!resp.ok) { el.innerHTML = `<span style="color:#e74c3c">${j.error}</span>`; return; }
-    // Ververs tellingen + eigen stem en herteken de regel met de juiste actieve staat.
-    const na = await (await fetch(`/api/arguments/${argId}/ratings`)).json();
-    const naRij = (na.ratings || []).find(r => authUser && r.rater === authUser.username);
-    arg.mijn_oordeel = naRij ? naRij.oordeel : null;
-    el.innerHTML = ratingRegel(arg, na.telling)
-      + `<span style="color:#2ecc71;margin-left:6px">${unvote ? 'stem ingetrokken' : 'oordeel opgeslagen'}${j.advies ? ' (advies — agent)' : ''}</span>`;
-  } catch (e) {
-    el.innerHTML = `<span style="color:#e74c3c">Netwerkfout: ${e.message}</span>`;
-  }
 }
 
 // ============================================================
@@ -5440,6 +5364,9 @@ function showInstanceDetail(d, content, color) {
       <div class="entity-type" style="color:${color}">${weergaveNaam(d.type)}</div>
       <h2>${overlegTitel('entity_id', d.id, d.name)}</h2>
       ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
+      <div style="margin-top:6px"><a href="/tip?betreft=entity:${d.id}" rel="nofollow"
+        style="font-size:11px;color:var(--text-muted)"
+        title="Meld een feitelijke onjuistheid of draag een bron aan (eenrichting, geen account nodig)">⚑ Onjuistheid melden / bron voorstellen</a></div>
     </div>
   `;
   if (d.description) html += `<div class="detail-description">${d.description}</div>`;
@@ -7112,8 +7039,6 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 // ============================================================
 // INIT
 // ============================================================
-// Bridging-status lui ophalen voor de rating-latentie-hint in de discussieboom.
-fetch('/api/bridging').then(r => r.json()).then(j => { bridgingStatus = j; }).catch(() => {});
 initTimeline();
 populateSizeMetricOptions();
 // Model-afhankelijke UI op de startstand zetten (zelfde regels als de modelwissel-handler).
@@ -167987,16 +167912,7 @@ window.addEventListener('hashchange', selectFromHash);
       "weight": 0.6,
       "status": "ongecontroleerd",
       "objection_type": null,
-      "ratings": {
-        "mens": {
-          "nuttig": 1,
-          "niet_nuttig": 0
-        },
-        "agent": {
-          "nuttig": 0,
-          "niet_nuttig": 0
-        }
-      },
+      "ratings": null,
       "tau": 0.5,
       "sigma": 0.5
     },
@@ -170138,16 +170054,7 @@ window.addEventListener('hashchange', selectFromHash);
       "weight": 0.65,
       "status": "ongecontroleerd",
       "objection_type": null,
-      "ratings": {
-        "mens": {
-          "nuttig": 1,
-          "niet_nuttig": 0
-        },
-        "agent": {
-          "nuttig": 0,
-          "niet_nuttig": 0
-        }
-      },
+      "ratings": null,
       "tau": 0.4317,
       "sigma": 0.4317
     },
@@ -231886,7 +231793,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Aandacht voor media",
       "source_author": "Wetenschappelijke Raad voor het Regeringsbeleid",
       "url": "https://www.wrr.nl/documenten/2024/10/03/aandacht-voor-media",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260522073704/https://www.wrr.nl/documenten/2024/10/03/aandacht-voor-media",
       "has_locator": true
     },
     {
@@ -232376,7 +232283,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Memo's dividendbelasting openbaar gemaakt",
       "source_author": "Ministerie van Algemene Zaken / Ministerie van Financiën",
       "url": "https://www.rijksoverheid.nl/regering/bewindspersonen/mark-rutte/documenten/publicaties/2018/04/24/notities-5-t-m-12-bij-brief-over-dividendbelating",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20191014155102/https://www.rijksoverheid.nl/regering/bewindspersonen/mark-rutte/documenten/publicaties/2018/04/24/notities-5-t-m-12-bij-brief-over-dividendbelating",
       "has_locator": true
     },
     {
@@ -232390,7 +232297,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Memo's dividendbelasting openbaar gemaakt",
       "source_author": "Ministerie van Algemene Zaken / Ministerie van Financiën",
       "url": "https://www.rijksoverheid.nl/regering/bewindspersonen/mark-rutte/documenten/publicaties/2018/04/24/notities-5-t-m-12-bij-brief-over-dividendbelating",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20191014155102/https://www.rijksoverheid.nl/regering/bewindspersonen/mark-rutte/documenten/publicaties/2018/04/24/notities-5-t-m-12-bij-brief-over-dividendbelating",
       "has_locator": true
     },
     {
@@ -232404,7 +232311,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Memo's dividendbelasting openbaar gemaakt",
       "source_author": "Ministerie van Algemene Zaken / Ministerie van Financiën",
       "url": "https://www.rijksoverheid.nl/regering/bewindspersonen/mark-rutte/documenten/publicaties/2018/04/24/notities-5-t-m-12-bij-brief-over-dividendbelating",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20191014155102/https://www.rijksoverheid.nl/regering/bewindspersonen/mark-rutte/documenten/publicaties/2018/04/24/notities-5-t-m-12-bij-brief-over-dividendbelating",
       "has_locator": true
     },
     {
@@ -232418,7 +232325,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Staat steunt KLM met leningen en garanties van 3,4 miljard euro",
       "source_author": "Ministerie van Financiën",
       "url": "https://www.rijksoverheid.nl/documenten/kamerstukken/2020/06/26/kamerbrief-steunmaatregelen-klm",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260511002801/https://www.rijksoverheid.nl/documenten/kamerstukken/2020/06/26/kamerbrief-steunmaatregelen-klm",
       "has_locator": true
     },
     {
@@ -232432,7 +232339,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Lifting the Lid on Lobbying: Enhancing Trust in Public Decision-making in the Netherlands",
       "source_author": "Transparency International Nederland",
       "url": "https://www.transparency.nl/wp-content/uploads/2023/02/Lifting-the-Lid-on-Lobbying-Formatted-31-01-2023.pdf",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20251030212803/https://www.transparency.nl/wp-content/uploads/2023/02/Lifting-the-Lid-on-Lobbying-Formatted-31-01-2023.pdf",
       "has_locator": true
     },
     {
@@ -235652,7 +235559,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "PAX Jaarverslag — financiering en herkomst inkomsten",
       "source_author": "PAX",
       "url": "https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260309233911/https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
       "has_locator": true
     },
     {
@@ -235666,7 +235573,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Subsidiekader Power of Voices (Ministerie van Buitenlandse Zaken)",
       "source_author": null,
       "url": "https://paxvoorvrede.nl/nieuws/pax-zeer-verheugd-opnieuw-vijf-jaar-strategisch-partner-van-buitenlandse-zaken/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260512121521/https://paxvoorvrede.nl/nieuws/pax-zeer-verheugd-opnieuw-vijf-jaar-strategisch-partner-van-buitenlandse-zaken/",
       "has_locator": true
     },
     {
@@ -235680,7 +235587,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "PAX Jaarverslag — financiering en herkomst inkomsten",
       "source_author": "PAX",
       "url": "https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260309233911/https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
       "has_locator": true
     },
     {
@@ -235694,7 +235601,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Rechtszaak PAX & Oxfam Novib tegen de Staat over F-35-onderdelen naar Israel",
       "source_author": null,
       "url": "https://www.rechtspraak.nl/Organisatie-en-contact/Organisatie/Gerechtshoven/Gerechtshof-Den-Haag/Nieuws/Paginas/Nederland-moet-de-uitvoer-van-F-35-onderdelen-naar-Israel-stoppen.aspx",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20251224170711/https://www.rechtspraak.nl/Organisatie-en-contact/Organisatie/Gerechtshoven/Gerechtshof-Den-Haag/Nieuws/Paginas/Nederland-moet-de-uitvoer-van-F-35-onderdelen-naar-Israel-stoppen.aspx",
       "has_locator": true
     },
     {
@@ -235708,7 +235615,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Don't Bank on the Bomb (PAX/ICAN-rapportenreeks)",
       "source_author": "PAX",
       "url": "https://paxvoorvrede.nl/wat-wij-doen/programmas/dont-bank-on-the-bomb/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260305232923/https://paxvoorvrede.nl/wat-wij-doen/programmas/dont-bank-on-the-bomb/",
       "has_locator": true
     },
     {
@@ -235722,7 +235629,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "PAX Jaarverslag — financiering en herkomst inkomsten",
       "source_author": "PAX",
       "url": "https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260309233911/https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
       "has_locator": true
     },
     {
@@ -235736,7 +235643,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Nieuwe ngo-subsidieregels vanaf 2026: minimaal 50% niet-gouvernementele inkomsten",
       "source_author": null,
       "url": "https://nos.nl/artikel/2544164-ontwikkelingsorganisaties-vrezen-kaalslag-vanwege-bezuinigingsplannen",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20250904054542/https://nos.nl/artikel/2544164-ontwikkelingsorganisaties-vrezen-kaalslag-vanwege-bezuinigingsplannen",
       "has_locator": true
     },
     {
@@ -235750,7 +235657,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Don't Bank on the Bomb (PAX/ICAN-rapportenreeks)",
       "source_author": "PAX",
       "url": "https://paxvoorvrede.nl/wat-wij-doen/programmas/dont-bank-on-the-bomb/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260305232923/https://paxvoorvrede.nl/wat-wij-doen/programmas/dont-bank-on-the-bomb/",
       "has_locator": true
     },
     {
@@ -235764,7 +235671,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Ontwikkeling derde geldstroom en beïnvloeding van wetenschappelijk onderzoek",
       "source_author": "Rathenau Instituut",
       "url": "https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260511155125/https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
       "has_locator": true
     },
     {
@@ -235778,7 +235685,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Ontwikkeling derde geldstroom en beïnvloeding van wetenschappelijk onderzoek",
       "source_author": "Rathenau Instituut",
       "url": "https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260511155125/https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
       "has_locator": true
     },
     {
@@ -235806,7 +235713,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Nationale Wetenschapsagenda (NWA) — thematische programmering",
       "source_author": "NWO",
       "url": "https://www.nwo.nl/en/researchprogrammes/dutch-research-agenda-nwa/thematic-programming",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20250721185045/https://www.nwo.nl/en/researchprogrammes/dutch-research-agenda-nwa/thematic-programming",
       "has_locator": true
     },
     {
@@ -235820,7 +235727,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Ontwikkeling derde geldstroom en beïnvloeding van wetenschappelijk onderzoek",
       "source_author": "Rathenau Instituut",
       "url": "https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260511155125/https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
       "has_locator": true
     },
     {
@@ -235848,7 +235755,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Kabinet bezuinigt 1 miljard op onderwijs en wetenschap",
       "source_author": "FNV",
       "url": "https://www.fnv.nl/nieuwsbericht/sectornieuws/fnv-overheid/2024/10/bezuinig-niet-op-de-toekomst",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260116184829/https://www.fnv.nl/nieuwsbericht/sectornieuws/fnv-overheid/2024/10/bezuinig-niet-op-de-toekomst",
       "has_locator": true
     },
     {
@@ -235904,7 +235811,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "PAX Jaarverslag — financiering en herkomst inkomsten",
       "source_author": "PAX",
       "url": "https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260309233911/https://nl.wikipedia.org/wiki/PAX_(vredesorganisatie)",
       "has_locator": true
     },
     {
@@ -235918,7 +235825,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Ontwikkeling derde geldstroom en beïnvloeding van wetenschappelijk onderzoek",
       "source_author": "Rathenau Instituut",
       "url": "https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260511155125/https://www.rathenau.nl/nl/werking-van-het-wetenschapssysteem/ontwikkeling-derde-geldstroom-en-beinvloeding-van",
       "has_locator": true
     },
     {
@@ -235946,7 +235853,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Cora van Nieuwenhuizen heeft een lobbyverbod maar bemoeit zich met het werk van klimaatminister Jetten",
       "source_author": "Follow the Money",
       "url": "https://www.ftm.nl/artikelen/cora-van-nieuwenhuizen-negeert-lobbyverbod",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20240118181256/https://www.ftm.nl/artikelen/cora-van-nieuwenhuizen-negeert-lobbyverbod",
       "has_locator": true
     },
     {
@@ -235960,7 +235867,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Samen optrekken naar sterk Defensie (Hans Hillen, NIDV)",
       "source_author": "Materieelgezien",
       "url": "https://magazines.defensie.nl/materieelgezien/2017/08/06mg201708hillennidv",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260316083248/https://magazines.defensie.nl/materieelgezien/2017/08/06mg201708hillennidv",
       "has_locator": true
     },
     {
@@ -235974,7 +235881,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Angelien Eijsink benoemd tot voorzitter NIDV",
       "source_author": "NIDV",
       "url": "https://www.nidv.eu/nieuws/angelien-eijsink-benoemd-tot-voorzitter-nidv/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20250427192124/https://www.nidv.eu/nieuws/angelien-eijsink-benoemd-tot-voorzitter-nidv/",
       "has_locator": true
     },
     {
@@ -236030,7 +235937,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Kerk en Vrede weerspreekt PAX",
       "source_author": "Kerk en Vrede",
       "url": "https://vredessite.nl/nieuws/pax_2131.html",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20240518225408/https://www.vredessite.nl/nieuws/pax_2131.html",
       "has_locator": true
     },
     {
@@ -236044,7 +235951,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Van 'Ban de bom' tot F16's voor Oekraïne: wat is er gebeurd met het linkse pacifisme?",
       "source_author": "Wynia's Week",
       "url": "https://www.wyniasweek.nl/van-ban-de-bom-tot-f16s-voor-oekraine-wat-is-er-in-vredesnaam-gebeurd-met-het-linkse-pacifisme/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260520043101/https://www.wyniasweek.nl/van-ban-de-bom-tot-f16s-voor-oekraine-wat-is-er-in-vredesnaam-gebeurd-met-het-linkse-pacifisme/",
       "has_locator": true
     },
     {
@@ -236072,7 +235979,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Kerk en Vrede weerspreekt PAX",
       "source_author": "Kerk en Vrede",
       "url": "https://vredessite.nl/nieuws/pax_2131.html",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20240518225408/https://www.vredessite.nl/nieuws/pax_2131.html",
       "has_locator": true
     },
     {
@@ -236086,7 +235993,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Van 'Ban de bom' tot F16's voor Oekraïne: wat is er gebeurd met het linkse pacifisme?",
       "source_author": "Wynia's Week",
       "url": "https://www.wyniasweek.nl/van-ban-de-bom-tot-f16s-voor-oekraine-wat-is-er-in-vredesnaam-gebeurd-met-het-linkse-pacifisme/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260520043101/https://www.wyniasweek.nl/van-ban-de-bom-tot-f16s-voor-oekraine-wat-is-er-in-vredesnaam-gebeurd-met-het-linkse-pacifisme/",
       "has_locator": true
     },
     {
@@ -236100,7 +236007,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Gratis en zelfstandig RTL Nieuws en Nu.nl redden de democratie niet",
       "source_author": "Michiel Buitelaar & Peter Olsthoorn",
       "url": "https://www.netkwesties.nl/2104/gratis-zelfstandig-rtl-nieuws-redden.htm",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260414054246/https://www.netkwesties.nl/2104/gratis-zelfstandig-rtl-nieuws-redden.htm",
       "has_locator": true
     },
     {
@@ -236114,7 +236021,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "De Persgroep Nederland (Wikipedia) — PCM-saneringsperiode onder Apax 2004-2007",
       "source_author": "Wikipedia-auteurs",
       "url": "https://nl.wikipedia.org/wiki/De_Persgroep_Nederland",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260705204424/https://nl.wikipedia.org/wiki/De_Persgroep_Nederland",
       "has_locator": true
     },
     {
@@ -236128,7 +236035,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "DPG mag RTL overnemen, wel onder strikte voorwaarden",
       "source_author": "NOS",
       "url": "https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260701201451/https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
       "has_locator": true
     },
     {
@@ -236142,7 +236049,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "DPG mag RTL overnemen, wel onder strikte voorwaarden",
       "source_author": "NOS",
       "url": "https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260701201451/https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
       "has_locator": true
     },
     {
@@ -236156,7 +236063,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Gratis en zelfstandig RTL Nieuws en Nu.nl redden de democratie niet",
       "source_author": "Michiel Buitelaar & Peter Olsthoorn",
       "url": "https://www.netkwesties.nl/2104/gratis-zelfstandig-rtl-nieuws-redden.htm",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260414054246/https://www.netkwesties.nl/2104/gratis-zelfstandig-rtl-nieuws-redden.htm",
       "has_locator": true
     },
     {
@@ -236170,7 +236077,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Verkenning naar legitimatiecriteria voor publieke omroepen",
       "source_author": "Colenbrander, B.; Van Eijk, N.; Etty, W.; Van t Klooster, N.; Van Zoest-Hommema, I. (AEF)",
       "url": "https://www.tweedekamer.nl/downloads/document?id=2021D43440",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260314222457/https://www.tweedekamer.nl/downloads/document?id=2021D43440",
       "has_locator": true
     },
     {
@@ -236184,7 +236091,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Verkenning naar legitimatiecriteria voor publieke omroepen",
       "source_author": "Colenbrander, B.; Van Eijk, N.; Etty, W.; Van t Klooster, N.; Van Zoest-Hommema, I. (AEF)",
       "url": "https://www.tweedekamer.nl/downloads/document?id=2021D43440",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260314222457/https://www.tweedekamer.nl/downloads/document?id=2021D43440",
       "has_locator": true
     },
     {
@@ -236198,7 +236105,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Afschaffing dividendbelasting definitief van tafel, geld naar bedrijfsleven",
       "source_author": "NOS",
       "url": "https://nos.nl/artikel/2254925-afschaffing-dividendbelasting-definitief-van-tafel-geld-naar-bedrijfsleven",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20251104070930/https://nos.nl/artikel/2254925-afschaffing-dividendbelasting-definitief-van-tafel-geld-naar-bedrijfsleven",
       "has_locator": true
     },
     {
@@ -236226,7 +236133,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "NPO: huidig omroepbestel niet beheersbaar, kabinet wil andere criteria",
       "source_author": "NOS",
       "url": "https://nos.nl/l/2435413",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20241216183029/https://nos.nl/l/2435413",
       "has_locator": true
     },
     {
@@ -236240,7 +236147,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "NPO: huidig omroepbestel niet beheersbaar, kabinet wil andere criteria",
       "source_author": "NOS",
       "url": "https://nos.nl/l/2435413",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20241216183029/https://nos.nl/l/2435413",
       "has_locator": true
     },
     {
@@ -236254,7 +236161,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Het omroepbestel is stuk gemaakt",
       "source_author": "Ton Verlind",
       "url": "https://www.spreekbuis.nl/het-omroepbestel-is-stuk-gemaakt/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260306171815/https://www.spreekbuis.nl/het-omroepbestel-is-stuk-gemaakt/",
       "has_locator": true
     },
     {
@@ -236268,7 +236175,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Het omroepbestel is stuk gemaakt",
       "source_author": "Ton Verlind",
       "url": "https://www.spreekbuis.nl/het-omroepbestel-is-stuk-gemaakt/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260306171815/https://www.spreekbuis.nl/het-omroepbestel-is-stuk-gemaakt/",
       "has_locator": true
     },
     {
@@ -236310,7 +236217,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Verkenning naar legitimatiecriteria voor publieke omroepen",
       "source_author": "Colenbrander, B.; Van Eijk, N.; Etty, W.; Van t Klooster, N.; Van Zoest-Hommema, I. (AEF)",
       "url": "https://www.tweedekamer.nl/downloads/document?id=2021D43440",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260314222457/https://www.tweedekamer.nl/downloads/document?id=2021D43440",
       "has_locator": true
     },
     {
@@ -253628,7 +253535,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "DPG mag RTL overnemen, wel onder strikte voorwaarden",
       "source_author": "NOS",
       "url": "https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260701201451/https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
       "has_locator": true
     },
     {
@@ -254888,7 +254795,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "DPG mag RTL overnemen, wel onder strikte voorwaarden",
       "source_author": "NOS",
       "url": "https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260701201451/https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
       "has_locator": true
     },
     {
@@ -256526,7 +256433,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "DPG mag RTL overnemen, wel onder strikte voorwaarden",
       "source_author": "NOS",
       "url": "https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260701201451/https://nos.nl/artikel/2572676-dpg-mag-rtl-overnemen-wel-onder-strikte-voorwaarden",
       "has_locator": true
     },
     {
@@ -274950,7 +274857,7 @@ window.addEventListener('hashchange', selectFromHash);
       "source_title": "Van 'Ban de bom' tot F16's voor Oekraïne: wat is er gebeurd met het linkse pacifisme?",
       "source_author": "Wynia's Week",
       "url": "https://www.wyniasweek.nl/van-ban-de-bom-tot-f16s-voor-oekraine-wat-is-er-in-vredesnaam-gebeurd-met-het-linkse-pacifisme/",
-      "archive_url": null,
+      "archive_url": "https://web.archive.org/web/20260520043101/https://www.wyniasweek.nl/van-ban-de-bom-tot-f16s-voor-oekraine-wat-is-er-in-vredesnaam-gebeurd-met-het-linkse-pacifisme/",
       "has_locator": true
     },
     {

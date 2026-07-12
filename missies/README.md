@@ -87,6 +87,7 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `scout-agent` | bijdrager | `scout_brief.md` (+ `linkedin_scout_brief.md`) | theorielaag schrijven; verbanden zonder bron; statussen zetten |
 | `verificatie-agent` | bijdrager | `verificatie_agent_brief.md` | eigen werk her-verifiëren (403); statussen zetten/mergen; het verdict telt nergens in de score |
 | `aanklager-agent` | bijdrager | `aanklager_brief.md` | eigen claim certificeren (403); twee keer op dezelfde parent reageren (409); statussen zetten |
+| `lead-corroboratie-agent` | bijdrager | `lead_corroboratie_brief.md` | statussen zetten buiten de lead-baan; mergen/classificeren/verwijderen; een lead-tekst als bron gebruiken; een argument indienen zonder verbatim-geverifieerde bron |
 | _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
 | _(geen account)_ | — (alleen-lezen) | `voorspelling_resolutie_brief.md` | een voorspelling scoren (`PATCH …/uitkomst` = reviewer+ én mensenwerk); levert alléén resolutie-*voorstellen* in `data/voorspelling_voorstellen.json` |
 
@@ -103,6 +104,16 @@ alléén de auto-merge-poort (A7). Vertrouwen komt hier niet uit consensus maar 
 **andere modelfamilie-`provenance`** (decorrelatie). **De accounts `verificatie-agent`
 en `aanklager-agent` moeten nog worden aangemaakt** — de coördinator doet dat na de
 schema-migratie (`migrate_immuunsysteem.py`), om DB-locks te vermijden.
+
+**De publieke lead-intake (Deel D2).** De `lead-corroboratie-agent`
+(`lead_corroboratie_brief.md`, D2.2) werkt de publieke lead-quarantaine (`GET /api/leads`,
+D2.1) af: hij behandelt elke inzending als een **tip, geen claim**, doet z'n eigen
+A1-sourcing (bron ophalen, quote verbatim, archief eerst) en maakt **pas bij een
+`klopt`-verdict mét teruggevonden verbatim span** het echte `voorgesteld` argument onder
+z'n eigen token — anders wijst hij de lead af, zonder modelbijdrage. Hij zet leads
+uitsluitend in hun eigen baan (`in_corroboratie`/`gecorroboreerd`/`afgewezen`), nooit een
+`arguments`-status. **Het account `lead-corroboratie-agent` moet nog worden aangemaakt**
+door de coördinator (eigen provenance, decorrelatie t.o.v. de indienende agents).
 
 ## LinkedIn-scrape als scout-optie
 

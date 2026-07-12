@@ -126,6 +126,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 
 ### A3 — Schrap de mens-diversiteit-laag · Fase 5 (koppelbaar aan Fase 2) · M
 
+> **Fase-5 status (branch `monetisatie-bouw`, 12 juli 2026):** DONE mens-diversiteit-laag geschrapt (bridging/kalibratie-scripts weg, `/api/bridging` + ratings-endpoints weg, rating-UI weg); `scoring.py` `bridged_weights` alleen nog override-hook; golden snapshot byte-identiek (laag was inert). `argument_ratings`/`watchlists` bevroren, niets DB-gewist.
+
 **Als** onderhouder **wil ik** de bridging-/rating-/kalibratie-machinerie verwijderen **zodat** de score niet langer leunt op een diverse mensenpool die er niet meer is — bij n=1 is die laag toch al inert.
 
 **Waarom.** `bridging.py`, `argument_ratings`, `kalibratie_agents.py` en de nuttig/ondergraving-ratings zijn zinloos zonder diverse mensenpool. `scoring.py` valt voor `bridged_weights` al terug op het neutrale gewicht 1.0. Dit is **sloop van de mens-diversiteit-laag** en overlapt Deel D1 (governance afbouwen) — voer het daar gecoördineerd uit, hier staat de epistemische rechtvaardiging. **Kruisverwijzing: D1.**
@@ -936,6 +938,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 ### D1 — Wat gaat / wat blijft  ·  Fase 5  ·  L
 
+> **Fase-5 status:** DONE bevestigd — de B3-gate (Fase 1) is de prive-grens; governance -> eigenaar-checklist; A3 doet de feitelijke sloop; `voorstellen.py` ongewijzigd.
+
 **Als** eigenaar **wil ik** de multi-mens governance-machinerie afbouwen en de redactie-tools achter een privé-gate zetten **zodat** het systeem solo + agents draait zonder consensus-onderhandeling, terwijl alle bewijs-, score- en viz-motor én de open bijdrage-intake intact blijven.
 
 **Waarom.** De flessenhals is niet de bijdrage maar de *governance*: `maxime` mergede alles handmatig, de "autonome" agents draaiden nauwelijks onbewaakt, en de review-queue is gebouwd als sociale ruimte voor een community die er niet is (n=1). Deel A vervangt "diverse mensen worden het eens" door bron-herverificatie + tegenspraak, dus de mens-diversiteit-laag (ratings/bridging/watchlists) is bij n=1 al inert en de twee-akkoorden-RfC's zijn overbodig. Niet slopen om te slopen: de bijdrage blíjft, alleen ontpersoonlijkt en eenrichting (D2).
@@ -973,6 +977,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 ### D2-kern — Publiek intake-/rectificatie-endpoint + widget (eenrichting)  ·  Fase 5  ·  M
 
+> **Fase-5 status:** DONE `POST /api/leads` (loginloos) + `GET /api/lead_token` + `leads`-tabel + `/tip`-widget; een publieke inzending is een tip, telt in niets, eenrichting.
+
 **Als** bezoeker/indiener (anoniem) **wil ik** één simpel formulier waarmee ik een onjuistheid kan melden óf een bron/tip kan aandragen **zodat** ik het model kan verbeteren zonder account, en **als** eigenaar **wil ik** dat die inzending nooit rechtstreeks in de bewijs-structuur schrijft.
 
 **Waarom.** De rectificatieflow (AVG art. 16/21) en de publieke bijdrage zijn *dezelfde* niet-interactieve intake: "meld onjuistheid / stel bron voor" = één eenrichtings-wachtrij. Ontwerpregel: **een publieke inzending is een tip/lead, geen claim** — ze landt in een lager-vertrouwde baan, telt in niets, en wordt pas bewijs als een *agent* haar onafhankelijk her-afleidt (A1). Het publiek mag *wijzen*, alleen geverifieerde her-afleiding *telt*.
@@ -1006,6 +1012,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 ### D2.0 — Laag 0: kosteloze poort (vóór de wachtrij, vóór elke agent-token)  ·  Fase 5  ·  M
 
+> **Fase-5 status:** DONE `_lead_poort`: HMAC-token-challenge -> honeypot -> tijd-heuristiek -> strenge per-IP-limiet -> `SPAM_DOMEINEN` -> `html.escape`+maxlength, voor elke write/token. OWNER-ACTION: PoW/Turnstile-haak + `X-Forwarded-For`/ProxyFix onder de proxy + `SPAM_DOMEINEN` uitbreiden.
+
 **Als** eigenaar **wil ik** een stapel gratis filters die strikt vóór de wachtrij draaien **zodat** een junk-flood wordt gedropt voordat er één agent-token (dat écht geld kost) aan te pas komt — denial-of-wallet-verweer.
 
 **Waarom.** A1/A2-verificatie kost tokens per claim; een junk-flood is dus een *denial-of-wallet*-aanval op het tokenbudget. Goedkope filters (CAPTCHA, rate-limit, honeypot, blocklist) horen daarom strikt vóór de dure. "Nooit een verificatie-token besteden aan iets dat een regel had kunnen droppen."
@@ -1038,6 +1046,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 ---
 
 ### D2.1 — Laag 1: lead-quarantaine (structurele isolatie + agent-corroboratie)  ·  Fase 5  ·  M
+
+> **Fase-5 status:** DONE aparte `leads`-baan (telt in niets, snapshot byte-identiek), `GET`/`PATCH /api/leads` (agent-wachtrij), difflib sock-puppet-collapse -> `duplicaat`; corroboratie via de `lead-corroboratie-agent`.
 
 **Als** eigenaar **wil ik** dat publieke leads in een aparte, lager-vertrouwde baan landen die in niets meetelt en nooit auto-merget **zodat** volume geen consensus kan fabriceren en een agent élke lead vers moet her-afleiden voor ze bewijs wordt.
 
@@ -1073,6 +1083,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 ### D2.2 — Laag 2: immuunsysteem gehard tegen injectie  ·  Fase 5  ·  L
 
+> **Fase-5 status:** DONE `missies/lead_corroboratie_brief.md` (gestructureerd verdict, data-nooit-instructie, verbatim-eis, circulaire-bron-check, methode-tier) + account `lead-corroboratie-agent` (provenance grok-4). OWNER-ACTION: de missie draaien.
+
 **Als** verificatie-agent **wil ik** een lead corroboreren door de ingezonden tekst en de opgehaalde brontekst uitsluitend als **data** te behandelen en een **gestructureerd** verdict te geven **zodat** prompt-injectie, gefabriceerde bronnen en circulaire bronnen geen hefboom hebben.
 
 **Waarom.** Als je mensen wegtrekt en de intake opent, wordt het immuunsysteem dragend: één gecompromitteerde inzending mag de agent niet kapen. Verificatie-agents behandelen ingezonden + opgehaalde tekst als data, nooit als instructie; het verdict is gestructureerd (`klopt/twijfel/klopt-niet` + verbatim span), niet vrije tekst — dat neemt de injectie-hefboom weg.
@@ -1106,6 +1118,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 ### D2.3 — Laag 3: de smaad-firewall (niet-onderhandelbaar)  ·  Fase 5  ·  M
 
+> **Fase-5 status:** DONE smaad-firewall — `arguments.smaad_hold` op negatieve persoon-claims (heuristiek), render-block in `viz_data`+`paginas`, `POST /api/arguments/<id>/smaad_vrijgeven` (maintainer-only, agent->403); organisaties vallen erbuiten.
+
 **Als** eigenaar **wil ik** dat elke inzending met een negatieve feitelijke claim over een genoemd natuurlijk persoon nooit automatisch merget en nooit publiek rendert zonder mijn akkoord **zodat** het smaadrisico mechanisch is afgedicht — hoe schoon de bron ook is.
 
 **Waarom.** Smaad/onrechtmatige daad staat los van AVG en geldt altijd: publiceer gesourcete feiten en geattribueerde meningen, nooit een eigen beschuldiging. Voor publieke inzendingen wordt dat mechanisch afgedwongen: negatieve claims over genoemde *personen* (niet organisaties) mergen nooit automatisch en renderen nooit zonder eigenaars-akkoord. Hoogste ernst, laagste volume — goedkoop om hard dicht te zetten.
@@ -1137,6 +1151,8 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 ---
 
 ### D2.4 — Laag 4: vangnet + anomalie-monitoring  ·  Fase 5  ·  M
+
+> **Fase-5 status:** DONE `validation.check_lead_anomalie` (waarschuwing) -> `/api/health`/C4; niets verwijderd (statusvlag + `edit_log`); retro-blocklist deelt `SPAM_DOMEINEN`.
 
 **Als** eigenaar/systeemaccount **wil ik** een burst-alarm op de lead-instroom en een auditeerbaar spoor van geweigerde tips **zodat** een gecoördineerde aanval (piek over één entiteit / uit één IP-range / één narratief-richting) vroeg opvalt en herhaal-misbruikers retroactief te blocklisten zijn.
 
@@ -1291,6 +1307,8 @@ Geen afzwakking van de dekking ("alles publiek, maximale dekking") — wél de c
 ---
 
 ### J2 — Rectificatie-/verwijderflow (AVG art. 16/21) — dezelfde intake als de publieke bijdrage  ·  Fase 5  ·  M
+
+> **Fase-5 status:** DONE `web/rectificatie.html` (route `/rectificatie`, 6-stappen-proces + termijn) + melden-knoppen (elementpagina's + viz) -> dezelfde `/tip`-widget; gelinkt uit de gedeelde voettekst.
 
 **Als** betrokkene (over wie data is gepubliceerd) **wil ik** per pagina een zichtbare "feitelijke onjuistheid melden / bezwaar maken"-optie met een gedocumenteerd proces **zodat** ik mijn AVG-recht op rectificatie (art. 16) en bezwaar (art. 21) kan uitoefenen zonder een gesprek te hoeven voeren.
 

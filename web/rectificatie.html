@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Rectificatie &amp; bezwaar — Wie bezit de Nederlandse media</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Hoe een rectificatie of bezwaar (AVG art. 16/21) wordt afgehandeld: van eenrichtings-melding tot onafhankelijke her-verificatie, eigenaarsbesluit en volledig spoor.">
+<link rel="stylesheet" href="/static/huisstijl.css">
+<script src="/static/huisstijl.js"></script>
+<style>
+body { min-height: 100vh; display: flex; flex-direction: column; }
+main { flex: 1; width: 100%; max-width: 760px; margin: 0 auto; padding: 32px 20px 8px; }
+.lead { font-size: 15px; color: var(--text-dim); line-height: 1.6; margin: 4px 0 8px; }
+article h1 { font-size: 24px; letter-spacing: -0.02em; margin: 6px 0 4px; }
+article h2 {
+  font-size: 17px; margin: 34px 0 8px; padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+article p { line-height: 1.65; margin: 8px 0; font-size: 14px; }
+article a { color: var(--accent); }
+code { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px;
+  background: var(--bg-inzet); padding: 1px 5px; border-radius: 4px; }
+.stappen { list-style: none; counter-reset: stap; padding-left: 0; margin: 12px 0; }
+.stappen > li {
+  position: relative; margin: 12px 0; padding: 12px 16px 12px 52px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card);
+  font-size: 13.5px; line-height: 1.6; color: var(--text-dim);
+}
+.stappen > li::before {
+  counter-increment: stap; content: counter(stap);
+  position: absolute; left: 14px; top: 12px;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text); font-size: 12.5px; font-weight: 600;
+}
+.stappen b { color: var(--text); }
+.kader {
+  background: var(--bg-card); border: 1px solid color-mix(in srgb, var(--knop-rood) 35%, transparent);
+  border-radius: var(--radius); padding: 14px 18px; margin: 16px 0; font-size: 13.5px;
+  line-height: 1.6; color: var(--text-dim);
+}
+.kader strong { color: var(--text); }
+.cta {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 8px;
+}
+.cta a {
+  display: inline-block; padding: 9px 16px; border-radius: 8px; font-size: 13.5px;
+  text-decoration: none;
+}
+.cta a.prim { background: var(--accent); color: #fff; font-weight: 600; }
+.cta a.sec { border: 1px solid var(--border); color: var(--text-dim); }
+.cta a:hover { filter: brightness(1.12); }
+.termijn-noot { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header class="topbal" data-actief=""></header>
+<main>
+<article>
+  <h1>Rectificatie &amp; bezwaar</h1>
+  <p class="lead">Ben je het niet eens met een gegeven in dit onderzoek, of vind je dat een feit
+  onjuist is? Je kunt een <strong>rectificatie</strong> (AVG art. 16) of <strong>bezwaar</strong>
+  (AVG art. 21) indienen — zonder account en zonder een gesprek te hoeven voeren. Deze pagina legt
+  uit wat er daarna precies gebeurt, zodat het proces transparant en controleerbaar is.</p>
+
+  <div class="cta">
+    <a class="prim" href="/tip?soort=rectificatie">Onjuistheid melden of bezwaar maken</a>
+    <a class="sec" href="/methode">Lees de methode &amp; verantwoording</a>
+  </div>
+
+  <h2 id="hoe">Hoe je melding wordt afgehandeld</h2>
+  <p>Een rectificatie of bezwaar loopt via exact hetzelfde eenrichtings-kanaal als een gewone tip.
+  Je <em>wijst</em> op iets; een onafhankelijke controle bepaalt of en hoe het onderzoek verandert.
+  De stappen:</p>
+
+  <ol class="stappen">
+    <li><b>Je melding komt in de eenrichtings-wachtrij.</b> Ze wordt opgeslagen met herkomst
+      <code>publiek</code> en telt op dat moment in niets mee: ze beweegt geen score, heft geen
+      vlag op en verschijnt niet vanzelf in het publieke onderzoek. Het is een <em>lead</em>, geen
+      claim.</li>
+    <li><b>Een agent her-verifieert de bron onafhankelijk.</b> Een controle-agent zoekt de betwiste
+      of aangedragen bron zelf op en beoordeelt haar op eigen kracht. Alleen een zelfstandig
+      bevestigde bron kan tot een wijziging leiden — jouw melding op zichzelf is nooit het bewijs.</li>
+    <li><b>De eigenaar beslist.</b> Een mens weegt de uitkomst van die her-verificatie en besluit
+      of er iets verandert. Publieke meldingen worden nooit automatisch samengevoegd in het model.</li>
+    <li><b>Smaad-firewall bij een genoemd persoon.</b> Een <b>negatieve claim over een genoemd
+      natuurlijk persoon</b> rendert nooit zonder uitdrukkelijk <b>eigenaars-akkoord</b>. Dit soort
+      meldingen wordt apart geroute en kan niet langs de automatische verwerking het publieke beeld in.</li>
+    <li><b>Niets wordt stil verwijderd.</b> Elke wijziging laat een spoor na: een statusvlag op het
+      betrokken element plus een regel in het <code>edit_log</code>. Ook een verwijdering of
+      correctie blijft zo herleidbaar — het onderzoek is controleerbaar op zijn eigen geschiedenis.</li>
+    <li><b>Indicatieve responstermijn.</b> We streven ernaar een melding binnen een redelijke
+      <b>termijn</b> van doorgaans enkele weken te beoordelen. Omdat er geen antwoordkanaal is,
+      krijg je geen persoonlijke reactie; de uitkomst is zichtbaar in het onderzoek zelf en in het
+      bijbehorende spoor.</li>
+  </ol>
+
+  <div class="kader">Een rectificatie die een gepubliceerd feit <strong>tegenspreekt</strong>, kan
+  via de normale controle als tegenargument of onderbouwde ondergraving in het onderzoek landen —
+  jij wijst, de agent leidt af. Zo verandert er nooit iets via een stille bewerking, en blijft elke
+  stap zichtbaar in de discussie en het <strong>edit_log</strong>.</div>
+
+  <h2 id="rechtsgrond">Waarom dit zo werkt</h2>
+  <p>Dit onderzoek publiceert gesourcete feiten en geattribueerde meningen over de <em>structuur</em>
+  van het Nederlandse medialandschap, in het algemeen belang — het beschuldigt geen personen. Voor
+  zover daarbij persoonsgegevens worden verwerkt, gebeurt dat onder de journalistieke en academische
+  exemptie (art. 43 UAVG). De rectificatie- en bezwaarflow hierboven hoort bij die zorgvuldige
+  werkwijze: neutraal, gesourcet, herleidbaar en betwistbaar. Meer daarover staat op de
+  <a href="/methode">methode-pagina</a>.</p>
+  <p class="termijn-noot">Klaar om te melden? Gebruik
+  <a href="/tip?soort=rectificatie">het meldformulier</a> — het duurt een minuut, geen account nodig.</p>
+</article>
+</main>
+</body>
+</html>

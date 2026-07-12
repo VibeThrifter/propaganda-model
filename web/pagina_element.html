@@ -250,6 +250,14 @@ onafhankelijke bewijslijnen, tegenspraak), niet een oordeel over personen.</p>
 
 <p class="viz-link"><a href="{{ viz_deeplink }}">↗ Bekijk dit element in de interactieve netwerkgraaf</a></p>
 
+{# Rectificatie/tip (D2/J2): meld een onjuistheid of draag een bron aan. De
+   `betreft`-context (entity:/relation:/mechanism:<id>) leiden we af uit de viz-
+   deeplink (`/#sel=<anker>`) zodat we geen extra Jinja-variabele hoeven. #}
+<p class="viz-link" style="margin-top:2px">
+  <a href="/tip?betreft={{ viz_deeplink.split('sel=')|last|urlencode }}"
+     rel="nofollow">⚑ Feitelijke onjuistheid melden of bron voorstellen</a>
+</p>
+
 </main>
 </body>
 </html>

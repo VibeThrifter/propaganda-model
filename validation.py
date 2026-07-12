@@ -1084,6 +1084,62 @@ def check_immuunsysteem(conn):
     ]
 
 
+# ── Publieke-intake-anomalie (D2.4, Laag 4) ──────────────────
+
+# Drempels voor de burst-vlag. Bewust modest; een piek is een signaal voor de eigenaar
+# (C4), geen model-inconsistentie — daarom ernst 'waarschuwing', nooit 'fout' (de
+# ratchet-baseline blijft ongemoeid).
+LEAD_BURST_VENSTER_UREN = 24
+LEAD_BURST_DREMPEL_BETREFT = 10   # leads over één 'betreft' binnen het venster
+LEAD_BURST_DREMPEL_IP = 10        # leads uit één IP-hash binnen het venster
+LEAD_BURST_DREMPEL_DUP = 15       # duplicaat-cluster over één 'betreft' (near-dup narratief)
+
+
+def check_lead_anomalie(conn):
+    """LEAD-ANOMALIE (D2.4, waarschuwing): vlag een verdachte piek in de publieke intake —
+    veel leads over één entiteit/'betreft', uit één IP-hash, of één near-dup-narratief
+    (duplicaat-cluster) binnen een venster. Voedt C4 (eigenaar-toezicht) + /api/health.
+    Nooit 'fout' (een burst is geen model-inconsistentie); de tabel hoeft niet te bestaan."""
+    tabellen = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    if "leads" not in tabellen:
+        return []
+    grens = f"-{LEAD_BURST_VENSTER_UREN} hours"
+    treffers = []
+    for r in conn.execute("""
+            SELECT betreft, COUNT(*) AS n FROM leads
+            WHERE betreft IS NOT NULL AND betreft <> ''
+              AND created_at >= datetime('now', ?)
+            GROUP BY betreft HAVING n >= ? ORDER BY n DESC""",
+            (grens, LEAD_BURST_DREMPEL_BETREFT)):
+        treffers.append(f"betreft '{r['betreft'][:60]}': {r['n']} leads "
+                        f"in {LEAD_BURST_VENSTER_UREN}u")
+    for r in conn.execute("""
+            SELECT ingezonden_ip_hash AS h, COUNT(*) AS n FROM leads
+            WHERE ingezonden_ip_hash IS NOT NULL
+              AND created_at >= datetime('now', ?)
+            GROUP BY ingezonden_ip_hash HAVING n >= ? ORDER BY n DESC""",
+            (grens, LEAD_BURST_DREMPEL_IP)):
+        treffers.append(f"IP-hash {r['h'][:12]}…: {r['n']} leads "
+                        f"in {LEAD_BURST_VENSTER_UREN}u")
+    for r in conn.execute("""
+            SELECT betreft, COUNT(*) AS n FROM leads
+            WHERE status = 'duplicaat' AND betreft IS NOT NULL AND betreft <> ''
+              AND created_at >= datetime('now', ?)
+            GROUP BY betreft HAVING n >= ? ORDER BY n DESC""",
+            (grens, LEAD_BURST_DREMPEL_DUP)):
+        treffers.append(f"near-dup-narratief over '{r['betreft'][:50]}': "
+                        f"{r['n']} duplicaten")
+    return [_bevinding(
+        "LEAD-ANOMALIE",
+        "Verdachte piek in de publieke intake (entiteit/IP/narratief)",
+        "waarschuwing", treffers,
+        "Een burst leads over één betreft, uit één IP-hash of als near-dup-cluster kan een "
+        "gecoördineerde aanval zijn. Signaal voor de eigenaar (C4); geen model-fout — "
+        "leads tellen nergens in de score mee. Herhaal-misbruikers zijn retroactief te "
+        "blocklisten (Laag 0).")]
+
+
 def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen = []
     bevindingen += check_koppelingsplicht(conn)
@@ -1100,6 +1156,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)
     bevindingen += check_fase3(conn)
+    bevindingen += check_lead_anomalie(conn)
     bevindingen += check_schema_pariteit(conn, schema_path)
 
     totalen = {"fout": 0, "waarschuwing": 0, "info": 0}

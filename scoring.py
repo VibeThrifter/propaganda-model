@@ -114,9 +114,10 @@ DEFAULT_WEIGHT = 0.50      # fallback in argument_force() als er geen gewicht me
 # Zelf-gerapporteerd `weight` is geen objectieve maat: de invoerder zet zijn eigen
 # argumentgewicht (verbeterplan Z2). Daarom telt de opgeslagen weight-kolom NIET meer mee
 # in de score — de basiskracht τ rust alleen op verifieerbare factoren (status × bron).
-# Het gewicht valt dus uit de formule (neutraal = 1.0) tot een *bridged rating* (M2.5) het
-# objectief invult: meerdere beoordelaars samen i.p.v. de invoerder zelf. De kolom blijft
-# bestaan (niet gewist), maar drijft de score pas weer zodra bridging draait.
+# Het gewicht valt dus uit de formule (neutraal = 1.0). De mens-diversiteit-/ratinglaag die
+# het ooit objectief kon invullen (bridging) is bij de solo+agents-kanteling geschrapt — bij
+# n=1 was ze toch al inert. De kolom blijft bestaan (niet gewist); ``bridged_weights`` blijft
+# als optionele override-hook, maar wordt niet meer uit een bestand gevoed.
 NEUTRAL_WEIGHT = 1.0
 NO_CITATION_FACTOR = 0.30  # bronfactor-ondergrens als een argument geen citaties heeft
 
@@ -587,11 +588,14 @@ def emergent_scores(literature_roots, compositie_roots) -> dict:
 # ── DB-aggregatie: alle afgeleide scores in één keer ────────
 
 def bridged_weights_from_file(path) -> dict | None:
-    """Laad bridged argumentgewichten (M2.5) uit data/bridging.json, indien aanwezig.
+    """Laad een bridged-gewichten-map {argument_id: gewicht} uit een JSON-bestand.
 
-    Het bestand wordt geschreven door scripts/bridging.py en bevat
-    {"weights": {argument_id: gewicht}}; zolang de beoordelaarspool te klein is
-    schrijft dat script geen gewichten en geldt het zelfgekozen ``weight``.
+    Overblijfsel van de mens-diversiteit-/ratinglaag (bridging), die bij de
+    solo+agents-kanteling is geschrapt (A3): de live score-/viz-pad (`/api/scores`,
+    `graph_data`) voedt ``bridged_weights`` niet meer uit een bestand. De helper
+    blijft dormant bestaan voor enkele analyse-/release-scripts die 'm defensief
+    aanroepen; ze retourneert None zolang er geen gewichten in het bestand staan,
+    zodat het neutrale gewicht 1.0 geldt (de laag is bij n=1 inert).
     """
     import json
     from pathlib import Path
@@ -624,9 +628,11 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     ``exclude_cluster`` laat alle citaties uit één broncluster weg — de basis van de
     leave-one-cluster-out-analyse (scripts/analyse_gevoeligheid.py, M1.6).
 
-    ``bridged_weights`` (M2.5): {argument_id: gewicht} uit de bridging-aggregatie van
-    ratings; vervangt waar aanwezig het zelfgekozen ``weight`` (Z2). Zie
-    ``bridged_weights_from_file`` voor het laden van data/bridging.json.
+    ``bridged_weights`` (optioneel): {argument_id: gewicht} — een objectieve
+    override-hook die waar aanwezig het zelfgekozen ``weight`` (Z2) vervangt.
+    Wordt sinds de solo+agents-kanteling niet meer uit een bestand gevoed
+    (de mens-diversiteit-/ratinglaag is bij n=1 inert); de parameter blijft als
+    override-hook (o.a. voor de leave-one-cluster-out-analyse en tests).
 
     Fase 2: argumenten met status 'voorgesteld' tellen in niets mee (M2.2), en
     ``vervangen`` elementen (M2.6, splitsen/samenvoegen) worden overgeslagen — hun

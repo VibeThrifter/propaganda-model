@@ -1158,7 +1158,6 @@ const pathClaims = {};      // 'bronRolId>doelRolId' → [root arguments]: eindc
                             // afgeleide pijl als geheel onderbouwen (property 'indirecte_invloed_op')
 const argsById = new Map(); // argument id → argument object
 const citationsByArg = {};  // argument_id → [citations]
-let bridgingStatus = null;  // M2.5: wanneer telt een rating mee in de score? (lui via /api/bridging)
 const SOURCE_TYPES = ['boek','academisch_artikel','rapport','nieuwsartikel','transcript',
                       'interview','dataset','wetgeving','persbericht','website','overig'];
 const roleIdByName = {};
@@ -1313,30 +1312,6 @@ function countStances(args) {
   return { sup, con, ctx, total: sup + con + ctx };
 }
 
-// Eerlijk over rating-latentie (M2.5): een duim is zichtbaar advies en beweegt de score
-// pas zodra de beoordelaarspool de bridging-drempel haalt én scripts/bridging.py opnieuw draait.
-function bridgingHint() {
-  const b = bridgingStatus;
-  if (!b) return '';
-  const v = b.vloer || {}, live = b.live || {};
-  let tekst;
-  if (b.actief) {
-    const pct = Math.round((b.gem_vertrouwen || 0) * 100);
-    tekst = `Bridging weegt mee in het argumentgewicht: 'Argument klopt' (+) en gehandhaafde `
-      + `ondergravingen (−) bepalen het gezindheids-onafhankelijke gewicht. Vertrouwen groeit `
-      + `vloeiend met het aantal oordelen (nu gemiddeld ~${pct}%), geen harde grens.`;
-    if (b.verouderd) tekst += ' Nieuwe oordelen tellen mee na de eerstvolgende bridging-run.';
-  } else {
-    tekst = `Bridging schuift vloeiend in zodra er meer oordelen zijn — nu nog te weinig om `
-      + `gezindheid te schatten (${live.n_raters || 0} beoordelaars, ${live.n_ratings || 0} oordelen; `
-      + `fit-vloer ≥${v.min_raters}/≥${v.min_ratings}). Tot dan: neutraal gewicht 1,0, geen klif.`;
-  }
-  return `<div style="font-size:10px;color:var(--text-muted);background:rgba(255,255,255,.03);`
-    + `border:1px solid ${b.verouderd ? 'color-mix(in srgb,#e0a23a 30%,transparent)' : 'var(--border)'};`
-    + `border-radius:6px;padding:5px 8px;margin:0 0 8px;line-height:1.5"`
-    + ` title="Bridging (M2.5): het gewicht van een argument groeit/daalt met gezindheids-onafhankelijke oordelen — endorsement (+) en onderbouwde ondergraving (−). Geen drempel-klif: krimp naar neutraal 1,0.">${tekst}</div>`;
-}
-
 function renderArgTree(args) {
   if (!args || !args.length) return '';
   const counts = countStances(args);
@@ -1347,7 +1322,6 @@ function renderArgTree(args) {
     <span><span class="count con">${counts.con}</span> tegen</span>
     <span><span class="count ctx">${counts.ctx}</span> context</span>
   </div>`;
-  html += bridgingHint();
   html += '<div class="arg-tree">';
   args.forEach(a => { html += renderArgNode(a, 0); });
   html += '</div>';
@@ -1405,9 +1379,9 @@ function renderArgNode(arg, depth) {
     html += `<div class="arg-weight">${parts.join(' · ')}</div>`;
   }
 
-  // M2.5: ratings — je beoordeelt onderbouwing/relevantie/eerlijkheid, nooit waarheid;
-  // eigen werk raten weigert de server; agent-ratings zijn zichtbaar advies.
-  html += `<div id="ratings-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingRegel(arg)}</div>`;
+  // Oordeel-regel: alléén de onderbouwde ondergraving ('argument klopt niet').
+  // De 👍-endorsement-rating (bridging) is geschrapt (A3) — dit is een reply, geen rating.
+  html += `<div id="oordeel-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingRegel(arg)}</div>`;
   html += bezwaarRegel(arg);
   html += vetoRegel(arg);
 
@@ -1442,37 +1416,15 @@ function renderArgNode(arg, depth) {
   return html;
 }
 
-// M2.5: ratings-helpers (mens telt mee in bridging zodra de pool het toelaat;
-// agent-ratings zijn advies en tellen nooit onderling)
-function ratingTekst(rt) {
-  if (!rt) return '';
-  const deel = (label, m, a) => `${label} ${m}${a ? ` (+${a} agent)` : ''}`;
-  return deel('👍', rt.mens.nuttig, rt.agent.nuttig) + ' · '
-       + deel('👎', rt.mens.niet_nuttig, rt.agent.niet_nuttig) + ' · ';
-}
-
-// De duim-regel: tellingen + twee toggle-links. Je eigen stem krijgt een vinkje +
-// accentkleur; nogmaals erop klikken trekt 'm in (un-vote). `telling` overschrijft
-// arg.ratings na een verse fetch.
-// Review-verdict v2: 'Argument klopt' = lichte endorsement (nuttig-rating; telt niet als
-// bewijs of in de score, voedt hooguit later bridging). 'Argument klopt niet' = een
-// onderbouwd bezwaar = een ondergraving (opent het bezwaarformulier) die de score van
-// dit argument dempt tot ze is opgelost. De kale, redenloze downvote bestaat niet meer.
-// Van een ADMIN (maintainer) is de ondergraving een VETO: de parent telt voor 0 tot het
-// bezwaar is opgelost of met review is weerlegd (scoring.py, juli 2026).
-function ratingRegel(arg, telling) {
-  const rt = telling || arg.ratings;
-  const nuttig = rt ? (rt.mens.nuttig + (rt.agent.nuttig ? `+${rt.agent.nuttig}` : '')) : 0;
-  const eigen = authUser && arg.contributed_by === authUser.username;
-  const actief = (arg.mijn_oordeel === 'nuttig');
-  // Gebalanceerd oordeel-paar (samen, even zwaar): ✓ = lichte endorsement (rating);
-  // ✗ = onderbouwd bezwaar → opent de bezwaar-composer met '− Tegen' vast
-  // (een ondergraving die de kracht dempt tot ze is opgelost; bronloos).
-  const eens = eigen
-    ? `<span class="oordeel eens stat" title="je beoordeelt eigen werk niet">✓ Argument klopt${nuttig ? ` (${nuttig})` : ''}</span>`
-    : `<a href="#" class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'Het argument klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">✓ Argument klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
+// De oordeel-regel op een argument. De 👍/👎-endorsement-rating (M2.5 bridging) is
+// geschrapt (A3); wat blijft is de onderbouwde ondergraving — een reply, geen rating.
+// 'Argument klopt niet' opent het bezwaarformulier en wordt een '− Tegen'-reactie
+// (ondergraving) die de kracht van dit argument dempt tot ze is opgelost. Van een ADMIN
+// (maintainer) is die ondergraving een VETO: de parent telt voor 0 tot het bezwaar is
+// opgelost of met review is weerlegd (scoring.py, juli 2026).
+function ratingRegel(arg) {
   const oneens = `<a href="#" class="oordeel oneens knop" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM het argument niet klopt. Geen bron nodig. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Argument klopt niet</a>`;
-  return `<span class="oordeel-rij">${eens}${oneens}</span>`;
+  return `<span class="oordeel-rij">${oneens}</span>`;
 }
 
 // De resolutielus van een ONDERGRAVING: hier alleen de status-badge; de overgangs-
@@ -1544,34 +1496,6 @@ function argMenuItemsViz(arg) {
 function argMenuViz(id, knop) {
   const a = argsById.get(id);
   if (a) hsMenu(knop, argMenuItemsViz(a));
-}
-
-async function rateArgument(argId, oordeel) {
-  const el = document.getElementById('ratings-' + argId);
-  const arg = argsById.get(argId) || { id: argId };
-  try {
-    // Lees mijn huidige stem van de server (waarheid), zodat un-voten ook na
-    // herladen klopt: nogmaals op je eigen stem klikken = intrekken.
-    const voor = await (await fetch(`/api/arguments/${argId}/ratings`)).json();
-    const mijnRij = (voor.ratings || []).find(r => authUser && r.rater === authUser.username);
-    const unvote = (mijnRij ? mijnRij.oordeel : null) === oordeel;
-    const resp = unvote
-      ? await fetch(`/api/arguments/${argId}/ratings`, { method: 'DELETE' })
-      : await fetch(`/api/arguments/${argId}/ratings`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oordeel }),
-        });
-    const j = await resp.json();
-    if (!resp.ok) { el.innerHTML = `<span style="color:#e74c3c">${j.error}</span>`; return; }
-    // Ververs tellingen + eigen stem en herteken de regel met de juiste actieve staat.
-    const na = await (await fetch(`/api/arguments/${argId}/ratings`)).json();
-    const naRij = (na.ratings || []).find(r => authUser && r.rater === authUser.username);
-    arg.mijn_oordeel = naRij ? naRij.oordeel : null;
-    el.innerHTML = ratingRegel(arg, na.telling)
-      + `<span style="color:#2ecc71;margin-left:6px">${unvote ? 'stem ingetrokken' : 'oordeel opgeslagen'}${j.advies ? ' (advies — agent)' : ''}</span>`;
-  } catch (e) {
-    el.innerHTML = `<span style="color:#e74c3c">Netwerkfout: ${e.message}</span>`;
-  }
 }
 
 // ============================================================
@@ -5355,6 +5279,9 @@ function showInstanceDetail(d, content, color) {
       <div class="entity-type" style="color:${color}">${weergaveNaam(d.type)}</div>
       <h2>${overlegTitel('entity_id', d.id, d.name)}</h2>
       ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
+      <div style="margin-top:6px"><a href="/tip?betreft=entity:${d.id}" rel="nofollow"
+        style="font-size:11px;color:var(--text-muted)"
+        title="Meld een feitelijke onjuistheid of draag een bron aan (eenrichting, geen account nodig)">⚑ Onjuistheid melden / bron voorstellen</a></div>
     </div>
   `;
   if (d.description) html += `<div class="detail-description">${d.description}</div>`;
@@ -7027,8 +6954,6 @@ document.getElementById('addModal').addEventListener('click', (e) => {
 // ============================================================
 // INIT
 // ============================================================
-// Bridging-status lui ophalen voor de rating-latentie-hint in de discussieboom.
-fetch('/api/bridging').then(r => r.json()).then(j => { bridgingStatus = j; }).catch(() => {});
 initTimeline();
 populateSizeMetricOptions();
 // Model-afhankelijke UI op de startstand zetten (zelfde regels als de modelwissel-handler).

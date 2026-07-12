@@ -512,6 +512,14 @@ CREATE TABLE arguments (
     --                  vervangt; bij merge wordt het oude 'verouderd' + vervangen = 1.
     vervangen BOOLEAN NOT NULL DEFAULT FALSE,
     reviseert_id INTEGER REFERENCES arguments(id),
+    -- Smaad-firewall (D2.3): een nieuw 'voorgesteld' argument met een negatieve
+    -- feitelijke claim over een genoemd natuurlijk persoon krijgt bij CREATIE
+    -- smaad_hold = 1. Zolang die staat wordt het argument uit ELKE publieke render
+    -- gehouden (viz_data.py + paginas.py — net zo streng als 'voorgesteld') en merget
+    -- het nooit automatisch; alleen de eigenaar (maintainer, mens) heft het op via
+    -- POST /api/arguments/<id>/smaad_vrijgeven. Bestaande argumenten blijven 0 (geen
+    -- retroactieve markering). Kwam via ALTER TABLE (scripts/migrate_leads.py).
+    smaad_hold INTEGER DEFAULT 0,
     -- Doelregel (M1.1, boomsemantiek): een ROOT-argument draagt minstens één doel
     -- (praktijk: relatie/entiteit; theorie: rol/mechanisme/emergent veld); een REPLY
     -- (parent_argument_id gevuld) draagt GÉÉN eigen doel — zijn stance is relatief aan
@@ -802,6 +810,40 @@ CREATE TABLE source_mentions (
 );
 
 --------------------------------------------------------------
+-- LEADS (D2.1): de publieke intake-/rectificatie-baan (Fase 5).
+-- STRUCTURELE ISOLATIE: een aparte, lager-vertrouwde tabel — geen 'herkomst'-kolom
+-- op arguments. Een publieke inzending is een TIP/LEAD, geen claim: ze landt hier,
+-- telt in NIETS mee (geen enkele query in scoring.py/influence.py/viz_data.py leest
+-- deze tabel), auto-merget nooit, en rendert nooit publiek. Pas een corroboratie-agent
+-- (aparte lane) leidt 'm — na eigen bron-herverificatie — onafhankelijk her af tot een
+-- echt 'voorgesteld' argument via de gewone POST /api/arguments; agent_arg_id wijst dan
+-- naar dat argument. Niets wordt verwijderd: statusvlag + edit_log (bestaande discipline).
+-- Aangelegd via schema.sql (verse build) én scripts/migrate_leads.py (bestaande DB).
+--------------------------------------------------------------
+
+CREATE TABLE leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    herkomst TEXT NOT NULL DEFAULT 'publiek',
+    soort TEXT NOT NULL DEFAULT 'tip' CHECK(soort IN ('rectificatie', 'tip')),
+    claim TEXT NOT NULL,                  -- de melding/tip (HTML-gestript bij opslag)
+    bron_url TEXT,                        -- optionele aangedragen bron
+    quote TEXT,                           -- optioneel citaat (HTML-gestript)
+    betreft TEXT,                         -- vrije tekst: de genoemde entiteit/persoon/relatie
+    ingezonden_ip_hash TEXT,              -- gehasht IP (burst-analyse D2.4); nooit ruw IP/PII
+    render_ts TEXT,                       -- server-getekende uitgifte-tijd van het lead_token
+    status TEXT NOT NULL DEFAULT 'binnengekomen' CHECK(status IN (
+        'binnengekomen',     -- net binnen, wacht op de corroboratie-agent
+        'in_corroboratie',   -- de agent werkt eraan
+        'gecorroboreerd',    -- agent leidde een echt argument af (agent_arg_id gezet)
+        'afgewezen',         -- agent kon de lead niet staven
+        'duplicaat',         -- sock-puppet-collapse: near-dup van een eerdere lead
+        'smaad_hold'         -- negatieve persoonsclaim; eigenaars-wachtrij
+    )),
+    agent_arg_id INTEGER,                 -- het door een agent afgeleide argument (NULL tot dan)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--------------------------------------------------------------
 -- INDEXEN
 --------------------------------------------------------------
 
@@ -843,6 +885,8 @@ CREATE INDEX idx_ratings_argument ON argument_ratings(argument_id);
 CREATE INDEX idx_lineage_oud ON lineage(element_type, oud_id);
 CREATE INDEX idx_lineage_nieuw ON lineage(element_type, nieuw_id);
 CREATE INDEX idx_predictions_status ON predictions(status);
+CREATE INDEX idx_leads_status ON leads(status);
+CREATE INDEX idx_leads_ip ON leads(ingezonden_ip_hash);
 
 --------------------------------------------------------------
 -- SEED DATA: ROLLEN (theoretisch model)

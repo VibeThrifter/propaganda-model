@@ -6,13 +6,16 @@ Open:  http://localhost:5000
 import datetime
 import difflib
 import functools
+import hashlib
+import hmac
+import html
 import json
 import os
 import re
 import sqlite3
 import time
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from flask import Flask, g, jsonify, redirect, request, send_file, session
 
 import auth  # wachtwoord-/token-hashing (M0.6)
@@ -39,7 +42,6 @@ DATA_DIR = Path(os.environ.get("PROPAGANDA_DATA_DIR", str(ROOT / "data")))
 DB_PATH = Path(os.environ.get("PROPAGANDA_DB_PATH", str(DATA_DIR / "propaganda_model.db")))
 WEB_PATH = Path(os.environ.get("PROPAGANDA_WEB_PATH", str(ROOT / "web")))
 SECRET_KEY_PATH = Path(os.environ.get("PROPAGANDA_SECRET_KEY_PATH", str(DATA_DIR / "secret_key")))
-BRIDGING_PATH = DATA_DIR / "bridging.json"
 REVIEW_ADVIES_PATH = DATA_DIR / "review_advies.json"
 BRON_SUGGESTIES_PATH = DATA_DIR / "bron_suggesties.json"
 VOORSPELLING_VOORSTELLEN_PATH = DATA_DIR / "voorspelling_voorstellen.json"
@@ -622,8 +624,8 @@ def index():
 # ── Graafdata voor de visualisatie (W5.1) ────────────────────
 # De pagina op / is dun; de data komt live hiervandaan. Een mtime-cache voorkomt
 # dat elke paginalaad de volledige scoringsketen (~0,75 s) opnieuw draait: de
-# sleutel verandert zodra de DB, bridging.json of de nieuwste release verandert —
-# precies de drie inputs van viz_data.export_data.
+# sleutel verandert zodra de DB of de nieuwste release verandert —
+# precies de twee inputs van viz_data.export_data.
 _graph_cache = {}
 
 
@@ -636,7 +638,7 @@ def _graph_cache_key():
             return (0, 0)
     nieuwste_release = max((_stat(p) for p in RELEASES_PATH.glob("model-v*.json")),
                            default=(0, 0))
-    return (_stat(DB_PATH), _stat(BRIDGING_PATH), nieuwste_release)
+    return (_stat(DB_PATH), nieuwste_release)
 
 
 @app.route("/api/graph_data")
@@ -856,26 +858,13 @@ def get_arguments():
                 "onderwerp": row["onderwerp"],
             })
 
-    # Ratings (M2.5) per argument: tellingen + de eigen stem van de ingelogde
-    # gebruiker, zodat de viz de duim-toggle kan tonen (un-voten = nogmaals op je
-    # eigen stem klikken). Lezen is open, dus de gebruiker kan ontbreken.
-    user = _zoek_user(conn)
-    mij = user["username"] if user else None
+    # De 👍/👎-ratinglaag (M2.5) is bij de solo+agents-kanteling geschrapt (A3): bij n=1
+    # was ze inert. De tabel argument_ratings blijft bevroren (audit) maar wordt niet meer
+    # uitgelezen; de velden blijven leeg zodat de front-end netjes degradeert.
     for a in args_map.values():
         a["ratings"] = {"mens": {"nuttig": 0, "niet_nuttig": 0},
                         "agent": {"nuttig": 0, "niet_nuttig": 0}}
         a["mijn_oordeel"] = None
-    if args_map:
-        qs = ",".join("?" * len(args_map))
-        for r in conn.execute(f"""
-            SELECT ar.argument_id, ar.rater, ar.oordeel, u.kind
-            FROM argument_ratings ar JOIN users u ON u.username = ar.rater
-            WHERE ar.argument_id IN ({qs})
-        """, list(args_map.keys())).fetchall():
-            a = args_map[r["argument_id"]]
-            a["ratings"][r["kind"]][r["oordeel"]] += 1
-            if mij and r["rater"] == mij:
-                a["mijn_oordeel"] = r["oordeel"]
 
     # Verrijk citaties met vindplaats/link (vervangt de kale join hierboven), zodat
     # de discussieboom de bron klikbaar kan tonen.
@@ -1010,6 +999,68 @@ def _methode_fout(methode, quote):
         return "Ongeldige methode. Kies uit: " + ", ".join(METHODES)
     prob = validation.methode_consistentie(methode, quote)
     return prob[0] if prob else None
+
+
+# ── Smaad-firewall (D2.3, Laag 3) ────────────────────────────
+# Negatief-feitelijk lexicon: woorden die een beschuldiging van een strafbaar/
+# verwijtbaar FEIT dragen (geen geattribueerde mening). De heuristiek is bewust
+# conservatief (liever te veel dan te weinig in de eigenaars-wachtrij) — een agent-
+# classificatie in de corroboratie-brief (D2.2) is de tweede laag. Woordgrens-match
+# op de kleine letters van de claim (+reasoning). Uitbreidbaar.
+SMAAD_LEXICON = {
+    "fraude", "fraudeur", "frauduleus", "corrupt", "corruptie", "omkoping", "omkoopt",
+    "omgekocht", "liegt", "loog", "liegen", "leugen", "leugens", "leugenaar",
+    "belangenverstrengeling", "veroordeeld", "veroordeling", "crimineel", "criminele",
+    "misdaad", "misdrijf", "oplichting", "oplichter", "oplicht", "witwassen", "witwast",
+    "witwaste", "verduistering", "verduistert", "verduisterde", "chantage", "chanteert",
+    "smaad", "laster", "plagiaat", "misbruik", "aanranding", "verkrachting", "racist",
+    "racisme", "nepotisme", "vriendjespolitiek", "malversatie", "malversaties",
+    "machtsmisbruik", "intimidatie", "intimideert", "pedofiel", "dief", "steelt",
+    "gestolen", "bedrog", "bedriegt", "valsheid", "meineed", "omkopen", "zwendel",
+}
+_SMAAD_PATROON = re.compile(
+    r"\b(" + "|".join(re.escape(w) for w in sorted(SMAAD_LEXICON)) + r")\b", re.I)
+
+
+def _bevat_negatieve_lading(*teksten) -> bool:
+    for t in teksten:
+        if t and _SMAAD_PATROON.search(t):
+            return True
+    return False
+
+
+def _raakt_persoon(conn, entity_id=None, relation_id=None, betreft=None) -> bool:
+    """Raakt dit doel een genoemd natuurlijk persoon? entity_id → type='persoon';
+    relation_id → bron- of doel-entiteit is 'persoon'; betreft (vrije tekst, leads) →
+    matcht op de naam van een 'persoon'-entiteit."""
+    if entity_id:
+        r = conn.execute("SELECT type FROM entities WHERE id = ?", (entity_id,)).fetchone()
+        if r and r["type"] == "persoon":
+            return True
+    if relation_id:
+        n = conn.execute("""
+            SELECT COUNT(*) FROM relations r
+            JOIN entities e ON e.id IN (r.source_id, r.target_id)
+            WHERE r.id = ? AND e.type = 'persoon'""", (relation_id,)).fetchone()[0]
+        if n:
+            return True
+    if betreft:
+        naald = betreft.strip().lower()
+        if naald:
+            for e in conn.execute("SELECT name FROM entities WHERE type = 'persoon'"):
+                naam = (e["name"] or "").strip().lower()
+                if naam and (naam in naald or naald in naam):
+                    return True
+    return False
+
+
+def _negatieve_persoonsclaim(conn, *, entity_id=None, relation_id=None, betreft=None,
+                             claim="", reasoning="") -> bool:
+    """D2.3-heuristiek: het doel raakt een natuurlijk persoon ÉN de tekst draagt
+    negatief-feitelijke lading. Organisaties (type ≠ 'persoon') vallen er bewust buiten."""
+    return (_bevat_negatieve_lading(claim, reasoning)
+            and _raakt_persoon(conn, entity_id=entity_id, relation_id=relation_id,
+                               betreft=betreft))
 
 
 @app.route("/api/arguments", methods=["POST"])
@@ -1333,6 +1384,22 @@ def create_argument():
                           "citaties": len(citaties)}),
               f"Nieuw argument: {stance}"))
 
+        # Smaad-firewall (D2.3, Laag 3): een nieuw ROOT-argument met een negatieve
+        # feitelijke claim over een genoemd natuurlijk persoon krijgt smaad_hold = 1.
+        # Dat houdt het uit ELKE publieke render (viz_data.py + paginas.py) tot alleen
+        # de eigenaar (maintainer, mens) het vrijgeeft — hoe schoon de bron ook is.
+        # Alleen bij creatie (nieuw voorgesteld argument); bestaande args blijven 0.
+        if parent_id is None and _negatieve_persoonsclaim(
+                conn, entity_id=entity_id, relation_id=relation_id,
+                claim=claim, reasoning=reasoning or ""):
+            conn.execute("UPDATE arguments SET smaad_hold = 1 WHERE id = ?", (arg_id,))
+            conn.execute("""
+                INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+                VALUES ('arguments', ?, 'updated', ?, ?, ?)
+            """, (arg_id, contributed_by, json.dumps({"smaad_hold": 1}),
+                  "smaad-firewall (D2.3): negatieve feitelijke claim over een natuurlijk "
+                  "persoon — geblokkeerd voor publieke render tot eigenaars-akkoord"))
+
         # Admin hoeft geen review (juli 2026): een argument van een maintainer merget
         # meteen — dezelfde citatiepoort als merge_argument (M0.3, zachte variant),
         # gemarkeerd als self-merge (n=1, herauditeerbaar via edit_log). Een admin-
@@ -1626,6 +1693,35 @@ def update_argument_status(arg_id):
     conn.commit()
     conn.close()
     return jsonify({"id": arg_id, "status": new_status})
+
+
+@app.route("/api/arguments/<int:arg_id>/smaad_vrijgeven", methods=["POST"])
+@require_user("maintainer")
+def smaad_vrijgeven(arg_id):
+    """Smaad-firewall opheffen (D2.3): alleen de eigenaar (maintainer, mens) heft de
+    smaad_hold-vlag op een argument op → het argument mag weer publiek renderen. Een
+    agent/reviewer kan dit niet (403 via de maintainer-poort). Menselijk eindoordeel op
+    de hoogste-inzet-categorie; geaudit in edit_log."""
+    conn = get_db()
+    arg = conn.execute("SELECT id, smaad_hold FROM arguments WHERE id = ?",
+                       (arg_id,)).fetchone()
+    if not arg:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if not arg["smaad_hold"]:
+        conn.close()
+        return jsonify({"id": arg_id, "smaad_hold": 0,
+                        "opmerking": "Argument stond niet op smaad_hold"}), 200
+    conn.execute("UPDATE arguments SET smaad_hold = 0 WHERE id = ?", (arg_id,))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
+    """, (arg_id, g.user["username"], json.dumps({"smaad_hold": 1}),
+          json.dumps({"smaad_hold": 0}),
+          "smaad-firewall vrijgegeven door eigenaar (maintainer)"))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": arg_id, "smaad_hold": 0}), 200
 
 
 @app.route("/api/arguments/<int:arg_id>/bezwaar", methods=["PATCH"])
@@ -4982,89 +5078,6 @@ def mijn_herbeoordelen():
                     "entiteiten": entiteiten, "relaties": relaties})
 
 
-# ── Ratings (M2.5) ───────────────────────────────────────────
-
-@app.route("/api/arguments/<int:arg_id>/ratings", methods=["GET"])
-def get_ratings(arg_id):
-    conn = get_db()
-    rows = [dict(r) for r in conn.execute("""
-        SELECT ar.rater, ar.oordeel, ar.reden, ar.motivatie, ar.created_at, u.kind
-        FROM argument_ratings ar JOIN users u ON u.username = ar.rater
-        WHERE ar.argument_id = ? ORDER BY ar.id""", (arg_id,))]
-    conn.close()
-    telling = {"mens": {"nuttig": 0, "niet_nuttig": 0},
-               "agent": {"nuttig": 0, "niet_nuttig": 0}}
-    for r in rows:
-        telling[r["kind"]][r["oordeel"]] += 1
-    return jsonify({"argument_id": arg_id, "ratings": rows, "telling": telling})
-
-
-@app.route("/api/arguments/<int:arg_id>/ratings", methods=["POST"])
-@require_user()
-def create_rating(arg_id):
-    """Rating afgeven (M2.5): nuttig/niet_nuttig + gestructureerde reden.
-
-    Je beoordeelt onderbouwing/relevantie/eerlijkheid, nooit waarheid; eigen werk
-    raten kan niet. Agent-ratings zijn zichtbaar advies (kalibratie: M2.5)."""
-    data = request.json or {}
-    oordeel = data.get("oordeel")
-    if oordeel not in ("nuttig", "niet_nuttig"):
-        return jsonify({"error": "oordeel moet 'nuttig' of 'niet_nuttig' zijn"}), 400
-    reden = data.get("reden") or None
-
-    conn = get_db()
-    arg = conn.execute("SELECT contributed_by FROM arguments WHERE id = ?",
-                       (arg_id,)).fetchone()
-    if not arg:
-        conn.close()
-        return jsonify({"error": "Argument niet gevonden"}), 404
-    if arg["contributed_by"] == g.user["username"]:
-        conn.close()
-        return jsonify({"error": "Eigen werk raten kan niet (M2.5)"}), 403
-    try:
-        conn.execute("""
-            INSERT INTO argument_ratings (argument_id, rater, oordeel, reden, motivatie)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT (argument_id, rater)
-            DO UPDATE SET oordeel = excluded.oordeel, reden = excluded.reden,
-                          motivatie = excluded.motivatie, created_at = CURRENT_TIMESTAMP
-        """, (arg_id, g.user["username"], oordeel, reden,
-              (data.get("motivatie") or "").strip() or None))
-        conn.execute("""
-            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value)
-            VALUES ('argument_ratings', ?, 'created', ?, ?)
-        """, (arg_id, g.user["username"], json.dumps({"oordeel": oordeel, "reden": reden})))
-        conn.commit()
-    except sqlite3.IntegrityError as e:
-        conn.close()
-        return jsonify({"error": str(e)}), 400
-    conn.close()
-    return jsonify({"argument_id": arg_id, "rater": g.user["username"],
-                    "oordeel": oordeel, "kind": g.user["kind"],
-                    "advies": g.user["kind"] == "agent"}), 201
-
-
-@app.route("/api/arguments/<int:arg_id>/ratings", methods=["DELETE"])
-@require_user()
-def delete_rating(arg_id):
-    """Eigen rating intrekken (un-vote): verwijdert uitsluitend de stem van de
-    ingelogde gebruiker op dit argument. Idempotent — geen stem = niets te doen."""
-    conn = get_db()
-    cur = conn.execute(
-        "DELETE FROM argument_ratings WHERE argument_id = ? AND rater = ?",
-        (arg_id, g.user["username"]))
-    verwijderd = cur.rowcount > 0
-    if verwijderd:
-        conn.execute("""
-            INSERT INTO edit_log (table_name, record_id, action, changed_by)
-            VALUES ('argument_ratings', ?, 'deleted', ?)
-        """, (arg_id, g.user["username"]))
-        conn.commit()
-    conn.close()
-    return jsonify({"argument_id": arg_id, "rater": g.user["username"],
-                    "verwijderd": verwijderd})
-
-
 # ── Recent changes & watchlists (M2.4) ───────────────────────
 
 @app.route("/api/recent_changes")
@@ -5389,43 +5402,6 @@ def get_health():
     return jsonify(rapport)
 
 
-@app.route("/api/bridging")
-def bridging_status():
-    """Bridging-status (M2.5) zodat de UI eerlijk kan zijn over rating-latentie.
-
-    `data/bridging.json` (geschreven door scripts/bridging.py) stuurt de score
-    daadwerkelijk aan; de live pool komt uit de DB. Wijken die af, dan moet
-    bridging.py opnieuw draaien — dat maken we zichtbaar via `verouderd`.
-    """
-    rapport = {}
-    try:
-        rapport = json.loads(BRIDGING_PATH.read_text())
-    except (OSError, json.JSONDecodeError):
-        rapport = {}
-    conn = get_db()
-    row = conn.execute("""
-        SELECT COUNT(DISTINCT ar.rater) AS raters, COUNT(*) AS ratings
-        FROM argument_ratings ar JOIN users u ON u.username = ar.rater
-        WHERE u.kind = 'mens'""").fetchone()
-    conn.close()
-    live = {"n_raters": row["raters"], "n_ratings": row["ratings"]}
-    verouderd = (live["n_raters"] != rapport.get("n_raters")
-                 or live["n_ratings"] != rapport.get("n_ratings"))
-    vert = rapport.get("vertrouwen") or {}
-    gem_vertrouwen = round(sum(vert.values()) / len(vert), 3) if vert else 0.0
-    return jsonify({
-        # Geen klif meer: 'vloer' is alleen het identificeerbaarheids-minimum waaronder
-        # de fit niet draait; daarboven schuift bridging vloeiend in (krimp met k).
-        "actief": bool(rapport.get("actief")),
-        "vloer": rapport.get("vloer", {"min_raters": 3, "min_ratings": 6}),
-        "k": rapport.get("k", 5),
-        "gem_vertrouwen": gem_vertrouwen,
-        "json": {"n_raters": rapport.get("n_raters"), "n_ratings": rapport.get("n_ratings")},
-        "live": live,
-        "verouderd": verouderd,
-    })
-
-
 @app.route("/api/scores")
 def get_scores():
     """Herbereken de volledige scoringsketen en geef alle afgeleide scores terug.
@@ -5434,8 +5410,7 @@ def get_scores():
     visuele codering te verversen zonder de hele pagina te regenereren.
     """
     conn = get_db()
-    scores = scoring.compute_all_scores(
-        conn, bridged_weights=scoring.bridged_weights_from_file(BRIDGING_PATH))
+    scores = scoring.compute_all_scores(conn)
     conn.close()
     return jsonify(scores)
 
@@ -5510,23 +5485,301 @@ def get_bereik():
 # ── Agent-geheugen: waar heeft dit account al op gereageerd? ──
 # Voorkomt dat een agent over de tijd twee keer op hetzelfde argument reageert. Geen
 # eigen tabel nodig — de reacties staan al in de data: een reply is een argument met
-# parent_argument_id + contributed_by, een rating staat in argument_ratings. Een agent
+# parent_argument_id + contributed_by. (De 👍/👎-ratinglaag is bij de solo+agents-
+# kanteling geschrapt — A3 — dus reageren = uitsluitend nog via een reply.) Een agent
 # haalt vóór een ronde zijn eigen lijst op en slaat die argumenten over.
 @app.route("/api/agent/reeds_gereageerd")
 @require_user()
 def reeds_gereageerd():
-    """De argument-id's waar het ingelogde account al op reageerde (reply of rating),
+    """De argument-id's waar het ingelogde account al op reageerde (via een reply),
     zodat een agent ze in een volgende ronde overslaat."""
     conn = get_db()
     ik = g.user["username"]
     via_reply = sorted({r["parent_argument_id"] for r in conn.execute(
         "SELECT DISTINCT parent_argument_id FROM arguments "
         "WHERE contributed_by = ? AND parent_argument_id IS NOT NULL", (ik,))})
-    via_rating = sorted({r["argument_id"] for r in conn.execute(
-        "SELECT DISTINCT argument_id FROM argument_ratings WHERE rater = ?", (ik,))})
     conn.close()
-    return jsonify({"door": ik, "via_reply": via_reply, "via_rating": via_rating,
-                    "gereageerd_op": sorted(set(via_reply) | set(via_rating))})
+    return jsonify({"door": ik, "via_reply": via_reply,
+                    "gereageerd_op": via_reply})
+
+
+# ══ Publieke intake: leads-baan + Laag 0-poort (D2-kern / D2.0 / D2.1) ══════════
+# Een publieke inzending is een TIP/LEAD, geen claim: ze landt in de aparte, lager-
+# vertrouwde `leads`-baan (aparte tabel = structurele isolatie; telt in NIETS mee, geen
+# scoring/influence/viz leest 'm, auto-merget nooit, rendert nooit publiek). Vóór de write
+# draait een stapel GRATIS filters (Laag 0) — denial-of-wallet-verweer: nooit een agent-
+# token besteden aan iets dat een goedkope regel had kunnen droppen. Pas een corroboratie-
+# agent (aparte lane) leidt een lead onafhankelijk her af tot een echt 'voorgesteld'
+# argument via de gewone POST /api/arguments (met de harde citatiepoort). Alles eenrichting.
+
+# Harde lengtegrenzen per vrije-tekstveld.
+LEAD_MAXLENGTHS = {"claim": 1000, "bron_url": 500, "quote": 2000, "betreft": 200}
+# Challenge: het lead_token is een HMAC-getekende uitgifte-timestamp (render_ts).
+LEAD_TOKEN_MAX_LEEFTIJD = 3600.0   # token 1 uur geldig
+LEAD_MIN_INVULTIJD = 2.0           # < 2 s ná uitgifte = bot → stille drop
+# Per-IP rate-limit: VEEL strenger dan de account-limieten (30/60/120 per minuut).
+LEAD_RATE_LIMIET = 5               # inzendingen ...
+LEAD_RATE_WINDOW = 3600.0          # ... per uur, per IP (in-memory emmer, als _rate_emmers)
+_lead_emmers = {}
+# Sock-puppet-collapse: difflib-drempel op claim+betreft (spiegelt create_argument, M0.3).
+LEAD_DEDUP_DREMPEL = 0.85
+# Spam-domein-blocklist (host uit bron_url). Uitbreidbaar (D2.4 retroactief blocklisten).
+SPAM_DOMEINEN = {
+    "bit.ly", "tinyurl.com", "t.me", "spam.example", "casino.example",
+    "buy-now.example", "viagra.example", "cheap-pills.example",
+}
+
+
+def _client_ip():
+    """Client-IP voor de per-IP-poort. Achter een reverse proxy (B1: Caddy/nginx) staat
+    het echte IP in X-Forwarded-For (eerste hop = client); lokaal/tests valt het terug op
+    request.remote_addr. (ProxyFix is de nette deploy-variant; deze helper houdt de code
+    dependency-vrij.)"""
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr or "onbekend"
+
+
+def _lead_rate_ok(ip) -> bool:
+    nu = time.monotonic()
+    emmer = _lead_emmers.setdefault(ip, [])
+    emmer[:] = [t for t in emmer if nu - t < LEAD_RATE_WINDOW]
+    if len(emmer) >= LEAD_RATE_LIMIET:
+        return False
+    emmer.append(nu)
+    return True
+
+
+def _teken_lead_token(render_ts: float) -> str:
+    ts = f"{render_ts:.3f}"
+    sig = hmac.new(app.secret_key, ts.encode(), hashlib.sha256).hexdigest()
+    return f"{ts}.{sig}"
+
+
+def _lead_token_geldig(token):
+    """(ok, render_ts) — verifieer de HMAC-handtekening en de leeftijd van het lead_token."""
+    if not token or not isinstance(token, str) or "." not in token:
+        return (False, None)
+    ts_str, _, sig = token.rpartition(".")
+    verwacht = hmac.new(app.secret_key, ts_str.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, verwacht):
+        return (False, None)
+    try:
+        ts = float(ts_str)
+    except ValueError:
+        return (False, None)
+    if time.time() - ts > LEAD_TOKEN_MAX_LEEFTIJD:
+        return (False, None)
+    return (True, ts)
+
+
+def _ip_hash(ip) -> str:
+    """Gehasht IP (nooit ruw IP/PII opslaan) — sessiesleutel als pepper, stabiel per IP
+    voor de burst-analyse (D2.4)."""
+    return hashlib.sha256(app.secret_key + (ip or "").encode()).hexdigest()
+
+
+def _strip_veld(waarde, maxlen):
+    """HTML-escape (stdlib) + harde afkap. Ruwe lengte eerst begrensd, dan geëscaped."""
+    s = waarde if isinstance(waarde, str) else ("" if waarde is None else str(waarde))
+    return html.escape(s.strip()[:maxlen])
+
+
+def _spam_domein(bron_url) -> bool:
+    if not bron_url:
+        return False
+    host = (urlparse(bron_url if "//" in bron_url else "//" + bron_url).hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host in SPAM_DOMEINEN
+
+
+@app.route("/api/lead_token")
+def lead_token():
+    """Geef een HMAC-getekende render_ts (challenge-baseline, D2.0). Geen auth. Een
+    PoW-/Turnstile-haak kan hierbovenop (open beslissing); de getekende tijdstempel is de
+    baseline die zowel de challenge als de tijd-heuristiek voedt."""
+    return jsonify({"token": _teken_lead_token(time.time())})
+
+
+@app.route("/tip")
+def tip_page():
+    """Publieke intake-widget (D2-kern). De UI-lane levert web/tip.html."""
+    return send_file(WEB_PATH / "tip.html")
+
+
+@app.route("/rectificatie")
+def rectificatie_page():
+    """Rectificatie-ingang (J2/D2.4) — dezelfde eenrichtings-wachtrij als /tip."""
+    return send_file(WEB_PATH / "rectificatie.html")
+
+
+def _lead_poort(data):
+    """Laag 0 (D2.0): kosteloze filters, strikt vóór de write en vóór elke agent-token.
+    Volgorde: challenge → honeypot → tijd-heuristiek → per-IP rate-limit → blocklist.
+    Retourneert (True, render_ts) of (False, (respons, status)) — een stille 200-drop
+    voor bot-signalen (honeypot/te snel), een 400/429 voor challenge/limiet/blocklist."""
+    # (1) Challenge — geldig, niet-verlopen HMAC-token.
+    ok, render_ts = _lead_token_geldig(data.get("lead_token"))
+    if not ok:
+        return (False, (jsonify({"error": "Ongeldig of verlopen formulier-token; herlaad "
+                                          "de pagina (GET /api/lead_token)."}), 400))
+    # (2) Honeypot — het onzichtbare veld 'website' is ingevuld → bot. Stille 200-drop
+    #     (geen foutsignaal dat de bot leert te omzeilen).
+    if (data.get("website") or "").strip():
+        return (False, (jsonify({"ok": True}), 200))
+    # (3) Tijd-heuristiek — te snel ingevuld ná uitgifte → bot. Stille drop.
+    if time.time() - render_ts < LEAD_MIN_INVULTIJD:
+        return (False, (jsonify({"ok": True}), 200))
+    # (4) Per-IP rate-limit — veel strenger dan de account-limieten.
+    if not _lead_rate_ok(_client_ip()):
+        return (False, (jsonify({"error": "Te veel inzendingen; probeer het later "
+                                          "opnieuw."}), 429))
+    # (5) Spam-domein-blocklist op de bron-URL.
+    if _spam_domein(data.get("bron_url") or data.get("url")):
+        return (False, (jsonify({"error": "Bron-domein staat op de blocklist."}), 400))
+    return (True, render_ts)
+
+
+@app.route("/api/leads", methods=["POST"])
+def create_lead():
+    """Publieke intake (D2-kern + D2.0 + D2.1). BEWUST GEEN @require_user — _lead_poort is
+    de eigen, loginloze gate. Een welgevormde inzending landt als één rij in de aparte
+    leads-baan (status='binnengekomen'); ze telt in NIETS mee en rendert nooit publiek.
+    Respons: 201 {lead_id} (ondoorzichtig) of een stille 200-drop / 400/429 uit Laag 0."""
+    data = request.json or {}
+    poort_ok, uit = _lead_poort(data)
+    if not poort_ok:
+        return uit
+    render_ts = uit
+
+    # (6) HTML-strip + harde lengtebegrenzing op alle vrije-tekstvelden (stored-XSS-verweer).
+    claim = _strip_veld(data.get("claim") or data.get("melding"), LEAD_MAXLENGTHS["claim"])
+    if not claim.strip():
+        return jsonify({"error": "Een melding/claim is verplicht."}), 400
+    soort = (data.get("soort") or "tip").strip().lower()
+    if soort not in ("tip", "rectificatie"):
+        soort = "tip"
+    bron_url = _strip_veld(data.get("bron_url") or data.get("url"),
+                           LEAD_MAXLENGTHS["bron_url"]) or None
+    quote_v = _strip_veld(data.get("quote"), LEAD_MAXLENGTHS["quote"]) or None
+    betreft = _strip_veld(data.get("betreft"), LEAD_MAXLENGTHS["betreft"]) or None
+
+    conn = get_db()
+    # (7) Sock-puppet-collapse (D2.1): near-dup van een bestaande lead → 'duplicaat', zodat
+    #     1000 sock-puppets samenvallen tot één te-corroboreren claim (agreement onder
+    #     indieners telt nergens; dezelfde regel als "agreement onder agents is nep-bewijs").
+    nieuw_sleutel = (claim + " " + (betreft or "")).lower()
+    status = "binnengekomen"
+    for rij in conn.execute("SELECT claim, betreft FROM leads"):
+        bestaand = ((rij["claim"] or "") + " " + (rij["betreft"] or "")).lower()
+        if difflib.SequenceMatcher(None, nieuw_sleutel, bestaand).ratio() >= LEAD_DEDUP_DREMPEL:
+            status = "duplicaat"
+            break
+
+    cur = conn.execute("""
+        INSERT INTO leads (herkomst, soort, claim, bron_url, quote, betreft,
+                           ingezonden_ip_hash, render_ts, status)
+        VALUES ('publiek', ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (soort, claim, bron_url, quote_v, betreft, _ip_hash(_client_ip()),
+          f"{render_ts:.3f}", status))
+    lead_id = cur.lastrowid
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+        VALUES ('leads', ?, 'created', NULL, ?, ?)
+    """, (lead_id, json.dumps({"soort": soort, "status": status}),
+          "Publieke intake (D2): lead binnengekomen"))
+    conn.commit()
+    conn.close()
+    # Ondoorzichtig lead_id: ontvangst-bevestiging zonder status-lek/thread/reply-kanaal.
+    opaque = hashlib.sha256(str(lead_id).encode() + app.secret_key).hexdigest()[:16]
+    return jsonify({"lead_id": opaque}), 201
+
+
+def _mag_leads_lezen(conn):
+    """De lead-wachtrij is voor de corroboratie-agent en de eigenaar: reviewer+ of een
+    agent-account. Het publiek ziet de quarantaine nooit."""
+    return heeft_rol(conn, g.user, "reviewer") or g.user.get("kind") == "agent"
+
+
+@app.route("/api/leads")
+@require_user()
+def list_leads():
+    """De agent-wachtrij (D2.1): leads voor de corroboratie-agent. Reviewer+ of agent-
+    account. Standaard alleen 'binnengekomen'; ?status=<...> of ?status=alle voor de rest."""
+    conn = get_db()
+    if not _mag_leads_lezen(conn):
+        conn.close()
+        return jsonify({"error": "Alleen reviewer+ of een agent-account leest de "
+                                 "lead-wachtrij"}), 403
+    status = request.args.get("status", "binnengekomen")
+    if status == "alle":
+        rijen = conn.execute("SELECT * FROM leads ORDER BY id").fetchall()
+    else:
+        rijen = conn.execute("SELECT * FROM leads WHERE status = ? ORDER BY id",
+                             (status,)).fetchall()
+    leads = [dict(r) for r in rijen]
+    conn.close()
+    return jsonify({"leads": leads, "aantal": len(leads)})
+
+
+LEAD_STATUSSEN = ("binnengekomen", "in_corroboratie", "gecorroboreerd", "afgewezen",
+                  "duplicaat", "smaad_hold")
+
+
+@app.route("/api/leads/<int:lead_id>", methods=["PATCH"])
+@require_user()
+def patch_lead(lead_id):
+    """Lead-status bijwerken door de corroboratie-agent (D2.1/D2.2). Reviewer+ of agent-
+    account (403 anders). Bedoelde levensloop: binnengekomen → in_corroboratie →
+    gecorroboreerd/afgewezen (agent_arg_id wijst naar het afgeleide echte argument). De
+    overgangen worden niet streng afgedwongen; niets wordt verwijderd (statusvlag +
+    edit_log). Het publiek raakt dit endpoint nooit."""
+    conn = get_db()
+    if not _mag_leads_lezen(conn):
+        conn.close()
+        return jsonify({"error": "Alleen reviewer+ of een agent-account werkt de "
+                                 "lead-wachtrij bij"}), 403
+    lead = conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    if not lead:
+        conn.close()
+        return jsonify({"error": "Lead niet gevonden"}), 404
+    data = request.json or {}
+    velden, waarden = [], []
+    nieuwe_status = data.get("status")
+    if nieuwe_status is not None:
+        if nieuwe_status not in LEAD_STATUSSEN:
+            conn.close()
+            return jsonify({"error": f"Status moet een van {LEAD_STATUSSEN} zijn"}), 400
+        velden.append("status = ?")
+        waarden.append(nieuwe_status)
+    if "agent_arg_id" in data:
+        aid = data.get("agent_arg_id")
+        if aid is not None and not conn.execute(
+                "SELECT 1 FROM arguments WHERE id = ?", (aid,)).fetchone():
+            conn.close()
+            return jsonify({"error": f"Argument {aid} bestaat niet"}), 400
+        velden.append("agent_arg_id = ?")
+        waarden.append(aid)
+    if not velden:
+        conn.close()
+        return jsonify({"error": "Niets te wijzigen: geef 'status' en/of "
+                                 "'agent_arg_id'"}), 400
+    conn.execute(f"UPDATE leads SET {', '.join(velden)} WHERE id = ?",
+                 waarden + [lead_id])
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('leads', ?, 'updated', ?, ?, ?, ?)
+    """, (lead_id, g.user["username"],
+          json.dumps({"status": lead["status"], "agent_arg_id": lead["agent_arg_id"]}),
+          json.dumps({"status": nieuwe_status if nieuwe_status is not None else lead["status"],
+                      "agent_arg_id": data.get("agent_arg_id", lead["agent_arg_id"])}),
+          "lead-corroboratie: status/agent_arg_id bijgewerkt"))
+    conn.commit()
+    rij = dict(conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone())
+    conn.close()
+    return jsonify(rij)
 
 
 if __name__ == "__main__":

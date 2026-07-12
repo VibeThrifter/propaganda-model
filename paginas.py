@@ -186,6 +186,12 @@ def _index(conn):
         for a in data["arguments"]:
             if a.get("status") in ("verworpen", "verouderd", "voorgesteld"):
                 continue
+            # Smaad-firewall (D2.3): een negatieve persoonsclaim onder smaad_hold rendert
+            # nooit publiek tot de eigenaar 'm vrijgeeft. viz_data.export_data houdt zulke
+            # args al helemaal uit deze lijst; deze guard maakt de uitsluiting expliciet en
+            # blijft veilig mocht de export ze ooit meesturen.
+            if a.get("smaad_hold"):
+                continue
             if a.get("parent_argument_id"):  # alleen roots dragen bronnen op het doel
                 continue
             for veld in args_op:

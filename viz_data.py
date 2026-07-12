@@ -21,7 +21,6 @@ import bereik as bereik_mod  # bereikmeter: publieksbereik (kijkers/lezers) per 
 
 ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "propaganda_model.db"
-BRIDGING_PATH = ROOT / "data" / "bridging.json"
 RELEASES_DIR = ROOT / "releases"
 
 
@@ -164,7 +163,11 @@ def export_data(conn):
             e['sub_effect_ids'] = sub.get(e['id'], [])
             e['parent_effect_ids'] = parent.get(e['id'], [])
 
-    # Arguments: volledige discussiebomen
+    # Arguments: volledige discussiebomen. Smaad-firewall (D2.3): een argument met
+    # smaad_hold = 1 (negatieve feitelijke persoonsclaim, nog niet vrijgegeven door de
+    # eigenaar) wordt volledig uit de publieke render gehouden — net zo streng als (en
+    # bovenop) 'voorgesteld'. Zo lekt het nergens in de graafdata (viz + de per-element
+    # pagina's, die dezelfde export lezen).
     cur.execute("""
         SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id,
                a.emergent_effect_id, a.parent_argument_id,
@@ -172,6 +175,7 @@ def export_data(conn):
                a.stance, a.claim, a.title, a.reasoning, a.weight, a.status,
                a.objection_type
         FROM arguments a
+        WHERE COALESCE(a.smaad_hold, 0) = 0
         ORDER BY a.parent_argument_id NULLS FIRST, a.id
     """)
     arguments = [dict(row) for row in cur.fetchall()]
@@ -206,24 +210,14 @@ def export_data(conn):
     cur.execute("SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity FROM instantiations")
     instantiations = [dict(r) for r in cur.fetchall()]
 
-    # Ratings-aggregaat per argument (M2.5): mens en agent apart (agent = advies)
-    ratings = {}
-    if cur.execute("SELECT name FROM sqlite_master WHERE type='table' "
-                   "AND name='argument_ratings'").fetchone():
-        for aid, kind, oordeel, n in cur.execute("""
-            SELECT ar.argument_id, u.kind, ar.oordeel, COUNT(*)
-            FROM argument_ratings ar JOIN users u ON u.username = ar.rater
-            GROUP BY ar.argument_id, u.kind, ar.oordeel"""):
-            ratings.setdefault(aid, {"mens": {"nuttig": 0, "niet_nuttig": 0},
-                                     "agent": {"nuttig": 0, "niet_nuttig": 0}})
-            ratings[aid][kind][oordeel] = n
+    # De 👍/👎-ratinglaag (M2.5) is bij de solo+agents-kanteling geschrapt (A3): bij n=1
+    # was ze inert. De tabel argument_ratings blijft bevroren (audit), maar wordt niet meer
+    # uitgelezen voor weergave; `a['ratings']` blijft None (de viz degradeert netjes).
     for a in arguments:
-        a['ratings'] = ratings.get(a['id'])
+        a['ratings'] = None
 
     # Volledige scoringsketen (gedeeld met /api/scores), zolang de connectie nog open is.
-    # Bridged gewichten (M2.5) tellen mee zodra scripts/bridging.py ze geschreven heeft.
-    scores = scoring.compute_all_scores(
-        conn, bridged_weights=scoring.bridged_weights_from_file(BRIDGING_PATH))
+    scores = scoring.compute_all_scores(conn)
 
     # Politieke kleurmeter (id-gekoppelde maps voor het detailpaneel). Preview = ook
     # `voorgesteld` signalen tellen voorlopig mee; nieuw werk staat immers nog voorgesteld.
