@@ -18,18 +18,44 @@ LinkedIn's voorwaarden werkt en per versie kan breken. De model-kant is de waard
 volledig testbare helft. Breekt de scraper, dan lever je met wat dan ook hetzelfde JSON
 aan en de mapper werkt ongewijzigd door.
 
-## ⚠️ Voorwaarden, risico & reikwijdte
+## ⚠️ Scraping-beleid (gericht, geen bulk) — J4
 
-- Geautomatiseerd scrapen **schendt LinkedIn's gebruiksvoorwaarden** en kan je account
-  (tijdelijk) blokkeren. Gebruik dit **gericht** (een handvol relevante profielen), met
-  mate, onder je eigen sessie — niet als bulk-crawler. De tool draait daarom standaard
-  *headful* (zichtbaar venster) met een menselijke login.
-- Dit is voor **legitiem onderzoek** naar de structuur van het Nederlandse mediaveld.
-  Verwerk alleen wat mensen zelf publiek op hun profiel zetten; het blijft
-  persoonsgegevens — behandel het zorgvuldig (`data/linkedin/` is gitignored).
-- LinkedIn-data is **zelf-gerapporteerd**: lage betrouwbaarheid. De mapper stelt daarom
-  bronklasse `grijs` voor en zet géén certainty/influence. Elk verband wacht op een
-  menselijke reviewer voordat het meetelt.
+Dit is **beleid, niet alleen advies**: een deel ervan zit als machinale rem in de tool
+(de profiel-cap hieronder). LinkedIn-scrapen is bewust *gericht* — bulk/proxy-scrapen is
+onevenredig risico (ToS-schending, account-ban, AVG) voor weinig opbrengst. De regels:
+
+1. **Harde bovengrens per run: een handvol relevante profielen, nooit een crawl-lijst.**
+   Concreet weigert de tool een batch **> 5 profielen** in één run (`PROFIEL_CAP`, geldt
+   voor zowel `scrape_profile.py` als `linkedin_naar_model.py`). De override
+   `--ik-weet-het` bestaat alleen voor uitzonderlijk, aantoonbaar gericht onderzoek —
+   níét om er een bulk-crawl mee te draaien. Kies profielen per **onderzoeksvraag**, niet
+   per lijst.
+2. **Headful, onder je eigen sessie.** De scraper draait standaard *headful* (zichtbaar
+   venster) met een handmatige login; geen headless bot-farm. De opgeslagen sessie is die
+   van de eigenaar zelf.
+3. **Pauze tussen requests.** Tussen twee profielen pauzeert de tool (menselijk tempo,
+   minder botdetectie); een rate-limit van de eigen API wordt netjes afgewacht
+   (`time.sleep(62)`).
+4. **Geen residentiële proxy's, geen IP-rotatie, geen bot-netwerk.** Bewust niet
+   ingebouwd en bewust niet toe te voegen — dat is precies de onevenredig-risicovolle lijn
+   die J4 uitsluit.
+5. **Eigenaar-getriggerd/gericht, geen 24/7-cron.** De scrape-trap staat niet op een
+   strak, onbewaakt 24/7-schema (dat lokt bans). Ze wordt gericht en bewust gestart voor
+   een concrete onderzoeksvraag — ook als agent-runs elders gescheduled worden (C1),
+   blijft scraping eigenaar-getriggerd.
+
+**Bronprioriteit — LinkedIn is aanvulling, geen hoofdweg.** Primaire structuurbronnen
+zijn de risicoarme, gezaghebbende registers: **KvK, jaarverslagen, publieke registers
+(handelsregister, ANBI, toezichthouders), en nieuws**. LinkedIn vult die aan waar een
+loopbaan/nevenfunctie er niet uit blijkt — het is *zelf-gerapporteerd* en zwak. Voor
+due-diligence (E2) worden register-mappers de hoofdweg; LinkedIn blijft secundair.
+
+**AVG-zorgvuldigheid.** Verwerk alleen wat mensen zelf publiek op hun profiel zetten; het
+blijft persoonsgegevens — behandel het zorgvuldig. De ruwe scrapes staan in
+`data/linkedin/` (**gitignored**, verlaten het apparaat niet). LinkedIn-data is
+**zelf-gerapporteerd → lage betrouwbaarheid**: de mapper stelt bronklasse `grijs` voor en
+zet géén certainty/influence. Elk verband landt `voorgesteld` en wacht op een menselijke
+reviewer voordat het meetelt.
 
 ## Installatie (alleen voor trap 1 — scrapen)
 
@@ -84,8 +110,13 @@ Opties van de mapper:
 | `--met-opleiding` / `--met-lidmaatschappen` | een van beide los aanzetten |
 | `--alles-kandidaat` | ken géén mechanisme toe (alle relaties als kandidaat) |
 | `--persoon-rol journalist` | rol-suggestie voor de persoon-knoop |
+| `--ik-weet-het` | override de profiel-cap (>5 JSON's in één run); alleen voor aantoonbaar gericht onderzoek, nooit bulk |
 | `--token <pad>` | ander Bearer-token (default `data/tokens/scout-agent.token`) |
 | `--api <url>` | andere API-basis (default `http://localhost:5000`) |
+
+Beide tools nemen **meerdere** profielen aan in één run (`scrape_profile.py <url> <url> …`,
+`linkedin_naar_model.py <json> <json> …`), maar weigeren een batch **> 5** zonder
+`--ik-weet-het` — de machinale rem achter het "gericht, geen bulk"-beleid hierboven.
 
 De mapper kan zonder browser worden getest tegen de meegeleverde fixture:
 

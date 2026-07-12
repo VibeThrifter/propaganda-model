@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<title>Inloggen — Propagandamodel</title>
+<title>Inloggen — Wie bezit de Nederlandse media</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/static/huisstijl.css">
 <style>
@@ -23,7 +23,7 @@ button { width: 100%; margin-top: 18px; padding: 10px; font-size: 14px; }
 </head>
 <body>
 <form class="kaart" id="loginForm">
-  <h1>Propagandamodel</h1>
+  <h1>Wie bezit de Nederlandse media</h1>
   <div class="sub">Inloggen voor bijdragen — lezen kan zonder account.</div>
   <label for="username">Gebruikersnaam</label>
   <input id="username" autocomplete="username" autofocus>
@@ -52,7 +52,11 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     });
     const data = await resp.json();
     if (!resp.ok) { fout.textContent = data.error || 'Inloggen mislukt'; return; }
-    window.location.href = '/';
+    // B3: honoreer ?next= zodat je na inloggen terugkomt op de gevraagde privé-pagina.
+    // Alleen een intern pad (begint met één '/') toestaan — geen open redirect.
+    const next = new URLSearchParams(location.search).get('next');
+    const veilig = next && /^\/(?!\/)/.test(next) ? next : '/';
+    window.location.href = veilig;
   } catch (err) { fout.textContent = 'Netwerkfout: ' + err.message; }
 });
 </script>

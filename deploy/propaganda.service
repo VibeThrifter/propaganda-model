@@ -1,0 +1,40 @@
+# systemd-unit voor de productie-deploy (B1) — de aanbevolen default (systemd + gunicorn,
+# géén Docker). Plaats als /etc/systemd/system/propaganda.service, pas de paden aan,
+# en zie deploy/README.md voor de stappen.
+#
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now propaganda
+#   systemctl status propaganda
+[Unit]
+Description=Wie bezit de Nederlandse media — Flask/gunicorn app
+After=network.target
+
+[Service]
+Type=simple
+# OWNER-ACTION: pas User/Group aan naar een non-root service-account op de VPS.
+User=propaganda
+Group=propaganda
+
+# OWNER-ACTION: het pad waar de repo staat uitgecheckt.
+WorkingDirectory=/opt/propaganda-model
+
+# data/ (DB + secret_key + tokens) op een persistent, gebackupt volume. Default =
+# de data/-map in de repo; wijs 'm desnoods naar een apart volume.
+Environment=PROPAGANDA_DATA_DIR=/opt/propaganda-model/data
+# Optioneel: laad extra env (bind/workers/domein) uit een bestand.
+# OWNER-ACTION: maak dit bestand of verwijder de regel.
+EnvironmentFile=-/etc/propaganda.env
+
+# OWNER-ACTION: pad naar de virtualenv met `pip install -r requirements.txt`.
+ExecStart=/opt/propaganda-model/.venv/bin/gunicorn -c deploy/gunicorn.conf.py server:app
+
+Restart=always
+RestartSec=3
+
+# Bescheiden hardening (data/ blijft schrijfbaar).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

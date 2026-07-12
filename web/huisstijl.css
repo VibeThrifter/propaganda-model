@@ -134,6 +134,22 @@ nav.topbal-nav a.actief {
   .topbal-merk .sub { display: none; }
 }
 
+/* ── Voettekst (gedeeld; gevuld door huisstijl.js) ─────────────────── */
+footer.hs-voet {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px 18px;
+  margin-top: 48px; padding: 18px 22px;
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-muted);
+}
+footer.hs-voet .hs-voet-merk { font-weight: 600; color: var(--text-dim); }
+footer.hs-voet nav { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+footer.hs-voet nav a { color: var(--text-dim); text-decoration: none; }
+footer.hs-voet nav a:hover { color: var(--text); text-decoration: underline; }
+@media (max-width: 700px) {
+  footer.hs-voet { padding: 14px 12px; margin-top: 28px; }
+}
+
 /* ── Micro-koppen ──────────────────────────────────────────────────── */
 h2.sectie, .groep-kop {
   font-size: 12px; font-weight: 600; text-transform: uppercase;

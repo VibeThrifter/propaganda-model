@@ -1,0 +1,31 @@
+# Caddy reverse-proxy + automatische HTTPS (B1). Caddy is één binary en regelt
+# Let's Encrypt-certificaten zelf (geen certbot-cron). Plaats als /etc/caddy/Caddyfile.
+#
+# OWNER-ACTION: vervang voorbeeld.tld door je echte domein en zorg dat de DNS
+# A/AAAA-records naar de VPS wijzen vóór je Caddy start (anders faalt de ACME-uitgifte).
+voorbeeld.tld {
+	# Proxy naar de gunicorn-backend op localhost (zie deploy/gunicorn.conf.py).
+	reverse_proxy 127.0.0.1:5000
+
+	# Caddy zet automatisch een geldig TLS-cert en redirect http:// → https://.
+	encode zstd gzip
+
+	# Veilige standaard-headers.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	log {
+		output file /var/log/caddy/propaganda.log
+	}
+}
+
+# Optioneel later (B3 open beslissing): een intern subdomein voor de redactie-UI,
+# afgeschermd met IP-allowlist of basic-auth op de proxy i.p.v. alleen de login-gate.
+# redactie.voorbeeld.tld {
+# 	@toegestaan remote_ip 203.0.113.0/24
+# 	handle @toegestaan { reverse_proxy 127.0.0.1:5000 }
+# 	respond 403
+# }

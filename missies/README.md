@@ -74,5 +74,9 @@ hetzelfde bijdragepad — de gewone REST-API, alles `voorgesteld`. Tweetraps:
    gedateerde `persoon→org`-affiliaties in (draaideur/brug-discipline; opleiding/club =
    kandidaat; bron `grijs`). Droogloop is default; idempotent + rate-limit-bestendig.
 
-Gericht gebruiken (handvol relevante profielen, geen bulk — het schendt LinkedIn's
-voorwaarden). Details: `tools/linkedin/README.md`.
+**Gericht, geen bulk (beleid J4):** een handvol relevante profielen per onderzoeksvraag,
+nooit een crawl-lijst — de tool weigert een batch > 5 zonder `--ik-weet-het`. Headful,
+eigen sessie, pauze tussen requests, geen proxy's, geen 24/7-cron (eigenaar-getriggerd).
+LinkedIn is **aanvulling**: de primaire structuurbronnen zijn KvK/jaarverslagen/publieke
+registers/nieuws; zelf-gerapporteerd → bronklasse `grijs`, `data/linkedin/` gitignored.
+Details: `tools/linkedin/README.md` § Scraping-beleid.

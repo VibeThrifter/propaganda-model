@@ -13,13 +13,23 @@ maar een projectie. Vandaar: **elke knoop en elke edge die je voorstelt draagt e
 bron en een argument**, en je oogst tweezijdig (ook tegenmacht-verbanden, ook
 verbanden die het model *compliceren*).
 
-> **LinkedIn — standaard-reflex bij persoonsonderzoek.** Gaat je ronde over een persoon
-> (loopbaan, nevenfuncties, draaideur, clubjes, opleiding) of persoon↔org-banden, overweeg
-> dan als éérste stap de LinkedIn-scrape-tool in `tools/linkedin/` (eigen brief:
-> `missies/linkedin_scout_brief.md`) — vóór handmatig webzoeken — en noteer die afweging in
-> je missielog, ook als je 'm bewust overslaat (publieke bronnen dekken beter, sessie dood).
-> Ze levert gedateerde `persoon→org`-affiliaties via hetzelfde bijdragepad (alles
-> `voorgesteld`). Zelfde anti-overfit- en bronplicht als hier.
+> **LinkedIn — standaard-reflex bij persoonsonderzoek, maar aanvulling, geen hoofdweg.**
+> Gaat je ronde over een persoon (loopbaan, nevenfuncties, draaideur, clubjes, opleiding)
+> of persoon↔org-banden, overweeg dan als éérste stap de LinkedIn-scrape-tool in
+> `tools/linkedin/` (eigen brief: `missies/linkedin_scout_brief.md`) — en noteer die
+> afweging in je missielog, ook als je 'm bewust overslaat (publieke bronnen dekken beter,
+> sessie dood). Ze levert gedateerde `persoon→org`-affiliaties via hetzelfde bijdragepad
+> (alles `voorgesteld`). Zelfde anti-overfit- en bronplicht als hier.
+>
+> **Beleid J4 — gericht, geen bulk.** Een handvol relevante profielen per onderzoeksvraag,
+> **nooit** een crawl-lijst; de tool weigert een batch **> 5** zonder `--ik-weet-het`.
+> Headful, onder de eigen sessie, met pauze tussen requests, **geen residentiële proxy's
+> en geen 24/7-cron** (eigenaar-getriggerd). **Bronprioriteit:** de primaire
+> structuurbronnen zijn **KvK, jaarverslagen, publieke registers en nieuws** — zoek een
+> loopbaan/nevenfunctie éérst daar; LinkedIn is de (zelf-gerapporteerde, zwakke)
+> aanvulling. **AVG:** alleen wat mensen zelf publiek zetten; ruwe scrapes in
+> `data/linkedin/` (gitignored); zelf-gerapporteerd → bronklasse `grijs`, telt niet mee
+> tot een reviewer classificeert.
 
 ## Onderwerpkeuze & anti-overfit-protocol (verplicht — zelfde geest als de documentalist)
 

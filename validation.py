@@ -417,6 +417,26 @@ def klasse_consistentie(source_type, reliability, heeft_locator) -> list:
     return problemen
 
 
+def _archief_dekking(conn):
+    """Wayback-dekking (C3): hoeveel URL-bronnen hebben een archive_url-locatie?
+
+    Noemer = bronnen met een 'url'-locatie; teller = daarvan die óók een
+    'archive_url'-locatie hebben. Gedeeld door de ARCHIEF-DEKKING-bevinding en het
+    kerngetal, zodat de 3%→hoog-voortgang op één plek berekend wordt."""
+    url_bronnen = conn.execute("""
+        SELECT COUNT(DISTINCT s.id) FROM sources s
+        JOIN source_locations l ON l.source_id = s.id AND l.location_type = 'url'
+    """).fetchone()[0]
+    gearchiveerd = conn.execute("""
+        SELECT COUNT(DISTINCT s.id) FROM sources s
+        JOIN source_locations l ON l.source_id = s.id AND l.location_type = 'url'
+        WHERE EXISTS (SELECT 1 FROM source_locations a
+                      WHERE a.source_id = s.id AND a.location_type = 'archive_url')
+    """).fetchone()[0]
+    pct = round(100 * gearchiveerd / url_bronnen, 1) if url_bronnen else None
+    return {"url_bronnen": url_bronnen, "gearchiveerd": gearchiveerd, "percentage": pct}
+
+
 def check_bronnen(conn, network=False):
     zonder_locatie = [
         f"bron #{s['id']}: {s['title']} ({s['source_type']})"
@@ -444,6 +464,7 @@ def check_bronnen(conn, network=False):
         for prob in klasse_consistentie(s["source_type"], s["reliability"], s["heeft_loc"]):
             inconsistent.append(f"bron #{s['id']} ({s['title']}): {prob}")
 
+    dekking = _archief_dekking(conn)
     bevindingen = [
         _bevinding("BRON-LOCATIE", "Bronnen zonder vindplaats (source_locations)",
                    "waarschuwing", zonder_locatie,
@@ -451,6 +472,13 @@ def check_bronnen(conn, network=False):
         _bevinding("BRON-ARCHIEF", "URL-bronnen zonder archive_url", "waarschuwing",
                    zonder_archief,
                    "Webpagina's verdwijnen; een Wayback-snapshot houdt het bewijs controleerbaar."),
+        _bevinding("ARCHIEF-DEKKING", "Wayback-archiveringsgraad van URL-bronnen", "info",
+                   [f"{dekking['gearchiveerd']} van {dekking['url_bronnen']} URL-bronnen "
+                    f"gearchiveerd = {dekking['percentage']}%"] if dekking["url_bronnen"] else [],
+                   "Aandeel URL-bronnen mét een archive_url-locatie (Wayback). C3 tilt dit "
+                   "van ~3% richting hoog: A1-herverificatie en de 'linkrot-vrij'-claim "
+                   "vereisen een onveranderlijke kopie. Draai scripts/archiveer_bronnen.py --save.",
+                   aantal=dekking["url_bronnen"] - dekking["gearchiveerd"]),
         _bevinding("BRON-KLASSE", "Bron-classificaties die niet bij het brontype passen "
                    "of een vindplaats missen", "waarschuwing", inconsistent,
                    "De reliability-klasse stuurt de score; ze hoort bij het brontype te "
@@ -483,6 +511,136 @@ def check_bronnen(conn, network=False):
             "controleer een bevinding handmatig vóór je de bron afschrijft."))
 
     return bevindingen
+
+
+# ── Neutraliteit / smaad-productregel (J3) ───────────────────
+
+# Negatief-geladen, potentieel-beschuldigende woorden (Nederlands). De lijst hoeft
+# niet uitputtend te zijn: de check is adviserend en mag ruim vlaggen.
+NEUTRALITEIT_NEGATIEF = {
+    "corrupt", "corruptie", "corrupte", "fraude", "frauduleus", "fraudeert",
+    "oplichting", "oplichter", "oplichten", "omkoping", "omgekocht", "omkopen",
+    "chantage", "afpersing", "witwas", "witwassen", "witwaste",
+    "crimineel", "criminele", "misdaad", "misdadig", "strafbaar",
+    "liegt", "loog", "leugen", "leugens", "leugenaar", "gelogen",
+    "bedrog", "bedriegt", "bedroog", "misleiding", "misleidt", "misleidde",
+    "belangenverstrengeling", "machtsmisbruik", "misbruik", "wanbeleid",
+    "verzweeg", "verzwijgt", "verzwegen", "doofpot", "samenzwering", "samenspanning",
+    "schuldig", "medeplichtig", "laakbaar", "onethisch", "immoreel",
+    "manipuleert", "manipulatie", "manipuleerde", "intimideert", "intimidatie",
+    "dubieus", "dubieuze", "malversatie", "malversaties", "verduistering",
+    "nepotisme", "vriendjespolitiek", "graaien", "graaier", "zelfverrijking",
+}
+
+# In-zin-attributiesignalen: is een bron/spreker in dezelfde zin genoemd, dan is
+# het een geattribueerde (dus toegestane) claim, geen eigen-stem-beschuldiging.
+NEUTRALITEIT_ATTRIBUTIE = (
+    "volgens", "aldus", "volgens eigen", "naar eigen zeggen",
+    "zei", "zegt", "zeggen", "stelt", "stelde", "beweert", "beweerde",
+    "schreef", "schrijft", "verklaarde", "verklaart", "oordeelde", "oordeelt",
+    "concludeert", "concludeerde", "rapporteert", "rapporteerde", "meldt", "meldde",
+    "betoogt", "betoogde", "noemde", "noemt", "citeert", "citeerde",
+    "volgens het", "volgens de", "according to",
+)
+# Aanhalingstekens/dubbele punt duiden op een citaat → geattribueerd genoeg.
+_CITAAT_TEKENS = ('"', "'", "«", "»", "„", "“", "”", "‘", "’", "„", "″")
+
+_ZIN_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _bevat_attributie(zin_lower: str) -> bool:
+    if any(t in zin_lower for t in _CITAAT_TEKENS):
+        return True
+    for sig in NEUTRALITEIT_ATTRIBUTIE:
+        # woordgrens zodat 'meldt' niet in 'gemeld...' fout matcht is niet nodig;
+        # een ruime attributie-match onderdrukt juist (veilige kant: minder vlaggen).
+        if sig in zin_lower:
+            return True
+    return False
+
+
+def check_neutraliteit(conn):
+    """NEUTRALITEIT-RENDER (J3): adviserende smaad-/neutraliteitscontrole.
+
+    Heuristiek (bewust ruim, adviserend — nooit een geratchete 'fout', zodat
+    `validate_model.py --strict` groen blijft): scant de eigen-stem-tekst van het
+    model — `arguments.claim`, `arguments.reasoning`, `relations.description`,
+    `entities.description` — plus, indien aanwezig, gegenereerde prose in
+    `data/prose/*.txt` (B5, nog niet gebouwd). Per *zin* vlagt ze een passage die
+    (1) de naam van een `type='persoon'`-entiteit noemt, én (2) een negatief-geladen
+    woord (NEUTRALITEIT_NEGATIEF) bevat, én (3) géén in-zin bron-attributie draagt
+    (NEUTRALITEIT_ATTRIBUTIE / aanhalingstekens). Zo'n passage is een kandidaat-
+    *beschuldiging in de eigen stem van het model* over een genoemd natuurlijk
+    persoon — precies wat smaad-/onrechtmatige-daad-risico geeft (plan §Juridisch).
+
+    Bewust een paar false-positives boven een gemiste beschuldiging: het is een
+    toezichtsignaal (waarschuwing), geen poort. Een correct geattribueerde zin
+    ("volgens de NOS …", of een citaat) wordt niet gevlagd; een kale conclusie in
+    de eigen stem wél. Personen worden op hun volledige opgeslagen naam gematcht
+    (woordgrens), wat losse achternamen/gewone woorden buiten schot houdt.
+    """
+    personen = [r["name"] for r in conn.execute(
+        "SELECT name FROM entities WHERE type = 'persoon' AND NOT vervangen")]
+    if not personen:
+        return [_bevinding("NEUTRALITEIT-RENDER",
+                           "Ongeattribueerde negatieve persoons-claims in de eigen stem",
+                           "waarschuwing", [], _NEUTRALITEIT_TOELICHTING)]
+
+    # Eén alternatie-regex over alle persoonsnamen (langste eerst), met woordgrenzen.
+    naam_regex = re.compile(
+        r"(?<!\w)(" + "|".join(re.escape(n) for n in sorted(personen, key=len, reverse=True))
+        + r")(?!\w)")
+
+    def scan(bron_label, tekst):
+        treffers = []
+        if not tekst:
+            return treffers
+        for zin in _ZIN_SPLIT.split(tekst):
+            zin_l = zin.lower()
+            if not any(w in zin_l for w in NEUTRALITEIT_NEGATIEF):
+                continue
+            m = naam_regex.search(zin)
+            if not m:
+                continue
+            if _bevat_attributie(zin_l):
+                continue
+            snip = zin.strip()
+            treffers.append(f"{bron_label} — '{m.group(1)}': {snip[:110]}")
+        return treffers
+
+    gevlagd = []
+    for a in conn.execute("""
+            SELECT id, claim, reasoning FROM arguments
+            WHERE NOT vervangen AND status != 'verworpen'"""):
+        gevlagd += scan(f"argument #{a['id']}", a["claim"])
+        gevlagd += scan(f"argument #{a['id']} (reasoning)", a["reasoning"])
+    for r in conn.execute(
+            "SELECT id, description FROM relations WHERE NOT vervangen"):
+        gevlagd += scan(f"relatie #{r['id']}", r["description"])
+    for e in conn.execute(
+            "SELECT id, name, description FROM entities WHERE NOT vervangen"):
+        gevlagd += scan(f"entiteit #{e['id']} ({e['name']})", e["description"])
+
+    # Optioneel: gegenereerde prose (B5). Bestaat nog niet; scan als het er komt.
+    prose_dir = Path(__file__).parent / "data" / "prose"
+    if prose_dir.is_dir():
+        for pad in sorted(prose_dir.glob("*.txt")):
+            try:
+                gevlagd += scan(f"prose {pad.name}", pad.read_text(encoding="utf-8"))
+            except OSError:
+                pass
+
+    return [_bevinding("NEUTRALITEIT-RENDER",
+                       "Ongeattribueerde negatieve persoons-claims in de eigen stem",
+                       "waarschuwing", gevlagd, _NEUTRALITEIT_TOELICHTING)]
+
+
+_NEUTRALITEIT_TOELICHTING = (
+    "Adviserende smaad-/neutraliteitscontrole (J3): een zin die een genoemd "
+    "natuurlijk persoon aan negatief-geladen taal koppelt zonder bron-attributie "
+    "in dezelfde zin. Het model spreekt in zijn eigen stem alleen gesourcete feiten "
+    "en geattribueerde meningen — nooit een eigen beschuldiging. Ruim bedoeld "
+    "(mogelijk false-positives); herformuleer met bron/attributie of controleer.")
 
 
 # ── Schema-pariteit (Z9) ─────────────────────────────────────
@@ -651,6 +809,8 @@ def kerngetallen(conn):
             if "emergent_effect_id" in arg_kolommen else 0),
         "bronclusters": een(
             "SELECT COUNT(DISTINCT COALESCE(cluster_key, 'bron' || id)) FROM sources"),
+        # Wayback-dekking (C3): 3% → hoog zichtbaar in de gezondheidsfoto.
+        "archief_dekking": _archief_dekking(conn),
         "citatie_concentratie_top3": top3,
         "citatie_concentratie_aandeel": (
             round(sum(t["citaties"] for t in top3) / citaties_totaal, 3) if citaties_totaal else None),
@@ -844,6 +1004,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_balans(conn)
     bevindingen += check_padclaims(conn)
     bevindingen += check_machtsvalentie(conn)
+    bevindingen += check_neutraliteit(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)

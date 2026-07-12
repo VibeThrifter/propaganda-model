@@ -10,17 +10,33 @@ Dit is een verbijzondering van de gewone scout-missie (`scout_brief.md`): dezelf
 anti-overfit-plicht, dezelfde "ik stel voor, een mens beslist"-regel, maar met LinkedIn
 als (zwakke, zelf-gerapporteerde) bron. Lees eerst `scout_brief.md`.
 
-## Voorwaarden & grenzen (lees dit eerst)
+## Scraping-beleid: gericht, geen bulk (lees dit eerst — J4)
 
-- Geautomatiseerd scrapen schendt LinkedIn's voorwaarden en kan een account blokkeren.
-  **Gericht** werken: een handvol relevante profielen per ronde, niet bulk. Headful,
-  onder de sessie van de eigenaar. **De agent mag/kan zowel trap 1 (scrape) als trap 2
-  (mapper) zelf draaien via Bash** — zolang de opgeslagen sessie leeft, is er geen
-  mens nodig om te scrapen of in te dienen. **Alléén de interactieve login**
-  (`scrape_profile.py login`, headful + 2FA/CAPTCHA) is mensenwerk; is de sessie verlopen,
-  relay dan dat ene commando (zie hieronder) en wacht — nooit blijven herproberen.
-- LinkedIn is **zelf-gerapporteerd** → betrouwbaarheid `grijs` (voorgesteld, telt niet in
-  de score tot een reviewer classificeert). Nooit gezaghebbend classificeren.
+- **Gericht, harde bovengrens.** Een handvol relevante profielen per onderzoeksvraag,
+  **nooit** een crawl-lijst. De tool dwingt dit af: een batch **> 5 profielen** in één run
+  wordt geweigerd (override `--ik-weet-het` alleen voor aantoonbaar gericht onderzoek,
+  nooit om te bulk-crawlen). Geautomatiseerd scrapen schendt LinkedIn's voorwaarden en kan
+  een account blokkeren; bulk/proxy-scrapen is onevenredig risico (ToS, ban, AVG) voor
+  weinig opbrengst.
+- **Headful, eigen sessie, pauze, geen proxy's.** De scraper draait *headful* onder de
+  sessie van de eigenaar, met een pauze tussen requests; **geen residentiële proxy's,
+  geen IP-rotatie, geen 24/7-cron.** Scraping blijft **eigenaar-getriggerd/gericht** —
+  ook als andere agent-runs gescheduled worden, staat de scrape-trap niet op een strak,
+  onbewaakt schema. **De agent mag/kan zowel trap 1 (scrape) als trap 2 (mapper) zelf
+  draaien via Bash** — zolang de opgeslagen sessie leeft, is er geen mens nodig om te
+  scrapen of in te dienen. **Alléén de interactieve login** (`scrape_profile.py login`,
+  headful + 2FA/CAPTCHA) is mensenwerk; is de sessie verlopen, relay dan dat ene commando
+  (zie hieronder) en wacht — nooit blijven herproberen.
+- **Bronprioriteit — LinkedIn is aanvulling, geen hoofdweg.** De **primaire**
+  structuurbronnen zijn de risicoarme, gezaghebbende registers: **KvK, jaarverslagen,
+  publieke registers (handelsregister, ANBI, toezichthouders), en nieuws**. Zoek een
+  loopbaan/nevenfunctie éérst daar; LinkedIn vult aan waar die registers zwijgen. Het is
+  zelf-gerapporteerd en zwak.
+- **AVG-zorgvuldigheid.** Verwerk alleen wat mensen zelf publiek op hun profiel zetten;
+  het blijft persoonsgegevens. De ruwe scrapes staan in `data/linkedin/` (**gitignored**,
+  verlaten het apparaat niet). LinkedIn is **zelf-gerapporteerd** → betrouwbaarheid
+  `grijs` (voorgesteld, telt niet in de score tot een reviewer classificeert). Nooit
+  gezaghebbend classificeren.
 - Alles landt `voorgesteld`. Geen statuswijzigingen, merges, classificaties, verwijderingen.
 - **De login is eigenaarswerk — een agent kan 'm niet.** De LinkedIn-sessie
   (`session.json`) verloopt na dagen–weken. Is 'ie verlopen, dan stoppen zowel de scraper

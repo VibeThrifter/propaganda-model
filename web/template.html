@@ -3,7 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Propagandamodel — Nederlandse Politiek &amp; Media</title>
+<title>Wie bezit de Nederlandse media — eigendom, geldstromen &amp; netwerk, gesourcet</title>
+<meta name="description" content="Een open onderzoeksdatabase naar de structuur achter het Nederlandse medialandschap: wie bezit de media, welke geldstromen en netwerken lopen eronder, en hoe die de nieuwsvoorziening vormgeven — elk verband gesourcet en toetsbaar.">
+<link rel="canonical" href="https://voorbeeld.tld/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Wie bezit de Nederlandse media">
+<meta property="og:description" content="Open onderzoeksdatabase: eigendom, geldstromen & netwerk van de Nederlandse media, gesourcet en toetsbaar.">
+<meta property="og:url" content="https://voorbeeld.tld/">
+<meta property="og:image" content="https://voorbeeld.tld/static/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wie bezit de Nederlandse media">
+<meta name="twitter:description" content="Open onderzoeksdatabase: eigendom, geldstromen & netwerk van de Nederlandse media, gesourcet en toetsbaar.">
+<!-- B2: canonical/OG-URL's dragen een placeholder-domein (voorbeeld.tld); de eigenaar
+     vervangt het bij deploy. og-image is optioneel (nog niet aanwezig). -->
 <link rel="stylesheet" href="/static/huisstijl.css">
 <script src="/static/huisstijl.js"></script>
 <style>
@@ -698,6 +710,22 @@ details.detail-section > .sec-body { margin-top: 8px; }
   padding: 7px 16px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px;
 }
 #laadFout button:hover { background: rgba(108,138,255,0.28); }
+
+/* Gedeelde voettekst (J1) — de viz is een full-screen app (body overflow:hidden),
+   dus geen doorlopende voet onderaan maar een compacte, discrete strook onderin
+   het midden (map-attributie-stijl). De juridische posture-links blijven zo op
+   élke publieke pagina zichtbaar, ook hier. */
+footer.hs-voet {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  margin: 0; padding: 4px 14px; border: none; border-top: none;
+  background: color-mix(in srgb, var(--bg-panel) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-radius: 8px 8px 0 0;
+  font-size: 10.5px; z-index: 79;
+  justify-content: center; gap: 4px 12px; max-width: calc(100vw - 40px);
+}
+footer.hs-voet .hs-voet-merk { display: none; }
+@media (max-width: 700px) { footer.hs-voet { font-size: 10px; padding: 3px 10px; } }
 </style>
 </head>
 <body>
@@ -705,8 +733,8 @@ details.detail-section > .sec-body { margin-top: 8px; }
 <header id="topbar">
   <button type="button" id="zijbalkKnop" aria-expanded="false" aria-label="Filters en instellingen"
           title="Filters en instellingen (zijbalk)">☰</button>
-  <h1>Propagandamodel</h1>
-  <span class="subtitle">NL politiek &amp; media</span>
+  <h1>Wie bezit de Nederlandse media</h1>
+  <span class="subtitle">eigendom, geldstromen &amp; netwerk — gesourcet</span>
   <div class="model-toggle" id="modelToggle">
     <button data-model="instance">Praktijk Model</button>
     <button class="active" data-model="theory">Theoretisch Model</button>

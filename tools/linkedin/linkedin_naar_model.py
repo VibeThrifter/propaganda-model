@@ -51,6 +51,12 @@ ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 DEFAULT_TOKEN = ROOT / "data" / "tokens" / "scout-agent.token"
 
+# J4 — machinale rem: gericht, geen bulk. Een run mag hooguit een handvol profielen
+# verwerken; meer vergt de expliciete override --ik-weet-het. Zo zit "gericht" niet
+# alleen in het beleid (README + missiebriefs) maar ook in de tool zelf. Verandert
+# NIETS aan de droogloop-default, de 429-await of de 'grijs'-betrouwbaarheid.
+PROFIEL_CAP = 5
+
 # Structureel entiteittype per herkomst (schema.sql). Bewust conservatief: een reviewer
 # corrigeert het type bij de review; de mapper mag niet gokken naar functie.
 TYPE_ERVARING = "bedrijf"            # werkgever — vaak, niet altijd, een bedrijf
@@ -368,7 +374,9 @@ def main():
     p = argparse.ArgumentParser(description="LinkedIn-profiel-JSON → modelvoorstellen.",
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
                                 epilog=__doc__)
-    p.add_argument("json", type=Path, help="genormaliseerd profiel-JSON (uit scrape_profile.py)")
+    p.add_argument("json", nargs="+", type=Path,
+                   help="genormaliseerd profiel-JSON (uit scrape_profile.py); "
+                        f"meerdere mag, tot de profiel-cap ({PROFIEL_CAP})")
     p.add_argument("--indienen", action="store_true", help="daadwerkelijk indienen (default: droogloop)")
     p.add_argument("--volledig", action="store_true", help="ook opleidingen én lidmaatschappen")
     p.add_argument("--met-opleiding", action="store_true", help="ook opleidingen meenemen")
@@ -376,33 +384,21 @@ def main():
     p.add_argument("--alles-kandidaat", action="store_true",
                    help="ken géén mechanisme toe (alle relaties als kandidaat)")
     p.add_argument("--persoon-rol", help="rol-naam voor de persoon-knoop (bv. 'journalist')")
+    p.add_argument("--ik-weet-het", action="store_true",
+                   help=f"override de per-run profiel-cap ({PROFIEL_CAP}); gericht werken "
+                        f"blijft de norm — gebruik dit niet om te bulk-crawlen")
     p.add_argument("--api", default="http://localhost:5000", help="basis-URL van de API")
     p.add_argument("--token", type=Path, default=DEFAULT_TOKEN, help="pad naar het Bearer-token")
     args = p.parse_args()
 
-    if not args.json.exists():
-        sys.exit(f"Bestand niet gevonden: {args.json}")
-    profiel = json.loads(args.json.read_text(encoding="utf-8"))
-    if profiel.get("type") != "persoon":
-        sys.exit("Dit script verwacht een persoonsprofiel (type='persoon').")
-
-    # Herken een 'kapotte scrape' (meestal: verlopen LinkedIn-sessie). Dan bevat het JSON
-    # geen loopbaan en heet de persoon vaak naar de authwall ('Aanmelden'/'Sign Up'). Zonder
-    # deze check zou de mapper stil 0 voorstellen doen; nu geeft 'ie de agent — en die de
-    # eigenaar — het exacte login-commando door (dat de eigenaar niet hoeft te onthouden).
-    naam = ((profiel.get("persoon") or {}).get("naam") or "").strip()
-    geen_loopbaan = not profiel.get("ervaringen") and not profiel.get("opleidingen")
-    authwall_naam = (not naam) or bool(re.search(
-        r"aanmelden|sign\s*up|word lid|join linkedin|log\s*in|^linkedin$", naam, re.I))
-    if geen_loopbaan and authwall_naam:
-        sys.exit(normalize.sessie_verlopen_bericht(
-            f"Het gescrapete JSON ({args.json.name}) bevat geen loopbaan en de naam "
-            f"('{naam or '—'}') lijkt op de LinkedIn-authwall — de scrape is vermoedelijk "
-            f"mislukt door een verlopen sessie."))
-    if geen_loopbaan:
-        print(f"⚠ Geen ervaringen én geen opleidingen in {args.json.name}. Is het profiel "
-              f"echt zo leeg, of is de LinkedIn-sessie verlopen? Zo ja, laat de eigenaar "
-              f"draaien: {normalize.SESSIE_LOGIN_COMMANDO}")
+    # J4 — machinale rem: gericht, geen bulk. Weiger een grote batch zonder expliciete
+    # override, zodat de tool zelf het beleid afdwingt (niet alleen de README).
+    if len(args.json) > PROFIEL_CAP and not args.ik_weet_het:
+        sys.exit(f"Geweigerd: {len(args.json)} profielen in één run overschrijdt de "
+                 f"profiel-cap ({PROFIEL_CAP}). Beleid J4: gericht werken, een handvol "
+                 f"relevante profielen per onderzoeksvraag — nooit een bulk-crawl. "
+                 f"Splits de run op, of voeg --ik-weet-het toe als je zeker weet dat dit "
+                 f"gericht onderzoek is (zie tools/linkedin/README.md § Scraping-beleid).")
 
     met_opleiding = args.volledig or args.met_opleiding
     met_lidmaatschappen = args.volledig or args.met_lidmaatschappen
@@ -422,6 +418,8 @@ def main():
         if persoon_rol_id is None:
             print(f"⚠ rol '{args.persoon_rol}' niet gevonden; persoon-knoop krijgt geen rol.")
 
+    # Eén planner voor de hele run, zodat de entiteit-/relatie-dedup ook óver meerdere
+    # profielen heen werkt (een gedeelde werkgever wordt niet dubbel voorgesteld).
     planner = Planner(api=api, bestaand=laad_entiteiten(),
                       draaideur_id=draaideur_mechanisme_id(),
                       indienen=args.indienen, alles_kandidaat=args.alles_kandidaat,
@@ -430,7 +428,34 @@ def main():
         print("(opleidingen overgeslagen — voeg --met-opleiding of --volledig toe)")
     if not met_lidmaatschappen:
         print("(lidmaatschappen overgeslagen — voeg --met-lidmaatschappen of --volledig toe)")
-    planner.verwerk(profiel, met_opleiding, met_lidmaatschappen)
+
+    for pad in args.json:
+        if not pad.exists():
+            sys.exit(f"Bestand niet gevonden: {pad}")
+        profiel = json.loads(pad.read_text(encoding="utf-8"))
+        if profiel.get("type") != "persoon":
+            sys.exit(f"Dit script verwacht een persoonsprofiel (type='persoon'): {pad.name}")
+
+        # Herken een 'kapotte scrape' (meestal: verlopen LinkedIn-sessie). Dan bevat het JSON
+        # geen loopbaan en heet de persoon vaak naar de authwall ('Aanmelden'/'Sign Up'). Zonder
+        # deze check zou de mapper stil 0 voorstellen doen; nu geeft 'ie de agent — en die de
+        # eigenaar — het exacte login-commando door (dat de eigenaar niet hoeft te onthouden).
+        naam = ((profiel.get("persoon") or {}).get("naam") or "").strip()
+        geen_loopbaan = not profiel.get("ervaringen") and not profiel.get("opleidingen")
+        authwall_naam = (not naam) or bool(re.search(
+            r"aanmelden|sign\s*up|word lid|join linkedin|log\s*in|^linkedin$", naam, re.I))
+        if geen_loopbaan and authwall_naam:
+            sys.exit(normalize.sessie_verlopen_bericht(
+                f"Het gescrapete JSON ({pad.name}) bevat geen loopbaan en de naam "
+                f"('{naam or '—'}') lijkt op de LinkedIn-authwall — de scrape is vermoedelijk "
+                f"mislukt door een verlopen sessie."))
+        if geen_loopbaan:
+            print(f"⚠ Geen ervaringen én geen opleidingen in {pad.name}. Is het profiel "
+                  f"echt zo leeg, of is de LinkedIn-sessie verlopen? Zo ja, laat de eigenaar "
+                  f"draaien: {normalize.SESSIE_LOGIN_COMMANDO}")
+
+        planner.verwerk(profiel, met_opleiding, met_lidmaatschappen)
+
     planner.samenvatting()
 
 

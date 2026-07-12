@@ -1,0 +1,11 @@
+User-agent: *
+# Redactie-/accountsurface hoort niet in de zoekindex (B3).
+Disallow: /overleg
+Disallow: /beheer
+Disallow: /werkbank
+Disallow: /account
+Disallow: /login
+# De API is geen leessurface — op één na: de deelbare graafdata blijft indexeerbaar
+# (feed-verhaal E1).
+Disallow: /api/
+Allow: /api/graph_data

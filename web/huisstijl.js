@@ -16,6 +16,15 @@
 //   6. Toetsenbord-bedienbaarheid: elk [onclick]-element krijgt automatisch
 //      tabindex + role="button" en reageert op Enter/spatie.
 
+// ── Merk (B2) — ÉÉN bron van waarheid voor de weergavenaam ──────────────
+// Eigenaar-verwisselbaar: pas alleen deze twee strings aan om de héle voorkant
+// (login/account/beheer/werkbank/overleg-topbal + de gedeelde voettekst) te
+// hernoemen. De viz heeft z'n eigen topbar (web/template.html) en de <title>/OG-
+// meta staan in de HTML — die spiegelen deze naam, dus verander ze mee. Sleutels,
+// API en DB blijven ongewijzigd (puur een weergavelaag, zoals weergaveNaam()).
+const HS_MERK = 'Wie bezit de Nederlandse media';
+const HS_MERK_SUB = 'eigendom, geldstromen & netwerk — gesourcet';
+
 // ── Identiteit (één keer opgehaald, gedeeld met de pagina) ──────────────
 let _hsMePromise = null;
 function hsMe() {
@@ -42,7 +51,7 @@ async function hsBouwTopbal() {
   const merk = document.createElement('a');
   merk.className = 'topbal-merk';
   merk.href = '/';
-  merk.innerHTML = 'Propagandamodel<span class="sub">NL politiek &amp; media</span>';
+  merk.innerHTML = `${hsEsc(HS_MERK)}<span class="sub">${hsEsc(HS_MERK_SUB)}</span>`;
 
   const nav = document.createElement('nav');
   nav.className = 'topbal-nav';
@@ -53,7 +62,8 @@ async function hsBouwTopbal() {
     if (key === actief) { a.classList.add('actief'); a.setAttribute('aria-current', 'page'); }
     return a;
   };
-  nav.append(link('/', 'Netwerk', 'netwerk'), link('/overleg', 'Overleg', 'overleg'));
+  nav.append(link('/', 'Netwerk', 'netwerk'), link('/overleg', 'Overleg', 'overleg'),
+             link('/methode', 'Methode', 'methode'));
 
   bal.prepend(merk, nav);
 
@@ -75,6 +85,37 @@ async function hsBouwTopbal() {
     chip.textContent = '✎ Inloggen om bij te dragen';
     chip.title = 'Lezen kan vrij, zonder account. Log in om bij te dragen.';
   }
+}
+
+// ── Voettekst (J1) — gedeeld op élke pagina, net als de topbal ──────────
+// Draagt de juridische posture (art. 43-UAVG-schild): op iedere publieke pagina
+// een link naar de methodologie/verantwoording, de rectificatieflow (J2) en
+// privacy. Auto-toegevoegd aan <body>; een pagina kan opt-outen met
+// <body data-geen-voet>. De viz (web/template.html) stylet 'm compact (zie
+// huisstijl.css .hs-voet + de viz-override).
+const HS_VOET_LINKS = [
+  ['Methode', '/methode'],
+  ['Over', '/methode#verantwoording'],
+  ['Rectificatie', '/rectificatie'],   // placeholder tot J2 (Fase 5)
+  ['Privacy', '/methode#privacy'],
+];
+function hsBouwVoet() {
+  if (document.body.dataset.geenVoet !== undefined) return;
+  if (document.querySelector('footer.hs-voet')) return;
+  const voet = document.createElement('footer');
+  voet.className = 'hs-voet';
+  const merk = document.createElement('span');
+  merk.className = 'hs-voet-merk';
+  merk.textContent = HS_MERK;
+  const nav = document.createElement('nav');
+  nav.setAttribute('aria-label', 'Voettekst');
+  HS_VOET_LINKS.forEach(([naam, pad]) => {
+    const a = document.createElement('a');
+    a.href = pad; a.textContent = naam;
+    nav.appendChild(a);
+  });
+  voet.append(merk, nav);
+  document.body.appendChild(voet);
 }
 
 // ── Toast: melding(tekst, soort, duurMs) — vervangt alert() ────────────
@@ -341,6 +382,7 @@ document.addEventListener('keydown', e => {
 
 function _hsInit() {
   hsBouwTopbal();
+  hsBouwVoet();
   hsMaakFocusbaar();
   new MutationObserver(_hsFocusGepland).observe(document.body, { childList: true, subtree: true });
 }

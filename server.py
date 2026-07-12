@@ -12,7 +12,8 @@ import re
 import sqlite3
 import time
 from pathlib import Path
-from flask import Flask, g, jsonify, request, send_file, session
+from urllib.parse import quote
+from flask import Flask, g, jsonify, redirect, request, send_file, session
 
 import auth  # wachtwoord-/token-hashing (M0.6)
 import scoring  # scoringsketen: afgeleide praktijk- en theoriescores
@@ -25,13 +26,18 @@ import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de t
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
 
 ROOT = Path(__file__).parent
-DB_PATH = ROOT / "data" / "propaganda_model.db"
-WEB_PATH = ROOT / "web"
-SECRET_KEY_PATH = Path(__file__).parent / "data" / "secret_key"
-BRIDGING_PATH = Path(__file__).parent / "data" / "bridging.json"
-REVIEW_ADVIES_PATH = Path(__file__).parent / "data" / "review_advies.json"
-BRON_SUGGESTIES_PATH = Path(__file__).parent / "data" / "bron_suggesties.json"
-RELEASES_PATH = Path(__file__).parent / "releases"
+# Optionele env-override voor deploy (B1). Defaults blijven exact de repo-root, dus
+# lokaal draaien (python3 server.py) verandert niets. PROPAGANDA_DATA_DIR verplaatst
+# de hele data/-map (DB + secret_key + tokens) naar een persistent volume; de drie
+# losse paden zijn daarnaast individueel te overschrijven.
+DATA_DIR = Path(os.environ.get("PROPAGANDA_DATA_DIR", str(ROOT / "data")))
+DB_PATH = Path(os.environ.get("PROPAGANDA_DB_PATH", str(DATA_DIR / "propaganda_model.db")))
+WEB_PATH = Path(os.environ.get("PROPAGANDA_WEB_PATH", str(ROOT / "web")))
+SECRET_KEY_PATH = Path(os.environ.get("PROPAGANDA_SECRET_KEY_PATH", str(DATA_DIR / "secret_key")))
+BRIDGING_PATH = DATA_DIR / "bridging.json"
+REVIEW_ADVIES_PATH = DATA_DIR / "review_advies.json"
+BRON_SUGGESTIES_PATH = DATA_DIR / "bron_suggesties.json"
+RELEASES_PATH = ROOT / "releases"
 
 app = Flask(__name__, static_folder=str(WEB_PATH), static_url_path="/static")
 
@@ -60,9 +66,16 @@ app.secret_key = _secret_key()
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=5.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # B1: veilig onder meerdere gunicorn-workers. WAL laat lezen-tijdens-schrijven
+    # toe (de auto-merge-service schrijft terwijl bezoekers lezen); busy_timeout
+    # laat een gelijktijdige schrijver even wachten i.p.v. direct 'database is locked'.
+    # WAL is een persistente DB-file-instelling (één keer zetten volstaat), maar het
+    # herhalen is goedkoop en robuust bij een verse build.
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     return conn
 
 
@@ -198,6 +211,29 @@ def require_user(min_rol="bijdrager"):
     return decorator
 
 
+def require_user_page(min_rol="bijdrager"):
+    """Pagina-poort (B3): een niet-ingelogde bezoeker wordt naar /login?next=<pad>
+    geredirect (HTTP 302) i.p.v. een JSON-401 te krijgen (die 401 is prima voor de
+    API's maar lelijk voor een HTML-pagina). De echte datalaag-poorten zitten al op
+    de API's; dit schermt alleen de redactie-*pagina's* af zodat ze niet als publieke,
+    indexeerbare surface uitlekken."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            conn = get_db()
+            rij = _zoek_user(conn)
+            conn.close()
+            if rij is None:
+                pad = request.full_path.rstrip("?")
+                return redirect(f"/login?next={quote(pad, safe='/')}", code=302)
+            if ROLE_ORDER.get(rij["role"], 0) < ROLE_ORDER[min_rol]:
+                # Ingelogd maar te lage rol: naar de leessurface, niet naar login.
+                return redirect("/", code=302)
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
 @app.route("/login")
 def login_page():
     return send_file(WEB_PATH / "login.html")
@@ -208,7 +244,24 @@ def account_page():
     return send_file(WEB_PATH / "account.html")
 
 
+@app.route("/methode")
+def methode_page():
+    """Publieke methodologie-/verantwoordingspagina (B2 + J1): de vijf filters, de
+    scoring-/bewijsdiscipline, de redactionele verantwoording, de neutraliteits-
+    verklaring, de disclaimer en de art. 43-UAVG-grondslag. Openbaar (geen gate) —
+    dit is het juridische schild en moet vindbaar zijn vanaf de voordeur."""
+    return send_file(WEB_PATH / "methode.html")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    """Weert de redactie-/account-routes en de API uit de zoekindex, maar houdt de
+    deelbare graafdata (GET /api/graph_data) expliciet toegankelijk (feed-verhaal E1)."""
+    return send_file(ROOT / "robots.txt", mimetype="text/plain")
+
+
 @app.route("/beheer")
+@require_user_page("maintainer")
 def beheer_page():
     """Accountbeheer voor maintainers: rollen, filterrollen en (de)activeren via het
     web — zodat een reviewer onboarden geen shell-toegang meer vergt. De pagina toont
@@ -217,6 +270,7 @@ def beheer_page():
 
 
 @app.route("/werkbank")
+@require_user_page("bijdrager")
 def werkbank_page():
     """Mijn werkbank: het eigen ingediende werk (argumenten, voorstellen, praktijk)
     met de ontvangen feedback en knoppen om te bewerken, reviseren of opnieuw in te
@@ -225,6 +279,7 @@ def werkbank_page():
 
 
 @app.route("/overleg")
+@require_user_page("bijdrager")
 def overleg_page():
     """Overlegpagina (Wikipedia-stijl 'Overleg'): alle threads én open
     voorstellen/RfC's op een eigen volledige pagina, los van de netwerkviz."""
@@ -232,6 +287,7 @@ def overleg_page():
 
 
 @app.route("/overleg/voorstel/<int:vid>")
+@require_user_page("bijdrager")
 def overleg_voorstel_page(vid):
     """Permalink-pagina van één RfC/voorstel — het 'dakloze' nieuwe theorie-element
     dat (nog) geen knoop in de graaf heeft en dus een eigen adresseerbare pagina

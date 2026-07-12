@@ -30,6 +30,7 @@ import asyncio
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -40,6 +41,13 @@ ROOT = Path(__file__).resolve().parents[2]
 UITVOER_DIR = ROOT / "data" / "linkedin"
 SESSIE_BESTAND = Path(__file__).resolve().parent / "session.json"
 LOGIN_TIMEOUT_S = 600  # 10 minuten om handmatig in te loggen (incl. 2FA/CAPTCHA)
+
+# J4 — machinale rem: gericht, geen bulk. Eén run scrapet hooguit een handvol profielen;
+# meer vergt de expliciete override --ik-weet-het. Tussen twee profielen pauzeert de tool
+# (menselijk tempo, minder botdetectie). Verandert NIETS aan de headful-default of de
+# is_logged_in-poort.
+PROFIEL_CAP = 5
+PAUZE_TUSSEN_PROFIELEN_S = 5
 
 
 def _eis_bibliotheek():
@@ -137,23 +145,45 @@ def main():
     p = argparse.ArgumentParser(description="Scrape een LinkedIn-profiel naar genormaliseerd JSON.",
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
                                 epilog=__doc__)
-    p.add_argument("url", nargs="?", help="LinkedIn-profiel-URL, of 'login' om een sessie te maken")
+    p.add_argument("url", nargs="*",
+                   help="LinkedIn-profiel-URL('s), of 'login' om een sessie te maken; "
+                        f"meerdere mag, tot de profiel-cap ({PROFIEL_CAP})")
     p.add_argument("--bedrijf", action="store_true", help="scrape een company-pagina i.p.v. een persoon")
-    p.add_argument("--out", type=Path, help="uitvoerbestand (default data/linkedin/<slug>.json)")
+    p.add_argument("--out", type=Path, help="uitvoerbestand (default data/linkedin/<slug>.json; "
+                                            "alleen bij één URL)")
     p.add_argument("--sessie", type=Path, default=SESSIE_BESTAND, help="pad naar het sessiebestand")
     p.add_argument("--headless", action="store_true",
                    help="draai zonder zichtbaar venster (afgeraden: anti-botdetectie is strenger)")
+    p.add_argument("--ik-weet-het", action="store_true",
+                   help=f"override de per-run profiel-cap ({PROFIEL_CAP}); gericht werken "
+                        f"blijft de norm — gebruik dit niet om te bulk-crawlen")
     args = p.parse_args()
 
     if not args.url:
         p.print_help()
         return
-    if args.url == "login":
+    if args.url == ["login"]:
         asyncio.run(_login())
         return
 
-    uit = args.out or (UITVOER_DIR / f"{_slug(args.url)}.json")
-    asyncio.run(_scrape(args.url, args.bedrijf, uit, args.sessie, args.headless))
+    urls = args.url
+    # J4 — machinale rem: gericht, geen bulk. Weiger een grote batch zonder override.
+    if len(urls) > PROFIEL_CAP and not args.ik_weet_het:
+        sys.exit(f"Geweigerd: {len(urls)} profielen in één run overschrijdt de profiel-cap "
+                 f"({PROFIEL_CAP}). Beleid J4: gericht werken, een handvol relevante profielen "
+                 f"per onderzoeksvraag — nooit een bulk-crawl. Splits de run op, of voeg "
+                 f"--ik-weet-het toe als je zeker weet dat dit gericht onderzoek is "
+                 f"(zie tools/linkedin/README.md § Scraping-beleid).")
+    if args.out and len(urls) > 1:
+        sys.exit("--out werkt alleen met één URL; laat 'm weg voor een batch "
+                 "(elk profiel gaat dan naar data/linkedin/<slug>.json).")
+
+    for i, url in enumerate(urls):
+        uit = args.out or (UITVOER_DIR / f"{_slug(url)}.json")
+        asyncio.run(_scrape(url, args.bedrijf, uit, args.sessie, args.headless))
+        # Pauze tussen requests: menselijk tempo, minder kans op botdetectie/ban.
+        if i < len(urls) - 1:
+            time.sleep(PAUZE_TUSSEN_PROFIELEN_S)
 
 
 if __name__ == "__main__":

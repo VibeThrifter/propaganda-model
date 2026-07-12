@@ -1,0 +1,5 @@
+# Runtime-afhankelijkheden voor de productie-deploy (B1).
+# De app-runtime is stdlib + Flask; gunicorn is de enige extra deploy-dependency
+# (de WSGI-server). Géén build step: `pip install -r requirements.txt` volstaat.
+flask==3.1.3
+gunicorn==23.0.0
