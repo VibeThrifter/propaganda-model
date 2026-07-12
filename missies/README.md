@@ -60,7 +60,23 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `documentalist-agent` | bijdrager | `documentalist_brief.md` | rechtstreeks de score in; alles wacht op review |
 | `criticus-agent` | bijdrager | `criticus_brief.md` | stromannen; statussen zetten; alles wacht op review |
 | `scout-agent` | bijdrager | `scout_brief.md` (+ `linkedin_scout_brief.md`) | theorielaag schrijven; verbanden zonder bron; statussen zetten |
+| `verificatie-agent` | bijdrager | `verificatie_agent_brief.md` | eigen werk her-verifiëren (403); statussen zetten/mergen; het verdict telt nergens in de score |
+| `aanklager-agent` | bijdrager | `aanklager_brief.md` | eigen claim certificeren (403); twee keer op dezelfde parent reageren (409); statussen zetten |
 | _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
+
+**Het immuunsysteem (A1/A2, Deel A).** De `verificatie-agent` her-verifieert elke
+`voorgesteld` supporting/contradicting-root onafhankelijk tegen de echte bron
+(+ archiefkopie) — quote verbatim, dekt de bron de claim — en schrijft een
+`klopt/twijfel/klopt-niet`-verdict via `POST /api/arguments/<id>/herverificatie`. De
+`aanklager-agent` is de gedecorreleerde tegenstander: hij zoekt een tegenbron
+(weerlegging-root), valt de inferentie aan (ondergraving-reply), of certificeert dat de
+claim de aanval `overleefde` via `POST /api/arguments/<id>/tegenspraak`. Beide oordelen
+leven in de procestabel `immuun_oordelen`, tellen **nergens** in de score, en voeden
+alléén de auto-merge-poort (A7). Vertrouwen komt hier niet uit consensus maar uit
+**onafhankelijkheid**: indiener, verificatie-agent en aanklager draaien elk onder een
+**andere modelfamilie-`provenance`** (decorrelatie). **De accounts `verificatie-agent`
+en `aanklager-agent` moeten nog worden aangemaakt** — de coördinator doet dat na de
+schema-migratie (`migrate_immuunsysteem.py`), om DB-locks te vermijden.
 
 ## LinkedIn-scrape als scout-optie
 

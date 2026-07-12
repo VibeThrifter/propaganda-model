@@ -535,7 +535,40 @@ CREATE TABLE citations (
     page TEXT,                           -- pagina / paginabereik ("pp. 45-48")
     section TEXT,                        -- hoofdstuk / sectie ("Hoofdstuk 3: Sourcing")
     context TEXT,                        -- korte toelichting bij het citaat
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Provenance-methode (A5): HOE is deze quote verkregen? Zit op de citatie, niet de
+    -- bron — dezelfde bron kan verbatim geciteerd óf door een LLM samengevat worden.
+    -- verbatim_quote (sterk) > officieel_register_scrape (medium) > llm_samenvatting_van_pagina
+    -- (zwak) weegt mee in scoring.source_factor. NULL = onbekend = neutraal (factor 1,0):
+    -- de bestaande hand-gecureerde citaties bewegen niet. Staat als laatste kolom zodat
+    -- een verse build gelijk is aan de ALTER TABLE-migratie (scripts/migrate_methode_tier.py).
+    methode TEXT CHECK(methode IS NULL OR methode IN (
+        'verbatim_quote', 'officieel_register_scrape', 'llm_samenvatting_van_pagina'))
+);
+
+--------------------------------------------------------------
+-- IMMUUN_OORDELEN (A1/A2): het epistemische immuunsysteem.
+-- Aparte PROCES-tabel naast de argumentenboom: een her-verificatie-verdict (A1,
+-- reproductietest tegen de echte bron) of een tegenspraak-certificaat (A2,
+-- gedecorreleerde aanklager). GEEN agreement-counting en GEEN boomnode — deze
+-- oordelen dragen géén τ/σ-gewicht en tellen nergens in de score; ze zijn puur
+-- procesmetadata voor de auto-merge-poort (A7) + het eigenaars-vangnet.
+-- model_familie (uit users.provenance) draagt de decorrelatie-eis van A2/A7.
+--------------------------------------------------------------
+
+CREATE TABLE immuun_oordelen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    argument_id INTEGER NOT NULL REFERENCES arguments(id),
+    fase TEXT NOT NULL CHECK(fase IN ('herverificatie', 'tegenspraak')),
+    verdict TEXT,                        -- herverificatie: klopt/twijfel/klopt-niet;
+                                         -- tegenspraak: aangevallen/overleefd/onbeslist
+    verbatim_span TEXT,                  -- A1: de letterlijk teruggevonden passage
+    bron_id INTEGER,                     -- welke citatie-bron is nagelopen
+    detail TEXT,
+    door TEXT,                           -- het account dat oordeelde (users.username)
+    model_familie TEXT,                  -- uit users.provenance (decorrelatie, A2/A7)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(argument_id, fase, door)
 );
 
 --------------------------------------------------------------
@@ -772,6 +805,7 @@ CREATE INDEX idx_arguments_parent ON arguments(parent_argument_id);
 CREATE INDEX idx_arguments_stance ON arguments(stance);
 CREATE INDEX idx_citations_argument ON citations(argument_id);
 CREATE INDEX idx_citations_source ON citations(source_id);
+CREATE INDEX idx_immuun_argument ON immuun_oordelen(argument_id, fase);
 CREATE INDEX idx_mechanisms_filter ON mechanisms(filter);
 CREATE INDEX idx_mechfilters_filter ON mechanism_filters(filter);
 CREATE INDEX idx_mechthemes_theme ON mechanism_themes(theme);

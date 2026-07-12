@@ -24,6 +24,10 @@ import bereik  # bereikmeter: gesourcet publieksbereik (kijkers/lezers/invullers
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
+try:
+    import dedup  # A6: semantische (paraphrase-)dedup bovenop difflib; aparte stdlib-module
+except ImportError:  # de module wordt parallel gebouwd — val terug op alleen difflib
+    dedup = None
 
 ROOT = Path(__file__).parent
 # Optionele env-override voor deploy (B1). Defaults blijven exact de repo-root, dus
@@ -879,6 +883,22 @@ def discussion_index():
 FILTERS = {"eigendom", "advertentie", "sourcing", "flak", "ideologie",
            "cross_filter", "systeemactor", "tegenmacht", "overig"}
 
+# Provenance-methode-tier (A5): de toegestane methode-waarden op een citatie.
+METHODES = tuple(scoring.METHODE_FACTOR)
+
+
+def _methode_fout(methode, quote):
+    """Valideer een citatie-methode (A5). Geen reviewer-poort: methode is een MECHANISCH
+    feit (verbatim gekopieerd of LLM-samengevat), geen oordeel zoals reliability — de
+    A1-verbatim-herverificatie is de teeth. Retourneert een foutstring, of None als ok.
+    NULL/afwezig is toegestaan (neutrale factor 1,0)."""
+    if methode is None:
+        return None
+    if methode not in scoring.METHODE_FACTOR:
+        return "Ongeldige methode. Kies uit: " + ", ".join(METHODES)
+    prob = validation.methode_consistentie(methode, quote)
+    return prob[0] if prob else None
+
 
 @app.route("/api/arguments", methods=["POST"])
 @require_user()
@@ -1071,6 +1091,9 @@ def create_argument():
     for c in citaties:
         if not isinstance(c, dict) or not c.get("source_id"):
             return jsonify({"error": "Elke citatie vereist een source_id"}), 400
+        fout = _methode_fout(c.get("methode"), c.get("quote"))
+        if fout:
+            return jsonify({"error": fout}), 400
 
     # Voorstel-workflow (M2.2): elk argument landt als 'voorgesteld' en telt in niets
     # mee tot een reviewer merget. De citatiepoort (M0.3) wordt op het merge-moment
@@ -1130,8 +1153,16 @@ def create_argument():
         conn.close()
         return jsonify({"error": f"Mechanisme {prop_value} bestaat niet"}), 400
 
-    # Duplicaatdetectie (M2.4): vergelijk de claim met bestaande root-argumenten op
-    # hetzelfde doel (stdlib-tekstgelijkenis; bewust geen externe embeddings).
+    # Duplicaatdetectie (M2.4 + A6): vergelijk de claim met bestaande root-argumenten op
+    # hetzelfde doel. Twee goedkope, stdlib-lagen (bewust geen externe embeddings in het
+    # synchrone POST-pad):
+    #   - difflib.SequenceMatcher, drempel 0,85 (gratis Laag-0-voorcheck, bestaand gedrag);
+    #   - dedup.gelijkenis (A6, token-cosine/Jaccard over shingles), drempel 0,80 — vangt
+    #     herformuleringen die difflib mist (synoniemarme paraphrase, herordening).
+    # Een kandidaat wordt gevlagd als max(difflib, dedup) ≥ zijn drempel. De 409 geeft de
+    # gelijkenis-score per bron terug; negeer_duplicaten=true blijft de bewuste override.
+    DIFFLIB_DREMPEL = 0.85
+    DEDUP_DREMPEL = 0.80
     if parent_id is None and not data.get("negeer_duplicaten"):
         doel_map = {"relation_id": relation_id, "entity_id": entity_id, "role_id": role_id,
                     "mechanism_id": mechanism_id, "emergent_effect_id": emergent_effect_id}
@@ -1140,11 +1171,16 @@ def create_argument():
         for rij in conn.execute(
                 f"SELECT id, claim, status FROM arguments WHERE {doelkolom} = ? "
                 "AND parent_argument_id IS NULL", (doel_map[doelkolom],)):
-            gelijkenis = difflib.SequenceMatcher(
-                None, claim.lower(), (rij["claim"] or "").lower()).ratio()
-            if gelijkenis >= 0.85:
+            ander = rij["claim"] or ""
+            difflib_ratio = difflib.SequenceMatcher(
+                None, claim.lower(), ander.lower()).ratio()
+            dedup_ratio = dedup.gelijkenis(claim, ander) if dedup is not None else 0.0
+            if difflib_ratio >= DIFFLIB_DREMPEL or dedup_ratio >= DEDUP_DREMPEL:
                 kandidaten.append({"id": rij["id"], "claim": rij["claim"],
-                                   "status": rij["status"], "gelijkenis": round(gelijkenis, 2)})
+                                   "status": rij["status"],
+                                   "gelijkenis": round(max(difflib_ratio, dedup_ratio), 2),
+                                   "difflib": round(difflib_ratio, 2),
+                                   "dedup": round(dedup_ratio, 2)})
         if kandidaten:
             conn.close()
             return jsonify({"error": "Mogelijke duplicaat-claim op dit doel; dien opnieuw "
@@ -1171,10 +1207,10 @@ def create_argument():
 
         for c in citaties:
             conn.execute("""
-                INSERT INTO citations (argument_id, source_id, quote, page, section, context)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO citations (argument_id, source_id, quote, page, section, context, methode)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (arg_id, c["source_id"], c.get("quote"), c.get("page"),
-                  c.get("section"), c.get("context")))
+                  c.get("section"), c.get("context"), c.get("methode")))
 
         # Log in edit_log
         conn.execute("""
@@ -1218,10 +1254,11 @@ def _kopieer_citaties(conn, van_arg_id, naar_arg_id):
     """Citaties dupliceren naar een nieuw (revisie-)argument."""
     for c in conn.execute("SELECT * FROM citations WHERE argument_id = ?",
                           (van_arg_id,)).fetchall():
-        conn.execute("""INSERT INTO citations (argument_id, source_id, quote, page, section, context)
-                        VALUES (?, ?, ?, ?, ?, ?)""",
+        conn.execute("""INSERT INTO citations
+                        (argument_id, source_id, quote, page, section, context, methode)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                      (naar_arg_id, c["source_id"], c["quote"], c["page"],
-                      c["section"], c["context"]))
+                      c["section"], c["context"], c["methode"]))
 
 
 def _zet_citaties(conn, arg_id, citaties):
@@ -1232,12 +1269,16 @@ def _zet_citaties(conn, arg_id, citaties):
             return "Elke citatie vereist een source_id"
         if not conn.execute("SELECT 1 FROM sources WHERE id = ?", (c["source_id"],)).fetchone():
             return f"Bron {c['source_id']} bestaat niet"
+        fout = _methode_fout(c.get("methode"), c.get("quote"))
+        if fout:
+            return fout
     conn.execute("DELETE FROM citations WHERE argument_id = ?", (arg_id,))
     for c in citaties:
-        conn.execute("""INSERT INTO citations (argument_id, source_id, quote, page, section, context)
-                        VALUES (?, ?, ?, ?, ?, ?)""",
+        conn.execute("""INSERT INTO citations
+                        (argument_id, source_id, quote, page, section, context, methode)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                      (arg_id, c["source_id"], c.get("quote"), c.get("page"),
-                      c.get("section"), c.get("context")))
+                      c.get("section"), c.get("context"), c.get("methode")))
     return None
 
 
@@ -1629,6 +1670,131 @@ def merge_argument(arg_id):
                     "vervangt": vervangt})
 
 
+# ── Immuunsysteem (A1/A2): her-verificatie + verplichte tegenspraak ──
+# Procesmetadata in immuun_oordelen — GEEN boomnode, GEEN τ/σ, telt NERGENS in de score.
+# Beide poorten weigeren zelf-oordeel (door == contributed_by): een reproductietest tegen
+# de echte bron (A1) en een gedecorreleerde aanklager (A2) zijn precies de twee dingen die
+# met agents wél schalen, maar alleen als een ánder account ze uitvoert.
+
+HERVERIFICATIE_VERDICTS = ("klopt", "twijfel", "klopt-niet")
+TEGENSPRAAK_VERDICTS = ("aangevallen", "overleefd", "onbeslist")
+
+
+def _normaliseer_tekst(s: str) -> str:
+    """Lowercase + witruimte-collapse, voor de goedkope verbatim-voorcheck (A1)."""
+    return " ".join((s or "").lower().split())
+
+
+def _schrijf_immuun_oordeel(conn, arg_id, fase, verdict, *, verbatim_span=None,
+                            bron_id=None, detail=None):
+    """Schrijf een immuun_oordeel-rij + edit_log-regel onder de ingelogde gebruiker.
+    Retourneert de nieuwe rij-id. UNIQUE(argument_id, fase, door) wordt door de caller
+    afgevangen (sqlite3.IntegrityError → 409)."""
+    door = g.user["username"]
+    model_familie = g.user.get("provenance")
+    cur = conn.execute("""
+        INSERT INTO immuun_oordelen
+            (argument_id, fase, verdict, verbatim_span, bron_id, detail, door, model_familie)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (arg_id, fase, verdict, verbatim_span, bron_id, detail, door, model_familie))
+    oid = cur.lastrowid
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+        VALUES ('immuun_oordelen', ?, 'created', ?, ?, ?)
+    """, (oid, door, json.dumps({"argument_id": arg_id, "fase": fase, "verdict": verdict}),
+          f"immuun-oordeel ({fase}): {verdict}"))
+    return oid
+
+
+@app.route("/api/arguments/<int:arg_id>/herverificatie", methods=["POST"])
+@require_user()
+def herverificatie(arg_id):
+    """A1 — onafhankelijke bron-herverificatie. Een ándere agent haalt de bron opnieuw op
+    en checkt de quote verbatim + de citaat-dekking. Verdict klopt/twijfel/klopt-niet.
+    403 bij zelf-verificatie. Telt nergens in de score — procesmetadata voor de auto-merge-
+    poort (A7)."""
+    data = request.json or {}
+    verdict = data.get("verdict")
+    if verdict not in HERVERIFICATIE_VERDICTS:
+        return jsonify({"error": "verdict moet een van zijn: "
+                                 + ", ".join(HERVERIFICATIE_VERDICTS)}), 400
+    verbatim_span = (data.get("verbatim_span") or "").strip() or None
+    bron_id = data.get("bron_id")
+    detail = (data.get("detail") or "").strip() or None
+
+    conn = get_db()
+    arg = conn.execute("SELECT id, contributed_by FROM arguments WHERE id = ?",
+                       (arg_id,)).fetchone()
+    if not arg:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if arg["contributed_by"] == g.user["username"]:
+        conn.close()
+        return jsonify({"error": "Zelf-verificatie is niet toegestaan: een andere agent moet "
+                                 "de bron onafhankelijk her-verifiëren (A1)"}), 403
+
+    # Goedkope mechanische voorcheck (A1): claim je verdict 'klopt' mét een verbatim_span,
+    # dan moet die span (genormaliseerd) een citaat-quote van dit argument bevatten — zo niet,
+    # forceer 'twijfel'. Dit is de gratis filter vóór de dure LLM-beoordeling.
+    if verdict == "klopt" and verbatim_span:
+        quotes = [q[0] for q in conn.execute(
+            "SELECT quote FROM citations WHERE argument_id = ? AND quote IS NOT NULL AND TRIM(quote) <> ''",
+            (arg_id,)).fetchall()]
+        span_n = _normaliseer_tekst(verbatim_span)
+        if quotes and not any(_normaliseer_tekst(q) in span_n or span_n in _normaliseer_tekst(q)
+                              for q in quotes):
+            verdict = "twijfel"
+            detail = ("[auto] verbatim_span matcht geen enkele citaat-quote van dit argument; "
+                      "verdict verlaagd naar 'twijfel'. " + (detail or "")).strip()
+
+    try:
+        oid = _schrijf_immuun_oordeel(conn, arg_id, "herverificatie", verdict,
+                                      verbatim_span=verbatim_span, bron_id=bron_id, detail=detail)
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Je gaf al een herverificatie-oordeel op dit argument"}), 409
+    conn.close()
+    return jsonify({"id": oid, "argument_id": arg_id, "fase": "herverificatie",
+                    "verdict": verdict, "detail": detail}), 201
+
+
+@app.route("/api/arguments/<int:arg_id>/tegenspraak", methods=["POST"])
+@require_user()
+def tegenspraak(arg_id):
+    """A2 — verplichte tegenspraak. Een gedecorreleerde aanklager zoekt een tegenbron of valt
+    de inferentie aan; vindt hij niets weerlegbaars, dan certificeert hij 'overleefd'. Zo blijft
+    'ik zocht en vond niets' PROCESMETADATA (nooit een contextual-boomnode). Verdict
+    aangevallen/overleefd/onbeslist. 403 bij zelf-certificering. Telt nergens in de score."""
+    data = request.json or {}
+    verdict = data.get("verdict")
+    if verdict not in TEGENSPRAAK_VERDICTS:
+        return jsonify({"error": "verdict moet een van zijn: "
+                                 + ", ".join(TEGENSPRAAK_VERDICTS)}), 400
+    detail = (data.get("detail") or "").strip() or None
+
+    conn = get_db()
+    arg = conn.execute("SELECT id, contributed_by FROM arguments WHERE id = ?",
+                       (arg_id,)).fetchone()
+    if not arg:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if arg["contributed_by"] == g.user["username"]:
+        conn.close()
+        return jsonify({"error": "Zelf-certificering is niet toegestaan: een gedecorreleerde "
+                                 "aanklager moet de claim aanvallen (A2)"}), 403
+
+    try:
+        oid = _schrijf_immuun_oordeel(conn, arg_id, "tegenspraak", verdict, detail=detail)
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Je gaf al een tegenspraak-certificaat op dit argument"}), 409
+    conn.close()
+    return jsonify({"id": oid, "argument_id": arg_id, "fase": "tegenspraak",
+                    "verdict": verdict, "detail": detail}), 201
+
+
 @app.route("/api/arguments/<int:arg_id>/score_diff")
 def argument_score_diff(arg_id):
     """Score-diff-preview (M2.2): wat verschuift er als dit argument die status krijgt?
@@ -1985,6 +2151,10 @@ def create_citation():
     if not argument_id or not source_id:
         return jsonify({"error": "argument_id en source_id zijn verplicht"}), 400
 
+    fout = _methode_fout(data.get("methode"), data.get("quote"))
+    if fout:
+        return jsonify({"error": fout}), 400
+
     conn = get_db()
     arg = conn.execute("SELECT id, status FROM arguments WHERE id = ?", (argument_id,)).fetchone()
     if not arg:
@@ -1996,10 +2166,10 @@ def create_citation():
 
     try:
         cur = conn.execute("""
-            INSERT INTO citations (argument_id, source_id, quote, page, section, context)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO citations (argument_id, source_id, quote, page, section, context, methode)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (argument_id, source_id, data.get("quote"), data.get("page"),
-              data.get("section"), data.get("context")))
+              data.get("section"), data.get("context"), data.get("methode")))
         cid = cur.lastrowid
 
         # Citatiepoort (M0.3): een ÉCHTE citatie (quote óf vindplaats van de bron)
@@ -2037,15 +2207,23 @@ def patch_citation(cid):
     (zonder een duplicaat-citatie aan te maken). Heft, net als create_citation, een
     'bronvermelding_nodig'-status op zodra de citatie daarmee 'echt' wordt."""
     data = request.json or {}
-    velden = {k: data[k] for k in ("quote", "page", "section", "context") if k in data}
+    velden = {k: data[k] for k in ("quote", "page", "section", "context", "methode") if k in data}
     if not velden:
-        return jsonify({"error": "Niets om te wijzigen (quote/page/section/context)"}), 400
+        return jsonify({"error": "Niets om te wijzigen (quote/page/section/context/methode)"}), 400
     conn = get_db()
-    row = conn.execute("SELECT id, argument_id, source_id FROM citations WHERE id = ?",
+    row = conn.execute("SELECT id, argument_id, source_id, quote, methode FROM citations WHERE id = ?",
                        (cid,)).fetchone()
     if not row:
         conn.close()
         return jsonify({"error": "Citatie niet gevonden"}), 404
+    # A5: valideer de (effectieve) methode tegen de (effectieve) quote — de verbatim-regel
+    # geldt ook als je alleen de quote leegmaakt of alleen de methode zet.
+    eff_methode = velden.get("methode", row["methode"])
+    eff_quote = velden.get("quote", row["quote"])
+    fout = _methode_fout(eff_methode, eff_quote)
+    if fout:
+        conn.close()
+        return jsonify({"error": fout}), 400
     sets = ", ".join(f"{k} = ?" for k in velden)
     conn.execute(f"UPDATE citations SET {sets} WHERE id = ?", (*velden.values(), cid))
 
@@ -3827,13 +4005,44 @@ def _verrijk_review_argumenten(conn, rows):
     # Citaties op de reviewkaart (quote + bron + link/archief) zodat reviewen iets
     # betekent, plus een legibele poort-vlag vóór de merge-klik.
     cites = _citaties_per_argument(conn, [a["id"] for a in argumenten])
+    # Immuunsysteem (A1/A2): het nieuwste her-verificatie-verdict + tegenspraak-certificaat
+    # per argument, zodat /overleg (en straks de auto-merge-poort A7) ze naast de kaart toont.
+    immuun = _immuun_per_argument(conn, [a["id"] for a in argumenten])
     for a in argumenten:
         a["citations"] = cites.get(a["id"], [])
         a["n_echte_bronnen"] = sum(1 for c in a["citations"] if c["echt"])
         a["ongesourcet_root"] = (a["parent_argument_id"] is None
                                  and a["stance"] in ("supporting", "contradicting")
                                  and a["n_echte_bronnen"] == 0)
+        oordeel = immuun.get(a["id"], {})
+        a["herverificatie"] = oordeel.get("herverificatie")
+        a["tegenspraak"] = oordeel.get("tegenspraak")
     return argumenten
+
+
+def _immuun_per_argument(conn, arg_ids):
+    """{arg_id: {'herverificatie': {...}|None, 'tegenspraak': {...}|None}} — per fase het
+    NIEUWSTE immuun-oordeel (A1/A2). Leeg als de tabel (nog) niet bestaat (live DB vóór de
+    migratie)."""
+    if not arg_ids or not conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='immuun_oordelen'").fetchone():
+        return {}
+    qs = ",".join("?" * len(arg_ids))
+    resultaat = {}
+    # Per (argument, fase) wint de hoogste id = het nieuwste oordeel.
+    for row in conn.execute(f"""
+            SELECT o.argument_id, o.fase, o.verdict, o.verbatim_span, o.bron_id,
+                   o.detail, o.door, o.model_familie, o.created_at
+            FROM immuun_oordelen o
+            WHERE o.argument_id IN ({qs})
+              AND o.id = (SELECT MAX(o2.id) FROM immuun_oordelen o2
+                          WHERE o2.argument_id = o.argument_id AND o2.fase = o.fase)
+            """, arg_ids):
+        resultaat.setdefault(row["argument_id"], {})[row["fase"]] = {
+            "verdict": row["verdict"], "verbatim_span": row["verbatim_span"],
+            "bron_id": row["bron_id"], "detail": row["detail"], "door": row["door"],
+            "model_familie": row["model_familie"], "created_at": row["created_at"]}
+    return resultaat
 
 
 @app.route("/api/review_queue")

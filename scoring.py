@@ -79,6 +79,25 @@ def relevance_factor(onderwerp: str | None) -> float:
     """Relevantiefactor van een bron voor dit (NL-)model; onbekend/NULL = neutraal 1,0."""
     return RELEVANTIE_FACTOR.get(onderwerp or "onbepaald", DEFAULT_RELEVANTIE)
 
+# Provenance-methode-tier (A5): HOE is de quote verkregen? Een volume-scrape mag zich
+# niet voordoen als hard bewijs — een LLM-samenvatting van een pagina is geen verbatim
+# citaat. Dit weegt eerlijk lager mee in de bronfactor, symmetrisch met de relevantie-as.
+# NULL/onbekend = 1,00 (neutraal): de bestaande hand-gecureerde citaties bewegen niet en
+# de golden snapshot blijft groen; alleen nieuw-gescrapet materiaal met een expliciete
+# lage-tier-methode wordt afgewaardeerd. De A1-verbatim-herverificatie is de teeth die
+# voorkomt dat een scraper de straf ontloopt door "verbatim" te liegen.
+METHODE_FACTOR = {
+    "verbatim_quote": 1.00,               # letterlijk overgenomen passage (sterk)
+    "officieel_register_scrape": 0.85,    # gestructureerd uit een officieel register (medium)
+    "llm_samenvatting_van_pagina": 0.55,  # LLM-samenvatting van een pagina (zwak)
+}
+DEFAULT_METHODE = 1.00
+
+
+def methode_factor(methode: str | None) -> float:
+    """Methodefactor van een citatie; onbekend/NULL = neutraal 1,0."""
+    return METHODE_FACTOR.get(methode, DEFAULT_METHODE) if methode else DEFAULT_METHODE
+
 # Verificatiestatus van een argument schaalt zijn bewijskracht.
 STATUS_FACTOR = {
     "geverifieerd": 1.00,
@@ -135,17 +154,25 @@ def reliability_weight(reliability: str | None) -> float:
 def source_factor(citations) -> float:
     """Bronfactor van een argument op basis van zijn sterkste citaat.
 
-    ``citations`` is een lijst (reliability, onderwerp)-paren — of, voor terugwaartse
-    compatibiliteit, kale reliability-strings (dan geldt onderwerp=onbepaald).
+    ``citations`` is een lijst (reliability, onderwerp, methode)-triples — of, voor
+    terugwaartse compatibiliteit, (reliability, onderwerp)-paren of kale
+    reliability-strings (dan geldt onderwerp=onbepaald, methode=neutraal).
 
     Geen citaties -> NO_CITATION_FACTOR. Anders 0.3 + 0.7 * (beste effectieve gewicht),
-    waarbij effectief gewicht = reliabilitygewicht × relevantiefactor (gecapt op 1,0).
-    Zo gaat een goed gestaafd, NL-relevant argument richting 1.0; 'eigen_synthese' weegt 0.
+    waarbij effectief gewicht = reliabilitygewicht × relevantiefactor × methodefactor
+    (A5; gecapt op 1,0). Zo gaat een goed gestaafd, NL-relevant, verbatim geciteerd
+    argument richting 1.0; 'eigen_synthese' weegt 0 en een LLM-samenvatting weegt lager.
     """
     weights = []
     for c in (citations or []):
-        reliability, onderwerp = c if isinstance(c, (tuple, list)) else (c, None)
-        weights.append(min(1.0, reliability_weight(reliability) * relevance_factor(onderwerp)))
+        if isinstance(c, (tuple, list)):
+            reliability = c[0]
+            onderwerp = c[1] if len(c) > 1 else None
+            methode = c[2] if len(c) > 2 else None
+        else:
+            reliability, onderwerp, methode = c, None, None
+        weights.append(min(1.0, reliability_weight(reliability)
+                           * relevance_factor(onderwerp) * methode_factor(methode)))
     if not weights:
         return NO_CITATION_FACTOR
     return NO_CITATION_FACTOR + (1.0 - NO_CITATION_FACTOR) * max(weights)
@@ -608,15 +635,16 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
     Gedeeld door scripts/generate_viz.py (statische snapshot) en de /api/scores-endpoint
     (live herberekening), zodat de aggregatielogica op één plek staat.
     """
-    # Citaties per argument: (reliability, cluster, onderwerp). NULL-cluster = eigen cluster.
+    # Citaties per argument: (reliability, cluster, onderwerp, methode). NULL-cluster =
+    # eigen cluster; methode (A5) weegt mee in de bronfactor (NULL = neutraal).
     cites_by_arg = {}
-    for arg_id, reliability, cluster, source_id, onderwerp in conn.execute("""
-            SELECT c.argument_id, s.reliability, s.cluster_key, s.id, s.onderwerp
+    for arg_id, reliability, cluster, source_id, onderwerp, methode in conn.execute("""
+            SELECT c.argument_id, s.reliability, s.cluster_key, s.id, s.onderwerp, c.methode
             FROM citations c JOIN sources s ON c.source_id = s.id"""):
         key = cluster or f"bron{source_id}"
         if exclude_cluster is not None and key == exclude_cluster:
             continue
-        cites_by_arg.setdefault(arg_id, []).append((reliability, key, onderwerp))
+        cites_by_arg.setdefault(arg_id, []).append((reliability, key, onderwerp, methode))
 
     # Maintainers voor het admin-veto: een gemergede, niet-opgeloste ondergraving van
     # een maintainer ('argument klopt niet' als admin-oordeel) maakt de punten van zijn
@@ -650,12 +678,12 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
         # bridged rating (M2.5) het objectief invult. De opgeslagen `weight`-kolom wordt
         # bewust genegeerd — net als een niet-onderbouwde invloed-prior.
         w = bridged_weights[aid] if (bridged_weights and aid in bridged_weights) else NEUTRAL_WEIGHT
-        taus[aid] = argument_force(w, status, [(r, o) for r, _, o in cites])
+        taus[aid] = argument_force(w, status, [(r, o, meth) for r, _, o, meth in cites])
         parents[aid] = parent_id
         stances[aid] = stance
         # Cluster van het argument: dat van zijn zwaarste échte citatie (gewicht > 0);
         # zonder echte citatie deelt het het pseudocluster (M1.2).
-        echte = [(reliability_weight(r), cl) for r, cl, o in cites if reliability_weight(r) > 0]
+        echte = [(reliability_weight(r), cl) for r, cl, o, meth in cites if reliability_weight(r) > 0]
         cluster = max(echte)[1] if echte else ZONDER_BRON_CLUSTER
         meta[aid] = {"relation_id": rel_id, "entity_id": ent_id, "role_id": role_id,
                      "mechanism_id": mech_id, "emergent_effect_id": eff_id,

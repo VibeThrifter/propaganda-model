@@ -19,6 +19,8 @@ data/bron_suggesties.json
 # Regenereerbare meter-rapporten (uit de DB, zie scripts/*_meter.py)
 data/doelgroep.json
 data/bereik.json
+# Per-host runtime-log van scripts/archiveer_bronnen.py (C3)
+data/archiveer_log.jsonl
 # Scout-onderzoeksuitvoer (ruwe JSON; het mission-log in missies/logs/ is de ingecheckte neerslag)
 data/scout/
 # LinkedIn-integratie: gescrapete persoonsdata + auth-sessie + geïsoleerde venv

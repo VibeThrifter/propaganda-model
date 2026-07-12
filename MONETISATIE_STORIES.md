@@ -57,6 +57,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 
 ### A1 — Onafhankelijke bron-herverificatie (verplichte fase) · Fase 2 · L
 
+> **Fase-2 status (branch `monetisatie-bouw`, 12 juli 2026):** ✅ geïmplementeerd — `immuun_oordelen`-tabel + `POST /api/arguments/<id>/herverificatie` (403 zelf-verificatie, verbatim-voorcheck), `review_queue` verrijkt, `IMMUUN-DEKKING`-check (achterstand ~3223), `missies/verificatie_agent_brief.md` + account `verificatie-agent` (provenance gpt-5.1). 🧑 OWNER-ACTION: de missie draaien om de achterstand weg te werken.
+
 **Als** systeem **wil ik** dat elke `voorgesteld` supporting/contradicting-root door een *andere* agent tegen de echte bron (+ archiefkopie) wordt her-geverifieerd **zodat** een gehallucineerd of verkeerd toegeschreven citaat betrapt wordt vóór het telt — de agent-vervanger van menselijke review.
 
 **Waarom.** Voor mensen was de review-vraag "vindt een mens dit ook". Voor agents wordt het "bevestigt een blinde tweede agent het tegen de echte bron": haal de bron opnieuw op, check dat de quote **verbatim** matcht en dat ze de claim daadwerkelijk steunt. Gestructureerd verdict `klopt/twijfel/klopt-niet`, mirror van `missies/reviewbeoordelaar_brief.md`.
@@ -90,6 +92,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 ---
 
 ### A2 — Verplichte tegenspraak (aanklager als lopende band) · Fase 2 · L
+
+> **Fase-2 status:** ✅ geïmplementeerd — `POST /api/arguments/<id>/tegenspraak` (403 zelf-certificering, deelt `immuun_oordelen`), `TEGENSPRAAK-DEKKING`-check (~3173), `missies/aanklager_brief.md` + account `aanklager-agent` (provenance gemini-3-pro). Boom-demping ongewijzigd. 🧑 OWNER-ACTION: missie draaien.
 
 **Als** systeem **wil ik** dat elke claim langs een gedecorreleerde 'aanklager'-agent gaat die een tegenbron zoekt, de inferentie aanvalt, of certificeert dat de claim de aanval overleefde **zodat** alleen wat een aanval overleeft in vertrouwen stijgt — geen confirmatie-cascade.
 
@@ -186,6 +190,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 
 ### A5 — Provenance-methode-tier (voor scraping) · Fase 2 · M
 
+> **Fase-2 status:** ✅ volledig geïmplementeerd — `citations.methode` enum; `METHODE_FACTOR` (verbatim 1,0 / register 0,85 / llm 0,55; NULL=1,0 → golden snapshot groen); `METHODE-CONSISTENTIE`-check (start 0); `migrate_methode_tier.py` gedraaid (3.656 citaties → NULL).
+
 **Als** systeem **wil ik** naast `reliability`/`onderwerp` een *methode*-dimensie op citaties **zodat** een volume-scrape zich niet voordoet als hard bewijs: `verbatim_quote` (sterk) > `officieel_register_scrape` (medium) > `llm_samenvatting_van_pagina` (zwak) weegt eerlijk mee in `bronfactor`.
 
 **Waarom.** Naarmate scraping opschaalt, komt bewijs binnen dat mechanisch geoogst is; een LLM-samenvatting van een pagina is geen verbatim citaat. `scoring.py bronfactor` moet dat eerlijk lager wegen, symmetrisch met de bestaande relevantie-as. Een validator-check (mirror `BRON-KLASSE`) bewaakt dat de opgegeven methode consistent is.
@@ -217,6 +223,8 @@ Rode draad: hoe meer mensen je wegtrekt en hoe harder je scrapet, hoe zwaarder d
 ---
 
 ### A6 — Semantische dedup bovenop difflib · Fase 2 · M
+
+> **Fase-2 status:** ✅ volledig geïmplementeerd — `dedup.py` (stdlib `gelijkenis`, drempel 0,80) + bedrading in `create_argument` (`max(difflib 0,85, dedup 0,80)`), 409 met breakdown + `negeer_duplicaten`-override, `scripts/test_dedup.py`. ⏳ DEFERRED: offline echte-embedding-optie (`scripts/embed_claims.py`).
 
 **Als** systeem **wil ik** dat bijna-duplicaat-claims herkend worden ook als de bewoording verschilt **zodat** paraphrase-duplicaten niet "veel bewijs" faken naarmate scraping opschaalt.
 

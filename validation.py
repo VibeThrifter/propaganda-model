@@ -417,6 +417,20 @@ def klasse_consistentie(source_type, reliability, heeft_locator) -> list:
     return problemen
 
 
+def methode_consistentie(methode, quote) -> list:
+    """Problemen met de provenance-methode van een citatie (A5; leeg = consistent).
+
+    Gedeeld tussen de create-poort (server.py) en de METHODE-CONSISTENTIE-validator.
+    Een citatie die 'verbatim_quote' claimt moet een niet-lege quote dragen — anders
+    is de sterkste tier (factor 1,0) een lege belofte. NULL/andere methoden zijn vrij.
+    """
+    problemen = []
+    if methode == "verbatim_quote" and not (quote or "").strip():
+        problemen.append("methode 'verbatim_quote' vereist een niet-lege quote "
+                         "(de letterlijk overgenomen passage)")
+    return problemen
+
+
 def _archief_dekking(conn):
     """Wayback-dekking (C3): hoeveel URL-bronnen hebben een archive_url-locatie?
 
@@ -995,6 +1009,81 @@ def check_machtsvalentie(conn):
     return out
 
 
+def check_methode(conn):
+    """METHODE-CONSISTENTIE (A5, fout): citaties die 'verbatim_quote' claimen zonder
+    een niet-lege quote. De methode stuurt de bronfactor (scoring.source_factor), dus
+    een lege verbatim-claim is precies de tier-ontduiking die A5 moet afvangen. Deelt de
+    regel met de create-poort (methode_consistentie). Alle bestaande citaties hebben
+    methode=NULL → deze check start op 0 fouten (baseline blijft ongewijzigd)."""
+    fout = []
+    for c in conn.execute(
+            "SELECT id, argument_id, methode, quote FROM citations "
+            "WHERE methode IS NOT NULL ORDER BY id"):
+        for prob in methode_consistentie(c["methode"], c["quote"]):
+            fout.append(f"citatie #{c['id']} (arg #{c['argument_id']}): {prob}")
+    return [
+        _bevinding("METHODE-CONSISTENTIE",
+                   "Citaties met een provenance-methode die niet bij de quote past",
+                   "fout", fout,
+                   "Een 'verbatim_quote'-citatie hoort een letterlijke quote te dragen; "
+                   "anders weegt de sterkste methode-tier (factor 1,0) op lucht. De "
+                   "create-poort weigert zulke citaties bij invoer (A5)."),
+    ]
+
+
+def _immuun_tabel_bestaat(conn) -> bool:
+    return conn.execute("SELECT name FROM sqlite_master WHERE type='table' "
+                        "AND name='immuun_oordelen'").fetchone() is not None
+
+
+def check_immuunsysteem(conn):
+    """IMMUUN-DEKKING (A1, info) + TEGENSPRAAK-DEKKING (A2, info).
+
+    Meet de achterstand van het immuunsysteem: evidentiële roots (supporting/
+    contradicting) die nog geen onafhankelijke bron-herverificatie (A1) resp. geen
+    enkele gedecorreleerde tegenspraak (A2) hebben gehad. Beide zijn INFO — het
+    immuunsysteem bouwt zich op; het is een meetbare achterstand, geen fout."""
+    if not _immuun_tabel_bestaat(conn):
+        return []
+    zonder_herverificatie = [
+        f"argument #{a['id']} ({a['stance']}): {(a['claim'] or '')[:70]}"
+        for a in conn.execute("""
+            SELECT a.id, a.stance, a.claim FROM arguments a
+            WHERE a.stance IN ('supporting', 'contradicting')
+              AND a.parent_argument_id IS NULL
+              AND NOT a.vervangen
+              AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o
+                              WHERE o.argument_id = a.id AND o.fase = 'herverificatie')
+            ORDER BY a.id
+        """)]
+    zonder_tegenspraak = [
+        f"argument #{a['id']} ({a['stance']}): {(a['claim'] or '')[:70]}"
+        for a in conn.execute("""
+            SELECT a.id, a.stance, a.claim FROM arguments a
+            WHERE a.stance IN ('supporting', 'contradicting')
+              AND a.parent_argument_id IS NULL
+              AND a.status NOT IN ('voorgesteld', 'verworpen')
+              AND NOT a.vervangen
+              AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o
+                              WHERE o.argument_id = a.id AND o.fase = 'tegenspraak')
+            ORDER BY a.id
+        """)]
+    return [
+        _bevinding("IMMUUN-DEKKING",
+                   "Evidentiële roots zonder onafhankelijke bron-herverificatie (A1)",
+                   "info", zonder_herverificatie,
+                   "Een supporting/contradicting-root hoort door een andere agent tegen "
+                   "de echte bron te worden her-geverifieerd (verbatim + citaat-dekking). "
+                   "Dit meet de achterstand; het verdict telt nergens in de score."),
+        _bevinding("TEGENSPRAAK-DEKKING",
+                   "Gemergede evidentiële roots zonder enige tegenspraak (A2)",
+                   "info", zonder_tegenspraak,
+                   "Elke gemergede claim hoort langs een gedecorreleerde aanklager te gaan "
+                   "die een tegenbron zoekt of de inferentie aanvalt. Dit meet de "
+                   "achterstand; het certificaat telt nergens in de score."),
+    ]
+
+
 def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen = []
     bevindingen += check_koppelingsplicht(conn)
@@ -1004,6 +1093,8 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_balans(conn)
     bevindingen += check_padclaims(conn)
     bevindingen += check_machtsvalentie(conn)
+    bevindingen += check_methode(conn)
+    bevindingen += check_immuunsysteem(conn)
     bevindingen += check_neutraliteit(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)

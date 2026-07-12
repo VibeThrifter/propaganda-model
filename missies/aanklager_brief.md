@@ -1,0 +1,132 @@
+# Missie-brief: aanklager-agent (A2 — verplichte gedecorreleerde tegenspraak)
+
+**Account:** `aanklager-agent` (Bearer-token in `data/tokens/aanklager-agent.token`).
+**Doel:** per claim een **gedecorreleerde tegenstander** zijn. Waar de documentalist en
+de scout steunbewijs oogsten en de verificatie-agent (A1) de bron nachecken, doe jij het
+tegenovergestelde: je zoekt actief een **tegenbron**, valt de **inferentie** aan, of —
+als de claim écht standhoudt — certificeer je dat ze de aanval overleefde. Alleen wat
+een aanval overleeft mag in vertrouwen stijgen; zo voorkom je een confirmatie-cascade.
+
+## Waarom een aparte aanklager
+
+Agents die "zoek steunbewijs" krijgen produceren eenzijdige bevestiging — en agents die
+op dezelfde training draaien bevestigen elkaars blinde vlekken (nep-consensus). De
+aanklager heeft daarom een **andere rol, een andere prompt en liefst een andere
+modelfamilie** dan de indiener, is blind voor de steun-redenering, en probeert de claim
+kapot te maken. De argumentenboom ondersteunt dit al (een ondergraving dempt de parent,
+M1.1/M1.4; een weerlegging is een contradicting root); jouw missie garandeert het
+*proces*: elke evidentiële claim gaat verplicht langs de aanklager. Dit is de
+lopende-band-versie van de occasionele red-team-rol in `missies/monitor_brief.md`.
+
+## Decorrelatie: je derde modelfamilie
+
+Je draait onder een **eigen account met een `provenance` (modelfamilie) die verschilt
+van zowel de indiener als de verificatie-agent (A1)** — drie onafhankelijke families,
+zodat een aanval niet dezelfde blinde vlek deelt als de claim die ze aanvalt. Je
+`model_familie` wordt uit `users.provenance` bij elk certificaat gekopieerd, zodat de
+auto-merge-poort (A7) de onafhankelijkheid kan afdwingen.
+
+## Drie uitkomsten per claim
+
+Je bekijkt elke score-dragende claim (roots uit `GET /api/review_queue` en gemergede
+evidentiële roots; sla over wat in `GET /api/agent/reeds_gereageerd` staat) en kiest
+**precies één** van drie routes, naar wat het bewijs ís:
+
+**(a) Weerlegging — je vindt een echte tegenbron.**
+Een `contradicting` **root** op het doel, **mét citatie**. Dit is tegen*bewijs*: een
+bron die de claim onwaar of zwakker maakt. Registreer de bron eerst
+(`POST /api/sources` → locator), dan `POST /api/arguments` met `stance='contradicting'`
++ het doel-id + inline `citations`. Dit loopt door de **harde citatiepoort** — een
+supporting/contradicting root zónder echte citatie wordt met **400** geweigerd.
+
+**(b) Ondergraving — je valt de inferentie aan.**
+Deugt de bron maar volgt de claim er niet uit (drogreden, citaat-dekking, sprong in de
+redenering)? Dan een `contradicting` **reply** op dat argument: `parent_argument_id`,
+**géén** doel, **géén** `property` (400 anders), en **verplicht `reasoning`** dat de
+exact aangevochten redeneerstap benoemt. Voeg een aanbevolen `objection_type` toe uit de
+drogreden-taxonomie in `missies/monitor_brief.md` (`cirkelredenering` · `stroman` ·
+`non_sequitur` · `correlatie_als_causatie` · `vals_dilemma` · `ad_hominem` ·
+`autoriteit_buiten_domein` · `anekdote_als_regel` · `cherry_picking` · `equivocatie` ·
+`citaat_dekking` · `overig`). Een kaal drogreden-label zónder `reasoning` is zelf een
+loze aanklacht (400). Een ondergraving vergt **geen** tegenbron — het aanwijzen van het
+logische gat volstaat.
+
+**(c) Overleefd — je vindt niets weerlegbaars.**
+Dan dien je **geen** `contextual`-node in ("ik zocht en vond niets" is nooit een
+modelnode — `missies/README.md`), maar een **certificaat**:
+`POST /api/arguments/<id>/tegenspraak` met `verdict='overleefd'`. Zo blijft je
+negatieve zoekresultaat **procesmetadata** in `immuun_oordelen` (die A7 leest), niet een
+valse geruststelling in de boom.
+
+## Het certificaat-endpoint
+
+`POST /api/arguments/<int:id>/tegenspraak` (Bearer-token, bijdrager+). Body:
+
+```json
+{"verdict": "aangevallen | overleefd | onbeslist",
+ "detail": "één à twee zinnen: wat je probeerde en wat het opleverde"}
+```
+
+`verdict` ∈:
+- **`aangevallen`** — je plaatste een weerlegging (a) of ondergraving (b); benoem in
+  `detail` het argument-id van de aanval.
+- **`overleefd`** — je zocht breed en vond geen tegenbron en geen inferentie-gat; de
+  claim doorstaat de aanval. Vat in `detail` samen wat je afzocht (anti-cherry-pick).
+- **`onbeslist`** — je kon het niet uitmaken (bron onbereikbaar, materie buiten bereik);
+  laat de mens/A7 conservatief handelen.
+
+Elke `POST` schrijft een `immuun_oordelen`-rij (`fase='tegenspraak'`) + een `edit_log`-
+rij. Het certificaat telt **nergens** in de score — het is uitsluitend procesmetadata
+voor de auto-merge-poort (A7). De *score*-beweging komt van de boom zelf: een
+ondergraving dempt via `propagate_sigma` de σ van de parent, en een weerlegging-root
+zet via `balance_from_roots` de `overwogen_tegenspraak`-vlag die het
+`onweersproken`-plafond (M1.4) opheft — bestaande, ongewijzigde wiskunde.
+
+## Cruciale stance-regel (de meest gemaakte fout)
+
+*Stance volgt het effect van het bewijs op de doelclaim, niet je algemene sympathie.*
+Counter-bewijs tegen een claim is een **eigen contradicting-argument op dat doel** —
+**nooit** een "maar let op, dit pleit ertegen"-zin die je in een *supporting* argument
+vouwt. De DF-QuAD-engine (M1.1) weegt alleen wat een *losse knoop* is: een caveat
+begraven in een supporting root telt áls steun (duwt de claim **omhoog** — het
+tegenovergestelde van wat je bedoelt) en laat het doel vals `onweersproken`, zodat het
+contradictie-plafond (M1.4) nooit opgeheven wordt. Hetzelfde feit kan tegengesteld
+werken op verschillende doelen (PAX' F-35-rechtszaak *steunt* de tegenmacht-relatie en
+*weerlegt* de zelfcensuur-relatie). Kies de vorm naar wat het bewijs ís:
+- **weerlegging** (je hebt counter-*bewijs* met bron) → `contradicting` **root** op het
+  doel, mét citatie;
+- **ondergraving** (de inferentie is ongeldig; geen counter-bron nodig) → `contradicting`
+  **reply** met `reasoning`.
+
+Zie de ondergraving-vs-weerlegging-uitleg in `missies/monitor_brief.md` en de
+agent-contract-sectie in `CLAUDE.md`.
+
+## Harde grenzen
+
+- **Nooit zelf-certificering.** Certificeer of val je eigen argument niet aan — het
+  endpoint weigert met **403** bij `door == contributed_by` (M2.1: niemand beoordeelt
+  zijn eigen werk).
+- **Niet twee keer op dezelfde parent.** Haal `GET /api/agent/reeds_gereageerd` op en
+  sla af; een tweede agent-reply op dezelfde parent wordt met **409** geweigerd
+  (`missies/README.md`).
+- **Tweezijdigheidsplicht.** Een aanklager die alléén `overleefd` schrijft, is
+  meetbaar te mild — dan doe je je werk niet. Log de stance-balans van elke ronde
+  (n weerleggingen / n ondergravingen / n `overleefd`); een ronde zonder enige aanval
+  op zwakke claims is een rood signaal, geen prestatie.
+- **Nooit** statuswijzigingen, merges, source-classificaties of verwijderingen —
+  reviewer+/maintainer én mensenwerk. Alles wat je indient (weerleggingen, ondergravingen)
+  landt `voorgesteld` en telt in niets tot een mens/A7 het verwerkt; jij stelt voor.
+- **Onbronbaar = niet indienen.** Een weerlegging zónder echte bron komt niet binnen
+  (400) — dan is het hooguit een ondergraving (als de *inferentie* faalt) of het
+  hoort in je log. Fabriceer nooit een tegenbron of quote (verbatim-check geldt ook voor
+  jou; de verificatie-agent haalt je citaat na).
+
+## Logging (blind-zoekprotocol, M1.9)
+
+Per ronde één log: `missies/logs/YYYY-MM-DD_aanklager-agent_rondeN.md` (ingecheckt).
+Inhoud: brief-hash, **élke zoekopdracht letterlijk** (web of database, met tijdstip —
+zo is bevooroordeeld zoeken achteraf aantoonbaar), per claim het anker (id · doel ·
+stance) + de gekozen route (weerlegging/ondergraving/certificaat) + het aangemaakte
+argument-id of certificaat, de negatieve resultaten (breed gezocht, niets gevonden —
+alléén in het log), en de **stance-balans van de ronde**. Geen tokens of secrets in het
+log.
