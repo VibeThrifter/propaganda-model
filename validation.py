@@ -32,8 +32,9 @@ BEKENDE_DDL_VERSCHILLEN = {
     "sources": "CHECK op reliability_voorgesteld/onderwerp_voorgesteld leeft alleen in "
                "schema.sql; live kolommen kwamen via ALTER TABLE "
                "(migrate_classificatie_voorstel.py)",
-    "arguments": "property-CHECK kreeg 'politieke_positie' via tabel-rebuild "
-                 "(migrate_politieke_positie_property.py); de enum-waarden zijn gelijk, "
+    "arguments": "property-CHECK kreeg 'politieke_positie' + 'machtsvalentie' via tabel-"
+                 "rebuild (migrate_politieke_positie_property.py, migrate_machtsvalentie_"
+                 "property.py); de enum-waarden zijn gelijk, "
                  "alleen het CHECK-commentaar verschilt van schema.sql",
 }
 
@@ -202,6 +203,7 @@ def check_bewijs(conn):
             WHERE a.stance IN ('supporting', 'contradicting')
               AND a.parent_argument_id IS NULL
               AND a.status != 'voorgesteld'
+              AND NOT a.vervangen
               AND NOT EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
             ORDER BY a.id
         """)]
@@ -614,6 +616,7 @@ def kerngetallen(conn):
             SELECT COUNT(*) FROM arguments a
             WHERE a.stance IN ('supporting', 'contradicting')
               AND a.parent_argument_id IS NULL
+              AND NOT a.vervangen
               AND NOT EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)"""),
         "relaties_zonder_argumenten": een("""
             SELECT COUNT(*) FROM relations r
@@ -806,6 +809,32 @@ def check_fase3(conn):
 
 # ── Alles in één run ─────────────────────────────────────────
 
+def check_machtsvalentie(conn):
+    """MACHTSVALENTIE: elk 'machtsvalentie'-aspect-argument codeert een geldige
+    edge-valentie ('filter:<filter>' of 'as:<as>:<opent|sluit>') én hangt aan een edge
+    (relatie of mechanisme). De API poortert dit al bij creatie; deze check is een
+    backstop voor direct-DB-rijen (migraties/handmatig)."""
+    import tegenmacht
+    rows = conn.execute("""
+        SELECT id, property_value, relation_id, mechanism_id
+        FROM arguments WHERE property = 'machtsvalentie'
+    """).fetchall()
+    fout = []
+    for a in rows:
+        if tegenmacht.parse_machtsvalentie(a["property_value"]) is None:
+            fout.append(f"arg #{a['id']}: ongeldige property_value {a['property_value']!r}")
+        elif not (a["relation_id"] or a["mechanism_id"]):
+            fout.append(f"arg #{a['id']}: hangt niet aan een edge (relatie/mechanisme)")
+    out = []
+    if fout:
+        out.append(_bevinding(
+            "MACHTSVALENTIE",
+            "Machtsvalentie-annotaties met ongeldige vorm of zonder edge", "fout", fout,
+            "Een 'machtsvalentie'-aspect codeert 'filter:<filter>' (verantwoording) of "
+            "'as:<as>:<opent|sluit>' (contra-hegemonie) op een relatie/mechanisme."))
+    return out
+
+
 def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen = []
     bevindingen += check_koppelingsplicht(conn)
@@ -814,6 +843,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_invloed(conn)
     bevindingen += check_balans(conn)
     bevindingen += check_padclaims(conn)
+    bevindingen += check_machtsvalentie(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)

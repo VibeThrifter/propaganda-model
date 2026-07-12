@@ -100,18 +100,16 @@ def main():
                json={"relation_id": 1, "stance": "contextual", "claim": "x"})
     eis(r.status_code == 401, f"ongeldig token -> 401 ({r.status_code})")
 
-    print("5. Maintainer: merge-flow + zelf-verificatieblok (M2.1/M2.2)")
+    print("5. Maintainer: auto-merge + zelf-verificatieblok (M2.1/juli 2026)")
     kop = {"Authorization": f"Bearer {maintainer_token}"}
     r = c.post("/api/arguments", headers=kop,
                json={"relation_id": 1, "stance": "contextual", "claim": "Eigen claim"})
-    eigen_arg = r.get_json()["id"]
-    r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
-                json={"status": "geverifieerd"})
-    eis(r.status_code == 400, f"voorgesteld vergt eerst merge ({r.status_code})")
-    r = c.post(f"/api/arguments/{eigen_arg}/merge", headers=kop)
     j = r.get_json()
-    eis(r.status_code == 200 and j["self_merged"] is True,
-        "eigen voorstel mergen mag (n=1) maar zet de self_merged-vlag")
+    eigen_arg = j["id"]
+    eis(r.status_code == 201 and j["status"] == "ongecontroleerd" and j["self_merged"],
+        f"maintainer-argument merget meteen (admin hoeft geen review) ({j.get('status')})")
+    r = c.post(f"/api/arguments/{eigen_arg}/merge", headers=kop)
+    eis(r.status_code == 400, f"nogmaals mergen kan niet — al auto-gemerged ({r.status_code})")
     r = c.patch(f"/api/arguments/{eigen_arg}/status", headers=kop,
                 json={"status": "geverifieerd"})
     eis(r.status_code == 403, f"eigen werk verifiëren is onmogelijk (M2.1) ({r.status_code})")

@@ -106,7 +106,7 @@ header.topbal { position: static; }
              border: 1px solid color-mix(in srgb, #e0a23a 35%, transparent); border-radius: 8px;
              padding: 6px 10px; margin: 2px 0 10px; }
 .bronbadge code { background: rgba(0,0,0,.3); padding: 1px 4px; border-radius: 4px; }
-/* oordeel-paar: ✓ Logica klopt / ✗ Logica klopt niet — gebalanceerd, samen, even zwaar */
+/* oordeel-paar: ✓ Argument klopt / ✗ Argument klopt niet — gebalanceerd, samen, even zwaar */
 .oordeel-rij { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11px; flex-wrap: wrap; }
 .oordeel { padding: 2px 10px; border-radius: 9px; border: 1px solid var(--border); font-variant-numeric: tabular-nums; }
 .oordeel-saldo { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -211,6 +211,14 @@ header.topbal { position: static; }
 .vpil-n { font-size: 11px; padding: 1px 7px; border-radius: 8px; background: rgba(255,255,255,.08);
   color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .vpil.actief .vpil-n { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+/* Sub-tabs binnen een segment (Praktijk → entiteiten/relaties; Argumenten → per type):
+   lichter dan de hoofd-segmentpillen, zitten er direct onder. */
+.vsubsegment { display: inline-flex; flex-wrap: wrap; gap: 5px; margin: -8px 0 16px; }
+.vsubpil { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim);
+  padding: 4px 11px; border-radius: 8px; cursor: pointer; user-select: none; border: 1px solid var(--border); }
+.vsubpil:hover { color: var(--text); background: var(--bg-hover); }
+.vsubpil.actief { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent); }
 main { max-width: 880px; margin: 0 auto; padding: 22px; }
 .kaart { padding: 18px 20px; }
 /* Wachtrij-item + agent-advies ernaast (reviewbeoordelaar; los van het model, telt niet mee) */
@@ -318,6 +326,10 @@ function linkify(s) {
   return out + esc(s.slice(last));
 }
 let ME = null;
+// Voorstellen/review-wachtrij is reviewer-werkruimte: alleen ingelogde reviewer+ ziet 'm
+// (spiegelt de server-poort op /api/review_queue en /api/voorstellen). Bijdragers zien
+// hun eigen ingediende werk in de werkbank, niet hier.
+function magReview() { return !!(ME && ME.role && ME.role !== 'bijdrager'); }
 let ROLLEN = [];          // lichte rollenlijst (GET /api/roles) voor de rol-keuze bij entiteit-goedkeuring
 // Structurele entiteittypes (de niet-legacy set uit schema.sql) voor de bewerk-dropdown bij
 // heraanmelden; legacy-types blijven geldig maar tonen we niet als nieuwe keuze. De huidige
@@ -395,6 +407,7 @@ function toonTabUI(naam) {
   document.getElementById('tabBronnen').classList.toggle('actief', naam === 'bronnen');
 }
 function kiesTab(naam) {
+  if (naam === 'voorstellen' && !magReview()) return;  // reviewer-only werkruimte
   toonTabUI(naam);
   if (naam === 'voorstellen' && !reviewGeladen) laadVoorstellen();
   if (naam === 'bronnen' && !bronnenGeladen) laadBronnen();
@@ -510,6 +523,9 @@ async function init() {
   } catch (e) { ME = null; }
   try { ROLLEN = await (await fetch('/api/roles')).json(); } catch (e) { ROLLEN = []; }
   try { BRIDGING = await (await fetch('/api/bridging')).json(); } catch (e) { BRIDGING = null; }
+  // Voorstellen-tab enkel voor reviewer+; anders de knop verbergen (server weigert de data toch).
+  const tabV = document.getElementById('tabVoorstellen');
+  if (tabV) tabV.style.display = magReview() ? '' : 'none';
   laadVoorstellenBadge();
   // Routing: /overleg/voorstel/<id> = eigen voorstel-pagina; #<param>=<id> = thread-permalink;
   // zonder permalink verwelkomt de startkaart (W3.1).
@@ -731,12 +747,12 @@ function argMenuItems(a, ck) {
       return [{ label: 'Verbeteren…', onClick: () => bewerkArg(a.id, ck), titel: 'bijschaven (telt nog nergens)' }];
     return [];
   }
-  // Bewijs aandragen (de oude reageer-bar) — stance volgt de knop, wisselen kan in de composer.
+  // Twee reacties op een argument, niets anders (juli 2026): (1) '✗ Argument klopt
+  // niet' — de ondergraving, bronloos, zit als knop in het oordeel-paar op de knoop;
+  // (2) 'Bewijs/tegenbewijs gevonden' — een reactie mét bron, vóór of tegen — hier.
   const items = [
-    { label: '＋ Bewijs vóór…', onClick: () => toonReply(a.id, 'supporting', false, ck),
-      titel: 'draag bewijs of een argument aan dat dit argument ondersteunt' },
-    { label: '－ Bewijs tegen…', onClick: () => toonReply(a.id, 'contradicting', false, ck),
-      titel: 'draag bewijs of een argument aan dat tegen dit argument in gaat' },
+    { label: '⇄ Bewijs/tegenbewijs gevonden…', onClick: () => toonReply(a.id, 'supporting', false, ck),
+      titel: 'draag een bron aan die dit argument staaft of weerspreekt' },
   ];
   // Poort-acties (de oude arg-acties). Een mens herziet zijn eigen voorstel; een
   // maintainer mag bot-werk bijschaven (een gewone gebruiker niet andermans werk).
@@ -810,6 +826,7 @@ function rendNode(a, ck) {
   if (!ck.startsWith('afg-')) {
     h += ratingRegel(a, ck);
     h += bezwaarRegelO(a);
+    h += vetoRegelO(a);
   }
   h += `<div id="${replySlot(ck, a.id)}"></div>`;
   (a._kids || []).forEach(k => { h += rendNode(k, ck); });
@@ -818,19 +835,21 @@ function rendNode(a, ck) {
 }
 // Ratings = de community-notes-laag (M2.5): je beoordeelt onderbouwing/relevantie/
 // eerlijkheid, nooit waarheid. Mens telt mee in bridging; agent is zichtbaar advies.
-// Review-verdict v2: 'Logica klopt' = lichte endorsement (nuttig-rating; telt niet in de
-// score, voedt hooguit later bridging). 'Logica klopt niet' = onderbouwd bezwaar = een
+// Review-verdict v2: 'Argument klopt' = lichte endorsement (nuttig-rating; telt niet in de
+// score, voedt hooguit later bridging). 'Argument klopt niet' = onderbouwd bezwaar = een
 // ondergraving (opent het bezwaarformulier) die de score van dit argument dempt tot ze
-// is opgelost. De kale, redenloze downvote bestaat niet meer.
+// is opgelost. De kale, redenloze downvote bestaat niet meer. Van een ADMIN (maintainer)
+// is zo'n ondergraving een VETO: de parent telt voor 0 tot het bezwaar is opgelost of
+// met review is weerlegd (scoring.py, juli 2026).
 // Het oordeel-paar: één gebalanceerd duo dat de SOUNDNESS van het argument beoordeelt.
-// '✓ Logica klopt' = lichte endorsement (rating, geen knoop, voedt hooguit bridging).
-// '✗ Logica klopt niet' = onderbouwd bezwaar → opent dezelfde reageer-composer met '− Tegen'
+// '✓ Argument klopt' = lichte endorsement (rating, geen knoop, voedt hooguit bridging).
+// '✗ Argument klopt niet' = onderbouwd bezwaar → opent dezelfde reageer-composer met '− Tegen'
 // voorgekozen (een ondergraving die de kracht dempt tot ze is opgelost). De twee horen visueel
 // bij elkaar (apart van 'reageren') en wegen even zwaar — geen schreeuwend rood naast grijs.
 function ratingRegel(a, ck) {
   ck = ck || '';
   const r = a.ratings || { mens: { nuttig: 0 }, agent: { nuttig: 0 } };
-  // Bridging-saldo: +1 per endorsement ('logica klopt'), −1 per gehandhaafde ondergraving
+  // Bridging-saldo: +1 per endorsement ('argument klopt'), −1 per gehandhaafde ondergraving
   // (contradicting reply-kind dat niet 'opgelost' is en niet vervangen/verworpen).
   const plus = (r.mens.nuttig || 0) + (r.agent.nuttig || 0);
   const min = (a._kids || []).filter(k => k.stance === 'contradicting'
@@ -838,14 +857,14 @@ function ratingRegel(a, ck) {
     && !k.vervangen && k.status !== 'verworpen').length;
   const net = plus - min;
   const saldoTekst = net > 0 ? `+${net}` : (net < 0 ? `−${-net}` : '0');
-  const saldo = `<span class="oordeel-saldo" title="saldo: ${plus} × ‘logica klopt’ (endorsement) − ${min} gehandhaafde ondergraving(en)">${saldoTekst}</span>`;
+  const saldo = `<span class="oordeel-saldo" title="saldo: ${plus} × ‘argument klopt’ (endorsement) − ${min} gehandhaafde ondergraving(en)">${saldoTekst}</span>`;
   const eigen = ME && a.contributed_by === ME.username;
   const actief = a.mijn_oordeel === 'nuttig';
   const eens = (!ME || eigen)
-    ? `<span class="oordeel eens stat" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Logica klopt</span>`
-    : `<span class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief},'${ck}')" title="De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Logica klopt</span>`;
+    ? `<span class="oordeel eens stat" title="${eigen ? 'je beoordeelt eigen werk niet' : 'log in om te beoordelen'}">✓ Argument klopt</span>`
+    : `<span class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArg(${a.id},'nuttig',${actief},'${ck}')" title="Het argument klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet${actief ? ' · nogmaals = intrekken' : ''})">✓ Argument klopt</span>`;
   const oneens = (ME && !a.vervangen)
-    ? `<span class="oordeel oneens knop" onclick="toonReply(${a.id},'contradicting',true,'${ck}')" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</span>`
+    ? `<span class="oordeel oneens knop" onclick="toonReply(${a.id},'contradicting',true,'${ck}')" title="Onderbouwd bezwaar: zeg WAAROM het argument niet klopt. Geen bron nodig. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Argument klopt niet</span>`
     : '';
   return `<div class="oordeel-rij">${eens}${oneens}${saldo}</div>`;
 }
@@ -860,6 +879,24 @@ function bezwaarRegelO(a) {
   return `<div class="ratings" style="gap:10px"><span style="color:${kleur};font-weight:600" ` +
     `title="Stand van de resolutielus — afhandelen kan via het ⋯-menu van dit argument">${label}</span></div>`;
 }
+// Admin-veto ('argument klopt niet' door een maintainer): nult de punten van de parent
+// volledig (scoring.py, juli 2026) — tot het bezwaar is opgelost, of tot het veto zelf
+// een gemergede, niet-opgeloste tegen-reactie draagt (succesvol weerlegd via review).
+// Spiegel van de serverregel in scoring.compute_all_scores.
+function actiefVetoO(a) {
+  if (!a || !a.auteur_is_admin || !a.parent_argument_id || a.stance !== 'contradicting') return false;
+  if (a.vervangen || ['voorgesteld', 'verworpen'].includes(a.status)) return false;
+  if (a.bezwaar_resolutie === 'opgelost') return false;
+  return !(a._kids || []).some(k => k.stance === 'contradicting' && !k.vervangen
+    && !['voorgesteld', 'verworpen'].includes(k.status) && k.bezwaar_resolutie !== 'opgelost');
+}
+function vetoRegelO(a) {
+  if (actiefVetoO(a)) return `<div class="ratings" style="gap:10px"><span style="color:#e0635f;font-weight:600" ` +
+    `title="Een ondergraving van een admin (maintainer) maakt de punten van het argument hierboven volledig ongedaan — tot dit bezwaar is opgelost, of tot iemand het weerlegt met een tegen-reactie die een reviewer merget.">⛔ admin-oordeel — nult het argument hierboven</span></div>`;
+  if ((a._kids || []).some(actiefVetoO)) return `<div class="ratings" style="gap:10px"><span style="color:#e0635f;font-weight:600" ` +
+    `title="Een admin oordeelde ‘argument klopt niet’: dit argument telt voor 0 tot het bezwaar is opgelost of met review is weerlegd (een gemergede tegen-reactie op het bezwaar).">⛔ door admin ongedaan gemaakt — telt voor 0</span></div>`;
+  return '';
+}
 // Eerlijk over rating-latentie: een duim is zichtbaar advies en beweegt de score pas
 // zodra de beoordelaarspool de bridging-drempel haalt én scripts/bridging.py opnieuw draait.
 function bridgingHint() {
@@ -869,7 +906,7 @@ function bridgingHint() {
   let tekst;
   if (b.actief) {
     const pct = Math.round((b.gem_vertrouwen || 0) * 100);
-    tekst = `Bridging weegt mee in het argumentgewicht: 'Logica klopt' (+) en gehandhaafde ` +
+    tekst = `Bridging weegt mee in het argumentgewicht: 'Argument klopt' (+) en gehandhaafde ` +
       `ondergravingen (−) bepalen het gezindheids-onafhankelijke gewicht. Vertrouwen groeit ` +
       `vloeiend met het aantal oordelen (nu gem. ~${pct}%), geen harde grens.`;
     if (b.verouderd) tekst += ` Nieuwe oordelen tellen mee na de eerstvolgende bridging-run.`;
@@ -945,7 +982,7 @@ async function toonStartkaart() {
   const d = document.getElementById('oDetail');
   d.innerHTML = '<div style="color:var(--text-muted);padding:24px">Laden…</div>';
   const [queue, feed] = await Promise.all([
-    haalReviewQueue(false).catch(() => null),
+    magReview() ? haalReviewQueue(false).catch(() => null) : Promise.resolve(null),
     fetch('/api/recent_changes?limit=120').then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
   if (huidig) return;  // de gebruiker opende ondertussen al een thread
@@ -967,7 +1004,7 @@ async function toonStartkaart() {
       `<div class="start-chips">${chips}</div></div>`;
   }
 
-  // (2) Threads met lopende bezwaren — 'logica klopt niet'-reacties die op afhandeling
+  // (2) Threads met lopende bezwaren — 'argument klopt niet'-reacties die op afhandeling
   // wachten (resolutielus 'open' of 'herzien'); n_bezwaar komt uit de discussie-index.
   const bezwaren = [];
   GROEPEN.forEach(([key, , param]) => ((indexData && indexData[key]) || []).forEach(it => {
@@ -976,7 +1013,7 @@ async function toonStartkaart() {
   bezwaren.sort((a, b) => b.n - a.n);
   const bezwaarHtml = !bezwaren.length ? '' :
     `<div class="start-sectie"><div class="vlabel">Threads met lopende bezwaren` +
-    `<button type="button" class="uitleg" aria-label="Uitleg bezwaren" data-uitleg="Een bezwaar ('logica klopt niet') dempt de kracht van een argument tot het is afgehandeld: de auteur past het argument aan ('herzien'), waarna de bezwaarmaker het bezwaar sluit ('opgelost') of laat staan ('blijft'). Deze threads hebben bezwaren die nog op zo'n stap wachten.">ⓘ</button></div>` +
+    `<button type="button" class="uitleg" aria-label="Uitleg bezwaren" data-uitleg="Een bezwaar ('argument klopt niet') dempt de kracht van een argument tot het is afgehandeld — van een admin nult het de punten zelfs volledig: de auteur past het argument aan ('herzien'), waarna de bezwaarmaker het bezwaar sluit ('opgelost') of laat staan ('blijft'). Deze threads hebben bezwaren die nog op zo'n stap wachten.">ⓘ</button></div>` +
     bezwaren.slice(0, 6).map(b =>
       `<div class="t-item" onclick="openThreadUitStart('${b.param}',${b.id})">` +
       `<span class="t-label" title="${esc(b.label)}">${esc(b.label)}</span>` +
@@ -1173,36 +1210,42 @@ async function collectOCites(fid, msg) {
 function formHtml(opts) {
   const fid = 'f' + Math.random().toString(36).slice(2, 8);
   const reply = !!opts.parent_argument_id;
-  // Ondergraving-modus: binnengekomen via '✗ Logica klopt niet'. De stance ligt vast op
-  // − Tegen (geen Voor/Context), kop en onderbouwing zijn toegespitst op het bezwaar.
+  // Twee reacties op een argument, niets anders (juli 2026):
+  //   1. Ondergraving-modus ('✗ Argument klopt niet'): stance vast op − Tegen, GEEN
+  //      bronvelden (een bezwaar vergt geen bron), wél een vrij categorie-veld.
+  //   2. Bewijs-modus ('Bewijs/tegenbewijs gevonden'): vóór of tegen, mét bron (verplicht).
   const ondergraving = !!opts.ondergraving;
   // Kruimelpad: maakt de plek in de boom expliciet — je hangt een tak onder dít argument.
   const parentArg = reply ? (ctx(opts.ck).map().get(opts.parent_argument_id) || {}) : null;
   const kruimel = parentArg ? `<div class="reply-kruimel">↳ je ${ondergraving ? 'ondergraaft' : 'reageert op'} <b>«${esc((parentArg.claim || '').slice(0, 100))}${(parentArg.claim || '').length > 100 ? '…' : ''}»</b></div>` : '';
-  // Eén consistente positiekeuze (Voor/Tegen/Context), root én reply. Bij een reply staat de
-  // positie voorgekozen uit de knop waarmee je hier kwam (Reageer→Voor, '✗ Logica klopt niet'
-  // →Tegen) en kun je nog wisselen; − Tegen is de ondergraving en vereist onderbouwing. In
-  // ondergraving-modus staat de keuze vast en tonen we een statisch label i.p.v. de drie tabs.
+  // Eén consistente positiekeuze, root én reply. Bij een bewijs-reply staat de positie
+  // voorgekozen en kun je wisselen (vóór/tegen); in ondergraving-modus staat de keuze
+  // vast en tonen we een statisch label.
   const pre = reply ? (opts.stance || 'supporting') : null;
   const stKnop = (st, cls, lbl) => `<button type="button" class="${pre === st ? cls : ''}" onclick="kiesStance('${fid}','${st}',this)">${lbl}</button>`;
   const stanceBlok = ondergraving
-    ? `<div class="stance-kies vast" id="${fid}-st" data-stance="contradicting"><span class="stance-vast">− Tegen — ‘logica klopt niet’</span></div>`
+    ? `<div class="stance-kies vast" id="${fid}-st" data-stance="contradicting"><span class="stance-vast">− Tegen — ‘argument klopt niet’</span></div>`
     : `<div class="stance-kies" id="${fid}-st"${pre ? ` data-stance="${pre}"` : ''}>
       ${stKnop('supporting', 'sel-sup', reply ? '＋ Bewijs vóór' : '+ Voor')}
-      ${stKnop('contradicting', 'sel-con', reply ? '－ Bewijs tegen' : '− Tegen')}
+      ${stKnop('contradicting', 'sel-con', reply ? '－ Tegenbewijs' : '− Tegen')}
     </div>`;
   const stanceHint = ondergraving
-    ? `<div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px">Geen bron nodig — benoem de redeneerstap die niet deugt; dit dempt de kracht tot het bezwaar is <b>opgelost</b>.</div>`
+    ? `<div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px">Geen bron nodig — benoem wat er niet klopt; dit ${ME && ME.role === 'maintainer' ? 'nult als admin-oordeel de punten van het argument volledig' : 'dempt de kracht'} tot het bezwaar is <b>opgelost</b>.</div>`
+    : (reply ? `<div style="font-size:11px;color:var(--text-muted);margin:2px 0 6px">Bewijs of tegenbewijs vergt minstens één <b>bron</b> — kies vóór of tegen.</div>` : '');
+  const catVeld = ondergraving
+    ? `<label>Categorie bezwaar <span style="text-transform:none;color:var(--text-muted)">(optioneel, vrij veld)</span></label>
+    <input type="text" id="${fid}-cat" placeholder="bv. drogreden (stroman, cirkelredenering…), citaat dekt claim niet, verouderde bron">`
     : '';
   return `<div class="form" id="${fid}" data-target='${JSON.stringify(opts).replace(/'/g, "&#39;")}'>
-    <h4>${ondergraving ? 'Logica klopt niet — zeg waarom' : (reply ? 'Geef bewijs — vóór of tegen dit argument' : 'Nieuw argument')}</h4>
+    <h4>${ondergraving ? 'Argument klopt niet — zeg waarom' : (reply ? 'Bewijs/tegenbewijs gevonden — vóór of tegen dit argument' : 'Nieuw argument')}</h4>
     ${kruimel}
     ${stanceBlok}
     ${stanceHint}
     <label>Bewering *</label>
-    <input type="text" id="${fid}-claim" placeholder="${ondergraving ? 'De kern van je bezwaar, kort en bondig' : (reply ? 'De kern van je reactie, kort en bondig' : 'De kernbewering, kort en bondig')}">
-    <label>Onderbouwing${ondergraving ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht — benoem de aangevochten stap)</span>' : (reply ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht bij Bewijs tegen)</span>' : '')}</label>
-    <textarea id="${fid}-reason" placeholder="${ondergraving ? 'Welke redeneerstap deugt niet, en waarom?' : 'Redenering of toelichting'}"></textarea>
+    <input type="text" id="${fid}-claim" placeholder="${ondergraving ? 'De kern van je bezwaar, kort en bondig' : (reply ? 'Wat laat de bron zien, kort en bondig' : 'De kernbewering, kort en bondig')}">
+    <label>Onderbouwing${ondergraving ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht — benoem wat er niet klopt)</span>' : (reply ? ' <span style="text-transform:none;color:var(--text-muted)">(verplicht bij Tegenbewijs)</span>' : '')}</label>
+    <textarea id="${fid}-reason" placeholder="${ondergraving ? 'Wat klopt er niet aan dit argument, en waarom?' : 'Redenering of toelichting'}"></textarea>
+    ${catVeld}
     ${reply ? '' : `<div class="rij2">
       <div><label>Eigenschap (optioneel)</label>
         <select id="${fid}-prop">
@@ -1215,24 +1258,24 @@ function formHtml(opts) {
       <div><label>Waarde (bij eigenschap)</label>
         <input type="text" id="${fid}-propval" placeholder="bv. 0.1"></div>
     </div>`}
-    ${oCiteListHtml(fid, true)}
-    <div style="font-size:11px;color:var(--text-muted);margin:-2px 0 6px">Meerdere bronnen mogen — gebruik <b>+ bron toevoegen</b>. Een nieuwe bron landt meteen als referentie; een reviewer classificeert betrouwbaarheid/onderwerp later (tab <b>Bronnen</b>). Een vindplaats (URL) maakt het citaat meteen verifieerbaar.</div>
-    <div style="margin-top:12px"><button class="prim" onclick="verstuur('${fid}')">Indienen als voorstel</button>
+    ${ondergraving ? '' : oCiteListHtml(fid, true)}
+    ${ondergraving ? '' : `<div style="font-size:11px;color:var(--text-muted);margin:-2px 0 6px">Meerdere bronnen mogen — gebruik <b>+ bron toevoegen</b>. Een nieuwe bron landt meteen als referentie; een reviewer classificeert betrouwbaarheid/onderwerp later (tab <b>Bronnen</b>). Een vindplaats (URL) maakt het citaat meteen verifieerbaar.</div>`}
+    <div style="margin-top:12px"><button class="prim" onclick="verstuur('${fid}')">${ME && ME.role === 'maintainer' ? 'Toevoegen — telt meteen (admin)' : 'Indienen als voorstel'}</button>
       ${reply ? `<button onclick="document.getElementById('${fid}').remove()">Annuleren</button>` : ''}</div>
     <div class="melding" id="${fid}-msg"></div>
   </div>`;
 }
-// Open/wissel/sluit de reageer-composer in de reply-slot. Zelfde positie nogmaals = sluiten;
-// een andere positie (bv. via '✗ Logica klopt niet' → contradicting) = wisselen. Twee ingangen,
-// één composer: '↩ Reageer' geeft de volledige Voor/Tegen/Context-keuze, '✗ Logica klopt niet'
-// (ondergraving=true) zet 'm vast op − Tegen en spitst kop/onderbouwing toe op de ondergraving.
+// Open/wissel/sluit de reageer-composer in de reply-slot. Zelfde ingang nogmaals = sluiten.
+// Twee ingangen, één composer: '⇄ Bewijs/tegenbewijs gevonden' (⋯-menu) geeft de
+// vóór/tegen-keuze mét bronvelden, '✗ Argument klopt niet' (oordeel-paar,
+// ondergraving=true) zet 'm vast op − Tegen, zonder bronvelden.
 function toonReply(argId, stance, ondergraving, ck) {
   ck = ck || '';
   const slot = document.getElementById(replySlot(ck, argId));
   if (!slot) return;
   stance = stance || 'supporting';
-  // Toggle-sleutel onderscheidt de twee ingangen, zodat 'Reageer→Tegen' en 'Logica klopt niet'
-  // elkaar niet voor 'al open' aanzien (en nogmaals klikken op dezelfde knop sluit).
+  // Toggle-sleutel onderscheidt de twee ingangen, zodat 'Bewijs/tegenbewijs' en 'Argument
+  // klopt niet' elkaar niet voor 'al open' aanzien (en nogmaals klikken op dezelfde knop sluit).
   const sleutel = ondergraving ? 'ondergraving' : stance;
   if (slot.firstChild && slot.dataset.stance === sleutel) { slot.innerHTML = ''; slot.dataset.stance = ''; return; }
   slot.dataset.stance = sleutel;
@@ -1365,11 +1408,14 @@ async function verstuur(fid) {
   const msg = document.getElementById(fid + '-msg');
   if (!stance) { msg.innerHTML = '<span style="color:#e0635f">Kies een positie.</span>'; return; }
   if (!claim) { msg.innerHTML = '<span style="color:#e0635f">Bewering is verplicht.</span>'; return; }
-  // Een ondergraving ('logica klopt niet') vereist altijd onderbouwing (server dwingt af).
-  if (reply && stance === 'contradicting' && !reason) { msg.innerHTML = '<span style="color:#e0635f">‘Logica klopt niet’ vereist onderbouwing: benoem wat er niet deugt aan de redenering of het argument.</span>'; return; }
+  // Een ondergraving ('argument klopt niet') én tegenbewijs vereisen onderbouwing (server dwingt af).
+  if (reply && stance === 'contradicting' && !reason) { msg.innerHTML = `<span style="color:#e0635f">${opts.ondergraving ? '‘Argument klopt niet’ vereist onderbouwing: benoem wat er niet klopt aan het argument.' : 'Tegenbewijs vereist onderbouwing: zeg wat de bron weerspreekt.'}</span>`; return; }
   msg.textContent = 'Bron(nen) verwerken…';
   const citations = await collectOCites(fid, msg);
   if (citations === false) return;
+  // Bewijs/tegenbewijs is per definitie gesourcet; de ondergraving juist bronloos.
+  if (reply && !opts.ondergraving && !citations.length) { msg.innerHTML = '<span style="color:#e0635f">Bewijs/tegenbewijs vergt minstens één bron — voeg een bron met vindplaats of citaat toe. Klopt het argument gewoon niet? Gebruik dan ‘✗ Argument klopt niet’ (geen bron nodig).</span>'; return; }
+  const catEl = document.getElementById(fid + '-cat');
   const propEl = document.getElementById(fid + '-prop');
   const property = (!reply && propEl) ? (propEl.value || null) : null;
   const propvalEl = document.getElementById(fid + '-propval');
@@ -1381,6 +1427,7 @@ async function verstuur(fid) {
     mechanism_id: reply ? null : (opts.param === 'mechanism_id' ? opts.id : null),
     emergent_effect_id: reply ? null : (opts.param === 'emergent_effect_id' ? opts.id : null),
     parent_argument_id: opts.parent_argument_id || null,
+    objection_type: (opts.ondergraving && catEl) ? (catEl.value.trim() || null) : null,
     stance, claim, reasoning: reason || null, property, property_value, citations,
   };
   msg.textContent = 'Indienen…';
@@ -1390,7 +1437,9 @@ async function verstuur(fid) {
     });
     const j = await resp.json();
     if (!resp.ok) { msg.innerHTML = `<span style="color:#e0635f">${esc(j.error)}</span>`; return; }
-    msg.innerHTML = `<span style="color:#3ddc84">Ingediend als voorstel (status: ${esc(j.status)}). Telt mee na review.</span>`;
+    msg.innerHTML = j.status === 'voorgesteld'
+      ? `<span style="color:#3ddc84">Ingediend als voorstel (status: ${esc(j.status)}). Telt mee na review.</span>`
+      : `<span style="color:#3ddc84">Toegevoegd en meteen gemerged (admin, status: ${esc(j.status)}).</span>`;
     setTimeout(() => { ctxHerlaad(opts.ck); laadIndex(); laadVoorstellenBadge(); }, 900);
   } catch (e) { msg.innerHTML = `<span style="color:#e0635f">Netwerkfout: ${esc(e.message)}</span>`; }
 }
@@ -1435,11 +1484,12 @@ function haalReviewQueue(vernieuw) {
   return queuePromise;
 }
 async function laadVoorstellenBadge() {
+  const b = document.getElementById('vBadge');
+  if (!magReview()) { if (b) b.style.display = 'none'; return; }  // geen wachtrij voor niet-reviewers
   try {
     const q = await haalReviewQueue(true);
     const n = (q.voorstellen?.length || 0) + (q.argumenten?.length || 0)
       + (q.herkeuring?.length || 0) + (q.entiteiten?.length || 0) + (q.relaties?.length || 0);
-    const b = document.getElementById('vBadge');
     if (n > 0) { b.textContent = n; b.style.display = ''; } else { b.style.display = 'none'; }
   } catch (e) {}
 }
@@ -2122,6 +2172,56 @@ async function voegBronToe(key, idx, btn) {
     melding('Toevoegen mislukt: ' + e.message, 'fout');
   }
 }
+// ── Sub-tabs binnen een segment ──────────────────────────────────────────────
+// Praktijk splitst in entiteiten/relaties; Argumenten splitst per type. Eerste match
+// wint, zodat een politieke_positie-argument bij Ideologie belandt (niet bij Entiteit,
+// dat 't óók target) en een looptijd-argument bij Looptijd. Alleen niet-lege groepen
+// krijgen een pil; 'Alle' toont alles met een kopje per groep.
+let actiefArgSub = '__alle__';
+let actiefPraktijkSub = '__alle__';
+function kiesArgSub(k) { actiefArgSub = k; tekenVoorstellen(); }
+function kiesPraktijkSub(k) { actiefPraktijkSub = k; tekenVoorstellen(); }
+const ARG_SUBGROEPEN = [
+  ['ideologie', 'Ideologie', a => a.property === 'politieke_positie'],
+  ['looptijd', 'Looptijd', a => a.property === 'active_from' || a.property === 'active_until'],
+  ['reactie', 'Reacties', a => a.parent_argument_id != null],
+  ['relatie', 'Relatie', a => a.relation_id != null],
+  ['entiteit', 'Entiteit', a => a.entity_id != null],
+  ['rol', 'Rol', a => a.role_id != null],
+  ['mechanisme', 'Mechanisme', a => a.mechanism_id != null],
+  ['veld', 'Veld', a => a.emergent_effect_id != null],
+];
+function bucketArgQueue(args, render, introMap) {
+  const buckets = ARG_SUBGROEPEN.map(([key, label]) => ({ key, label, items: [], render, intro: (introMap || {})[key] || '' }));
+  const bi = new Map(ARG_SUBGROEPEN.map(([key], i) => [key, i]));
+  const overig = [];
+  for (const a of args) {
+    const g = ARG_SUBGROEPEN.find(([, , test]) => test(a));
+    if (g) buckets[bi.get(g[0])].items.push(a); else overig.push(a);
+  }
+  if (overig.length) buckets.push({ key: 'overig', label: 'Overig', items: overig, render, intro: '' });
+  return buckets;
+}
+// groepen = [{key,label,items,render,intro?}]. Rendert de sub-pillen (alleen niet-lege)
+// + de actieve groep(en). fnNaam = de kies-handler ('kiesArgSub'|'kiesPraktijkSub').
+function vSubtabs(groepen, actief, fnNaam) {
+  const gevuld = groepen.filter(g => g.items.length);
+  if (!gevuld.length) return '';
+  const totaal = gevuld.reduce((n, g) => n + g.items.length, 0);
+  const meerdere = gevuld.length > 1;
+  if (actief !== '__alle__' && !gevuld.some(g => g.key === actief)) actief = '__alle__';
+  const alle = !meerdere || actief === '__alle__';
+  let nav = '';
+  if (meerdere) {
+    const pil = (key, label, n) => `<span class="vsubpil${actief === key ? ' actief' : ''}" onclick="${fnNaam}('${key}')">${esc(label)}<span class="vpil-n">${n}</span></span>`;
+    nav = `<div class="vsubsegment">${pil('__alle__', 'Alle', totaal)}${gevuld.map(g => pil(g.key, g.label, g.items.length)).join('')}</div>`;
+  }
+  const toonG = alle ? gevuld : gevuld.filter(g => g.key === actief);
+  const body = toonG.map(g =>
+    (alle && meerdere ? `<h2 class="sectie">${esc(g.label)} (${g.items.length})</h2>` : '') +
+    (g.intro || '') + g.items.map(g.render).join('')).join('');
+  return nav + body;
+}
 function kiesVoorstelType(t) { actiefVoorstelType = t; voorstelTypeGekozen = true; tekenVoorstellen(); }
 function tekenVoorstellen() {
   const m = document.getElementById('vMain'), q = reviewData;
@@ -2154,8 +2254,12 @@ function tekenVoorstellen() {
     h += `<div class="banner">Voorgestelde <b>praktijklaag</b>-elementen: entiteiten/relaties die een niet-maintainer toevoegde. ` +
       `Ze staan nog niet in de graaf; een reviewer+ keurt goed of af (niemand keurt eigen werk goed).</div>`;
     if (!nPraktijk) h += '<div class="leeg">Geen openstaande praktijkvoorstellen.</div>';
-    if (nEnt) h += `<h2 class="sectie">Entiteiten (${nEnt})</h2>` + q.entiteiten.map(e => metAdvies('entiteit:' + e.id, rendModEntiteit(e))).join('');
-    if (nRel) h += `<h2 class="sectie">Relaties (${nRel})</h2>` + q.relaties.map(r => metAdvies('relatie:' + r.id, rendModRelatie(r))).join('');
+    else h += vSubtabs([
+      { key: 'entiteiten', label: 'Entiteiten', items: q.entiteiten,
+        render: e => metAdvies('entiteit:' + e.id, rendModEntiteit(e)) },
+      { key: 'relaties', label: 'Relaties', items: q.relaties,
+        render: r => metAdvies('relatie:' + r.id, rendModRelatie(r)) },
+    ], actiefPraktijkSub, 'kiesPraktijkSub');
   } else if (actiefVoorstelType === 'afgewezen') {
     const nav = (af.voorstellen || []).length, naa = (af.argumenten || []).length;
     const nae = (af.entiteiten || []).length, nar = (af.relaties || []).length;
@@ -2171,18 +2275,17 @@ function tekenVoorstellen() {
     if (!nArg) {
       h += '<div class="leeg">Geen voorgestelde argumenten.</div>';
     } else {
-      // Ideologie-signalen (politieke_positie, voor de kleurmeter) krijgen een eigen kopje:
-      // het is een aparte as-codering die niet in de zekerheidsbalans telt.
+      // Argumenten per type in sub-tabs: ideologie (kleurmeter-codering) · looptijd ·
+      // relatie · entiteit · rol · mechanisme · veld · reacties. De ideologie-groep houdt
+      // z'n uitleg-banner (aparte as-codering die niet in de zekerheidsbalans telt).
       const rendQ = a => metAdvies('arg:' + a.id, rendArg(a));
-      const ideo = q.argumenten.filter(a => a.property === 'politieke_positie');
-      const rest = q.argumenten.filter(a => a.property !== 'politieke_positie');
-      if (rest.length) h += `<h2 class="sectie">Argumenten (${rest.length})</h2>` + rest.map(rendQ).join('');
-      if (ideo.length) h += `<h2 class="sectie">Ideologie · kleurmeter (${ideo.length})</h2>` +
-        `<div class="banner" style="background:rgba(108,138,255,.10);border-color:color-mix(in srgb,var(--accent) 35%,transparent)">` +
-        `Politieke-positie-signalen voor de <b>kleurmeter</b> — gesourcete richting-codering per as ` +
-        `(economisch links/rechts · cultureel progressief/conservatief · establishment anti/pro). ` +
-        `Telt niet in de zekerheidsbalans; de magnitude wordt afgeleid uit de richtingen.</div>` +
-        ideo.map(rendQ).join('');
+      const introMap = {
+        ideologie: `<div class="banner" style="background:rgba(108,138,255,.10);border-color:color-mix(in srgb,var(--accent) 35%,transparent)">` +
+          `Politieke-positie-signalen voor de <b>kleurmeter</b> — gesourcete richting-codering per as ` +
+          `(economisch links/rechts · cultureel progressief/conservatief · establishment anti/pro). ` +
+          `Telt niet in de zekerheidsbalans; de magnitude wordt afgeleid uit de richtingen.</div>`,
+      };
+      h += vSubtabs(bucketArgQueue(q.argumenten, rendQ, introMap), actiefArgSub, 'kiesArgSub');
     }
   }
   m.innerHTML = h;
@@ -2432,16 +2535,28 @@ async function toonVoorstelPagina(vid) {
   m.innerHTML = 'Laden…';
   try {
     const resp = await fetch(`/api/voorstellen/${vid}`);
-    if (!resp.ok) { m.innerHTML = `<div class="banner">Voorstel #${vid} niet gevonden. <a href="/overleg">← Alle voorstellen</a></div>`; return; }
+    if (!resp.ok) {
+      const msg = resp.status === 403 ? 'Je hebt geen toegang tot dit voorstel — alleen de indiener of een reviewer kan het bekijken.'
+        : resp.status === 401 ? 'Log in om dit voorstel te bekijken.'
+        : `Voorstel #${vid} niet gevonden.`;
+      m.innerHTML = `<div class="banner">${msg} <a href="/overleg">← naar overleg</a></div>`;
+      return;
+    }
     const v = await resp.json();
-    let h = `<a class="graaf-link" href="/overleg" onclick="event.preventDefault();terugNaarVoorstellen()">← Alle voorstellen</a>`;
+    let h = magReview()
+      ? `<a class="graaf-link" href="/overleg" onclick="event.preventDefault();terugNaarVoorstellen()">← Alle voorstellen</a>`
+      : `<a class="graaf-link" href="/overleg">← naar overleg</a>`;
     h += rendVoorstel(v);
     if (v.status !== 'open') h += `<div class="banner">Status: <b>${esc(v.status)}</b>` +
       `${v.besloten_at ? ' · besloten ' + esc(v.besloten_at.slice(0, 16)) : ''}. Permanent bewaard en herleidbaar (lineage, M2.6).</div>`;
     m.innerHTML = h;
   } catch (e) { m.innerHTML = `<div class="banner">Netwerkfout: ${esc(e.message)}</div>`; }
 }
-function terugNaarVoorstellen() { history.pushState(null, '', '/overleg'); reviewGeladen = false; laadVoorstellen(); }
+function terugNaarVoorstellen() {
+  history.pushState(null, '', '/overleg');
+  if (!magReview()) { kiesTab('overleg'); toonStartkaart(); return; }
+  reviewGeladen = false; laadVoorstellen();
+}
 
 document.getElementById('oZoek').addEventListener('input', e => tekenLijst(e.target.value));
 // Terug naar /overleg zonder hash (browser-terugknop) → startkaart i.p.v. lege detailkolom.

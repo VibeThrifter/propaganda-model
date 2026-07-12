@@ -13,6 +13,14 @@ maar een projectie. Vandaar: **elke knoop en elke edge die je voorstelt draagt e
 bron en een argument**, en je oogst tweezijdig (ook tegenmacht-verbanden, ook
 verbanden die het model *compliceren*).
 
+> **LinkedIn — standaard-reflex bij persoonsonderzoek.** Gaat je ronde over een persoon
+> (loopbaan, nevenfuncties, draaideur, clubjes, opleiding) of persoon↔org-banden, overweeg
+> dan als éérste stap de LinkedIn-scrape-tool in `tools/linkedin/` (eigen brief:
+> `missies/linkedin_scout_brief.md`) — vóór handmatig webzoeken — en noteer die afweging in
+> je missielog, ook als je 'm bewust overslaat (publieke bronnen dekken beter, sessie dood).
+> Ze levert gedateerde `persoon→org`-affiliaties via hetzelfde bijdragepad (alles
+> `voorgesteld`). Zelfde anti-overfit- en bronplicht als hier.
+
 ## Onderwerpkeuze & anti-overfit-protocol (verplicht — zelfde geest als de documentalist)
 
 1. **Neutrale missievraag, eerst zoeken.** Formuleer de zoekvraag zónder modelclaim

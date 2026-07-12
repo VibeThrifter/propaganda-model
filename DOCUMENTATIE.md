@@ -122,11 +122,28 @@ De zeven thema's:
 > `veld_eigenschap` (halo) en een groepseigenschap een `emergent_effects`-hyperedge — de aard-laag
 > codeert systemisch-zijn, een thema-as ernaast voegt niets toe (zie `migrate_thema_opschoning.py`).
 
-### Uitbreiding B: Tegenmacht
-Het model is niet deterministisch: het modelleert óók de krachten die het filtersysteem begrenzen of doorbreken. Zulke doorbraken zijn mogelijk, maar vaak incidenteel en onder druk (zie ook `toezicht_tandeloosheid`).
+### Uitbreiding B: Tegenmacht — een gerichte valentie, geen universele categorie
+Het model is niet deterministisch: het modelleert óók de krachten die het filtersysteem begrenzen of doorbreken. Maar "tegenmacht" is **geen eigenschap van een actor** en zelfs niet van een losse edge zonder meer: het is een **tweeplaatsig predicaat**, `tegenmacht(X, doel)`. In een veld van meerdere machtsblokken dient het tegenwerken van het ene blok vaak het andere; dezelfde actor kan dus tegenmacht zijn op de ene as en promacht op de andere. Een universeel "tegenmacht"-stempel (op een knoop, of als kleur van een entiteit) is daarom een categoriefout — de valentie hangt altijd aan een **edge relatief aan een benoemd doel** (zie [Deel B: machtsvalentie](#machtsvalentie--tegenmacht-als-edge-valentie)).
+
+Het model onderscheidt twee soorten "tegen" die niet op één hoop mogen:
+
+1. **Verantwoording** — tegenwicht tegen een *filter-machtsconcentratie* (de borgingsstichting tegen eigendomsconcentratie, de toezichthouder tegen holdingconcentratie, de vakbond/NVJ tegen flak). Dit zijn de institutionele accountability-mechanismen hieronder. Ze delen één doel — de verantwoording van geconcentreerde mediamacht — en ontlenen daaraan hun samenhang. Ze zijn dubbel: parlementaire controle *checkt* macht én *legitimeert* de institutionele orde (consensusvloer-versterking).
+2. **Contra-hegemonie** — een kracht die de grens van de **consensussfeer** verschuift: die een onderwerp van de sfeer van consensus naar die van legitieme controverse duwt. Dit is *niet* hetzelfde als verantwoording, en het is *niet* aan een actor te binden: een insurgente beweging kan contra-hegemoniaal zijn op de establishment-as en tegelijk reactionair/elite-gesteund op de economische as. Contra-hegemonie wordt daarom geclassificeerd als **edge-valentie per as**, niet als filter of actor-kleur.
+
+**Hallins drie sferen als referentiekader.** De multipolariteit die het emergente veld `consensuscalibratie` codeert (de mate van consensus tussen meerdere machtsblokken als regelknop op de filters) valt samen met Hallins drie sferen (*The Uncensored War*, 1986): de **sfeer van consensus** (alle blokken eens → filters strak, fabricage van instemming totaal — dit ís de regelknop van `consensuscalibratie`), de **sfeer van legitieme controverse** (concurrerende elite-facties, vooral op de culturele as → begrensde pluriformiteit, `schijnpluriformiteit`) en de **sfeer van deviantie** (uitdagingen aan de vloer zelf + de structureel uitgesloten onderkant → marginalisering, flak-terrein). Het model gaat dus **niet** uit van één monolithische elite: de emergente pro-elite bias is het sterkst op de *overlap* van de blokken (de vloer) en zwak/pluralistisch op de *betwiste* as. Tegenmacht in de contra-hegemonische zin = een kracht die die grens verschuift.
+
+De mechanismen hieronder houden `filter='tegenmacht'` — die filter-waarde markeert nu expliciet **soort 1 (verantwoording)**. Factie-insurgentie (bv. een partij die de institutionele legitimiteit betwist) krijgt géén `tegenmacht`-filter: ze wordt gemodelleerd als wat ze is (flak-/ideologie-edges tussen blokken), plus — waar ze de vloer zelf betwist — een `machtsvalentie`-annotatie op de betreffende as.
 
 **Rollen:** `onderzoeksjournalist`, `klokkenluider`, `parlementair_controleur`, `toezichthouder`, `vakbond_media`, `burgerinitiatief`, `borgingsstichting`, `alternatief_medium`
 **Mechanismen:** `onderzoeksjournalist_doorbraak`, `klokkenluider_doorbraak`, `onafhankelijk_medium_tegenwicht`, `parlementaire_controle`, `toezichthouder_interventie`, `toezicht_tandeloosheid`, `vakbond_bescherming`, `burgerinitiatief_druk`, `onafhankelijkheidsborging`, `redactiestatuut_borging`, `continuiteitsborging`, `afgedwongen_borging`, `projectfinanciering_journalistiek`
+
+#### Machtsvalentie — tegenmacht als edge-valentie
+De contra-hegemonische valentie leeft — net als de politieke kleurmeter — in **gesourcete, betwistbare** `arguments` met `property='machtsvalentie'` op een **relatie of mechanisme** (een edge), en is een **aspect**: het telt in niets mee (`ASPECT_PROPERTIES` sluit het uit van de zekerheidsbalans) en voedt geen score — een classificatie-/overlay-laag, zoals de kleurmeter. Twee vormen van `property_value`:
+
+- `filter:<eigendom|advertentie|sourcing|flak|ideologie>` — **verantwoording**: deze edge checkt die filter-machtsconcentratie.
+- `as:<economisch|cultureel|establishment>:<opent|sluit>` — **contra-hegemonie**: `opent` duwt het onderwerp van consensus → legitieme controverse (contra-hegemoniaal), `sluit` verstrakt de consensus (pro-hegemoniaal). Eén edge draagt max. één annotatie per as.
+
+`tegenmacht.py` leidt hieruit per actor (de bron-entiteit van de relatie) een valentie-per-as af — `Σ(gewicht·teken)/(Σgewicht+K)`, zelfde weging als de kleurmeter — plus welke filter-concentraties ze verantwoordt; bereikbaar via `GET /api/machtsvalentie` (`?preview=1` telt nog-`voorgesteld` annotaties voorlopig mee). Zo toont de viz *"FvD: opent op establishment, neutraal/sluit op economisch"* in plaats van één misleidende `tegenmacht`-kleur. Een platform is tegelijk consensusvloer-versterkend (eigendom/advertentie) én betwiste-as-versterkend (engagement blaast factie-insurgentie op) — alleen per-as-valentie kan dat zonder tegenspraak naast elkaar zetten.
 
 De `borgingsstichting` (onafhankelijkheidsstichting met prioriteitsaandeel/vetorecht, bv. Stichting Democratie en Media bij DPG) is de tegenpool van het STAK-controlevehikel uit Filter 1: ze biedt een structurele rem op eigenaarsinvloed, maar geen ijzeren garantie (een minderheidsbelang naast de winstgedreven meerderheid). Ze grijpt aan op beide eigenaarshefbomen op de inhoud: de benoeming van de hoofdredacteur (`onafhankelijkheidsborging`, tegenpool van `benoemingspolitiek`) én — via het redactiestatuut — de onafhankelijkheid van de hele redactie (`redactiestatuut_borging`, tegenpool van `redactioneel_budgetcontrole`), én de continuïteit van de titel zelf (`continuiteitsborging`, veto op verkoop/opheffing). Naast die zeggenschapsrol is ze ook **financier**: uit haar beleggingsrendement (niet uit het dividendloze DPG-belang) betaalt ze onderzoeksjournalistiek die het rendementsregime anders wegbezuinigt (`projectfinanciering_journalistiek`, tegenpool van `redactioneel_budgetcontrole`; ook dedicated persfondsen als SVDJ/FBJP/Journalismfund vervullen deze rol). De `toezichthouder` (ACM/CvdM) reguleert intussen niet de eigenaar-als-persoon maar de **concentratie/overname** op het holdingniveau (`toezichthouder_interventie`/`toezicht_tandeloosheid` → `overnamevehikel`); een ACM-interventie kan zo'n borgingsstichting zelfs afdwingen als overnamevoorwaarde (`afgedwongen_borging`, DPG-RTL-voorwaarden).
 
@@ -253,7 +270,12 @@ telt in *niets* mee (statusfactor 0; ook niet in de tegenspraak-balans) tot een
 reviewer het merget: `POST /api/arguments/<id>/merge` → `ongecontroleerd`, of
 `bronvermelding_nodig` als de citatiepoort (M0.3) dat eist — de poort verhuist dus
 naar het merge-moment. `merged_by` wordt vastgelegd; zelf-merge mag (n=1) maar zet
-de `self_merged`-vlag. Afwijzen = status `verworpen` (blijft herleidbaar). De
+de `self_merged`-vlag. **Uitzondering (juli 2026): een admin hoeft geen review** —
+een argument van een **maintainer** merget bij `POST` meteen (zelfde citatiepoort,
+`merged_by` = de maintainer, `self_merged` gevlagd, extra `merged`-regel in de
+`edit_log`); hetzelfde geldt voor een maintainer-**revisie** binnen de agent-scope
+(eigen werk, agent-werk of auteurloos seed-werk — andermans menswerk blijft een
+gewoon voorstel). Afwijzen = status `verworpen` (blijft herleidbaar). De
 **score-diff-preview** (`GET /api/arguments/<id>/score_diff`, op een tijdelijke
 kopie) toont vooraf wat acceptatie verschuift; de **review-wachtrij**
 (`/api/review_queue`, paneel in de viz) bundelt voorgestelde argumenten en open
@@ -320,8 +342,8 @@ kandidaten, override via `negeer_duplicaten`); recent-changes-feed
 (`/api/recent_changes`, open) + persoonlijke watchlist (`/api/watchlist`).
 
 **Ratings & bridging (M2.5, review-verdict v2).** Het verdict op een argument is
-**"Logica klopt"** (een lichte endorsement, `nuttig`-rating — telt niet als bewijs)
-of **"Logica klopt niet"** (een onderbouwde ondergraving met verplichte reden +
+**"Argument klopt"** (een lichte endorsement, `nuttig`-rating — telt niet als bewijs)
+of **"Argument klopt niet"** (een onderbouwde ondergraving met verplichte reden +
 resolutielus; zie "Resolutielus op een ondergraving" onder *Scores*). De kale 👎 als
 losse score-laag bestaat niet meer. Bridging (matrixfactorisatie,
 `scripts/bridging.py` → `data/bridging.json`) leidt hieruit een gezindheids-
@@ -547,7 +569,7 @@ zijn *emergent*: ze bouwen op uit de bewijslast eronder. De berekening (in `scor
 zet zijn eigen gewicht — Z2), dus de opgeslagen `weight`-kolom telt niet meer mee: in de praktijk is
 `weight = 1,0` (neutraal) en rust τ alleen op de verifieerbare factoren `statusfactor × bronfactor`.
 Een **bridged rating** (M2.5, review-verdict v2) vult het gewicht alsnog objectief in zodra de
-beoordelaarspool het toelaat: **+1** = een 'Logica klopt'-endorsement, **−1** = een gehandhaafde
+beoordelaarspool het toelaat: **+1** = een 'Argument klopt'-endorsement, **−1** = een gehandhaafde
 (niet-'opgelost') ondergraving — de beredeneerde vervanger van de oude 👎. `scripts/bridging.py`
 krimpt het oordeel naar het neutrale 1,0 met vertrouwen α = n/(n+k) (k=5): **geen drempel-klif meer**,
 alleen een kleine identificeerbaarheidsvloer (≥3 beoordelaars, ≥6 oordelen) waaronder de gezindheidsas
@@ -587,15 +609,29 @@ dat ze aanvalt (een drogredelijk argument vóór een ware claim trekt de claim n
 alleen op haar te stutten). Tegenbewijs voor het doel zelf is een **weerlegging**: een contradicting
 *root*-argument mét bron.
 
-**Resolutielus op een ondergraving (review-verdict v2).** "Logica klopt niet" is geen kale downvote:
-elke ondergraving vereist een `reasoning` (benoem wat er niet deugt) en draagt een stand
+**Resolutielus op een ondergraving (review-verdict v2).** "Argument klopt niet" is geen kale downvote:
+elke ondergraving vereist een `reasoning` (benoem wat er niet klopt) en draagt een stand
 `bezwaar_resolutie` ∈ {`open`, `herzien`, `blijft`, `opgelost`}. Open/herzien/blijft dempen de σ van
 de parent; alleen **`opgelost`** heft de demping op. De lus: de auteur van het aangevochten argument
 verbetert en zet `herzien`; de bezwaarmaker herbeoordeelt (`opgelost` of `blijft staan`); een reviewer
 mag een bezwaar pas **overrulen** naar `opgelost` ná `herzien` (zodat een afwezige bezwaarmaker het
 argument niet eeuwig bevriest). Het effect is omkeerbaar: lost de auteur het op, dan veert de σ terug
-naar haar onaangevochten basiskracht. De 👍/👎-duim als losse score-laag bestaat niet meer — "Logica
-klopt" is een lichte endorsement (voedt hooguit bridging), "Logica klopt niet" is deze ondergraving.
+naar haar onaangevochten basiskracht. De 👍/👎-duim als losse score-laag bestaat niet meer — "Argument
+klopt" is een lichte endorsement (voedt hooguit bridging), "Argument klopt niet" is deze ondergraving.
+Een ondergraving mag een `objection_type` dragen — sinds juli 2026 een **vrij tekstveld** (de
+CHECK-enum verviel via `migrate_objection_type_vrijtekst.py`: elke sluitende categorielijst bleek te
+kort en een volledige eindeloos; de oude drogreden-taxonomie blijft het aanbevolen vocabulaire).
+
+**Admin-veto (juli 2026).** Een ondergraving van een **maintainer** (admin) weegt niet mee als gewone
+demping maar als **veto**: de parent telt voor **0** (σ = 0, "de punten volledig ongedaan") zolang het
+bezwaar actief is. Het veto vervalt op twee manieren: (1) de resolutielus eindigt op **`opgelost`**
+(zoals elke ondergraving), of (2) iemand **weerlegt het veto met review** — een tegen-reactie
+(contradicting reply, met verplichte `reasoning`) op de admin-ondergraving die een reviewer merget
+schort het veto op, waarna de gewone DF-QuAD-demping weer geldt (het veto blijft dan een normale,
+zelf ook dempbare ondergraving). Een voorgestelde tegen-reactie verandert niets — de opheffing loopt
+per definitie via review. `scoring.py` exporteert de vlaggen `admin_veto` (op het veto) en `geveto`
+(op de genulde parent) in `argument_scores`; de UI toont ⛔-badges. End-to-end:
+`scripts/test_admin_veto.py`.
 
 **Laag B — afgeleide praktijkscore per relatie/entiteit:** `steun / (steun + tegen + k)` over de
 σ's van de root-argumenten, met **clusteraggregatie (M1.2)**: elke bron heeft een `cluster_key`
@@ -607,6 +643,21 @@ van het cluster (max, geen som → steun 1,0); een weerlegging D1 (τ 0,895, ins
 daar tegenover: `score = 1,0 / (1,0 + 0,895 + 1) = 0,3454`. Zonder argumenten valt de score terug op
 de handmatige `certainty` (prior, gefloord op 0,05 zonder bron); een entiteit zonder eigen argumenten
 erft het gemiddelde van haar relaties.
+
+**Uitzondering — personen dragen geen zekerheidsscore (juli 2026).** Het bestaan van een persoon is
+binair: een persoon bestaat of bestaat niet, en daar valt niets aan te scoren — een
+"geloofwaardigheid 34%" op een persoonsknoop leest als bestaanstwijfel en het
+`onweersproken`-plafond zou er zinloze tegenspraak afdwingen (niemand weerlegt het bestaan van een
+hoofdredacteur). `scoring.py` berekent de waarde intern nog wél (ze voedt als
+rol-instantie-zekerheid laag C: *functie-invulling*, geen bestaan) maar laat `persoon`-entiteiten
+weg uit de geëxporteerde `entities`/`entities_detail`; `viz_data.py` zet de velden expliciet op
+`None`, zodat de viz geen scorebalk, interval of onweersproken-badge tekent. De echte onzekerheden
+rond een persoon leven waar ze thuishoren: in de **relaties** (elk met eigen certainty) en de
+**aspect-overlays** (kleurmeter/welstandsmeter). Een niet-relevante of verzonnen persoon is een
+**moderatie**-kwestie, geen score-kwestie: de discussieboom op de knoop blijft bestaan (weerleg
+gerust de *typering*), een reviewer wijst een voorgestelde nep-persoon af en een maintainer kan elke
+persoonsentiteit verwijderen (`DELETE /api/entities/<id>`); de bronpoort op relaties vangt fictieve
+personen bovendien al bij binnenkomst.
 
 **Laag C — theoriescore per rol/mechanisme**, uit twee onafhankelijke bewijslijnen:
 - **Praktijk (bottom-up):** geloofwaardigheid-gewogen aggregatie over de gekoppelde instanties, met
@@ -693,7 +744,8 @@ Entiteit: DPG Media
 
 **Voorstel-poort (M2.2) + citatiepoort (M0.3).** Elk argument landt via
 `POST /api/arguments` als `voorgesteld` en telt nergens in mee tot een reviewer het
-merget. Op het merge-moment geldt de citatiepoort: een `supporting`- of
+merget — behalve van een **maintainer** (admin): dat merget meteen (juli 2026, zie
+"Voorstel-workflow"). Op het merge-moment geldt de citatiepoort: een `supporting`- of
 `contradicting`-**root**-argument zonder citaties wordt `bronvermelding_nodig`
 (statusfactor 0,40), mét citaties `ongecontroleerd`. De eerste citatie
 (`POST /api/citations`, of direct in het `citations`-veld van `POST /api/arguments`)
@@ -703,15 +755,19 @@ definitie door een ánder dan de auteur. Alleen `contextual` mag bronloos.
 
 **Reply-regels (M1.1/M1.8).** Een reply (`parent_argument_id` gevuld) draagt **geen
 eigen doel en geen property** (DB-CHECK; de API weigert anders): zijn stance is
-relatief aan de parent. Een `supporting`-reply versterkt het parent-argument; een
-`contradicting`-reply is een **ondergraving** ("de redenering deugt niet") — die mag
-bronloos (het aanwijzen van het logische gat volstaat, de citatiepoort geldt niet) en
-kan een machineleesbaar `objection_type` dragen (drogreden-taxonomie:
-`cirkelredenering`, `stroman`, `non_sequitur`, `correlatie_als_causatie`,
-`vals_dilemma`, `ad_hominem`, `autoriteit_buiten_domein`, `anekdote_als_regel`,
-`cherry_picking`, `equivocatie`, `citaat_dekking`, `overig`), met in `reasoning`
-de exact aangevochten redeneerstap. Een **weerlegging** (tegenbewijs voor het doel
-zelf) is géén reply maar een contradicting root-argument mét bron.
+relatief aan de parent. De UI kent op een argument precies **twee reacties** (juli
+2026): **"Argument klopt niet"** (de ondergraving — bronloos, reden verplicht) en
+**"Bewijs/tegenbewijs gevonden"** (een reply mét bron, vóór of tegen). Een
+`supporting`-reply versterkt het parent-argument; een `contradicting`-reply is een
+**ondergraving** ("dit argument klopt niet") — die mag bronloos (het aanwijzen van
+het gat volstaat, de citatiepoort geldt niet) en kan een `objection_type` dragen:
+sinds juli 2026 een **vrij tekstveld** (de indiener benoemt de categorie zelf; de
+oude drogreden-taxonomie — `cirkelredenering`, `stroman`, `non_sequitur`,
+`correlatie_als_causatie`, `vals_dilemma`, `ad_hominem`, `autoriteit_buiten_domein`,
+`anekdote_als_regel`, `cherry_picking`, `equivocatie`, `citaat_dekking`, `overig` —
+blijft het aanbevolen vocabulaire), met in `reasoning` wat er precies niet klopt.
+Een **weerlegging** (tegenbewijs voor het doel zelf) is géén reply maar een
+contradicting root-argument mét bron.
 
 ---
 
@@ -972,9 +1028,11 @@ curl -s -X POST localhost:5000/api/arguments \
 ### Reactie op een bestaand argument (discussieboom)
 
 Een reply draagt géén eigen doel en geen property (M1.1); een contradicting-reply is
-een ondergraving en mag bronloos, met optioneel `objection_type` (M1.8). Zet je een
-`objection_type`, dan is `reasoning` **verplicht** (benoem de aangevochten redeneerstap):
-een kaal drogreden-label is zelf een loze aanklacht en wordt geweigerd (400).
+een ondergraving ("argument klopt niet") en mag bronloos, met optioneel
+`objection_type` — sinds juli 2026 een **vrij tekstveld** (de taxonomie-waarden
+blijven het aanbevolen vocabulaire voor agents). Zet je een `objection_type`, dan is
+`reasoning` **verplicht** (benoem wat er precies niet klopt): een kaal
+categorie-label is zelf een loze aanklacht en wordt geweigerd (400).
 
 ```bash
 curl -s -X POST localhost:5000/api/arguments \

@@ -37,6 +37,7 @@ ideologie-naar-bias/
 ├── 04_recruitment-socialisatie.md     ← deelvraag 4: het gedeelde wereldbeeld van het corps
 ├── 05_progressief-neoliberale-technocratie.md ← deelvraag 5: de naam (Fraser) + in wiens voordeel
 ├── 06_onderzoeksopzet-redelijke-midden-contentanalyse.md ← agenda: het studie-ontwerp dat filter 5 hard maakt
+├── 07_frame-cyclus-genese-tot-instandhouding.md ← synthese: genese→reproductie→zelfversterking als één lus + praktijklaag-status + emergent-veld-oordeel
 └── bronnen/
     └── bronnenregister.md             ← grotendeels cross-ref (dit filter is synthese)
 ```
@@ -68,4 +69,4 @@ uit, dan een eigen submap (zie `../../_sjabloon-onderzoeksvraag-map.md`).
 - `../../2_wie-wordt-beinvloed/03_wie-moet-beinvloed-worden.md` — de publiek-bewerking (rekruteren/integreren).
 - `../../00_hoofdvragen-en-antwoord.md` — het centrale antwoord over de drie strengen heen.
 
-_Laatst bijgewerkt: 2026-06-30 (gevuld: netto-oordeel + 5 deelvraag-notities + bronnenregister; deelvraag 5 = progressief-neoliberale-technocratie, web-pass 30-06)._
+_Laatst bijgewerkt: 2026-07-08 (toegevoegd: `07_frame-cyclus` — synthese genese→reproductie→zelfversterking over de deelvragen heen, met praktijklaag-status per schakel en het emergent-veld-oordeel "geen nieuw veld nodig"). Eerder 2026-06-30: netto-oordeel + 5 deelvraag-notities + bronnenregister._

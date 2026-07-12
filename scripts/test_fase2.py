@@ -280,6 +280,7 @@ def main():
         "gestructureerde instantiatie alleen toegestaan bij een mechanisme-RfC")
 
     mech_rfc = {"element_type": "mechanisme", "filter": "flak", "aard": "direct",
+                "source_role_id": 1, "target_role_id": 2,
                 "definitie": "Testmechanisme bottom-up.", "effect": "Disciplineert.",
                 "freeze_test": "Zonder levende afzender dooft het — dus direct.",
                 "afgrenzing": "Anders dan publieke_aanval: informeel/privé.",
@@ -374,7 +375,8 @@ def main():
     print("7. M2.6 — samenvoegen via het voorstelpad (herbevestiging, lineage)")
     samen = {"element_type": "mechanisme", "oud_ids": [1, 2],
              "doel": {"naam": "f2_fusiemechanisme", "definitie": "Samengevoegd testmechanisme.",
-                      "filter": "eigendom", "effect": "Testeffect.", "aard": "direct"},
+                      "filter": "eigendom", "effect": "Testeffect.", "aard": "direct",
+                      "source_role_id": 1, "target_role_id": 2},
              "motivatie": "Vrijwel identieke bron- en argumentverzamelingen (test).",
              "herbevestigd": {"argumenten": [901], "relaties": [1],
                               "instantiaties": [1], "padclaims": []}}
@@ -410,9 +412,11 @@ def main():
 
     print("8. M2.6 — splitsen: restlijst-poort, dan end-to-end")
     nieuwe = [{"naam": "f2_split_a", "definitie": "Deel A.", "filter": "eigendom",
-               "effect": "Effect A.", "aard": "direct"},
+               "effect": "Effect A.", "aard": "direct",
+               "source_role_id": 1, "target_role_id": 2},
               {"naam": "f2_split_b", "definitie": "Deel B.", "filter": "eigendom",
-               "effect": "Effect B.", "aard": "direct"}]
+               "effect": "Effect B.", "aard": "direct",
+               "source_role_id": 1, "target_role_id": 2}]
     onvolledig = {"element_type": "mechanisme", "oud_id": fusie_id, "nieuwe": nieuwe,
                   "motivatie": "Vermengt eigendom en redactie (test).",
                   "toewijzing": {"argumenten": {}, "relaties": {}, "instantiaties": {},
@@ -511,7 +515,7 @@ def main():
     eis(c.patch(f"/api/arguments/{a3}/status", headers=kop["r1"],
                 json={"status": "betwist", "motivatie": "drogreden"}).status_code == 200,
         "herkeuren → betwist mét motivatie")
-    q = c.get("/api/review_queue").get_json()
+    q = c.get("/api/review_queue", headers=kop["r1"]).get_json()
     eis(any(x["id"] == a3 for x in q.get("herkeuring", [])), "betwist argument in de herkeuring-lijst")
     eis(all("thread_param" in x for x in q["argumenten"] + q["herkeuring"]),
         "review_queue draagt het thread-anker (ook voor replies)")
@@ -522,7 +526,8 @@ def main():
     # g. RfC afwijzen → herzien → nieuw open voorstel met herkomst
     rfc = {"soort": "nieuw_theorie_element", "titel": "Herzien-test", "payload": {
         "element_type": "mechanisme", "naam": "herzien_mech", "definitie": "d", "filter": "eigendom",
-        "effect": "e", "aard": "direct", "afgrenzing": "a", "falsificatiecriterium": "f", "freeze_test": "ft",
+        "effect": "e", "aard": "direct", "source_role_id": 1, "target_role_id": 2,
+        "afgrenzing": "a", "falsificatiecriterium": "f", "freeze_test": "ft",
         "instantiaties": [{"source_id": 1, "target_id": 2, "relation_type": "eigendom",
                            "toelichting": "t"}], "bronnen": [{"titel": "b"}]}}
     vid = c.post("/api/voorstellen", headers=kop["bij"], json=rfc).get_json()["id"]

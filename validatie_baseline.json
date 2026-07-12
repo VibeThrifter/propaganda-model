@@ -1,8 +1,7 @@
 {
   "_toelichting": "Ratchet voor validate_model.py --strict: bekende achterstand per foutcode. --strict faalt alleen boven deze aantallen. Aanscherpen met --update-baseline; verhogen is een bewuste, handmatige beslissing.",
-  "vastgesteld": "2026-07-02",
+  "vastgesteld": "2026-07-07",
   "fouten": {
-    "BEWIJS-CITATIE": 306,
-    "KOPPEL-REL-MECH": 4
+    "BEWIJS-CITATIE": 136
   }
 }

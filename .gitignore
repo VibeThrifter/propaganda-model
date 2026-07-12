@@ -16,3 +16,12 @@ data/kleurmeter.json
 # Adviserende agent-uitvoer (beslissteun, telt nergens mee in het model)
 data/review_advies.json
 data/bron_suggesties.json
+# Regenereerbare meter-rapporten (uit de DB, zie scripts/*_meter.py)
+data/doelgroep.json
+data/bereik.json
+# Scout-onderzoeksuitvoer (ruwe JSON; het mission-log in missies/logs/ is de ingecheckte neerslag)
+data/scout/
+# LinkedIn-integratie: gescrapete persoonsdata + auth-sessie + geïsoleerde venv
+data/linkedin/
+tools/linkedin/session.json
+tools/linkedin/.venv/

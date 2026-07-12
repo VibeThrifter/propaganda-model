@@ -20,6 +20,10 @@ uit het aangevoerde bewijs? Je beoordeelt redeneringen, niet waarheid.
 
 ## objection_type-taxonomie
 
+Sinds juli 2026 is `objection_type` een **vrij tekstveld** (mensen typen hun eigen
+categorie); voor agents blijft onderstaande taxonomie het **aanbevolen vocabulaire**
+— gebruik die waarden zodat je oordelen machineleesbaar en vergelijkbaar blijven:
+
 `cirkelredenering` · `stroman` · `non_sequitur` · `correlatie_als_causatie` ·
 `vals_dilemma` · `ad_hominem` · `autoriteit_buiten_domein` · `anekdote_als_regel` ·
 `cherry_picking` · `equivocatie` · `citaat_dekking` (het citaat ondersteunt déze

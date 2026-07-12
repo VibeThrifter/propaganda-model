@@ -517,7 +517,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
   font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 2px;
 }
 .reply-btn:hover { background: var(--bg-hover); color: var(--accent); }
-/* oordeel-paar: ✓ Logica klopt / ✗ Logica klopt niet — gebalanceerd, samen, even zwaar */
+/* oordeel-paar: ✓ Argument klopt / ✗ Argument klopt niet — gebalanceerd, samen, even zwaar */
 .oordeel-rij { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .oordeel { font-size: 10px; padding: 1px 8px; border-radius: 9px; border: 1px solid var(--border);
   text-decoration: none; white-space: nowrap; }
@@ -757,6 +757,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <button class="active" data-mode="type">Type</button>
       <button data-mode="filter">Filter</button>
       <button data-mode="ideologie" title="Kleur op afgeleide politieke positie (kleurmeter)">Ideologie</button>
+      <button data-mode="doelgroep" title="Kleur op getargette marketing-/welstandsklasse (welstandsmeter)">Doelgroep</button>
     </div>
     <div id="ideoControls" style="display:none;margin-top:8px">
       <div style="display:flex;align-items:center;gap:6px">
@@ -769,6 +770,14 @@ details.detail-section > .sec-body { margin-top: 8px; }
                 data-uitleg="Kleurt de nodes naar hun afgeleide politieke positie (kleurmeter), opgebouwd uit gesourcete signalen. Eén as tegelijk: economisch (links/rechts), cultureel (progressief/conservatief) of establishment (anti-elite-houding). Geen gesourcet signaal → grijs; dun bewijs → bleker.">ⓘ</button>
       </div>
       <div id="ideoLegend" style="margin-top:8px"></div>
+    </div>
+    <div id="doelgroepControls" style="display:none;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:var(--text-muted);flex:1">Welstandsklasse van het getargette publiek</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over de doelgroep-kleuring"
+                data-uitleg="Kleurt outlets naar de afgeleide marketing-/welstandsklasse die ze targetten (welstandsmeter), opgebouwd uit gesourcete signalen (mediakits, NOM/NMO-bereikdata). As: laag (D/C, minste bestedingsmacht) → hoog (A/AB1, kapitaalkrachtig). De operationele kant van koopkrachtselectie. Geen gesourcet signaal → grijs; dun bewijs → bleker.">ⓘ</button>
+      </div>
+      <div id="doelgroepLegend" style="margin-top:8px"></div>
     </div>
   </div>
   <div class="panel-section collapsible" id="filterSection">
@@ -789,6 +798,19 @@ details.detail-section > .sec-body { margin-top: 8px; }
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:-2px">
       <span id="timeMin">—</span>
       <span id="timeMax">—</span>
+    </div>
+    <div id="tijdloosRow" style="margin-top:8px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <span>Altijd tonen (los van jaar)</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over altijd tonen los van jaar"
+                data-uitleg="In een gekozen jaar toont de tijdlijn normaal alleen banden die dán liepen. Kies hier welke banden van de dán-zichtbare entiteiten tijdloos getoond worden — ongeacht wanneer ze liepen (de edge negeert het jaar). 'Partijbanden' = elke band naar een partij; 'Alle banden' = elke band. De entiteiten zelf blijven jaargefilterd; bij 'Alle jaren' verandert er niets.">ⓘ</button>
+        <button type="button" class="dropdown-btn" id="tijdloosDropdownBtn" style="margin-left:auto"
+                title="Kies welke banden altijd (tijdloos) getoond worden">
+          <span class="count" id="tijdloosCount" style="display:none">0</span>
+          <span class="chev" aria-hidden="true">▼</span>
+        </button>
+      </div>
+      <div class="dropdown-list" id="tijdloosList"><!-- gevuld door renderTijdloosOpties() --></div>
     </div>
   </div>
   <div class="panel-section collapsible geavanceerd" id="sliderSection">
@@ -844,7 +866,7 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <input type="checkbox" id="directToggle" checked>
       <span>Directe pijlen</span>
       <button type="button" class="uitleg" aria-label="Uitleg over directe pijlen"
-              data-uitleg="De gewone dyadische edges. Uit = alleen nodes (plus eventuele velden/indirecte pijlen), handig om de niet-directe lagen los te bekijken.">ⓘ</button>
+              data-uitleg="De gewone dyadische edges. Eén pijlpunt = gerichte invloed (bron→doel). Twéé pijlpunten = een richtingloze band: lidmaatschap, bestuur, adviseur, draaideur, personeel of alliantie — een wederzijds toebehoren, geen invloedsrichting. Let op: alleen bij 'alliantie' telt dat óók symmetrisch mee in de invloed/grootte; bij affiliaties is de dubbele punt puur beschrijvend (de invloed blijft bewijs-gepoort, standaard op de vloer). Uit = alleen nodes (plus eventuele velden/indirecte pijlen), handig om de niet-directe lagen los te bekijken.">ⓘ</button>
     </label>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:6px" id="brugAffRow">
       <input type="checkbox" id="brugAffToggle">
@@ -864,6 +886,31 @@ details.detail-section > .sec-body { margin-top: 8px; }
       <button type="button" class="uitleg" aria-label="Uitleg over voorgestelde elementen"
               data-uitleg="Toon entiteiten en relaties die nog 'voorgesteld' zijn (in review, nog niet goedgekeurd) — gestippeld/amber. Default uit: de viz toont het goedgekeurde model. Alleen relevant in het praktijkmodel.">ⓘ</button>
     </label>
+    <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px" id="valentieBlok">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:2px">
+        <span style="font-weight:600">Machtsvalentie</span>
+        <button type="button" class="uitleg" aria-label="Uitleg over machtsvalentie-selectie"
+                data-uitleg="Wat doet een verbinding met het publieke debat? Per edge, afgeleid uit gesourcete signalen — geen etiket op een actor. 'Opent het debat' = maakt een consensus-onderwerp betwistbaar (bv. de toeslagen-onthullingen richting Belastingdienst); 'sluit het debat' = versterkt juist de heersende consensus (bv. Brandpunts Bulgarenfraude-primeur, die het harde handhavingsframe verstrakte); 'verantwoording' = de edge controleert een machtsconcentratie (toezichthouder, vakbond, redactiestatuut). Geen oordeel: opent is geen compliment en sluit geen verwijt. Aanvinken toont alléén die edges, in hun kleur — dwars door de filter-as heen (ook als bv. de tegenmacht-chip uit staat). De tellingen volgen de tijdlijn en drempels.">ⓘ</button>
+      </div>
+      <div id="valentieLeeg" style="display:none;font-size:11px;color:var(--text-muted);margin-top:4px">Nog geen gesourcete signalen in dit model.</div>
+      <div id="valentieOpties">
+        <label class="valentieRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:5px">
+          <input type="checkbox" class="valentieToggle" value="opent">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#5a8f7b;flex-shrink:0"></span>
+          <span>Opent het debat — betwist de consensus <span class="valentieCount" data-cat="opent" style="color:var(--text-muted)"></span></span>
+        </label>
+        <label class="valentieRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:5px">
+          <input type="checkbox" class="valentieToggle" value="sluit">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#c0563f;flex-shrink:0"></span>
+          <span>Sluit het debat — versterkt de consensus <span class="valentieCount" data-cat="sluit" style="color:var(--text-muted)"></span></span>
+        </label>
+        <label class="valentieRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:5px">
+          <input type="checkbox" class="valentieToggle" value="verantwoording">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#6a7fb5;flex-shrink:0"></span>
+          <span>Verantwoording — controleert macht <span class="valentieCount" data-cat="verantwoording" style="color:var(--text-muted)"></span></span>
+        </label>
+      </div>
+    </div>
   </div>
   <div class="panel-section geavanceerd" id="layoutSection">
     <h3 id="layoutHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center"
@@ -1000,23 +1047,27 @@ const DATA = window.__GRAAFDATA__;
 // Kleuren per STRUCTURELE entiteitsvorm (kleurmodus "type"). Personen vormen één
 // categorie; hun functie in het model kleurt via de kleurmodus "filter".
 // Volgorde is bewust thematisch gegroepeerd; de legenda volgt deze volgorde.
+// Palet: één hue-familie per thematische groep, families maximaal gespreid op de
+// kleurencirkel; binnen een groep verwante tinten (lichtheid/hue-nuance). Bewust
+// felle, basale kleuren (hoge chroma, in OKLCH ontworpen op de donkere achtergrond
+// #0a0a0f, contrast ≥ 3:1) — kruisgroep-paren blijven ook op kleine nodes uit elkaar.
 const TYPE_COLORS = {
-  // Personen (één structurele soort)
-  persoon: '#8e9aaf',
-  // Politiek & bestuur
-  partij: '#c0392b', overheidsinstelling: '#1abc9c', toezichthouder: '#16a085',
-  rechterlijke_macht: '#5d6d7e',
-  // Lobby & invloed
-  lobbygroep: '#d35400', denktank: '#9b59b6', pr_bureau: '#e59866',
-  elite_netwerk: '#ca6f1e',
-  // Media
-  mediaorganisatie: '#3498db', omroep: '#2980b9', persbureau: '#2e86c1',
-  platform: '#8e44ad',
-  // Economie & eigendom
-  bedrijf: '#f0a030', vermogensbeheerder: '#b9770e', stichting: '#b7950b',
-  // Maatschappij
-  onderwijsinstelling: '#1e8449', ngo: '#27ae60', vakbond: '#2ecc71',
-  burgerinitiatief: '#82e0aa',
+  // Personen (één structurele soort) — rood, de enige warme rode familie
+  persoon: '#e6443d',
+  // Politiek & bestuur — teal/cyaan
+  partij: '#00bbb3', overheidsinstelling: '#009b88', toezichthouder: '#007d5d',
+  rechterlijke_macht: '#00adce',
+  // Lobby & invloed — paars/magenta
+  lobbygroep: '#aa3abb', denktank: '#a76ef8', pr_bureau: '#e867c3',
+  elite_netwerk: '#8446b2',
+  // Media — blauw
+  mediaorganisatie: '#0087f3', omroep: '#0061d8', persbureau: '#37a8ec',
+  platform: '#575eec',
+  // Economie & eigendom — goud/amber
+  bedrijf: '#e1b000', vermogensbeheerder: '#d58300', stichting: '#967600',
+  // Maatschappij — groen
+  onderwijsinstelling: '#008a39', ngo: '#009520', vakbond: '#46b427',
+  burgerinitiatief: '#93d044',
 };
 const RELATION_LABELS = {
   // Eigendom & financiën
@@ -1147,7 +1198,15 @@ const PROPERTY_LABELS = {
   mechanism: 'Mechanisme', filter: 'Filter',
   indirecte_invloed_op: 'Indirecte invloed op',
   compositie: 'Compositieclaim',
-  politieke_positie: 'Positie'
+  politieke_positie: 'Positie',
+  doelgroepklasse: 'Welstandsklasse',
+  bereik: 'Bereik'
+};
+// Publieksmaat-labels voor bereik-signalen ('kijkers:650000:2024' → "650.000 kijkers (2024)").
+const BEREIK_MAAT_LABELS = {
+  kijkers: 'kijkers', luisteraars: 'luisteraars', oplage: 'oplage',
+  bereik_totaal: 'totaalbereik print+online', online: 'maandbereik online',
+  invullers: 'invullers', volgers: 'volgers/leden'
 };
 // Leesbare weergave van property_value: classificatie-aspecten dragen een ID of
 // enum (rol/mechanisme = ID sinds M2.6, rename-vast; filter = enum) — resolve naar
@@ -1168,6 +1227,24 @@ function propValueDisplay(property, value) {
     if (parts.length >= 2) return `${as}: ${parts.slice(1).join(':')}`;   // richting-pool
     return value;
   }
+  if (property === 'doelgroepklasse') {
+    const parts = String(value).split(':');     // [welstand,klasse] of [welstand,'meting',getal]
+    if (parts[1] === 'meting') {
+      const v = parseFloat(parts[2]);
+      return isNaN(v) ? value : `welstand ${v > 0 ? '+' : ''}${v.toFixed(2)} (meting)`;
+    }
+    if (parts.length >= 2) return `klasse ${parts[1]}`;   // welstand:A → 'klasse A'
+    return value;
+  }
+  if (property === 'bereik') {
+    const parts = String(value).split(':');     // [maat, aantal, jaar]
+    if (parts.length === 3) {
+      const n = parseInt(parts[1], 10);
+      const maat = BEREIK_MAAT_LABELS[parts[0]] || parts[0];
+      return `${isNaN(n) ? parts[1] : n.toLocaleString('nl-NL')} ${maat} (${parts[2]})`;
+    }
+    return value;
+  }
   return value;
 }
 const STATUS_LABELS = {
@@ -1180,7 +1257,9 @@ const STATUS_COLORS = {
   betwist: '#e74c3c', geverifieerd: '#2ecc71', verouderd: '#7f8c9a',
   verworpen: '#e74c3c'
 };
-// M1.8: machineleesbare ondergraving-typen (drogreden of citaat-dekking)
+// M1.8: ondergraving-categorieën. Sinds juli 2026 een VRIJ tekstveld (de indiener
+// benoemt de categorie zelf); deze map geeft de oude taxonomie-sleutels nog een
+// leesbaar label, elke andere waarde rendert als ingetypte tekst.
 const OBJECTION_LABELS = {
   cirkelredenering: 'cirkelredenering', stroman: 'stroman', non_sequitur: 'non sequitur',
   correlatie_als_causatie: 'correlatie ≠ causatie', vals_dilemma: 'vals dilemma',
@@ -1215,7 +1294,7 @@ function bridgingHint() {
   let tekst;
   if (b.actief) {
     const pct = Math.round((b.gem_vertrouwen || 0) * 100);
-    tekst = `Bridging weegt mee in het argumentgewicht: 'Logica klopt' (+) en gehandhaafde `
+    tekst = `Bridging weegt mee in het argumentgewicht: 'Argument klopt' (+) en gehandhaafde `
       + `ondergravingen (−) bepalen het gezindheids-onafhankelijke gewicht. Vertrouwen groeit `
       + `vloeiend met het aantal oordelen (nu gemiddeld ~${pct}%), geen harde grens.`;
     if (b.verouderd) tekst += ' Nieuwe oordelen tellen mee na de eerstvolgende bridging-run.';
@@ -1302,6 +1381,7 @@ function renderArgNode(arg, depth) {
   // eigen werk raten weigert de server; agent-ratings zijn zichtbaar advies.
   html += `<div id="ratings-${arg.id}" style="font-size:10px;color:var(--text-muted);margin-top:2px">${ratingRegel(arg)}</div>`;
   html += bezwaarRegel(arg);
+  html += vetoRegel(arg);
 
   if (cites.length) {
     html += '<div class="arg-citations">';
@@ -1346,22 +1426,24 @@ function ratingTekst(rt) {
 // De duim-regel: tellingen + twee toggle-links. Je eigen stem krijgt een vinkje +
 // accentkleur; nogmaals erop klikken trekt 'm in (un-vote). `telling` overschrijft
 // arg.ratings na een verse fetch.
-// Review-verdict v2: 'Logica klopt' = lichte endorsement (nuttig-rating; telt niet als
-// bewijs of in de score, voedt hooguit later bridging). 'Logica klopt niet' = een
+// Review-verdict v2: 'Argument klopt' = lichte endorsement (nuttig-rating; telt niet als
+// bewijs of in de score, voedt hooguit later bridging). 'Argument klopt niet' = een
 // onderbouwd bezwaar = een ondergraving (opent het bezwaarformulier) die de score van
 // dit argument dempt tot ze is opgelost. De kale, redenloze downvote bestaat niet meer.
+// Van een ADMIN (maintainer) is de ondergraving een VETO: de parent telt voor 0 tot het
+// bezwaar is opgelost of met review is weerlegd (scoring.py, juli 2026).
 function ratingRegel(arg, telling) {
   const rt = telling || arg.ratings;
   const nuttig = rt ? (rt.mens.nuttig + (rt.agent.nuttig ? `+${rt.agent.nuttig}` : '')) : 0;
   const eigen = authUser && arg.contributed_by === authUser.username;
   const actief = (arg.mijn_oordeel === 'nuttig');
   // Gebalanceerd oordeel-paar (samen, even zwaar): ✓ = lichte endorsement (rating);
-  // ✗ = onderbouwd bezwaar → opent dezelfde reageer-composer met '− Tegen' voorgekozen
-  // (een ondergraving die de kracht dempt tot ze is opgelost).
+  // ✗ = onderbouwd bezwaar → opent de bezwaar-composer met '− Tegen' vast
+  // (een ondergraving die de kracht dempt tot ze is opgelost; bronloos).
   const eens = eigen
-    ? `<span class="oordeel eens stat" title="je beoordeelt eigen werk niet">✓ Logica klopt${nuttig ? ` (${nuttig})` : ''}</span>`
-    : `<a href="#" class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'De redenering klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">✓ Logica klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
-  const oneens = `<a href="#" class="oordeel oneens knop" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM de logica niet deugt. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Logica klopt niet</a>`;
+    ? `<span class="oordeel eens stat" title="je beoordeelt eigen werk niet">✓ Argument klopt${nuttig ? ` (${nuttig})` : ''}</span>`
+    : `<a href="#" class="oordeel eens knop${actief ? ' aan' : ''}" onclick="rateArgument(${arg.id},'nuttig');return false" title="${actief ? 'Nogmaals klikken trekt je endorsement in' : 'Het argument klopt (lichte endorsement — telt niet als bewijs, beweegt de score niet)'}">✓ Argument klopt${nuttig ? ` (${nuttig})` : ''}</a>`;
+  const oneens = `<a href="#" class="oordeel oneens knop" onclick="showBezwaarForm(${arg.id});return false" title="Onderbouwd bezwaar: zeg WAAROM het argument niet klopt. Geen bron nodig. Wordt een '− Tegen'-reactie (ondergraving) die de kracht van dit argument dempt tot ze is opgelost.">✗ Argument klopt niet</a>`;
   return `<span class="oordeel-rij">${eens}${oneens}</span>`;
 }
 
@@ -1380,17 +1462,31 @@ function bezwaarRegel(arg) {
     + ` title="Stand van de resolutielus van dit bezwaar — afhandelen kan via het ⋯-menu">${label}</span></div>`;
 }
 
+// Admin-veto ('argument klopt niet' door een maintainer, juli 2026): nult de punten van
+// de parent volledig (scoring.py). De vlaggen komen uit argument_scores (admin_veto op
+// het veto, geveto op de genulde parent) — eerst uit DATA.arguments (viz_data), daarna
+// vers via /api/scores (refreshScores) na elke mutatie.
+function vetoRegel(arg) {
+  const sc = ARG_SCORES.get(arg.id) || arg;
+  if (sc.admin_veto) return `<div style="font-size:10px;margin-top:2px"><span style="color:#e74c3c;font-weight:600"`
+    + ` title="Een ondergraving van een admin (maintainer) maakt de punten van het argument hierboven volledig ongedaan — tot dit bezwaar is opgelost, of tot iemand het weerlegt met een tegen-reactie die een reviewer merget.">⛔ admin-oordeel — nult het argument hierboven</span></div>`;
+  if (sc.geveto) return `<div style="font-size:10px;margin-top:2px"><span style="color:#e74c3c;font-weight:600"`
+    + ` title="Een admin oordeelde ‘argument klopt niet’: dit argument telt voor 0 tot het bezwaar is opgelost of met review is weerlegd (een gemergede tegen-reactie op het bezwaar).">⛔ door admin ongedaan gemaakt — telt voor 0</span></div>`;
+  return '';
+}
+
 // W3.2b: alle acties op een argument-knoop in één ⋯-menu (gedeeld hsMenu-patroon,
 // zelfde taal als /overleg). Reageren vergt een account (de server weigert anoniem);
 // de bezwaar-overgangen volgen dezelfde identiteitsregels als voorheen — de server
 // bewaakt wie wat mag, dit menu toont alleen wat zinvol is.
 function argMenuItemsViz(arg) {
   if (!authUser) return [];
+  // Twee reacties op een argument, niets anders (juli 2026): (1) '✗ Argument klopt
+  // niet' — de ondergraving, bronloos, zit als knop in het oordeel-paar op de knoop;
+  // (2) 'Bewijs/tegenbewijs gevonden' — een reactie mét bron, vóór of tegen — hier.
   const items = [
-    { label: '＋ Bewijs vóór…', onClick: () => showReplyForm(arg.id, 'supporting'),
-      titel: 'draag bewijs of een argument aan dat dit argument ondersteunt' },
-    { label: '－ Bewijs tegen…', onClick: () => showReplyForm(arg.id, 'contradicting'),
-      titel: 'draag bewijs of een argument aan dat tegen dit argument in gaat' },
+    { label: '⇄ Bewijs/tegenbewijs gevonden…', onClick: () => showReplyForm(arg.id, 'supporting'),
+      titel: 'draag een bron aan die dit argument staaft of weerspreekt' },
   ];
   // Afhandeling van een ondergraving: auteur van het aangevochten argument meldt
   // 'herzien'; de bezwaarmaker herbeoordeelt; een reviewer mag overrulen ná 'herzien'.
@@ -1673,50 +1769,61 @@ function onPropertyChange(formId) {
 
 function renderArgForm(opts) {
   // opts: { relation_id, entity_id, role_id, mechanism_id, emergent_effect_id,
-  //         parent_argument_id, property, property_value }
+  //         parent_argument_id, property, property_value, ondergraving }
   // Een REPLY (parent_argument_id gevuld) draagt geen eigen doel en geen property
   // (boomsemantiek M1.1): de doelen in opts dienen dan alleen om na het opslaan de
-  // juiste discussie te herladen. Een contradicting-reply is een ONDERGRAVING en
-  // kan een machineleesbaar objection_type meekrijgen (M1.8).
+  // juiste discussie te herladen. Reacties op een argument kennen precies TWEE vormen
+  // (juli 2026):
+  //   1. ondergraving ('✗ Argument klopt niet', via het oordeel-paar): stance vast op
+  //      − Tegen, verplichte onderbouwing, vrij categorie-veld, GEEN bronvelden;
+  //   2. bewijs/tegenbewijs (⋯-menu): vóór of tegen, mét bron (verplicht), geen gewicht.
+  // Een ROOT (nieuw argument op een doel) behoudt het volledige formulier.
   const formId = 'arg-form-' + Math.random().toString(36).slice(2, 8);
   const isReply = !!opts.parent_argument_id;
-  const parentLabel = isReply ? 'Reageer op argument' : 'Nieuw argument';
+  const ondergraving = !!opts.ondergraving;
+  const parentLabel = ondergraving ? 'Argument klopt niet — zeg waarom'
+    : isReply ? 'Bewijs/tegenbewijs gevonden — vóór of tegen dit argument' : 'Nieuw argument';
   const sel = v => opts.property === v ? ' selected' : '';
   // Kruimelpad: maakt de plek in de boom expliciet — je hangt een tak onder dít argument.
   const parentArg = isReply ? (argsById.get(opts.parent_argument_id) || {}) : null;
   const parentClaim = parentArg ? (parentArg.claim || '') : '';
   const kruimel = parentArg
-    ? `<div class="reply-kruimel">↳ je reageert op <b>«${parentClaim.slice(0, 100)}${parentClaim.length > 100 ? '…' : ''}»</b></div>`
+    ? `<div class="reply-kruimel">↳ je ${ondergraving ? 'ondergraaft' : 'reageert op'} <b>«${parentClaim.slice(0, 100)}${parentClaim.length > 100 ? '…' : ''}»</b></div>`
     : '';
-  // Eén consistente positiekeuze (Voor/Tegen/Context), root én reply. Bij een reply staat de
-  // positie voorgekozen uit de ingang ('＋ Bewijs vóór' in het ⋯-menu → Voor; '－ Bewijs tegen'
-  // of '✗ Logica klopt niet' → Tegen) en kun je nog wisselen; − Tegen is de ondergraving en
-  // vereist onderbouwing.
   const replyStance = opts.stance || 'supporting';
+  const benAdmin = authUser && authUser.role === 'maintainer';
 
   const stanceHint = `Elk argument landt als <b>voorstel</b> (M2.2) en telt pas mee nadat een
-       reviewer het merget. Voeg een citaat toe (alleen context mag bronloos):
+       reviewer het merget${benAdmin ? ' (een maintainer-argument merget meteen)' : ''}. Voeg een citaat toe (alleen context mag bronloos):
        zonder bron telt het na de merge nauwelijks mee.`;
 
-  // Eén picker voor alles. Bij een reply staat de positie voorgekozen.
+  // Eén picker; de ondergraving heeft geen keuze (vast − Tegen), bewijs kiest vóór/
+  // tegen, een root houdt Voor/Tegen/Context.
   const pickBtn = (st, cls, lbl, tip) => `<button type="button"${isReply && replyStance === st ? ` class="${cls}"` : ''} onclick="pickStance('${formId}','${st}',this)" title="${tip}">${lbl}</button>`;
-  const stancePicker = `<div class="stance-picker" id="${formId}-stance"${isReply ? ` data-stance="${replyStance}"` : ''}>
+  const stancePicker = ondergraving ? `<div class="stance-picker" id="${formId}-stance" data-stance="contradicting">
+          <span style="color:#e74c3c;font-weight:600">− Tegen — ‘argument klopt niet’</span>
+        </div>
+        <div class="field-hint">Geen bron nodig — benoem wat er niet klopt; ${benAdmin ? 'als admin-oordeel nult dit de punten van het argument volledig' : 'dit dempt de kracht van het argument'} tot het bezwaar is <b>opgelost</b>.</div>`
+    : isReply ? `<div class="stance-picker" id="${formId}-stance" data-stance="${replyStance}">
+          ${pickBtn('supporting', 'selected-sup', '＋ Bewijs vóór', 'De bron ondersteunt dit argument')}
+          ${pickBtn('contradicting', 'selected-con', '－ Tegenbewijs', 'De bron weerspreekt dit argument')}
+        </div>
+        <div class="field-hint">Bewijs/tegenbewijs vergt minstens één <b>bron</b>. Klopt het argument gewoon niet? Gebruik dan ‘✗ Argument klopt niet’ (geen bron nodig).</div>`
+    : `<div class="stance-picker" id="${formId}-stance">
           ${pickBtn('supporting', 'selected-sup', '+ Voor', 'Ondersteunend')}
-          ${pickBtn('contradicting', 'selected-con', '− Tegen', 'Weerleggend — ‘logica klopt niet’')}
+          ${pickBtn('contradicting', 'selected-con', '− Tegen', 'Weerleggend')}
           ${pickBtn('contextual', 'selected-ctx', '~ Context', 'Nuancerend')}
         </div>
-        <div class="field-hint">${isReply ? '<b>− Tegen</b> = ‘logica klopt niet’: een onderbouwd bezwaar dat de kracht van dit argument dempt tot het is <b>opgelost</b>.' : stanceHint}</div>`;
+        <div class="field-hint">${stanceHint}</div>`;
 
-  // Reply → een (verberg-/toonbaar) type-ondergravingveld, alleen zinvol bij − Tegen.
-  // Root → het eigenschap/waarde-paar.
-  const propertyRows = isReply ? `
-      <div class="form-row" id="${formId}-objrow" style="display:${replyStance === 'contradicting' ? '' : 'none'}">
-        <label>Type ondergraving (optioneel, bij − Tegen)</label>
-        <select id="${formId}-objection">
-          <option value="">— geen / n.v.t. —</option>
-          ${Object.entries(OBJECTION_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
-        </select>
-      </div>` : `
+  // Ondergraving → vrij categorie-veld (de dropdown-taxonomie verviel juli 2026: elke
+  // sluitende lijst bleek te kort — de indiener benoemt de categorie zelf).
+  // Root → het eigenschap/waarde-paar. Bewijs-reply → niets extra's.
+  const propertyRows = ondergraving ? `
+      <div class="form-row">
+        <label>Categorie bezwaar (optioneel, vrij veld)</label>
+        <input type="text" id="${formId}-objection" placeholder="bv. drogreden (stroman, cirkelredenering…), citaat dekt claim niet, verouderde bron">
+      </div>` : isReply ? '' : `
       <div class="form-row" style="display:flex;gap:8px">
         <div style="flex:1">
           <label>Eigenschap (optioneel)</label>
@@ -1752,21 +1859,21 @@ function renderArgForm(opts) {
       </div>
       <div class="form-row">
         <label>Bewering *</label>
-        <input type="text" id="${formId}-claim" placeholder="${isReply ? 'De kern van je reactie, kort en bondig' : 'De kernbewering, kort en bondig'}">
+        <input type="text" id="${formId}-claim" placeholder="${ondergraving ? 'De kern van je bezwaar, kort en bondig' : isReply ? 'Wat laat de bron zien, kort en bondig' : 'De kernbewering, kort en bondig'}">
       </div>
       <div class="form-row">
-        <label>Onderbouwing${isReply ? ' (verplicht bij − Tegen)' : ''}</label>
-        <textarea id="${formId}-reasoning" placeholder="${isReply ? 'Redenering of toelichting — verplicht bij − Tegen' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
+        <label>Onderbouwing${ondergraving ? ' (verplicht — benoem wat er niet klopt)' : isReply ? ' (verplicht bij − Tegenbewijs)' : ''}</label>
+        <textarea id="${formId}-reasoning" placeholder="${ondergraving ? 'Wat klopt er niet aan dit argument, en waarom?' : isReply ? 'Redenering of toelichting — verplicht bij − Tegenbewijs' : 'Uitgebreide redenering of toelichting (optioneel)'}"></textarea>
       </div>
       ${propertyRows}
-      ${citationListHtml(formId)}
-      <div class="form-row">
+      ${ondergraving ? '' : citationListHtml(formId)}
+      ${isReply ? '' : `<div class="form-row">
         <label>Gewicht (0-100%)</label>
         <input type="text" id="${formId}-weight" placeholder="bijv. 70">
-      </div>
+      </div>`}
       <div class="field-hint">${authIndienHint()}</div>
       <button class="btn-submit" onclick="submitArgument('${formId}', ${JSON.stringify(opts).replace(/"/g, '&quot;')})">
-        Argument toevoegen
+        ${benAdmin ? 'Toevoegen — telt meteen (admin)' : 'Argument toevoegen'}
       </button>
       <button class="btn-cancel" onclick="document.getElementById('${formId}').remove()">Annuleren</button>
       <div id="${formId}-msg"></div>
@@ -1779,9 +1886,6 @@ function pickStance(formId, stance, btn) {
   const cls = stance === 'supporting' ? 'selected-sup' : stance === 'contradicting' ? 'selected-con' : 'selected-ctx';
   btn.className = cls;
   picker.dataset.stance = stance;
-  // Het type-ondergravingveld is alleen zinvol bij − Tegen (de ondergraving).
-  const objRow = document.getElementById(formId + '-objrow');
-  if (objRow) objRow.style.display = (stance === 'contradicting') ? '' : 'none';
 }
 
 async function submitArgument(formId, opts) {
@@ -1795,21 +1899,24 @@ async function submitArgument(formId, opts) {
   const propValEl = document.getElementById(formId + '-propval');
   const propVal = (!isReply && propValEl) ? (propValEl.value.trim() || null) : null;
   const objEl = document.getElementById(formId + '-objection');
-  const objection = (isReply && objEl && stance === 'contradicting') ? (objEl.value || null) : null;
-  const weightRaw = document.getElementById(formId + '-weight').value.trim();
+  const objection = (isReply && objEl && stance === 'contradicting') ? (objEl.value.trim() || null) : null;
+  const weightEl = document.getElementById(formId + '-weight');   // alleen op een root-formulier
+  const weightRaw = weightEl ? weightEl.value.trim() : '';
   const msgEl = document.getElementById(formId + '-msg');
 
   if (!stance) { msgEl.innerHTML = '<div class="form-message error">Kies een positie (voor/tegen/context)</div>'; return; }
   if (!claim) { msgEl.innerHTML = '<div class="form-message error">Bewering is verplicht</div>'; return; }
-  // Een ondergraving ('logica klopt niet') vereist altijd onderbouwing — een kaal
-  // 'oneens' is de goedkope downvote die we niet willen (server dwingt dit ook af).
-  if (isReply && stance === 'contradicting' && !reasoning) { msgEl.innerHTML = '<div class="form-message error">‘Logica klopt niet’ vereist onderbouwing: benoem in het veld Onderbouwing precies wat er niet deugt aan de redenering of het argument.</div>'; return; }
+  // Een ondergraving ('argument klopt niet') én tegenbewijs vereisen onderbouwing — een
+  // kaal 'oneens' is de goedkope downvote die we niet willen (server dwingt dit ook af).
+  if (isReply && stance === 'contradicting' && !reasoning) { msgEl.innerHTML = `<div class="form-message error">${opts.ondergraving ? '‘Argument klopt niet’ vereist onderbouwing: benoem in het veld Onderbouwing precies wat er niet klopt aan het argument.' : 'Tegenbewijs vereist onderbouwing: zeg in het veld Onderbouwing wat de bron weerspreekt.'}</div>`; return; }
 
   const weight = weightRaw ? Math.min(100, Math.max(0, parseInt(weightRaw))) / 100 : null;
 
   // Bronnen oplossen (meerdere rijen; maakt zo nodig nieuwe bronnen aan); false = fout, stop.
   const citaties = await collectCitations(formId, msgEl);
   if (citaties === false) return;
+  // Bewijs/tegenbewijs is per definitie gesourcet; de ondergraving juist bronloos.
+  if (isReply && !opts.ondergraving && !citaties.length) { msgEl.innerHTML = '<div class="form-message error">Bewijs/tegenbewijs vergt minstens één bron — voeg een bron met vindplaats of citaat toe. Klopt het argument gewoon niet? Gebruik dan ‘✗ Argument klopt niet’ (geen bron nodig).</div>'; return; }
 
   // Boomsemantiek (M1.1): een reply stuurt GEEN doelen mee — de doelen in opts
   // dienen alleen om hieronder de juiste discussie te herladen.
@@ -1846,10 +1953,12 @@ async function submitArgument(formId, opts) {
         '<b>voorstel</b> — het telt mee zodra een reviewer het merget ' +
         '(zie de review-wachtrij).' + bronTip + '</div>';
     } else if (result.status === 'bronvermelding_nodig') {
-      msgEl.innerHTML = '<div class="form-message success">Argument toegevoegd — status: ' +
-        '<b>bronvermelding nodig</b>. Voeg een citaat toe zodat het volwaardig meetelt.</div>';
+      msgEl.innerHTML = '<div class="form-message success">Argument toegevoegd en meteen ' +
+        'gemerged (admin) — status: <b>bronvermelding nodig</b>. Voeg een citaat toe zodat ' +
+        'het volwaardig meetelt.</div>';
     } else {
-      msgEl.innerHTML = '<div class="form-message success">Argument toegevoegd!</div>';
+      msgEl.innerHTML = '<div class="form-message success">Argument toegevoegd en meteen ' +
+        `gemerged (admin, status: ${result.status}).</div>`;
     }
 
     // Herlaad de discussieboom na 500ms
@@ -1963,15 +2072,19 @@ function buildTreeFromApi(args) {
   return roots;
 }
 
-// Open/wissel/sluit de reageer-composer. Zelfde positie nogmaals = sluiten; een andere
-// positie (bv. via '✗ Logica klopt niet' → contradicting) = wisselen. Eén composer, altijd
-// dezelfde Voor/Tegen/Context-keuze — alleen de voorgekozen positie verschilt.
-function showReplyForm(argId, stance) {
+// Open/wissel/sluit de reageer-composer. Zelfde ingang nogmaals = sluiten. Twee
+// ingangen, één composer: '⇄ Bewijs/tegenbewijs gevonden' (⋯-menu) geeft de vóór/
+// tegen-keuze mét bronvelden; '✗ Argument klopt niet' (oordeel-paar, ondergraving=true)
+// zet 'm vast op − Tegen, zonder bronvelden.
+function showReplyForm(argId, stance, ondergraving) {
   const container = document.getElementById('reply-slot-' + argId);
   if (!container) return;
   stance = stance || 'supporting';
-  if (container.firstChild && container.dataset.stance === stance) { container.innerHTML = ''; container.dataset.stance = ''; return; }
-  container.dataset.stance = stance;
+  // Toggle-sleutel onderscheidt de twee ingangen, zodat 'Bewijs/tegenbewijs' en
+  // 'Argument klopt niet' elkaar niet voor 'al open' aanzien.
+  const sleutel = ondergraving ? 'ondergraving' : stance;
+  if (container.firstChild && container.dataset.stance === sleutel) { container.innerHTML = ''; container.dataset.stance = ''; return; }
+  container.dataset.stance = sleutel;
   // Een reactie erft de doelen van haar parent — ook theorie-doelen (rol,
   // mechanisme, emergent veld), anders weigert de server het argument.
   const parent = argsById.get(argId) || {};
@@ -1983,14 +2096,16 @@ function showReplyForm(argId, stance) {
     emergent_effect_id: parent.emergent_effect_id || null,
     parent_argument_id: argId,
     stance,
+    ondergraving: !!ondergraving,
   });
   container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// '✗ Logica klopt niet' → de reageer-composer met '− Tegen' voorgekozen (onderbouwing verplicht).
+// '✗ Argument klopt niet' → de bezwaar-composer: '− Tegen' vast, onderbouwing verplicht,
+// geen bronvelden (een ondergraving vergt geen bron).
 function showBezwaarForm(argId) {
   if (!authUser) { melding('Log in om een bezwaar in te dienen.', 'warn'); return; }
-  showReplyForm(argId, 'contradicting');
+  showReplyForm(argId, 'contradicting', true);
 }
 
 // Resolutielus op een ondergraving: auteur 'herzien' → bezwaarmaker 'opgelost'/'blijft'
@@ -2047,8 +2162,10 @@ function findArgTargets(argId) {
 // ============================================================
 
 // τ/σ per argument uit de statische snapshot (M1.1); /api/scores ververst ze live.
+// Incl. de admin-veto-vlaggen (admin_veto op het veto, geveto op de genulde parent).
 DATA.arguments.forEach(a => {
-  if (a.sigma != null) ARG_SCORES.set(a.id, { tau: a.tau, sigma: a.sigma });
+  if (a.sigma != null) ARG_SCORES.set(a.id, { tau: a.tau, sigma: a.sigma,
+    admin_veto: a.admin_veto, geveto: a.geveto });
 });
 
 // --- Instance model ---
@@ -2102,8 +2219,12 @@ let state = {
   geavanceerd: false,    // W2.1: expert-secties in de zijbalk tonen? (onthouden in localStorage)
   searchTerm: '',
   timelineYear: null,    // null = show all, number = filter to year
+  // 'Altijd tonen (los van jaar)' — alléén praktijkmodel: in een gekozen jaar de edge-looptijd
+  // negeren voor de dán-zichtbare entiteiten (endpoints blijven jaargefilterd). Set van
+  // gekozen band-soort-id's uit TIJDLOOS_OPTIES (leeg = tijdlijn volgt gewoon het jaar).
+  tijdloosSel: new Set(),
   legendSelection: new Set(),  // leeg = alles tonen; anders alleen geselecteerde legenda-keys
-  sizeMetric: 'influence_direct',  // welke maat de node-grootte bepaalt (zie SIZE_METRICS)
+  sizeMetric: 'influence',  // node-grootte standaard op transitieve netwerk-invloed (zie SIZE_METRICS)
   receivedMap: null,           // entity/rol-id -> som inkomende invloed (per buildGraph)
   showFieldEffects: false,     // emergente velden (goud, groeps-hyperedges) tonen? Default schoon.
   emergentSelection: new Set(),// geïsoleerde velden (chip-klik); leeg = alle velden als vage contour
@@ -2114,6 +2235,7 @@ let state = {
   showFilterMix: false,        // node-vulkleur = gewogen mix van alle filters die op de node werken (i.p.v. primaire kleur)? Default uit.
   showDerived: false,          // afgeleide (indirecte) pijlen tonen? Default alleen direct.
   showDirect: true,            // directe (dyadische) edges tekenen? Nodes blijven zichtbaar.
+  valentieSel: new Set(),      // machtsvalentie-edge-selectie: subset van {'opent','sluit','verantwoording'}. Leeg = uit (gewone weergave); anders alléén die edges, in valentie-kleur.
   showVoorgesteld: false,      // voorgestelde (in review, nog niet goedgekeurde) entiteiten/relaties als gestippelde ghost tonen? Default uit: de viz toont het goedgekeurde model.
   showBruggenAffiliatie: false, // ego-graf: neutrale stippelbruggen via gedeelde lidmaatschappen/bestuur/draaideur? Default uit (schone start).
   showBruggenBezit: false,     // ego-graf: stippelbruggen via gedeeld bezit/geld (eigenaar, adverteerder, investeerder)? Default uit — kwadratische wolk via grote hubs.
@@ -2186,6 +2308,9 @@ function initTimeline() {
     state.fieldPropertyMap = computeFieldPropertyMap();
     applyFilters();
     recolorNodes();   // node-kleur is tijdbewust: draaideur-figuren verkleuren mee met het jaar
+    // Jaar-afhankelijke grootte-maat (mediabereik): radius volgt het geselecteerde jaar
+    const sm = SIZE_METRICS[state.sizeMetric];
+    if (sm && sm.yearAware) applySizeMetric();   // invalideert zelf de max-cache
     // Ververs een open detailpaneel zodat de relatielijst het jaar volgt
     if (state.selectedNode) showDetail(state.selectedNode);
   });
@@ -2210,16 +2335,18 @@ merge.append('feMergeNode').attr('in', 'SourceGraphic');
 
 // Arrow — refX op de pijlpunt (x=7); de lijn wordt in linkArc ingekort tot de
 // node-rand, zodat de punt daar netjes op de (gebogen) lijn aansluit.
+// orient='auto-start-reverse' zodat dezelfde marker ook als marker-START bruikbaar is
+// (dan 180° gedraaid) — dat maakt tweezijdige (lidmaatschap-)edges mogelijk zonder aparte defs.
 defs.append('marker').attr('id', 'arrow-default')
   .attr('viewBox', '0 -4 8 8').attr('refX', 7).attr('refY', 0)
-  .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+  .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto-start-reverse')
   .append('path').attr('d', 'M0,-3L7,0L0,3').attr('fill', '#556').attr('opacity', 0.5);
 
 // Colored arrows
 Object.values(FILTER_COLORS).forEach(color => {
   defs.append('marker').attr('id', `arrow-${color.replace('#','')}`)
     .attr('viewBox', '0 -4 8 8').attr('refX', 7).attr('refY', 0)
-    .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+    .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto-start-reverse')
     .append('path').attr('d', 'M0,-3L7,0L0,3').attr('fill', color).attr('opacity', 0.6);
 });
 
@@ -2348,8 +2475,28 @@ function linkArc(d) {
   const k = span > trim + 4 ? trim : 0;
   const ex = x2 - (tx / tl) * k;
   const ey = y2 - (ty / tl) * k;
-  if (c.straight) return `M${x1},${y1}L${ex},${ey}`;
-  return `M${x1},${y1}Q${c.cx},${c.cy} ${ex},${ey}`;
+  // Tweezijdige (lidmaatschap-)edge: ook de bronkant inkorten zodat de start-pijlpunt
+  // op de rand van de bronknoop landt i.p.v. verstopt in het midden.
+  let sx = x1, sy = y1;
+  if (isBidiEdge(d)) {
+    const inx = c.straight ? (x2 - x1) : (c.cx - x1);
+    const iny = c.straight ? (y2 - y1) : (c.cy - y1);
+    const il = Math.hypot(inx, iny) || 1;
+    const strim = getRadius(d.source) + 3;
+    const sk = span > trim + strim + 4 ? strim : 0;
+    sx = x1 + (inx / il) * sk;
+    sy = y1 + (iny / il) * sk;
+  }
+  if (c.straight) return `M${sx},${sy}L${ex},${ey}`;
+  return `M${sx},${sy}Q${c.cx},${c.cy} ${ex},${ey}`;
+}
+
+// Tweezijdige edge = een band zónder invloedsrichting (wederzijds toebehoren): pijlpunt aan
+// beíde kanten. Aparte set (niet BRUG_AFFILIATIE) omdat 'woordvoerder_van' wél een richting
+// heeft — een woordvoerder spreekt namens de org — en dus enkelzijdig blijft, terwijl het
+// voor de bruggen-afleiding wél een affiliatie is.
+function isBidiEdge(d) {
+  return state.model !== 'theory' && d.relation_type && TWEEZIJDIG_TYPES.has(d.relation_type);
 }
 
 // Apex van de boog (t=0.5 van de kwadratische curve) — daar komt het edge-label.
@@ -2659,6 +2806,7 @@ function joinLinks(linksArr) {
   linkElements = linkGroupSel.selectAll('path.link').data(linksArr, d => d._idx);
   linkElements.exit()
     .attr('marker-end', 'none')   // de pijlpunt fadet niet mee met de lijn; meteen weg
+    .attr('marker-start', 'none')
     .transition('vis').duration(VIS_FADE_MS)
     .attr('stroke-opacity', 0)
     .remove();
@@ -2673,6 +2821,8 @@ function joinLinks(linksArr) {
   linkElements = enter.merge(linkElements);
   linkElements
     .attr('marker-end', d => markerFor(d, isTheory))   // reset ná selectNode-dimming
+    .attr('marker-start', d => markerStartFor(d, isTheory))
+    .attr('stroke', d => getLinkColor(d, isTheory))    // herkleuren bij bv. machtsvalentie-selectie
     .transition('vis').duration(VIS_FADE_MS)
     .attr('stroke-opacity', d => linkBaseOpacity(d, isTheory));
 
@@ -2972,6 +3122,10 @@ const SIZE_METRICS = {
                       val: d => (state.receivedMap && state.receivedMap.get(d.id)) || 0 },
   degree:           { label: 'Verbondenheid (aantal relaties)', models: ['instance', 'theory'],
                       val: d => d.degree || 0 },
+  mediabereik:      { label: 'Mediabereik (kijkers/lezers)', models: ['instance'], yearAware: true,
+                      // Gesourcet publieksbereik (bereik.py) per jaar; beweegt mee met de
+                      // tijdlijn-slider: carry-forward naar het laatst bekende jaar ≤ slider.
+                      val: d => bereikWaarde(d) },
   credibility:      { label: 'Geloofwaardigheid (bewijslast)', models: ['instance', 'theory'],
                       val: d => (state.model === 'theory' ? d.geloofwaardigheid : d.derived_certainty) || 0 },
   sterkte:          { label: 'Sterkte (theorie-score)', models: ['theory'],
@@ -2980,6 +3134,23 @@ const SIZE_METRICS = {
                       val: d => d.n_instanties || 0 },
   uniform:          { label: 'Gelijk (uit)', models: ['instance', 'theory'], val: () => 1 },
 };
+
+// Publieksbereik van een node in het tijdlijn-jaar: grootste bekende jaar ≤ slider
+// (carry-forward — een oplagecijfer uit 2015 geldt tot er een nieuwer punt is); slider
+// op 'alle jaren' → het nieuwste punt. Zichtbaarheid buiten de looptijd regelt de
+// timeline-filter (isActiveAt) al, dus carry-forward loopt nooit voorbij een eindjaar.
+function bereikWaarde(d) {
+  const reeks = d.bereik_reeks;
+  if (!reeks) return 0;
+  let best = null;
+  const doel = state.timelineYear;
+  Object.keys(reeks).forEach(k => {
+    const j = +k;
+    if (doel != null && j > doel) return;
+    if (best === null || j > best) best = j;
+  });
+  return best === null ? 0 : (reeks[best] || 0);
+}
 
 let _sizeMaxCache = null;
 function invalidateSizeCache() { _sizeMaxCache = null; }
@@ -3026,6 +3197,12 @@ function markerFor(l, isTheory) {
   const color = getLinkColor(l, isTheory);
   const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
   return `url(#${prefix}${color.replace('#', '')})`;
+}
+
+// Start-pijlpunt: alleen bij een tweezijdige (lidmaatschap-)edge; hergebruikt dezelfde
+// gekleurde marker (auto-start-reverse draait 'm 180°). Anders geen start-marker.
+function markerStartFor(l, isTheory) {
+  return isBidiEdge(l) ? markerFor(l, isTheory) : 'none';
 }
 
 // Basis-opacity van een link.
@@ -3194,6 +3371,7 @@ function getNodeColor(d) {
                                : (FILTER_COLORS[d.category] || FILTER_COLORS.overig);
   }
   if (state.colorMode === 'ideologie') return ideoColor(d);
+  if (state.colorMode === 'doelgroep') return doelgroepColor(d);
   if (state.colorMode === 'filter') {
     // Kleur is tijdsafhankelijk: in een gekozen jaar beslist de dan-actieve set
     // bron-relaties; bij 'alle jaren' (of geen actieve band) de timeloze bakwaarde.
@@ -3276,6 +3454,27 @@ function ideoColor(d) {
   return labMix(IDEO_MID, base, 0.35 + 0.65 * conf);
 }
 
+// ── Kleurmodus "doelgroep": node-kleur = afgeleide welstandsklasse (welstandsmeter) ──
+// Eén ordinale as: laag (D/C, minste bestedingsmacht) → hoog (A/AB1, kapitaalkrachtig). De
+// positie (−1..+1) komt uit DATA.doelgroep (doelgroep.py) — gesourcete, aanvechtbare signalen.
+// Hoog = goud (koopkrachtig publiek dat adverteerders willen), laag = grijs.
+const DG_LAAG = '#6b7280', DG_HOOG = '#c9a227';   // laag D/C ↔ hoog A/AB1
+function doelgroepDatum(d) {
+  const dg = DATA.doelgroep; if (!dg || !dg.outlets) return null;
+  const o = dg.outlets[d.id];
+  if (o && o.positie != null) return { pos: o.positie, conf: o.alpha };
+  return null;
+}
+function doelgroepColor(d) {
+  const dat = doelgroepDatum(d);
+  if (!dat) return IDEO_GEEN;
+  const t = Math.max(0, Math.min(1, (dat.pos + 1) / 2));   // −1..+1 → 0..1 (laag→hoog)
+  const base = t < 0.5 ? labMix(DG_LAAG, IDEO_MID, t * 2)
+                       : labMix(IDEO_MID, DG_HOOG, (t - 0.5) * 2);
+  const conf = Math.max(0, Math.min(1, dat.conf == null ? 0.5 : dat.conf));
+  return labMix(IDEO_MID, base, 0.35 + 0.65 * conf);
+}
+
 // Herkleur de bestaande node-bollen zonder rebuild (na een kleurmodus- of meng-wissel).
 function recolorNodes() {
   if (!nodeElements) return;
@@ -3284,7 +3483,44 @@ function recolorNodes() {
     .attr('stroke', d => d3.color(getNodeColor(d)).brighter(0.6));
 }
 
+// ── Machtsvalentie (tegenmacht als gerichte edge-valentie) ──
+// Kleur = betekenis: groen opent (contra-hegemoniaal, +), rood sluit (pro-hegemoniaal, −),
+// blauw verantwoording (accountability). Data uit DATA.machtsvalentie (tegenmacht.py):
+// per relatie (praktijk) of mechanisme (theorie) een netto `teken` + `verantwoordt`.
+const MV_KLEUR = { opent: '#5a8f7b', sluit: '#c0563f', verantwoording: '#6a7fb5' };
+function valentieVan(l, isTheory) {
+  const mv = DATA.machtsvalentie; if (!mv) return null;
+  const map = isTheory ? mv.mechanismen : mv.relaties;
+  return (map && l.id != null) ? (map[l.id] || null) : null;  // JSON-sleutels zijn strings; l.id coerct
+}
+// Welke selectie-categorieën draagt deze edge-valentie? (kan er meerdere zijn.)
+function valentieCats(v) {
+  if (!v) return [];
+  const cats = [];
+  if (v.teken > 0) cats.push('opent');
+  else if (v.teken < 0) cats.push('sluit');
+  if (v.verantwoordt && v.verantwoordt.length) cats.push('verantwoording');
+  return cats;
+}
+// Heeft het actieve model überhaupt valentie-signalen? (theorie = mechanismen, praktijk = relaties)
+// In een model zónder signalen is de selectie inert — anders zou een aangevinkt vakje bij
+// een modelwissel stilzwijgend álle edges verbergen. De lens-logica zelf zit in
+// computeVisibleLinks (een valentie-match passeert daar ook de filter-as).
+function valentieBeschikbaar(isTheory) {
+  const mv = DATA.machtsvalentie; if (!mv) return false;
+  const map = isTheory ? mv.mechanismen : mv.relaties;
+  return !!map && Object.keys(map).length > 0;
+}
+
 function getLinkColor(d, isTheory) {
+  // Bij een actieve machtsvalentie-selectie kleurt de valentie de edge (semantisch).
+  if (state.valentieSel.size) {
+    const cats = valentieCats(valentieVan(d, isTheory)).filter(c => state.valentieSel.has(c));
+    // Bij overlap: opent/sluit (as-richting) gaat vóór verantwoording.
+    if (cats.includes('opent')) return MV_KLEUR.opent;
+    if (cats.includes('sluit')) return MV_KLEUR.sluit;
+    if (cats.includes('verantwoording')) return MV_KLEUR.verantwoording;
+  }
   if (isTheory) return FILTER_COLORS[d.filter] || '#556';
   const src = typeof d.source === 'object' ? d.source : entityMap.get(d.source);
   return src ? (FILTER_COLORS[src.filterCat] || '#445') : '#445';
@@ -4590,6 +4826,11 @@ function relBarColor(r) {
 
 // Brugsoorten (zie schema relation_type): organisatorische affiliatie vs bezit/geld.
 const BRUG_AFFILIATIE = new Set(['lidmaatschap', 'bestuurder', 'adviseur', 'draaideur', 'personeel', 'woordvoerder_van']);
+// Richtingloze banden → tweezijdig getekend (zie isBidiEdge): affiliaties (wederzijds
+// toebehoren, 'woordvoerder_van' valt eruit want die heeft richting org→publiek) plus
+// 'alliantie', die óók in de invloedsmath al symmetrisch telt (INFLUENCE_SYMMETRIC) — daar
+// betekent ↔ terecht "beïnvloeden elkaar en telt in beide groottes".
+const TWEEZIJDIG_TYPES = new Set(['lidmaatschap', 'bestuurder', 'adviseur', 'draaideur', 'personeel', 'alliantie']);
 const BRUG_BEZIT = new Set(['eigendom', 'investering', 'financiering', 'donor', 'adverteerder']);
 const BRUG_COLOR = '#5fb3a3';   // neutraal teal — bewust géén accent (blauw) of veld (violet)
 // Zekerheids-weging: een brug rust op twee banden; zijn zekerheid = de zwakste schakel
@@ -4885,6 +5126,133 @@ function renderKleurmeter(d) {
     { open: true, meta: km.preview ? 'voorlopig' : null });
 }
 
+// ── Welstandsmeter (getargette marketing-/welstandsklasse) in het detailpaneel ──
+// Eén ordinale as: laag (D/C) → hoog (A/AB1). Uit DATA.doelgroep (doelgroep.py) — gesourcete,
+// aanvechtbare 'doelgroepklasse'-signalen (mediakits, NOM/NMO-bereikdata). De operationele
+// kant van koopkrachtselectie. Toont de positie-balk + de eigen aanvechtbare signaalboom.
+function renderDoelgroep(d) {
+  const dg = DATA.doelgroep;
+  if (!dg || !dg.outlets) return '';
+  const o = dg.outlets[d.id];
+  if (!o || o.positie == null) return '';
+  const ownArgs = (argsByEntity[d.id] || []).filter(a => a.property === 'doelgroepklasse');
+  const pct = (o.positie + 1) / 2 * 100;
+  const badge = o.as_soort === 'meting'
+    ? ` <span style="font-size:8px;font-weight:600;color:#caa84a;border:1px solid color-mix(in srgb,#caa84a 45%,transparent);border-radius:3px;padding:0 4px;letter-spacing:.03em">NOM/NMO-METING</span>`
+    : ` <span style="font-size:8px;color:var(--text-muted);letter-spacing:.03em">afgeleid uit signalen</span>`;
+  let body = `<div style="margin:8px 0 12px">
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px">
+      <span>◄ laag (D/C)</span><span style="color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em">welstand</span><span>hoog (A/AB1) ►</span>
+    </div>
+    <div style="position:relative;height:6px;background:var(--border-light);border-radius:3px">
+      <span style="position:absolute;left:50%;top:-2px;width:1px;height:10px;background:var(--border)"></span>
+      <span style="position:absolute;left:${pct}%;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--accent);transform:translateX(-50%);box-shadow:0 0 0 2px var(--bg)"></span>
+    </div>
+  </div>`;
+  if (ownArgs.length) body += `<div style="margin-top:6px">${renderArgTree(ownArgs)}</div>`;
+  else body += `<div style="font-size:10px;color:var(--text-muted);margin-top:4px">nog geen gesourcet klasse-signaal</div>`;
+  const kop = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">
+    <b>${o.klasse_label}</b>${badge} · vertrouwen α=${o.alpha} · ${o.n_signalen} gesourcet signaal/-en.
+    De klasse die deze outlet aan adverteerders levert; reageer eronder om een codering aan te vechten.</div>`;
+  return collapsibleSection('Welstandsmeter (getargette klasse)', kop + body,
+    { open: true, meta: dg.preview ? 'voorlopig' : null });
+}
+
+// ── Bereikmeter in het detailpaneel ───────────────────────────
+// Gesourcet publieksbereik per jaar (DATA.bereik, uit bereik.py): tijdreeks-staafjes
+// (grootste publieksmaat per jaar), highlight op het tijdlijn-jaar, plus de eigen
+// aanvechtbare signaalboom. Dit is de datalaag onder de grootte-maat 'Mediabereik'.
+function renderBereik(d) {
+  const bm = DATA.bereik;
+  if (!bm || !bm.entiteiten) return '';
+  const o = bm.entiteiten[d.id];
+  if (!o || !o.n_signalen) return '';
+  const ownArgs = (argsByEntity[d.id] || []).filter(a => a.property === 'bereik');
+  const jaren = Object.keys(o.reeks).map(Number).sort((a, b) => a - b);
+  const maxW = Math.max(...jaren.map(j => o.reeks[j]));
+  // Per jaar de maat van het grootste signaal (voor het label naast de staaf).
+  const maatBij = {};
+  o.signalen.forEach(s => {
+    if (s.aantal >= (o.reeks[s.jaar] || 0)) maatBij[s.jaar] = s.maat;
+  });
+  const rijen = jaren.map(j => {
+    const w = o.reeks[j];
+    const pct = Math.max(2, w / maxW * 100);
+    const actueel = state.timelineYear != null && j === +state.timelineYear;
+    const maat = BEREIK_MAAT_LABELS[maatBij[j]] || maatBij[j] || '';
+    return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0${actueel ? ';font-weight:600' : ''}">
+      <span style="width:34px;font-size:10px;color:${actueel ? 'var(--accent)' : 'var(--text-muted)'};text-align:right">${j}</span>
+      <span style="flex:1;height:8px;background:var(--border-light);border-radius:2px;position:relative">
+        <span style="position:absolute;left:0;top:0;height:100%;width:${pct}%;border-radius:2px;background:${actueel ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 55%, transparent)'}"></span>
+      </span>
+      <span style="width:150px;font-size:10px;color:var(--text-dim)">${w.toLocaleString('nl-NL')} ${maat}</span>
+    </div>`;
+  }).join('');
+  const nw = o.nieuwste;
+  const kop = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;line-height:1.5">
+    <b>${nw ? nw.aantal.toLocaleString('nl-NL') : '?'} ${nw ? (BEREIK_MAAT_LABELS[nw.maat] || nw.maat) : ''}</b>${nw ? ` (${nw.jaar})` : ''}
+    · ${o.n_signalen} gesourcet signaal/-en. Per jaar de grootste publieksmaat; stuurt de
+    grootte-maat 'Mediabereik' (beweegt mee met de tijdlijn). Reageer eronder om een cijfer aan te vechten.</div>`;
+  let body = `<div style="margin:6px 0 10px">${rijen}</div>`;
+  if (ownArgs.length) body += `<div style="margin-top:6px">${renderArgTree(ownArgs)}</div>`;
+  return collapsibleSection('Bereik (publiek)', kop + body,
+    { open: true, meta: bm.preview ? 'voorlopig' : null });
+}
+
+// ── Machtsvalentie (tegenmacht) in het detailpaneel ───────────
+// Per actor de contra-hegemonische valentie per as (opent/sluit de consensussfeer) +
+// welke filter-machtsconcentraties ze verantwoordt. Uit DATA.machtsvalentie (tegenmacht.py)
+// — afgeleid uit gesourcete 'machtsvalentie'-signalen op de edges, niet als actor-etiket.
+const MV_ASSEN = ['establishment', 'cultureel', 'economisch'];
+const MV_AS_TITEL = { establishment: 'Establishment', cultureel: 'Cultureel', economisch: 'Economisch' };
+function mvBalk(as, val) {
+  // Divergerende balk rond 0: ◄ sluit (pro-hegemoniaal) — opent (contra-hegemoniaal) ►.
+  const pct = (val + 1) / 2 * 100;
+  const kleur = val >= 0 ? MV_KLEUR.opent : MV_KLEUR.sluit;
+  return `<div style="margin:8px 0 2px">
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px">
+      <span>◄ sluit</span><span style="color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em">${MV_AS_TITEL[as]}</span><span>opent ►</span>
+    </div>
+    <div style="position:relative;height:6px;background:var(--border-light);border-radius:3px">
+      <span style="position:absolute;left:50%;top:-2px;width:1px;height:10px;background:var(--border)"></span>
+      <span style="position:absolute;left:${pct}%;top:-3px;width:12px;height:12px;border-radius:50%;background:${kleur};transform:translateX(-50%);box-shadow:0 0 0 2px var(--bg)"></span>
+    </div>
+  </div>`;
+}
+function renderMachtsvalentie(d) {
+  const mv = DATA.machtsvalentie;
+  if (!mv || !mv.actoren) return '';
+  const act = mv.actoren[d.id];
+  if (!act) return '';
+  let body = '';
+  // 1) Contra-hegemonie per as (soort 2): verschuift de consensusgrens (Hallin).
+  if (MV_ASSEN.some(a => act.valentie[a] != null)) {
+    body += `<div style="font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:2px">Contra-hegemonie <span style="font-weight:400;color:var(--text-muted)">(verschuift de consensusgrens)</span></div>`;
+    MV_ASSEN.forEach(a => {
+      if (act.valentie[a] == null) return;
+      body += mvBalk(a, act.valentie[a]);
+      body += `<div style="font-size:9px;color:var(--text-muted);margin:0 0 6px">${act.duiding[a]}</div>`;
+    });
+  }
+  // 2) Verantwoording (soort 1): welke filter-machtsconcentraties deze actor checkt.
+  if (act.verantwoordt && act.verantwoordt.length) {
+    const chips = act.verantwoordt.map(f =>
+      `<span style="display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;background:color-mix(in srgb,${MV_KLEUR.verantwoording} 18%,transparent);color:${MV_KLEUR.verantwoording};margin:2px 3px 0 0">${FILTER_LABELS[f] || f}</span>`).join('');
+    body += `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:4px">Verantwoording <span style="font-weight:400;color:var(--text-muted)">(houdt macht ter verantwoording)</span></div>${chips}</div>`;
+  }
+  if (!body) return '';
+  const geerfd = act.n_geerfd
+    ? ` en ${act.n_geerfd}× verantwoording geërfd van het mechanisme-type van haar relaties`
+    : '';
+  const kop = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">
+    Tegenmacht als <b>gerichte edge-valentie</b>, niet als etiket op deze actor — afgeleid uit
+    ${act.n_annotaties} eigen signaal/-en op haar edges${geerfd}. Reageer op de betreffende relatie
+    (of het mechanisme) om een codering aan te vechten.</div>`;
+  return collapsibleSection('Machtsvalentie', kop + body,
+    { open: true, meta: mv.preview ? 'voorlopig' : null });
+}
+
 // ── Inkomstenbron (donut) in het detailpaneel ─────────────────
 // De inkomstensamenstelling van een outlet als 'pie': een COMBINATIE VAN EDGES — elke
 // inkomende financier-relatie draagt een gesourcet aandeel (property='inkomensaandeel'),
@@ -4978,6 +5346,9 @@ function showInstanceDetail(d, content, color) {
       ${scoreVlaggen(sd)}`, { open: true, meta: `${pctScore}%` });
   }
   html += renderKleurmeter(d);
+  html += renderDoelgroep(d);
+  html += renderBereik(d);
+  html += renderMachtsvalentie(d);
   html += renderInkomsten(d);
   html += renderTimespanSection(d, 'entity_id', d.id);
   html += renderLoopbaanStrook(d);
@@ -4995,8 +5366,10 @@ function showInstanceDetail(d, content, color) {
 
   // Discussieboom voor deze entiteit — het toevoeg-formulier hoort BINNEN de sectie
   // (onder de boom), niet eronder; sectie altijd tonen, ook zonder argumenten.
-  // Politieke-positie-signalen tonen we in de kleurmeter (per-as-bomen), niet hier dubbel.
-  const entityArgs = (argsByEntity[d.id] || []).filter(a => a.property !== 'politieke_positie');
+  // Politieke-positie-/doelgroepklasse-/bereik-signalen tonen we in de eigen meters, niet hier dubbel.
+  const entityArgs = (argsByEntity[d.id] || []).filter(
+    a => a.property !== 'politieke_positie' && a.property !== 'doelgroepklasse'
+      && a.property !== 'bereik');
   const nEntArgs = entityArgs.length ? countStances(entityArgs).total : 0;
   const entDiscTree = nEntArgs ? renderArgTree(entityArgs)
     : `<div style="font-size:11px;color:var(--text-muted);padding:2px 0">Nog geen argumenten over deze entiteit.</div>`;
@@ -5107,12 +5480,45 @@ function axisPass(axisKey, edge, isTheory) {
 // 'goedgekeurd' is. Rollen/mechanismen (theoriemodel) dragen geen status → nooit ghost.
 function isVoorgesteld(d) { return !!(d && d.status && d.status !== 'goedgekeurd'); }
 
-function computeVisibleLinks() {
+// Raakt deze edge een partij-entiteit? (praktijkmodel: nodes dragen type 'partij'.)
+// Gebruikt voor de tijdlijn-optie 'Partijbanden altijd tonen': zulke edges mogen het
+// gekozen jaar negeren zolang beide uiteinden wél in dat jaar zichtbaar zijn.
+function isPartyLink(l) {
+  if (!nodeByIdGlobal) return false;
+  const sid = typeof l.source === 'object' ? l.source.id : l.source;
+  const tid = typeof l.target === 'object' ? l.target.id : l.target;
+  const s = nodeByIdGlobal.get(sid), t = nodeByIdGlobal.get(tid);
+  return (!!s && s.type === 'partij') || (!!t && t.type === 'partij');
+}
+
+// 'Altijd tonen (los van jaar)' — curatie van interessante band-soorten (praktijkmodel).
+// Partijbanden bovenaan (belangrijkst); de rest matcht op relation_type. In het
+// theoriemodel dragen edges geen relation_type en zijn er geen partij-nodes → alles false.
+const TIJDLOOS_OPTIES = [
+  { id: 'partij',       label: 'Partijbanden',           test: isPartyLink },
+  { id: 'eigendom',     label: 'Eigendom',               types: ['eigendom', 'investering'] },
+  { id: 'financiering', label: 'Financiering',           types: ['financiering', 'donor'] },
+  { id: 'bestuur',      label: 'Bestuur & lidmaatschap', types: ['lidmaatschap', 'bestuurder', 'adviseur', 'personeel'] },
+  { id: 'draaideur',    label: 'Draaideur',              types: ['draaideur'] },
+  { id: 'adverteerder', label: 'Adverteerder',           types: ['adverteerder'] },
+];
+// Mag deze edge het gekozen jaar negeren? (Één van de aangevinkte band-soorten matcht.)
+function linkTijdloos(l) {
+  if (!state.tijdloosSel.size) return false;
+  for (const opt of TIJDLOOS_OPTIES) {
+    if (!state.tijdloosSel.has(opt.id)) continue;
+    if (opt.test ? opt.test(l) : opt.types.includes(l.relation_type)) return true;
+  }
+  return false;
+}
+
+function computeVisibleLinks(negeerValentie) {
   const isTheory = state.model === 'theory';
   const cf = state.certMin;
   const inf = state.inflMin;
   const search = state.searchTerm.toLowerCase();
   const year = state.timelineYear;
+  const mvOk = valentieBeschikbaar(isTheory);
 
   const legendSel = state.legendSelection;
   const nodePassesFilter = new Map();
@@ -5137,8 +5543,19 @@ function computeVisibleLinks() {
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
     const tid = typeof l.target === 'object' ? l.target.id : l.target;
     if (!nodePassesFilter.get(sid) || !nodePassesFilter.get(tid)) return;
-    if (!axisPass('filter', l, isTheory)) return;   // filter-as (kan meerdere filters dragen)
-    if (!axisPass('theme', l, isTheory)) return;    // thema-as (dwarsverbanden)
+    // Machtsvalentie-lens: een actieve valentie-selectie toont alléén matchende edges, en
+    // een match passeert de filter-as — de tegenmacht-chip staat default uit en juist díé
+    // edges dragen de meeste signalen; zonder doorlaat bleef de lens vrijwel leeg. In
+    // telmodus (negeerValentie) geldt dezelfde doorlaat voor élke geannoteerde edge,
+    // zodat de tellingen tonen wat aanvinken daadwerkelijk laat zien.
+    const cats = (mvOk && (state.valentieSel.size || negeerValentie))
+      ? valentieCats(valentieVan(l, isTheory)) : null;
+    const inLens = !!cats && (negeerValentie
+      ? cats.length > 0 : cats.some(c => state.valentieSel.has(c)));
+    if (!negeerValentie && state.valentieSel.size && mvOk && !inLens) return;
+    if (!inLens && !axisPass('filter', l, isTheory)) return;  // filter-as (kan meerdere filters dragen)
+    if (!axisPass('theme', l, isTheory)) return;              // thema-as (dwarsverbanden)
+
     // Drempels werken in beide modellen, op model-eigen velden:
     //   instantie: zekerheid (certainty) + invloed (influence).
     //   theorie:   geloofwaardigheid (bewijslast) + sterkte (theorie-score).
@@ -5149,7 +5566,10 @@ function computeVisibleLinks() {
     } else {
       if ((l.certainty||0) < cf || (l.influence||0) < inf) return;
     }
-    if (!isActiveAt(l, year)) return;
+    // Tijdlijn: normaal moet de edge zelf in het jaar actief zijn. Uitzondering: met
+    // 'Altijd tonen (los van jaar)' negeren de gekozen band-soorten het jaar (de uiteinden
+    // zijn hierboven al op het jaar getoetst → alleen banden van dán-zichtbare entiteiten).
+    if (!isActiveAt(l, year) && !linkTijdloos(l)) return;
     visibleLinkSet.add(i);
   });
 
@@ -5273,6 +5693,31 @@ function applyFilters() {
     <span><span class="num">${visibleNodes.size}</span> ${nodeLabel}</span>
     <span><span class="num">${visibleLinkSet.size}</span> ${linkLabel}</span>
   `;
+
+  updateValentiePaneel();   // machtsvalentie-tellingen + lege-staat volgen elke filter-/modelwissel
+}
+
+// Machtsvalentie-paneel: live tellingen per categorie over de nú zichtbare edges (los van
+// de eigen selectie, anders drukt één vinkje de andere tellingen naar nul) en een eerlijke
+// lege-staat per model. Zo claimt het paneel nooit meer dan er in de huidige weergave
+// daadwerkelijk te selecteren valt.
+function updateValentiePaneel() {
+  const blok = document.getElementById('valentieBlok');
+  if (!blok) return;
+  const isTheory = state.model === 'theory';
+  const beschikbaar = valentieBeschikbaar(isTheory);
+  document.getElementById('valentieLeeg').style.display = beschikbaar ? 'none' : '';
+  document.getElementById('valentieOpties').style.display = beschikbaar ? '' : 'none';
+  if (!beschikbaar) return;
+  const { visibleLinkSet } = computeVisibleLinks(true);
+  const n = { opent: 0, sluit: 0, verantwoording: 0 };
+  visibleLinkSet.forEach(i => valentieCats(valentieVan(currentLinks[i], isTheory))
+    .forEach(c => n[c]++));
+  document.querySelectorAll('#valentieOpties .valentieRow').forEach(row => {
+    const cat = row.querySelector('.valentieToggle').value;
+    row.querySelector('.valentieCount').textContent = `(${n[cat]})`;
+    row.style.opacity = n[cat] ? '' : '0.45';
+  });
 }
 
 // ============================================================
@@ -5293,6 +5738,7 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     configureSliders(isTheory);     // drempels werken in beide modellen, op model-eigen velden
     document.getElementById('colorModeSection').style.display = isTheory ? 'none' : '';
     syncIdeoControls();             // as-kiezer hoort bij de instantie-kleurmodus 'ideologie'
+    syncDoelgroepControls();        // welstandsmeter-legenda hoort bij kleurmodus 'doelgroep'
     // Tijdlijn blijft in beide modellen zichtbaar: ook theorie-elementen zijn temporeel.
     // Veld-effecten bestaan alleen in het theoriemodel; in het praktijkmodel verbergen we die
     // rij en zetten 'm uit (alle relaties zijn daar normale edges, node-grootte = schoon).
@@ -5300,6 +5746,13 @@ document.querySelectorAll('#modelToggle button').forEach(btn => {
     document.getElementById('fieldToggleRow').style.display = isTheory ? '' : 'none';
     // NB: 'flex', niet '' — een lege string wist de inline display:flex van de rij.
     document.getElementById('edgeLabelRow').style.display = isTheory ? 'flex' : 'none';
+    // 'Altijd tonen (los van jaar)' is praktijkmodel-only (partij-nodes/relation_type bestaan
+    // daar; in theorie zou het toch niets doen). Verbergen én de dropdown dichtklappen.
+    document.getElementById('tijdloosRow').style.display = isTheory ? 'none' : '';
+    if (isTheory) {
+      document.getElementById('tijdloosDropdownBtn').classList.remove('open');
+      document.getElementById('tijdloosList').classList.remove('open');
+    }
     if (!isTheory) {
       state.showFieldEffects = false;
       state.showHalos = false;
@@ -5476,6 +5929,45 @@ document.getElementById('directToggle').addEventListener('change', e => {
   applyFilters();
   if (state.selectedNode) selectNode(state.selectedNode);
 });
+// Machtsvalentie-edge-selectie: elke aangevinkte categorie laat (alléén) die edges zien,
+// in valentie-kleur. Leeg = gewone weergave. Werkt in beide modellen (relatie ↔ mechanisme).
+document.querySelectorAll('.valentieToggle').forEach(cb => {
+  cb.addEventListener('change', e => {
+    if (e.target.checked) state.valentieSel.add(e.target.value);
+    else state.valentieSel.delete(e.target.value);
+    applyFilters();
+    if (state.selectedNode) selectNode(state.selectedNode);
+  });
+});
+// 'Altijd tonen (los van jaar)': dropdown met een curatie van interessante band-soorten
+// die de edge-looptijd negeren (endpoints blijven jaargefilterd). Alleen praktijkmodel.
+document.getElementById('tijdloosDropdownBtn').addEventListener('click', () => {
+  document.getElementById('tijdloosDropdownBtn').classList.toggle('open');
+  document.getElementById('tijdloosList').classList.toggle('open');
+});
+function updateTijdloosCount() {
+  const n = state.tijdloosSel.size;
+  const badge = document.getElementById('tijdloosCount');
+  badge.textContent = n;
+  badge.style.display = n ? '' : 'none';
+}
+function renderTijdloosOpties() {
+  const list = document.getElementById('tijdloosList');
+  list.innerHTML = TIJDLOOS_OPTIES.map(o =>
+    `<label class="dropdown-item"><input type="checkbox" data-tijdloos="${o.id}"`
+    + `${state.tijdloosSel.has(o.id) ? ' checked' : ''}><span>${o.label}</span></label>`).join('');
+  list.querySelectorAll('input[data-tijdloos]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) state.tijdloosSel.add(cb.dataset.tijdloos);
+      else state.tijdloosSel.delete(cb.dataset.tijdloos);
+      updateTijdloosCount();
+      applyFilters();
+      if (state.selectedNode) selectNode(state.selectedNode);
+    });
+  });
+  updateTijdloosCount();
+}
+renderTijdloosOpties();
 // Voorgesteld (in review) tonen/verbergen: gestippelde amber ghosts in het praktijkmodel.
 document.getElementById('voorgesteldToggle').addEventListener('change', e => {
   state.showVoorgesteld = e.target.checked;
@@ -5686,6 +6178,9 @@ const AXIS_DEFS = {
     get: () => state.activeFilters, set: s => { state.activeFilters = s; },
     cats: [], els: new Map(), mode: 'toggle',
     optOut: new Set(['tegenmacht']),  // standaard UIT tot je hem selecteert
+    // Alléén in het praktijkmodel standaard UIT: flak-edges trekken veel perifere
+    // doelwit-nodes binnen; zonder ligt het kernnetwerk compacter. Eén chip-klik zet 'm aan.
+    optOutInstance: new Set(['flak']),
     // cross_filter is geen echt Chomsky-filter maar een 'snijdt door meerdere filters'-label:
     // géén chip, en niet in de actieve set — de edge volgt zijn echte filters (en is al
     // isoleerbaar via het thema 'draaideur'). Label/kleur blijven voor weergave.
@@ -5739,9 +6234,11 @@ function rebuildAxis(axisKey) {
   const noChip = a.noChip || new Set();
   a.cats = Object.keys(a.labels).filter(k => present.has(k) && !noChip.has(k));
   // spotlight (thema's) start leeg = neutraal; toggle (filters) start alles-aan behalve opt-out
+  const optOut = new Set(a.optOut);
+  if (state.model === 'instance' && a.optOutInstance) a.optOutInstance.forEach(k => optOut.add(k));
   a.defaultActive = a.mode === 'spotlight'
     ? new Set()
-    : new Set(a.cats.filter(c => !a.optOut.has(c)));
+    : new Set(a.cats.filter(c => !optOut.has(c)));
   a.set(new Set(a.defaultActive));
   a.container.innerHTML = '';
   a.els.clear();
@@ -5825,6 +6322,31 @@ function renderIdeoLegend() {
     </div>`;
 }
 
+// Toon/verberg de welstandsmeter-legenda (alleen in kleurmodus 'doelgroep', instantiemodel).
+function syncDoelgroepControls() {
+  const box = document.getElementById('doelgroepControls');
+  if (!box) return;
+  const on = state.colorMode === 'doelgroep' && state.model !== 'theory';
+  box.style.display = on ? '' : 'none';
+  if (on) renderDoelgroepLegend();
+}
+
+// Gradiënt-balk laag↔hoog: de "legenda" van de doelgroep-kleuring.
+function renderDoelgroepLegend() {
+  const el = document.getElementById('doelgroepLegend');
+  if (!el) return;
+  const grad = `linear-gradient(to right, ${DG_LAAG}, ${IDEO_MID}, ${DG_HOOG})`;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px">
+      <span>◄ laag (D/C)</span><span>standaard</span><span>hoog (A/AB1) ►</span>
+    </div>
+    <div style="height:9px;border-radius:5px;background:${grad};border:1px solid var(--border)"></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-muted);margin-top:6px">
+      <span class="swatch" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${IDEO_GEEN};border:1px solid var(--border)"></span>
+      geen gesourcet signaal · dun bewijs → bleker
+    </div>`;
+}
+
 // View toggle (color mode)
 document.querySelectorAll('#viewToggle button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -5833,6 +6355,7 @@ document.querySelectorAll('#viewToggle button').forEach(btn => {
     state.colorMode = btn.dataset.mode;
     state.legendSelection.clear();  // keys verschillen per kleurmodus
     syncIdeoControls();
+    syncDoelgroepControls();
     renderLegend();
     applyFilters();
     recolorNodes();
@@ -6485,8 +7008,10 @@ const initTheory = state.model === 'theory';
 configureSliders(initTheory);
 document.getElementById('colorModeSection').style.display = initTheory ? 'none' : '';
 syncIdeoControls();
+syncDoelgroepControls();
 document.getElementById('fieldToggleRow').style.display = initTheory ? '' : 'none';
 document.getElementById('edgeLabelRow').style.display = initTheory ? 'flex' : 'none';
+document.getElementById('tijdloosRow').style.display = initTheory ? 'none' : '';  // praktijkmodel-only
 buildGraph();
 renderLegend();
 

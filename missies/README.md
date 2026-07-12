@@ -59,5 +59,20 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `monitor-agent` | bijdrager | `monitor_brief.md` | statussen zetten; alleen bevindingen indienen |
 | `documentalist-agent` | bijdrager | `documentalist_brief.md` | rechtstreeks de score in; alles wacht op review |
 | `criticus-agent` | bijdrager | `criticus_brief.md` | stromannen; statussen zetten; alles wacht op review |
-| `scout-agent` | bijdrager | `scout_brief.md` | theorielaag schrijven; verbanden zonder bron; statussen zetten |
+| `scout-agent` | bijdrager | `scout_brief.md` (+ `linkedin_scout_brief.md`) | theorielaag schrijven; verbanden zonder bron; statussen zetten |
 | _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
+
+## LinkedIn-scrape als scout-optie
+
+Persoon↔organisatie/opleiding/club-banden in kaart brengen kan met de **LinkedIn-integratie**
+in `tools/linkedin/` (brief: `linkedin_scout_brief.md`, account `scout-agent`). Ze werkt via
+hetzelfde bijdragepad — de gewone REST-API, alles `voorgesteld`. Tweetraps:
+
+1. `python3 tools/linkedin/scrape_profile.py <url>` → genormaliseerd `data/linkedin/<slug>.json`
+   (Playwright, eigen sessie; de eigenaar draait deze stap doorgaans zelf).
+2. `python3 tools/linkedin/linkedin_naar_model.py <json> [--volledig] [--indienen]` → dient
+   gedateerde `persoon→org`-affiliaties in (draaideur/brug-discipline; opleiding/club =
+   kandidaat; bron `grijs`). Droogloop is default; idempotent + rate-limit-bestendig.
+
+Gericht gebruiken (handvol relevante profielen, geen bulk — het schendt LinkedIn's
+voorwaarden). Details: `tools/linkedin/README.md`.

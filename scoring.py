@@ -121,7 +121,8 @@ ZONDER_BRON_CLUSTER = "_zonder_bron"
 # hoort staat los van de vraag óf het bestaat. Deze worden (nog) door niets afgeleid
 # geconsumeerd; ze leggen het debat vast (ik stel voor, jij beslist).
 ASPECT_PROPERTIES = ("influence", "indirecte_invloed_op", "compositie",
-                     "mechanism", "filter", "politieke_positie", "inkomensaandeel")
+                     "mechanism", "filter", "politieke_positie", "inkomensaandeel",
+                     "machtsvalentie", "doelgroepklasse", "bereik")
 
 
 # ── Laag A: basiskracht τ per argument ───────────────────────
@@ -184,7 +185,8 @@ def dfquad_strength(tau: float, support_sigmas, attack_sigmas) -> float:
     return tau
 
 
-def propagate_sigma(taus: dict, parents: dict, stances: dict, geneutraliseerd=None) -> dict:
+def propagate_sigma(taus: dict, parents: dict, stances: dict, geneutraliseerd=None,
+                    vetos=None) -> dict:
     """σ voor alle argumenten: kinderen eerst (post-order), dan de parent.
 
     taus           : {arg_id: τ}
@@ -196,8 +198,15 @@ def propagate_sigma(taus: dict, parents: dict, stances: dict, geneutraliseerd=No
                      staat — die dempen hun parent niet meer (review-verdict v2). Hun σ
                      wordt nog wél berekend (zichtbaar in de boom), maar telt niet als
                      aanval. Open/herzien/blijft dempen gewoon.
+    vetos          : set arg_ids van ADMIN-VETO's — actieve ondergravingen van een
+                     maintainer ('argument klopt niet' als admin-oordeel). Een parent
+                     met zo'n kind wordt volledig genuld (σ = 0), niet slechts gedempt.
+                     De opheffing (resolutie 'opgelost', of een gemergede tegen-reactie
+                     op het veto) is al verwerkt in de samenstelling van de set
+                     (compute_all_scores); hier telt alleen het lidmaatschap.
     """
     geneutraliseerd = geneutraliseerd or set()
+    vetos = vetos or set()
     children = {}
     for aid, pid in parents.items():
         if pid is not None:
@@ -212,13 +221,16 @@ def propagate_sigma(taus: dict, parents: dict, stances: dict, geneutraliseerd=No
             return taus[aid]
         gezien.add(aid)
         sup, att = [], []
+        veto = False
         for kind in children.get(aid, ()):
             ks = rekenen(kind, gezien)
             if stances.get(kind) == "supporting":
                 sup.append(ks)
             elif stances.get(kind) == "contradicting" and kind not in geneutraliseerd:
                 att.append(ks)
-        sigma[aid] = dfquad_strength(taus[aid], sup, att)
+                if kind in vetos:
+                    veto = True
+        sigma[aid] = 0.0 if veto else dfquad_strength(taus[aid], sup, att)
         return sigma[aid]
 
     for aid in taus:
@@ -606,17 +618,33 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
             continue
         cites_by_arg.setdefault(arg_id, []).append((reliability, key, onderwerp))
 
+    # Maintainers voor het admin-veto: een gemergede, niet-opgeloste ondergraving van
+    # een maintainer ('argument klopt niet' als admin-oordeel) maakt de punten van zijn
+    # parent volledig ongedaan (σ = 0) — tenzij het veto zelf succesvol is tegen-
+    # beargumenteerd: een gemergede, niet-opgeloste tegen-reactie op het veto schort het
+    # op (weerlegging loopt via review/merge), waarna de gewone DF-QuAD-demping geldt.
+    maintainers = {u for (u,) in conn.execute(
+        "SELECT username FROM users WHERE role = 'maintainer'")}
+
     # Alle argumenten: τ berekenen en de boom opzetten (M1.1)
     taus, parents, stances, meta = {}, {}, {}, {}
     geneutraliseerd = set()   # ondergravingen met resolutielus 'opgelost' (dempen niet)
+    actieve_ondergravingen = set()  # gemergede, niet-opgeloste contradicting replies
+    auteur = {}
     for (aid, rel_id, ent_id, role_id, mech_id, eff_id, parent_id,
-         prop, stance, weight, status, bezwaar_resolutie) in conn.execute("""
+         prop, stance, weight, status, bezwaar_resolutie, contributed_by) in conn.execute("""
             SELECT id, relation_id, entity_id, role_id, mechanism_id, emergent_effect_id,
-                   parent_argument_id, property, stance, weight, status, bezwaar_resolutie
+                   parent_argument_id, property, stance, weight, status, bezwaar_resolutie,
+                   contributed_by
             FROM arguments
             WHERE NOT vervangen"""):
         if bezwaar_resolutie == "opgelost":
             geneutraliseerd.add(aid)
+        auteur[aid] = contributed_by
+        if (parent_id is not None and stance == "contradicting"
+                and status not in ("voorgesteld", "verworpen")
+                and bezwaar_resolutie != "opgelost"):
+            actieve_ondergravingen.add(aid)
         cites = cites_by_arg.get(aid, [])
         # Zelf-gerapporteerd weight telt niet mee (Z2): neutraal gewicht, tenzij een
         # bridged rating (M2.5) het objectief invult. De opgeslagen `weight`-kolom wordt
@@ -634,9 +662,24 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
                      "property": prop, "stance": stance, "status": status,
                      "cluster": cluster, "n_citaties": len(echte)}
 
-    sigma = propagate_sigma(taus, parents, stances, geneutraliseerd)
+    # Admin-veto's: actieve maintainer-ondergravingen zonder actieve tegen-reactie.
+    kinderen = {}
+    for aid, pid in parents.items():
+        if pid is not None:
+            kinderen.setdefault(pid, []).append(aid)
+    vetos = {aid for aid in actieve_ondergravingen
+             if auteur.get(aid) in maintainers
+             and not any(k in actieve_ondergravingen for k in kinderen.get(aid, ()))}
+
+    sigma = propagate_sigma(taus, parents, stances, geneutraliseerd, vetos)
     argument_scores = {aid: {"tau": round(taus[aid], 4), "sigma": round(sigma[aid], 4)}
                        for aid in taus}
+    # Vlaggen voor de UI: het veto zelf + de genulde parent ('door admin ongedaan').
+    for aid in vetos:
+        argument_scores[aid]["admin_veto"] = True
+        pid = parents.get(aid)
+        if pid in argument_scores:
+            argument_scores[pid]["geveto"] = True
 
     # ROOT-argumenten groeperen per doel en per lijn (zekerheid / invloed / compositie)
     by_relation, by_rel_influence = {}, {}
@@ -723,8 +766,11 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
 
     # Afgeleide geloofwaardigheid per entiteit (prior = gem. zekerheid van haar relaties)
     entity_detail = {}
-    for (eid,) in conn.execute(
-            "SELECT id FROM entities WHERE NOT vervangen AND status = 'goedgekeurd'"):
+    persoon_ids = set()
+    for eid, etype in conn.execute(
+            "SELECT id, type FROM entities WHERE NOT vervangen AND status = 'goedgekeurd'"):
+        if etype == "persoon":
+            persoon_ids.add(eid)
         rel_cert = ent_cert_acc.get(eid)
         prior = (sum(rel_cert) / len(rel_cert)) if rel_cert else None
         entity_detail[eid] = instance_detail(by_entity.get(eid, []), prior_certainty=prior)
@@ -744,6 +790,15 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
             mech_instances.setdefault(mech_id, []).append({
                 "exemplarity": ex, "certainty": rel_detail[rel_id]["score"],
                 "influence": rel_infl_detail.get(rel_id, {}).get("score", 0.0)})
+
+    # Een persoon bestaat of bestaat niet — een zekerheids-/geloofwaardigheidsscore op een
+    # persoonsknoop is een categorie-fout (besluit juli 2026). De interne waarde voedt
+    # hierboven wél de rol-instantie-zekerheid (laag C meet functie-invulling, geen bestaan),
+    # maar de export laat personen weg zodat viz, /api/scores en score_diff er geen getal of
+    # onweersproken-plafond op tonen. Moderatie blijft het antwoord op nep/irrelevant:
+    # afwijzen of verwijderen, niet laag scoren.
+    for eid in persoon_ids:
+        entity_detail.pop(eid, None)
 
     roles = {role_id: theory_scores(by_role.get(role_id, []),
                                     role_instances.get(role_id, []), seed=f"rol{role_id}")

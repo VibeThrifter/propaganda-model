@@ -15,6 +15,9 @@ from pathlib import Path
 
 import scoring   # scoringsketen: afgeleide praktijk- en theoriescores
 import politiek  # politieke kleurmeter
+import tegenmacht  # machtsvalentie: tegenmacht als gerichte edge-valentie
+import doelgroep  # welstandsmeter: getargette marketing-/welstandsklasse per outlet
+import bereik as bereik_mod  # bereikmeter: publieksbereik (kijkers/lezers) per jaar
 
 ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "propaganda_model.db"
@@ -231,10 +234,41 @@ def export_data(conn):
         'organisaties': {o['id']: o for o in km['organisaties']},
     }
 
+    # Machtsvalentie (tegenmacht als GERICHTE edge-valentie): per actor de contra-
+    # hegemonische valentie per as + welke filter-concentraties ze verantwoordt, plus per
+    # relatie/mechanisme een netto `teken` (+1 opent / −1 sluit / 0). Preview net als de
+    # kleurmeter — nieuw werk staat voorgesteld. Voedt geen score; puur een overlay-laag.
+    mv = tegenmacht.compute_machtsvalentie(conn, include_voorgesteld=True)
+    machtsvalentie = {
+        'preview': mv['preview'],
+        'actoren': {a['id']: a for a in mv['actoren']},
+        'relaties': mv['relaties'],       # relation_id → netto valentie (praktijkmodel)
+        'mechanismen': mv['mechanismen'],  # mechanism_id → netto valentie (theoriemodel)
+    }
+
+    # Welstandsmeter (doelgroep.py): per outlet de getargette marketing-/welstandsklasse
+    # (hoog A ↔ laag D) uit gesourcete 'doelgroepklasse'-signalen. Id-gekoppelde map voor de
+    # viz (nodekleur + detailpaneel). Preview net als de kleurmeter — nieuw werk staat voorgesteld.
+    dg = doelgroep.compute_doelgroepmeter(conn, include_voorgesteld=True)
+    doelgroepmeter = {
+        'preview': dg['preview'],
+        'outlets': {o['id']: o for o in dg['outlets']},
+    }
+
     # Inkomstensamenstelling per outlet (de 'pie' in het detailpaneel): afgeleid uit de
     # financier-edges met gesourcete aandelen. Preview = ook nog-`voorgesteld` aandelen,
     # zodat nieuw werk meteen zichtbaar is (zoals de kleurmeter).
     inkomsten = scoring.compute_income_composition(conn, include_voorgesteld=True)
+
+    # Bereikmeter (bereik.py): gesourcet publieksbereik per entiteit per jaar. Id-gekoppelde
+    # map voor het detailpaneel + een plat per-node veld `bereik_reeks` (jaar → grootste
+    # publieksmaat) zodat de grootte-maat 'mediabereik' het zonder aparte lookup kan lezen
+    # en meebeweegt met de tijdlijn-slider. Preview net als de andere meters.
+    br = bereik_mod.compute_bereik(conn, include_voorgesteld=True)
+    bereikmeter = {
+        'preview': br['preview'],
+        'entiteiten': {o['id']: o for o in br['entiteiten']},
+    }
 
     # Argument counts per relation (voor edge labels)
     arg_counts = {}
@@ -257,6 +291,8 @@ def export_data(conn):
 
     for e in entities:
         e['degree'] = degree.get(e['id'], 0)
+        b = bereikmeter['entiteiten'].get(e['id'])
+        e['bereik_reeks'] = b['reeks'] if b else None
 
     for r in relations:
         ac = arg_counts.get(r['id'])
@@ -275,8 +311,15 @@ def export_data(conn):
         r['derived_influence'] = scores['relations_influence'].get(r['id'], r.get('influence') or 0.0)
         r['influence_detail'] = scores['relations_influence_detail'].get(r['id'])
     for e in entities:
-        e['derived_certainty'] = scores['entities'].get(e['id'], 0.0)
-        e['score_detail'] = scores['entities_detail'].get(e['id'])
+        if e['type'] == 'persoon':
+            # Een persoon bestaat of bestaat niet: geen zekerheidsscore (scoring.py
+            # exporteert personen niet). Expliciet None — de 0.0-default zou als
+            # "score 0%" renderen en dat is precies de misvatting die we weren.
+            e['derived_certainty'] = None
+            e['score_detail'] = None
+        else:
+            e['derived_certainty'] = scores['entities'].get(e['id'], 0.0)
+            e['score_detail'] = scores['entities_detail'].get(e['id'])
         # Afgeleide primaire rol = bron van waarheid voor kleur/categorie: het filter
         # met de grootste Σ(zekerheid×invloed) over de relaties van de entiteit. De
         # toegekende primary_role-categorie (uit de SQL hierboven) blijft als fallback
@@ -296,12 +339,17 @@ def export_data(conn):
         m.update(scores['mechanisms'].get(m['id'], {}))
     for eff in emergent_effects:
         eff.update(scores.get('emergent_effects', {}).get(eff['id'], {}))
-    # Per argument τ (basiskracht) en σ (eindkracht na replies, M1.1)
+    # Per argument τ (basiskracht) en σ (eindkracht na replies, M1.1) + admin-veto-
+    # vlaggen ('argument klopt niet' door een maintainer nult zijn parent volledig).
     for a in arguments:
         sc = scores.get('argument_scores', {}).get(a['id'])
         if sc:
             a['tau'] = sc['tau']
             a['sigma'] = sc['sigma']
+            if sc.get('admin_veto'):
+                a['admin_veto'] = True
+            if sc.get('geveto'):
+                a['geveto'] = True
 
     # ── Structurele invloed-centraliteit (topologie) ──
     # Twee varianten per node: de basisvelden (influence_*) komen uit de SCHONE dyadische graaf
@@ -341,5 +389,8 @@ def export_data(conn):
         'instantiations': instantiations,
         'release': laatste_release(),   # M3.1: releasetag in de topbar (of null)
         'kleurmeter': kleurmeter,       # politieke kleurmeter per entiteit (detailpaneel)
+        'machtsvalentie': machtsvalentie,  # tegenmacht als gerichte edge-valentie (overlay)
+        'doelgroep': doelgroepmeter,    # welstandsmeter: getargette klasse per outlet (overlay)
         'inkomsten': inkomsten,         # inkomstensamenstelling per outlet (donut, detailpaneel)
+        'bereik': bereikmeter,          # bereikmeter: publieksbereik per jaar (node-grootte + detailpaneel)
     }

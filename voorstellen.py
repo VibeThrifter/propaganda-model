@@ -150,9 +150,31 @@ def _valideer_elementvelden(conn, element_type, velden, fouten, prefix=""):
             fouten.append(f"{prefix}filter moet een van {MECHANISME_FILTERS} zijn")
         if not _tekst(velden, "effect"):
             fouten.append(f"{prefix}effect is verplicht")
-        if velden.get("aard") not in AARD_KEUZES:
+        aard = velden.get("aard")
+        if aard not in AARD_KEUZES:
             fouten.append(f"{prefix}aard moet 'direct' of 'veld_eigenschap' zijn "
                           "(beslisgids: CLAUDE.md)")
+        # Rol-eindpunten: een 'direct' edge vergt bron- én doelrol, anders tekent ze
+        # niet (de val waarin RfC #41 belandde). Een veld_eigenschap vergt minstens de
+        # doelrol (de knoop waarvan het een eigenschap is); de bron mag diffuus/NULL zijn.
+        for sleutel, verplicht in (("source_role_id", aard == "direct"),
+                                   ("target_role_id", aard in ("direct", "veld_eigenschap"))):
+            rid = velden.get(sleutel)
+            if rid in (None, "", 0, "0"):
+                if verplicht:
+                    fouten.append(f"{prefix}{sleutel} is verplicht voor aard '{aard}' "
+                                  "— een edge zonder rol-eindpunt tekent niet")
+                continue
+            try:
+                rid = int(rid)
+            except (ValueError, TypeError):
+                fouten.append(f"{prefix}{sleutel} moet een rol-id (geheel getal) zijn")
+                continue
+            rol = conn.execute("SELECT vervangen FROM roles WHERE id = ?", (rid,)).fetchone()
+            if rol is None:
+                fouten.append(f"{prefix}{sleutel}: rol {rid} bestaat niet")
+            elif rol["vervangen"]:
+                fouten.append(f"{prefix}{sleutel}: rol {rid} is vervangen; kies de opvolger")
     elif element_type == "rol":
         if velden.get("categorie") not in ROL_CATEGORIEEN:
             fouten.append(f"{prefix}categorie moet een van {ROL_CATEGORIEEN} zijn")

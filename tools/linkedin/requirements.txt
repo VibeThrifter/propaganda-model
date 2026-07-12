@@ -1,0 +1,11 @@
+# Geïsoleerde dependencies voor de LinkedIn-scrape-trap (trap 1, scrape_profile.py).
+# BEWUST losgekoppeld van de kern-app: server.py / scoring.py / de mapper draaien op
+# pure stdlib + Flask. Installeer dit alléén in een aparte venv als je zelf wilt scrapen:
+#
+#   python3 -m venv tools/linkedin/.venv && source tools/linkedin/.venv/bin/activate
+#   pip install -r tools/linkedin/requirements.txt
+#   playwright install chromium
+#
+# De mapper (trap 2, linkedin_naar_model.py) heeft NIETS hiervan nodig — alleen stdlib.
+linkedin-scraper>=3.0.0
+playwright>=1.40

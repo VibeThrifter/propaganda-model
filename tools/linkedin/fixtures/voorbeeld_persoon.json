@@ -1,0 +1,51 @@
+{
+  "type": "persoon",
+  "bron": {
+    "linkedin_url": "https://www.linkedin.com/in/voorbeeld-testpersoon/",
+    "gescraped_op": "2026-07-03"
+  },
+  "persoon": {
+    "naam": "Voorbeeld Testpersoon",
+    "kop": "Fictief profiel — alleen voor het testen van de mapper",
+    "locatie": "Amsterdam",
+    "over": "Deze knoop bestaat niet echt; dient om linkedin_naar_model.py te testen zonder browser."
+  },
+  "ervaringen": [
+    {
+      "organisatie": "NOS",
+      "functie": "Politiek verslaggever",
+      "van": "2012",
+      "tot": "2018",
+      "duur": "6 jaar",
+      "locatie": "Hilversum",
+      "beschrijving": "Fictieve ervaring bij een bestaande knoop (test 'entiteit bestaat al').",
+      "linkedin_url": null
+    },
+    {
+      "organisatie": "Fictief Adviesbureau Voorbeeld BV",
+      "functie": "Directeur Public Affairs",
+      "van": "2019-03",
+      "tot": null,
+      "duur": null,
+      "locatie": "Den Haag",
+      "beschrijving": "Fictieve ervaring bij een nieuwe knoop (test 'entiteit+' en relatietype bestuurder).",
+      "linkedin_url": null
+    }
+  ],
+  "opleidingen": [
+    {
+      "instelling": "Universiteit van Amsterdam",
+      "graad": "MSc Politicologie",
+      "van": "2007",
+      "tot": "2011",
+      "beschrijving": "Fictieve opleiding bij een bestaande onderwijsinstelling."
+    }
+  ],
+  "lidmaatschappen": [
+    {
+      "organisatie": "Fictieve Debatclub Voorbeeld",
+      "rol": null,
+      "herkomst": "accomplishment:organizations"
+    }
+  ]
+}

@@ -23,10 +23,14 @@ en de term; het SCP en de Nederlandse machtselite-sociologie maken het concreet 
 - `1.2_nederland-de-twee-elites.md` — de NL-toepassing met stemcijfers (WIL WP 2021/08).
 - `1.3_scp-klassen-en-vier-kapitalen.md` — wie de bovenlaag concreet is (SCP 2023).
 - `1.4_machtselite-en-diplomademocratie.md` — netwerk (Heemskerk/Fennema) + diplomademocratie.
+- `1.5_partijen-facties-en-de-establishment-as.md` — de partij→factie-kaart (D66 als dubbelpartij,
+  flanken búiten de facties) + de per-laag-lezing van de establishment-as.
 
 ## Belangrijkste les voor het model
 
 De twee facties bevechten elkaar publiekelijk (cultuuroorlog), maar zijn **beide elite**. Dat
 verklaart waarom "anti-elite-retoriek" (rechts-populisme tegen de Brahmin Left) géén
 anti-establishment is: het is intra-elite-strijd. De establishment-as moet meten wélke macht
-substantieel wordt gediend, niet welke toon wordt gevoerd.
+substantieel wordt gediend, niet welke toon wordt gevoerd. Intra-elite-onenigheid is daarbij
+géén weerlegging van het model maar de kernvoorspelling (bandbreedte = elite-meningsverschil) —
+uitgewerkt, mét de operationalisering "positie per laag", in `1.5`.

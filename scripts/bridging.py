@@ -11,10 +11,10 @@ onafhankelijk van gezindheid — alleen dát wordt het argumentgewicht. Een
 meerderheid van gelijkgestemden kan zo niets doordrukken.
 
 Twee bronnen vormen de 0/1-matrix (review-verdict v2 — de kale 👎 bestaat niet meer):
-  +1  'Logica klopt' = een nuttig-endorsement (argument_ratings.oordeel = 'nuttig');
+  +1  'Argument klopt' = een nuttig-endorsement (argument_ratings.oordeel = 'nuttig');
    0  een gehandhaafde ONDERGRAVING (een contradicting reply waarvan de resolutielus
-      NIET op 'opgelost' staat) is het beredeneerde oordeel "de logica van dit argument
-      deugt niet" — de bezwaarmaker beoordeelt daarmee het aangevochten argument (de
+      NIET op 'opgelost' staat) is het beredeneerde oordeel "dit argument klopt niet"
+      — de bezwaarmaker beoordeelt daarmee het aangevochten argument (de
       parent) als niet-nuttig. Zo houdt bridging het contrast dat het nodig heeft,
       maar is de 'downvote' onderbouwd i.p.v. goedkoop.
 
@@ -86,7 +86,7 @@ def main():
     if not DB_PATH.exists():
         sys.exit(f"FOUT: {DB_PATH} bestaat niet")
     conn = sqlite3.connect(DB_PATH)
-    # +1 = 'Logica klopt' (nuttig-endorsement); een legacy niet_nuttig telt als 0.
+    # +1 = 'Argument klopt' (nuttig-endorsement); een legacy niet_nuttig telt als 0.
     endorsements = [(u, i, 1.0 if o == "nuttig" else 0.0) for u, i, o in conn.execute("""
         SELECT ar.rater, ar.argument_id, ar.oordeel
         FROM argument_ratings ar

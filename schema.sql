@@ -228,6 +228,7 @@ CREATE TABLE relations (
         -- Organisatorisch
         'lidmaatschap',          -- lid van netwerk, partij, groep
         'personeel',             -- werkgever-werknemer
+        'dienstverband',         -- economische afhankelijkheid journalist<-org (Eigendom-filter; gerichte edge, geen affiliatie-brug)
         'bestuurder',            -- bestuurslid, commissaris, voorzitter
         'adviseur',              -- formeel of informeel advies
         'woordvoerder_van',      -- officiële voorlichter/woordvoerder
@@ -430,11 +431,28 @@ CREATE TABLE arguments (
                              -- Bron VERPLICHT (gated als 'influence'), telt NIET in de zekerheidsbalans
                              -- (ASPECT_PROPERTIES) — voedt de afgeleide inkomstensamenstelling
                              -- (scoring.compute_income_composition; residu = 100 − Σ institutionele edges).
-        'politieke_positie'  -- ideologisch positie-signaal over een entiteit (persoon/org); bron
+        'politieke_positie', -- ideologisch positie-signaal over een entiteit (persoon/org); bron
                              -- VERPLICHT (gated als 'influence'), telt NIET in de zekerheidsbalans
                              -- (ASPECT_PROPERTIES). property_value = '<as>:<signed -1..1>',
                              -- as ∈ {economisch, cultureel}, − = links/progressief, + = rechts/
                              -- conservatief. Voedt de afgeleide politieke kleurmeter (politiek.py).
+        'machtsvalentie',    -- tegenmacht als GERICHTE edge-valentie op een relatie/mechanisme (geen
+                             -- actor-categorie). GEEN bron nodig (interpretatie/structuur, aspect —
+                             -- telt NIET in de zekerheidsbalans). property_value = 'filter:<filter>'
+                             -- (verantwoording: tegen welke concentratie) of 'as:<economisch|cultureel|
+                             -- establishment>:<opent|sluit>' (contra-hegemonie: opent/sluit de consensus
+                             -- op die as, Hallin). Voedt de afgeleide machtsvalentie (tegenmacht.py).
+        'doelgroepklasse',   -- welke marketing-/welstandsklasse targt deze OUTLET-entiteit? bron
+                             -- VERPLICHT (gated als 'influence'/'politieke_positie'), telt NIET in de
+                             -- zekerheidsbalans (ASPECT_PROPERTIES). property_value = 'welstand:<klasse>'
+                             -- (klasse ∈ A/B1/B2/C/D, hoog→laag) of 'welstand:meting:<-1..1>' (NOM/NMO-
+                             -- bereikindex). Voedt de afgeleide welstandsmeter (doelgroep.py).
+        'bereik'             -- publieksbereik van een media-entiteit per jaar (kijkcijfers/oplage/
+                             -- maandbereik/invullers); bron VERPLICHT (gated als 'doelgroepklasse'),
+                             -- telt NIET in de zekerheidsbalans (ASPECT_PROPERTIES). property_value =
+                             -- '<maat>:<aantal>:<jaar>', maat ∈ bereik.MATEN (kijkers/luisteraars/
+                             -- oplage/bereik_totaal/online/invullers/volgers). Voedt de bereikmeter
+                             -- (bereik.py) en de tijdlijn-gekoppelde node-grootte in de viz.
     )),
     property_value TEXT,     -- voorgestelde waarde (bijv. '2019' voor active_from)
     stance TEXT NOT NULL CHECK(stance IN (
@@ -463,14 +481,17 @@ CREATE TABLE arguments (
     self_merged BOOLEAN NOT NULL DEFAULT FALSE,
     -- M2.2: wie het voorstel mergede (voorgesteld → ongecontroleerd/bronvermelding_nodig).
     merged_by TEXT REFERENCES users(username),
-    -- M1.8: machineleesbare classificatie van een ONDERGRAVING — een contradicting-reply
-    -- die de redenering van zijn parent aanvalt ("de gevolgtrekking deugt niet"), géén
+    -- M1.8: classificatie van een ONDERGRAVING — een contradicting-reply die de
+    -- redenering van zijn parent aanvalt ("de gevolgtrekking deugt niet"), géén
     -- tegenbewijs voor het doel. NULL voor gewone argumenten en weerleggingen.
-    objection_type TEXT CHECK(objection_type IN (
-        'cirkelredenering', 'stroman', 'non_sequitur', 'correlatie_als_causatie',
-        'vals_dilemma', 'ad_hominem', 'autoriteit_buiten_domein', 'anekdote_als_regel',
-        'cherry_picking', 'equivocatie', 'citaat_dekking', 'overig'
-    )),
+    -- Sinds juli 2026 een VRIJ tekstveld (CHECK vervallen, zie
+    -- migrate_objection_type_vrijtekst.py): elke sluitende categorielijst bleek te
+    -- kort en een volledige eindeloos — de indiener benoemt de categorie zelf. De
+    -- oude drogreden-taxonomie (cirkelredenering, stroman, non_sequitur,
+    -- correlatie_als_causatie, vals_dilemma, ad_hominem, autoriteit_buiten_domein,
+    -- anekdote_als_regel, cherry_picking, equivocatie, citaat_dekking, overig)
+    -- blijft het aanbevolen vocabulaire voor agents (missies/monitor_brief.md).
+    objection_type TEXT,
     -- Resolutielus van een ONDERGRAVING (contradicting reply): "logica klopt niet" met
     -- verplichte reden → auteur verbetert ('herzien') → bezwaarmaker herbeoordeelt
     -- ('opgelost'/'blijft'). Een 'opgelost' bezwaar dempt de σ van zijn parent NIET meer

@@ -455,7 +455,10 @@ facties. Waar de SCP-data dit dragen en het verklaringskracht heeft:
   delen van de VK/De Groene/OneWorld**.
 - **Pro/anti-establishment** snijdt hier dwars doorheen en is grotendeels *retoriek*: rechts-populisme
   (Telegraaf/WNL) is retorisch anti-establishment maar dient substantieel de merchant-right (intra-
-  elite, geen systeemoppositie — zie `00_`-§kernspanning). *Op-hold-tenzij-bruikbaar:* fijnere
+  elite, geen systeemoppositie — zie `00_`-§kernspanning). De operationalisering — establishment-
+  positie **per laag** van het dieptemodel (laag-1-oppositie ≠ laag-3-uitdaging), plus de
+  partij→factie-kaart (D66 als dubbelpartij, flanken búiten de facties) — staat in
+  `01_nationale-elite-facties/1.5`. *Op-hold-tenzij-bruikbaar:* fijnere
   vertakkingen niet verder uitwerken tot een case ze nodig heeft (conform de eigenaar: "niet meenemen
   als we er niets mee kunnen").
 

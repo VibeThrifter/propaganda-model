@@ -136,9 +136,13 @@ def main():
         eis(r.status_code == 201, f"POST /api/relations ({r.status_code}: {r.get_json()})")
         rel_id = r.get_json()["id"]
 
+        # De relatie materialiseert haar mechanisme-instantiatie zelf al (create_relation),
+        # dus een expliciete POST van hetzelfde paar is nu idempotent: 200 + hergebruikt.
         r = client.post("/api/instantiations", headers=kop, json={
             "mechanism_id": mech_id, "relation_id": rel_id, "exemplarity": 0.9})
-        eis(r.status_code == 201, f"POST /api/instantiations mech↔relatie ({r.status_code})")
+        eis(r.status_code in (200, 201), f"POST /api/instantiations mech↔relatie ({r.status_code})")
+        eis(r.get_json().get("hergebruikt") is True or r.status_code == 201,
+            "instantiatie mech↔relatie bestaat al (auto-gematerialiseerd) of nieuw aangemaakt")
         r = client.post("/api/instantiations", headers=kop, json={
             "role_id": rol_id, "entity_id": ent_a})
         eis(r.status_code == 201, f"POST /api/instantiations rol↔entiteit ({r.status_code})")
@@ -152,17 +156,27 @@ def main():
         eis(r.status_code == 400,
             f"POST /api/arguments zonder citatie botst op de bronplicht ({r.status_code})")
 
+        # Admin hoeft geen review (juli 2026): een maintainer-argument merget meteen.
         bron_id = sqlite3.connect(db).execute("SELECT MIN(id) FROM sources").fetchone()[0]
         r = client.post("/api/arguments", headers=kop, json={
             "relation_id": rel_id, "stance": "supporting",
-            "claim": "Testclaim voor de verse build.",
+            "claim": "Admin-testclaim voor de verse build.",
             "citations": [{"source_id": bron_id, "quote": "Testcitaat."}]})
+        a = r.get_json()
+        eis(r.status_code == 201 and a["status"] == "ongecontroleerd" and a["self_merged"],
+            f"maintainer-argument merget meteen (auto-merge, self_merged) ({a.get('status')})")
+
+        # Niet-maintainers volgen de gewone voorstel-workflow (M2.2).
+        r = client.post("/api/arguments", headers=kop_r1, json={
+            "relation_id": rel_id, "stance": "supporting",
+            "claim": "Onafhankelijke tweede bevestiging uit het handelsregister.",
+            "citations": [{"source_id": bron_id, "quote": "Testcitaat 2."}]})
         a = r.get_json()
         eis(r.status_code == 201 and a["status"] == "voorgesteld",
             f"POST /api/arguments (mét citatie) landt als voorstel (M2.2) ({a.get('status')})")
         arg_id = a["id"]
 
-        r = client.post(f"/api/arguments/{arg_id}/merge", headers=kop_r1)
+        r = client.post(f"/api/arguments/{arg_id}/merge", headers=kop_r2)
         eis(r.status_code == 200 and r.get_json()["status"] == "ongecontroleerd",
             f"merge van een gesourcete root → ongecontroleerd ({r.get_json().get('status')})")
 
@@ -192,8 +206,8 @@ def main():
         eis(r.status_code == 200, f"GET /api/scores ({r.status_code})")
         r = client.get("/api/health")
         eis(r.status_code == 200, f"GET /api/health ({r.status_code})")
-        r = client.get("/api/review_queue")
-        eis(r.status_code == 200, f"GET /api/review_queue ({r.status_code})")
+        r = client.get("/api/review_queue", headers=kop_r1)
+        eis(r.status_code == 200, f"GET /api/review_queue (reviewer) ({r.status_code})")
         r = client.get("/")
         eis(r.status_code == 200 and b'id="appScript"' in r.data and b'"%%DATA%%"' in r.data,
             f"GET / serveert de dunne pagina (template + boot-loader, W5.1) ({r.status_code})")

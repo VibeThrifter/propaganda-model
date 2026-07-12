@@ -17,6 +17,9 @@ from flask import Flask, g, jsonify, request, send_file, session
 import auth  # wachtwoord-/token-hashing (M0.6)
 import scoring  # scoringsketen: afgeleide praktijk- en theoriescores
 import politiek  # politieke kleurmeter: ideologische positie uit gesourcete signalen
+import tegenmacht  # machtsvalentie: tegenmacht als gerichte edge-valentie (geen categorie)
+import doelgroep  # welstandsmeter: getargette marketing-/welstandsklasse per outlet
+import bereik  # bereikmeter: gesourcet publieksbereik (kijkers/lezers/invullers) per jaar
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
@@ -76,9 +79,15 @@ ROLE_ORDER = {"bijdrager": 1, "reviewer": 2, "maintainer": 3}
 RATE_LIMITS = {"bijdrager": 30, "reviewer": 60, "maintainer": 120}
 RATE_WINDOW = 60.0
 _rate_emmers = {}
+# Vrijgesteld van de rate limit: de maintainer-rol (admin — bewuste mensbesluiten) en het
+# vaste bijdrage-account 'assistent'. Overige bijdragers/agents houden hun trap-limiet als
+# flood-rem tegen een doorgeslagen agent-lus.
+RATE_LIMIT_VRIJGESTELD = {"assistent"}
 
 
 def _rate_limit_ok(user) -> bool:
+    if user["role"] == "maintainer" or user.get("username") in RATE_LIMIT_VRIJGESTELD:
+        return True
     nu = time.monotonic()
     emmer = _rate_emmers.setdefault(user["id"], [])
     emmer[:] = [t for t in emmer if nu - t < RATE_WINDOW]
@@ -621,7 +630,7 @@ def get_arguments():
         )
         SELECT a.*, c.id as citation_id, c.quote, c.page, c.section, c.context as cite_context,
                s.title as source_title, s.author as source_author, s.reliability, s.onderwerp,
-               u.kind as auteur_kind
+               u.kind as auteur_kind, u.role as auteur_rol
         FROM arguments a
         JOIN boom ON a.id = boom.id
         LEFT JOIN citations c ON c.argument_id = a.id
@@ -656,6 +665,7 @@ def get_arguments():
                 "bezwaar_resolutie": row["bezwaar_resolutie"],
                 "contributed_by": row["contributed_by"],
                 "auteur_is_agent": (row["auteur_kind"] == "agent"),
+                "auteur_is_admin": (row["auteur_rol"] == "maintainer"),
                 "created_at": row["created_at"],
                 "vervangen": row["vervangen"],
                 "reviseert_id": row["reviseert_id"],
@@ -911,6 +921,60 @@ def create_argument():
                                      "'<percentage 0-100>:<jaar>' (jaar optioneel), bijv. "
                                      "'56:2024'. De magnitude komt uit de bron, niet vrij "
                                      "gekozen."}), 400
+    # Machtsvalentie (tegenmacht als gerichte edge-valentie): hoort bij een RELATIE of
+    # MECHANISME (een edge). property_value: 'filter:<filter>' (verantwoording — tegen
+    # welke concentratie) of 'as:<as>:<opent|sluit>' (contra-hegemonie — opent/sluit de
+    # consensus op die as, Hallin). Aspect: telt niet in de zekerheidsbalans en vereist
+    # geen bron (interpretatie/structuur, geen extern bewijs — zoals 'filter'/'mechanism').
+    if prop == "machtsvalentie":
+        if not (relation_id or mechanism_id):
+            return jsonify({"error": "property 'machtsvalentie' hoort bij een relatie of "
+                                     "mechanisme (relation_id of mechanism_id) — het is de "
+                                     "valentie van een edge, geen actor-kleur"}), 400
+        if tegenmacht.parse_machtsvalentie(prop_value) is None:
+            return jsonify({"error": "property_value voor 'machtsvalentie' is "
+                                     "'filter:<eigendom|advertentie|sourcing|flak|ideologie>' "
+                                     "(verantwoording) of 'as:<economisch|cultureel|"
+                                     "establishment>:<opent|sluit>' (contra-hegemonie)"}), 400
+    # Doelgroepklasse (welstandsmeter): welke marketing-/welstandsklasse targt een OUTLET.
+    # Hoort bij een ENTITEIT (entity_id). Een signaal codeert een KLASSE (A/B1/B2/C/D) op de
+    # as `welstand`, of een externe bereikmeting ('welstand:meting:<-1..1>'); de magnitude/
+    # positie wordt AFGELEID (doelgroep.py), niet zelf gekozen. Bron verplicht (zie evidentieel).
+    if prop == "doelgroepklasse":
+        if not entity_id:
+            return jsonify({"error": "property 'doelgroepklasse' hoort bij een entiteit "
+                                     "(entity_id) — welke klasse targt deze outlet?"}), 400
+        as_, _, rest = str(prop_value or "").partition(":")
+        ok = False
+        if as_ == doelgroep.AS:
+            if rest in doelgroep.KLASSEN:
+                ok = True
+            elif rest.startswith("meting:"):
+                try:
+                    mv = float(rest.split(":", 1)[1]); ok = -1.0 <= mv <= 1.0
+                except ValueError:
+                    ok = False
+        if not ok:
+            return jsonify({"error": "property_value voor 'doelgroepklasse' is "
+                                     "'welstand:<klasse>' met klasse ∈ {A, B1, B2, C, D} "
+                                     "(hoog→laag), of 'welstand:meting:<-1..1>' (NOM/NMO-"
+                                     "bereikindex). De magnitude wordt afgeleid, niet zelf gezet."}), 400
+    # Publieksbereik-signaal (bereikmeter): hoort bij een ENTITEIT. Eén signaal = één
+    # cijfer uit één bron: '<maat>:<aantal>:<jaar>' (bv. 'kijkers:650000:2024'). Het jaar
+    # is verplicht — de tijdreeks voedt de tijdlijn-gekoppelde node-grootte in de viz.
+    # Bron verplicht (zie evidentieel); telt in niets mee (ASPECT_PROPERTIES).
+    if prop == "bereik":
+        if not entity_id:
+            return jsonify({"error": "property 'bereik' hoort bij een entiteit "
+                                     "(entity_id) — welk publiek bereikt dit medium?"}), 400
+        try:
+            bereik._parse(prop_value)
+        except (ValueError, AttributeError) as e:
+            return jsonify({"error": "property_value voor 'bereik' is "
+                                     "'<maat>:<aantal>:<jaar>' met maat ∈ {"
+                                     + ", ".join(bereik.MATEN) + "}, aantal een positief "
+                                     "geheel getal en jaar 4 cijfers (het jaar waarop het "
+                                     f"cijfer slaat). Probleem: {e}"}), 400
     if prop and parent_id is not None:
         return jsonify({"error": "Een reactie draagt geen property: aspect-argumenten "
                                  "richten zich als root-argument op het doel zelf"}), 400
@@ -990,18 +1054,19 @@ def create_argument():
     #   Vrijgesteld (interpretatie/structuur, geen extern bewijs): classificatie-aspecten
     #   (property='filter'/'mechanism'), compositie- en padclaims ('compositie'/'indirecte_invloed_op'),
     #   contextual-roots, en replies/ondergravingen ('logica klopt niet' — parent_id gezet).
-    evidentieel = prop in (None, "influence", "politieke_positie", "inkomensaandeel")
-    if parent_id is None and stance in ("supporting", "contradicting") and evidentieel:
-        heeft_echte_bron = any(
-            bool((c.get("quote") or "").strip()) or conn.execute(
-                "SELECT 1 FROM source_locations WHERE source_id = ?", (c["source_id"],)).fetchone()
-            for c in citaties)
-        if not heeft_echte_bron:
-            conn.close()
-            return jsonify({"error": "Bron verplicht: een ondersteunend of weerleggend "
-                                     "root-argument vereist minstens één echte bron — een citaat "
-                                     "met quote, óf een bron met vindplaats (locator). Geef die mee "
-                                     "in 'citations' (source_id + quote, of een bron met url/doi/…)."}), 400
+    evidentieel = prop in (None, "influence", "politieke_positie", "inkomensaandeel",
+                           "doelgroepklasse", "bereik")
+    heeft_echte_bron = any(
+        bool((c.get("quote") or "").strip()) or conn.execute(
+            "SELECT 1 FROM source_locations WHERE source_id = ?", (c["source_id"],)).fetchone()
+        for c in citaties)
+    if (parent_id is None and stance in ("supporting", "contradicting") and evidentieel
+            and not heeft_echte_bron):
+        conn.close()
+        return jsonify({"error": "Bron verplicht: een ondersteunend of weerleggend "
+                                 "root-argument vereist minstens één echte bron — een citaat "
+                                 "met quote, óf een bron met vindplaats (locator). Geef die mee "
+                                 "in 'citations' (source_id + quote, of een bron met url/doi/…)."}), 400
 
     # Classificatie-aspect 'mechanism': de voorgestelde mechanisme-ID moet bestaan.
     if prop == "mechanism" and not conn.execute(
@@ -1063,6 +1128,25 @@ def create_argument():
               json.dumps({"claim": claim, "stance": stance, "status": status,
                           "citaties": len(citaties)}),
               f"Nieuw argument: {stance}"))
+
+        # Admin hoeft geen review (juli 2026): een argument van een maintainer merget
+        # meteen — dezelfde citatiepoort als merge_argument (M0.3, zachte variant),
+        # gemarkeerd als self-merge (n=1, herauditeerbaar via edit_log). Een admin-
+        # ondergraving ('argument klopt niet') wordt zo direct actief en nult zijn
+        # parent volledig (admin-veto, scoring.py) tot ze is opgelost of weerlegd.
+        if g.user["role"] == "maintainer":
+            status = ("bronvermelding_nodig"
+                      if parent_id is None and stance in ("supporting", "contradicting")
+                      and not heeft_echte_bron else "ongecontroleerd")
+            conn.execute("UPDATE arguments SET status = ?, merged_by = ?, self_merged = 1 "
+                         "WHERE id = ?", (status, contributed_by, arg_id))
+            conn.execute("""
+                INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+                VALUES ('arguments', ?, 'merged', ?, ?, ?, ?)
+            """, (arg_id, contributed_by,
+                  json.dumps({"status": "voorgesteld"}),
+                  json.dumps({"status": status}),
+                  "auto-merge: maintainer (admin hoeft geen review)"))
 
         conn.commit()
         result = dict(conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone())
@@ -1230,6 +1314,41 @@ def revise_argument(arg_id):
         VALUES ('arguments', ?, 'created', ?, ?, ?)
     """, (nieuw_id, g.user["username"], json.dumps({"reviseert": arg_id, "status": "voorgesteld"}),
           f"revisie van argument #{arg_id}"))
+
+    # Admin hoeft geen review (juli 2026): een maintainer-revisie merget meteen en
+    # supersedet het origineel — maar alleen binnen de agent-scope (eigen werk,
+    # agent-werk of auteurloos seed-werk). Andermans MENSWERK vervang je niet
+    # eigenmachtig: die revisie blijft een gewoon voorstel voor een tweede paar ogen.
+    if g.user["role"] == "maintainer" and (
+            oud["contributed_by"] is None
+            or oud["contributed_by"] == g.user["username"]
+            or _is_agent(conn, oud["contributed_by"])):
+        n_echt = conn.execute("""
+            SELECT COUNT(*) FROM citations c WHERE c.argument_id = ? AND (
+                (c.quote IS NOT NULL AND TRIM(c.quote) <> '')
+                OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id))
+            """, (nieuw_id,)).fetchone()[0]
+        nieuwe_status = ("bronvermelding_nodig"
+                         if oud["parent_argument_id"] is None
+                         and stance in ("supporting", "contradicting") and not n_echt
+                         else "ongecontroleerd")
+        conn.execute("UPDATE arguments SET status = ?, merged_by = ?, self_merged = 1 "
+                     "WHERE id = ?", (nieuwe_status, g.user["username"], nieuw_id))
+        conn.execute("UPDATE arguments SET status = 'verouderd', vervangen = 1 WHERE id = ?",
+                     (arg_id,))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('arguments', ?, 'merged', ?, ?, ?, ?)
+        """, (nieuw_id, g.user["username"],
+              json.dumps({"status": "voorgesteld"}), json.dumps({"status": nieuwe_status}),
+              "auto-merge: maintainer (admin hoeft geen review)"))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
+        """, (arg_id, g.user["username"], json.dumps({"vervangen": False}),
+              json.dumps({"vervangen": True, "status": "verouderd"}),
+              f"vervangen door revisie #{nieuw_id} (auto-merge maintainer)"))
+
     conn.commit()
     result = dict(conn.execute("SELECT * FROM arguments WHERE id = ?", (nieuw_id,)).fetchone())
     conn.close()
@@ -1954,6 +2073,14 @@ def create_entity():
         """, (name, etype, primary_role_id, description, active_from, active_until, status))
         eid = cur.lastrowid
 
+        # Klasse↔instantie-link meteen materialiseren als er een rol-suggestie is (spiegelt
+        # create_relation): zonder deze rij telt de entiteit na goedkeuring niet mee in de
+        # rolscore (laag C) en trekt ze KOPPEL-ENT-INST. Idempotent (INSERT OR IGNORE op de
+        # unieke index). De afgeleide primaire rol (viz-kleur) blijft los hiervan berekend.
+        if primary_role_id is not None:
+            conn.execute("INSERT OR IGNORE INTO instantiations (role_id, entity_id) "
+                         "VALUES (?, ?)", (primary_role_id, eid))
+
         conn.execute("""
             INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
             VALUES ('entities', ?, 'created', ?, ?, ?)
@@ -2048,6 +2175,15 @@ def create_relation():
         """, (source_id, target_id, rtype, mechanism_id, description,
               certainty, influence, bidirectional, active_from, active_until, status))
         rid = cur.lastrowid
+
+        # Klasse↔instantie-link meteen materialiseren als er een mechanisme is (zelfde
+        # regel als de RfC-adoptie in voorstellen.py en de maintainer-patch): zonder deze
+        # rij telt de relatie na goedkeuring niet mee in de theoriescore van het mechanisme
+        # (laag C) en trekt ze KOPPEL-REL-INST. Idempotent (INSERT OR IGNORE op de unieke
+        # index). Een kandidaat (mechanism_id NULL) krijgt er geen — die incubeert.
+        if mechanism_id is not None:
+            conn.execute("INSERT OR IGNORE INTO instantiations (mechanism_id, relation_id) "
+                         "VALUES (?, ?)", (mechanism_id, rid))
 
         conn.execute("""
             INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
@@ -2170,6 +2306,25 @@ def _modereer(tabel, rid):
                 "vindplaats). Een edge zonder bewijs is een lege bewering: wijs af, of "
                 "laat de indiener eerst een onderbouwend argument met bron toevoegen."}), 400
     conn.execute(f"UPDATE {tabel} SET status = ? WHERE id = ?", (nieuw, rid))
+    # Klasse↔instantie-link bij goedkeuring: het choke-point waar een element telt-mee-waardig
+    # wordt. Backstop naast create_relation/RfC-adoptie — vangt ook elementen die vóór die
+    # fixes 'voorgesteld' zijn aangemaakt zonder instantie-rij. Zonder deze rij telt het
+    # goedgekeurde element niet mee in de theoriescore (laag C) en trekt het KOPPEL-REL-INST /
+    # (als waarschuwing) KOPPEL-ENT-INST. Idempotent (INSERT OR IGNORE op de unieke index);
+    # een kandidaat-relatie zonder mechanisme is hier al geweigerd (orphan-poort hierboven).
+    if nieuw == "goedgekeurd":
+        if tabel == "relations":
+            mech = conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
+                                (rid,)).fetchone()["mechanism_id"]
+            if mech is not None:
+                conn.execute("INSERT OR IGNORE INTO instantiations (mechanism_id, relation_id) "
+                             "VALUES (?, ?)", (mech, rid))
+        elif tabel == "entities":
+            prol = conn.execute("SELECT primary_role_id FROM entities WHERE id = ?",
+                                (rid,)).fetchone()["primary_role_id"]
+            if prol is not None:
+                conn.execute("INSERT OR IGNORE INTO instantiations (role_id, entity_id) "
+                             "VALUES (?, ?)", (prol, rid))
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
         VALUES (?, ?, 'updated', ?, ?, ?, ?)
@@ -2854,6 +3009,33 @@ def _maintainer_patch(element_type):
                                      "relatie eerst terug naar 'voorgesteld'."}), 400
         if nieuw_mid != rij["mechanism_id"]:
             diff["mechanism_id"] = {"oud": rij["mechanism_id"], "nieuw": nieuw_mid}
+    # Mechanisme: een maintainer mag de rol-eindpunten (her)zetten. Zonder dit pad is
+    # er géén manier om source_role_id/target_role_id te corrigeren — terwijl een
+    # 'direct' edge zonder eindpunten niet tekent (precies de val waarin een RfC zonder
+    # eindpunten belandt). NULL/0/"" = losmaken (alleen zinvol voor de diffuse bron van
+    # een veld_eigenschap).
+    if element_type == "mechanisme":
+        for kol in ("source_role_id", "target_role_id"):
+            if kol not in d:
+                continue
+            raw = d[kol]
+            if raw in (None, "", 0, "0"):
+                nieuw_rid = None
+            else:
+                try:
+                    nieuw_rid = int(raw)
+                except (ValueError, TypeError):
+                    conn.close()
+                    return jsonify({"error": f"{kol} moet een rol-id (geheel getal) of null zijn"}), 400
+                rol = conn.execute("SELECT vervangen FROM roles WHERE id = ?", (nieuw_rid,)).fetchone()
+                if rol is None:
+                    conn.close()
+                    return jsonify({"error": f"rol {nieuw_rid} bestaat niet"}), 400
+                if rol["vervangen"]:
+                    conn.close()
+                    return jsonify({"error": f"rol {nieuw_rid} is vervangen; kies de opvolger"}), 400
+            if nieuw_rid != rij[kol]:
+                diff[kol] = {"oud": rij[kol], "nieuw": nieuw_rid}
     # Temporele velden (active_from/active_until) mag een maintainer (her)zetten op
     # elementen die ze dragen (entiteit/relatie/rol/mechanisme). Zonder dit pad is er
     # géén manier om een bestaande band te dateren — terwijl de timeline-/tijdbewuste
@@ -2870,6 +3052,7 @@ def _maintainer_patch(element_type):
         conn.close()
         velden_hint = toegestaan + (["primary_role_id"] if element_type == "entiteit" else []) \
             + (["mechanism_id"] if element_type == "relatie" else []) \
+            + (["source_role_id", "target_role_id"] if element_type == "mechanisme" else []) \
             + (["active_from", "active_until"] if element_type in ("entiteit", "relatie", "rol", "mechanisme") else [])
         return jsonify({"error": f"geen gewijzigd veld (toegestaan: {velden_hint})"}), 400
     if "name" in diff and voorstellen._naam_bestaat(conn, element_type, diff["name"]["nieuw"]):
@@ -2889,6 +3072,16 @@ def _maintainer_patch(element_type):
             if diff["mechanism_id"]["nieuw"]:
                 conn.execute("INSERT OR IGNORE INTO instantiations (mechanism_id, relation_id) "
                              "VALUES (?, ?)", (diff["mechanism_id"]["nieuw"], eid))
+        # Idem voor de rol↔entiteit-link als de primaire rol wijzigt: verplaats de
+        # instantiatie mee (create_entity/goedkeuring materialiseren haar, dus een
+        # rolcorrectie moet de oude rij opruimen en de nieuwe zetten).
+        if "primary_role_id" in diff:
+            if diff["primary_role_id"]["oud"]:
+                conn.execute("DELETE FROM instantiations WHERE entity_id = ? AND role_id = ?",
+                             (eid, diff["primary_role_id"]["oud"]))
+            if diff["primary_role_id"]["nieuw"]:
+                conn.execute("INSERT OR IGNORE INTO instantiations (role_id, entity_id) "
+                             "VALUES (?, ?)", (diff["primary_role_id"]["nieuw"], eid))
         conn.execute("""
             INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
             VALUES (?, ?, 'updated', ?, ?, ?, ?)
@@ -3068,6 +3261,24 @@ def create_instantiation():
         if not conn.execute(f"SELECT 1 FROM {table} WHERE id = ?", (ident,)).fetchone():
             conn.close()
             return jsonify({"error": f"{label} bestaat niet"}), 400
+
+    # Idempotent (net als create_source / add_source_location): sinds create_relation en
+    # het goedkeur-pad de klasse↔instantie-link zelf materialiseren, is een expliciete POST
+    # van hetzelfde paar een normaal "bestaat al"-geval, geen fout. Geef de bestaande rij
+    # terug i.p.v. 400 op de UNIQUE-index.
+    if role_id:
+        bestaand = conn.execute(
+            "SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity, notes "
+            "FROM instantiations WHERE role_id = ? AND entity_id = ?",
+            (role_id, entity_id)).fetchone()
+    else:
+        bestaand = conn.execute(
+            "SELECT id, role_id, mechanism_id, entity_id, relation_id, exemplarity, notes "
+            "FROM instantiations WHERE mechanism_id = ? AND relation_id = ?",
+            (mechanism_id, relation_id)).fetchone()
+    if bestaand:
+        conn.close()
+        return jsonify({**dict(bestaand), "hergebruikt": True}), 200
 
     try:
         cur = conn.execute("""
@@ -3286,8 +3497,11 @@ def herzien_voorstel(vid):
 
 
 @app.route("/api/voorstellen")
+@require_user("reviewer")
 def list_voorstellen():
-    """Openstaande (of alle, ?status=alle) voorstellen met reviewstand."""
+    """Openstaande (of alle, ?status=alle) voorstellen met reviewstand.
+
+    Reviewer+ only (zie review_queue): de voorstellenlijst is moderatie-werkruimte."""
     status = request.args.get("status", "open")
     conn = get_db()
     if status == "alle":
@@ -3301,14 +3515,22 @@ def list_voorstellen():
 
 
 @app.route("/api/voorstellen/<int:vid>")
+@require_user()
 def get_voorstel(vid):
     """Voorsteldetail, incl. de hertriage-checklist bij splitsen/samenvoegen
-    (per aanhangend argument/relatie/instantiatie/padclaim: toegewezen of niet)."""
+    (per aanhangend argument/relatie/instantiatie/padclaim: toegewezen of niet).
+
+    Zichtbaar voor reviewer+ (moderatie) óf de indiener zelf (die z'n eigen RfC vanuit
+    de werkbank bekijkt/herziet). Een andere bijdrager mag andermans voorstel niet zien."""
     conn = get_db()
     rij = conn.execute("SELECT * FROM voorstellen WHERE id = ?", (vid,)).fetchone()
     if not rij:
         conn.close()
         return jsonify({"error": "Voorstel niet gevonden"}), 404
+    if (ROLE_ORDER.get(g.user["role"], 0) < ROLE_ORDER["reviewer"]
+            and rij["ingediend_door"] != g.user["username"]):
+        conn.close()
+        return jsonify({"error": "Alleen de indiener of een reviewer+ mag dit voorstel zien"}), 403
     uit = _voorstel_dict(conn, rij)  # bevat al reviews (met motivatie)
 
     payload = uit["payload"]
@@ -3559,9 +3781,14 @@ def _verrijk_review_argumenten(conn, rows):
 
 
 @app.route("/api/review_queue")
+@require_user("reviewer")
 def review_queue():
     """Review-wachtrij (M2.2): voorgestelde argumenten + open voorstellen, plus de
-    herkeuring-lijst (betwiste, al gemergede argumenten — Fase B)."""
+    herkeuring-lijst (betwiste, al gemergede argumenten — Fase B).
+
+    Reviewer+ only: de wachtrij is moderatie-werkruimte. Voorstellen tellen in niets tot
+    een reviewer ze beoordeelt; niet-ingelogden en bijdragers hebben er niets te zoeken
+    (hun eigen ingediende werk zien ze in de werkbank, niet hier)."""
     conn = get_db()
     SELECT_ARG = """
         SELECT a.id, a.stance, a.claim, a.reasoning, a.property, a.property_value,
@@ -4559,6 +4786,45 @@ def get_kleurmeter():
     preview = request.args.get("preview") in ("1", "true", "ja")
     conn = get_db()
     res = politiek.compute_kleurmeter(conn, include_voorgesteld=preview)
+    conn.close()
+    return jsonify(res)
+
+
+@app.route("/api/machtsvalentie")
+def get_machtsvalentie():
+    """Afgeleide machtsvalentie (tegenmacht.py): tegenmacht als GERICHTE edge-valentie.
+    Per actor de contra-hegemonische valentie per as (opent/sluit de consensus, Hallin)
+    én welke filter-machtsconcentraties ze verantwoordt, uit 'machtsvalentie'-aspect-
+    argumenten op edges. ?preview=1 telt nog-`voorgesteld` annotaties voorlopig mee."""
+    preview = request.args.get("preview") in ("1", "true", "ja")
+    conn = get_db()
+    res = tegenmacht.compute_machtsvalentie(conn, include_voorgesteld=preview)
+    conn.close()
+    return jsonify(res)
+
+
+@app.route("/api/doelgroep")
+def get_doelgroep():
+    """Afgeleide welstandsmeter (doelgroep.py): per nieuwsoutlet de getargette marketing-/
+    welstandsklasse (hoog A/AB1 ↔ laag C/D) uit GESOURCETE 'doelgroepklasse'-signalen
+    (mediakits, NOM/NMO-bereikdata). Operationele brug van koopkrachtselectie. ?preview=1
+    telt nog-`voorgesteld` signalen voorlopig mee; standaard alleen gemergde signalen."""
+    preview = request.args.get("preview") in ("1", "true", "ja")
+    conn = get_db()
+    res = doelgroep.compute_doelgroepmeter(conn, include_voorgesteld=preview)
+    conn.close()
+    return jsonify(res)
+
+
+@app.route("/api/bereik")
+def get_bereik():
+    """Afgeleide bereikmeter (bereik.py): per media-entiteit het gesourcete publieksbereik
+    per jaar (kijkcijfers/oplage/maandbereik/invullers) uit 'bereik'-signalen. Voedt de
+    tijdlijn-gekoppelde node-grootte in de viz. ?preview=1 telt nog-`voorgesteld` signalen
+    voorlopig mee; standaard alleen gemergde signalen."""
+    preview = request.args.get("preview") in ("1", "true", "ja")
+    conn = get_db()
+    res = bereik.compute_bereik(conn, include_voorgesteld=preview)
     conn.close()
     return jsonify(res)
 
