@@ -746,7 +746,6 @@ footer.hs-voet .hs-voet-merk { display: none; }
   <a class="admin-btn" href="/overzicht" style="text-decoration:none" title="Bladeren: alle entiteiten en mechanismen, elk met een eigen deelbare pagina">Overzicht</a>
   <a class="admin-btn" href="/methode" style="text-decoration:none" title="Methodologie &amp; verantwoording: de vijf filters, de scoring-discipline en de neutraliteitsverklaring">Methode</a>
   <button type="button" id="discussieBtn" class="admin-btn" title="Open de overlegpagina — alle threads én open voorstellen, op een eigen pagina">Overleg</button>
-  <a id="werkbankBtn" class="admin-btn" href="/werkbank" style="display:none;text-decoration:none" title="Mijn werkbank: eigen ingediend werk + ontvangen feedback">Werkbank</a>
   <a id="beheerBtn" class="admin-btn" href="/beheer" style="display:none;text-decoration:none" title="Accountbeheer: rollen &amp; accounts (maintainer)">Beheer</a>
   <button id="addBtn" class="add-btn" title="Entiteit of relatie toevoegen" style="display:none">+ Toevoegen</button>
   <a id="authChip" class="admin-btn" href="/login" style="display:none;text-decoration:none">Inloggen</a>
@@ -2801,7 +2800,7 @@ function joinLinks(linksArr) {
       const tooltip = document.getElementById('tooltip');
       tooltip.innerHTML = `
         <div class="tt-type" style="color:${getLinkColor(d, isT)}">${isT ? (d.name || 'Mechanisme') : (RELATION_LABELS[d.relation_type] || d.relation_type)}</div>
-        <div class="tt-name">${src ? src.name : '?'} → ${tgt ? tgt.name : '?'}</div>
+        <div class="tt-name">${src ? src.name : '?'} ${isBidiEdge(d) ? '↔' : '→'} ${tgt ? tgt.name : '?'}</div>
         ${period ? `<div class="tt-desc" style="margin-bottom:4px">${period}</div>` : ''}
         ${d.description ? `<div class="tt-desc">${d.description}</div>` : ''}
         ${counts ? `<div class="tt-desc" style="margin-top:4px">${counts.total} argumenten: ${counts.sup} voor, ${counts.con} tegen</div>` : ''}
@@ -3618,7 +3617,7 @@ function selectRelation(r) {
     ${terugLink}
     <div class="detail-header">
       <div class="entity-type" style="color:${color}">${RELATION_LABELS[r.relation_type] || r.relation_type}${r.mechanism_name ? ' · ' + r.mechanism_name : ''}</div>
-      <h2>${overlegTitel('relation_id', r.id, srcName + ' → ' + tgtName)}</h2>
+      <h2>${overlegTitel('relation_id', r.id, srcName + (isBidiEdge(r) ? ' ↔ ' : ' → ') + tgtName)}</h2>
       ${r.mechanism_name ? renderTagBadges(r.mechanism_filters, r.mechanism_themes) : ''}
     </div>
     ${r.description ? `<div class="detail-description">${r.description}</div>` : ''}
@@ -4390,18 +4389,36 @@ function selectNode(d) {
     if (cascade.nodes.size > 0) {
       const reached = cascade.nodes, linkStrength = cascade.linkStrength;
       const prefix = isTheory ? 'arrow-theory-' : 'arrow-';
-      const nodeOn = id => id === d.id || reached.has(id);
+      // De downstream-cascade toont alléén uitgaande invloed. Directe buren in BEIDE
+      // richtingen horen er ook bij: wie déze node beïnvloedt (inkomend) is net zo
+      // relevant als wie zij beïnvloedt. Verzamel de zichtbare edges die de node raken
+      // en hun uiteinden, en meng ze door de cascade-highlight (verzoek juli 2026).
+      const directLinkIdx = new Set();
+      const directNeighborIds = new Set();
+      currentLinks.forEach(l => {
+        if (!visibleLinkSet.has(l._idx)) return;
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        if (sid !== d.id && tid !== d.id) return;
+        directLinkIdx.add(l._idx);
+        directNeighborIds.add(sid);
+        directNeighborIds.add(tid);
+      });
+      const nodeOn = id => id === d.id || reached.has(id) || directNeighborIds.has(id);
       nodeElements.select('.node-circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
       nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
       nodeElements.select('.field-halo').attr('opacity', n => nodeOn(n.id) ? fieldHaloOpacity(n) : 0.02);
       nodeElements.select('.filter-ring').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
-      // Echte data-join: alleen de cascade-pijlen blijven in de DOM, de rest verdwijnt
-      // met een exit-fade (geen spookranden op 3% meer). joinLinks zet markers en
-      // hoverbaarheid al goed; de verschijn-fade meteen afronden zodat hij de
-      // sterkte-opacity hieronder niet alsnog overschrijft.
-      joinLinks(state.showDirect ? currentLinks.filter(l => linkStrength.has(l._idx)) : []);
+      // Echte data-join: de cascade-pijlen én de directe (in-/uitgaande) pijlen blijven
+      // in de DOM, de rest verdwijnt met een exit-fade (geen spookranden op 3% meer).
+      // joinLinks zet markers en hoverbaarheid al goed; de verschijn-fade meteen afronden
+      // zodat hij de sterkte-opacity hieronder niet alsnog overschrijft.
+      joinLinks(state.showDirect ? currentLinks.filter(l => linkStrength.has(l._idx) || directLinkIdx.has(l._idx)) : []);
       linkElements.interrupt('vis')
-        .attr('stroke-opacity', l => 0.35 + 0.6 * Math.min(1, linkStrength.get(l._idx)));  // sterker pad = feller
+        // Cascade-pijl: feller naarmate het pad sterker is. Directe buur-pijl zonder
+        // cascade-sterkte (m.n. inkomend): vaste, goed zichtbare opacity.
+        .attr('stroke-opacity', l => linkStrength.has(l._idx)
+          ? 0.35 + 0.6 * Math.min(1, linkStrength.get(l._idx)) : 0.8);
       if (edgeLabelElements) edgeLabelElements.interrupt('vis').attr('opacity', 1);
 
       // Afgeleide (indirecte) invloed: alleen paden waarvan élke schakel onderbouwd
@@ -4417,7 +4434,9 @@ function selectNode(d) {
       // plaats van in de stand van het volledige netwerk te blijven staan. In
       // 'stable' doet syncSimulation niets; deselectNode → applyFilters herstelt.
       // NB: reached is een Map (id -> sterkte), dus expliciet de keys spreiden.
-      syncSimulation(new Set([d.id, ...reached.keys()]), new Set(linkStrength.keys()));
+      // De directe buren (in-/uitgaand) horen ook in het subnetwerk dat zich hergroepeert.
+      syncSimulation(new Set([d.id, ...reached.keys(), ...directNeighborIds]),
+                     new Set([...linkStrength.keys(), ...directLinkIdx]));
 
       updateEmergentFields();   // velden van de geselecteerde node oplichten
       showDetail(d);
@@ -6074,7 +6093,6 @@ function authIndienHint() {
       chip.title = 'Ingelogd — naar de accountpagina (token, uitloggen)';
       // Bijdragen mag voor elke ingelogde gebruiker (alles loopt als voorstel).
       addBtn.style.display = '';
-      document.getElementById('werkbankBtn').style.display = '';
       if (authUser.role === 'maintainer') {
         document.getElementById('beheerBtn').style.display = '';
         // W2.5: de verwijder-/ontkoppelknoppen in het detailpaneel volgen de rol —

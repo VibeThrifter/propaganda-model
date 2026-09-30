@@ -19,6 +19,7 @@ VERTICALE NIVEAUS                 DWARSDOORSNIJDENDE MODI
   Europees (3.2)                    financiële elite(3.7) — asset managers + centrale banken
         ↑                           Big Tech        (3.5) — distributie-infrastructuur
   imperiaal/transatlantisch (3.1)   neoliberalisme  (3.6) — legitimerende ideologie
+                                    ESG/managerial  (3.9) — normstelling als machtsclaim (getoetst)
 ```
 
 ## Notities in deze laag
@@ -30,6 +31,15 @@ VERTICALE NIVEAUS                 DWARSDOORSNIJDENDE MODI
 - `3.5_big-tech-platformelite.md` — platformisering, engagement-logica.
 - `3.6_neoliberale-hegemonie.md` — markt als "natuurwet"; Hall, Mirowski, Mellink & Oudenampsen.
 - `3.7_kapitalistische-financiele-elite.md` — Big Three (CORPNET/Heemskerk), centralebankmacht.
+- `3.8_ongekozen-laag-media-nexus.md` — een populaire (NieuwRechts) "10 stille machthebbers"-analyse
+  getoetst: het establishment-frame klopt als kaart (triangulatie), maar de scherpe concrete instanties
+  (Justice for Prosperity, DPG-EU-geld) zijn primair weerlegd/overdreven. Mapping op het bestaande model
+  + de vijf theorie-gaten.
+- `3.9_esg-diversiteit-en-de-managerial-class/` — **submap (eigen onderzoeksvraag)**: de these dat
+  vermogensbeheerders via uniforme ESG-/diversiteitsnormen een bovenwettelijk controlesysteem
+  bouwen, dat dit als moreel schild ongelijkheid afleidt, en dat een homogene bestuurdersklasse het
+  draagt — zes deelthesen, elk per deelclaim getoetst. Netto: **de structuur klopt, de regie niet**;
+  bevat óók de NL-cijfers die `3.7` als open vraag had staan.
 
 ## Rode draad
 De **structurele afhankelijkheden** (eigendom, agentschappen, platforms, asset managers) zijn voor
@@ -37,3 +47,8 @@ NL hard te documenteren. De **frame-effecten** (Atlantisch, EU, neoliberaal) zij
 maar voor NL het minst met content-analyse gestaafd. En één scherpe grens: **structurele financiële
 macht (3.7) is een modelobject; een genoemde-familie-cabal (`4.2`) is dat niet** — dat is
 complotmythe, geen structuur. Houd alles toetsbaar/falsifieerbaar (`04_`).
+
+Submap `3.9` scherpt die grens met een tweede meetpunt: niet alleen *wie bezit wat* (3.7), maar
+*wat doen ze met die positie*. Waar sturing meetbaar is (stemgedrag op aandeelhoudersvergaderingen,
+kapitaalkosteneffect van uitsluiting), blijkt ze afwezig of tegengesteld aan wat de
+sturings-these voorspelt — óók, en juist, in Nederland.

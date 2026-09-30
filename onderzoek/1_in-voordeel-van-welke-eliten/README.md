@@ -57,7 +57,9 @@ in `../00_hoofdvragen-en-antwoord.md`; het volledige streng-1-antwoord in
 │   ├── 3.4_oligarchie-vermogensconcentratie.md
 │   ├── 3.5_big-tech-platformelite.md
 │   ├── 3.6_neoliberale-hegemonie.md
-│   └── 3.7_kapitalistische-financiele-elite.md
+│   ├── 3.7_kapitalistische-financiele-elite.md
+│   ├── 3.8_ongekozen-laag-media-nexus.md
+│   └── 3.9_esg-diversiteit-en-de-managerial-class/   ← submap: ESG-regime, moreel schild, managerial class
 ├── 04_theorie-en-falsifieerbaarheid/  ← LAAG 4: emergent, geen complot (de guardrail)
 │   ├── 4.1_emergent-geen-complot.md
 │   └── 4.2_structuur-vs-complot-financiele-mythes.md

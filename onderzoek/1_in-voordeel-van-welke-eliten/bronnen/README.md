@@ -17,6 +17,14 @@ hardheid en verificatiestatus. Notities verwijzen met het **bron-ID** (`[P1]`, `
 - **M** — Media / eigendom (laag 2)
 - **T** — Transnationaal + theorie/falsifieerbaarheid (lagen 3–4)
 
+## Lokale (submap)registers
+Een submap met een eigen onderzoeksvraag mag een **eigen** register houden met eigen ID-blokken;
+bronnen die hier al staan worden daar niet gedupliceerd maar met hun bestaande ID aangehaald.
+- `../03_transnationale-structuren/3.9_esg-diversiteit-en-de-managerial-class/bronnen/bronnenregister.md`
+  — blokken **AM** (asset-manager/ESG-governance), **MS** (moreel schild), **MC** (managerial
+  class), **MM** (marktmacht), **PB** (politieke binding), **GR** (groene transitie/Great Reset),
+  **NL** (Nederlandse instantie).
+
 ## Verificatielegenda
 - ✅ **verbatim** — exacte bewoording primair opgehaald.
 - 🟡 **deels** — citatie/feit bevestigd, maar quote via mirror/secundaire bron of alleen abstract.

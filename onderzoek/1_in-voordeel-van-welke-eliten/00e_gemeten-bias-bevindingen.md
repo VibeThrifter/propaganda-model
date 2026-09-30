@@ -68,7 +68,8 @@ demografie (G25 🟡, Worlds of Journalism NL / Hermans e.a. 2011).
 | B2 | **Asiel** wordt gemeten overwegend negatief/als-dreiging geframed; maar de these dat **arbeidsmigratie pro-werkgever *onbetwist* doorloopt** is voor NL **niet aangetoond** — geen per-titel-meting splitst het zo, en immigratie-als-loonconcurrentie weerspreekt het deels. De schone "vluchtelingen domineren, arbeidsmigratie nauwelijks"-bevinding is **Zweeds** (Strömbäck), niet NL | werkgevers / groeimodel (**zwak voor NL**) | **ZWAK** | Vliegenthart/Boomgaarden (G6 🟡); Eberl e.a. 2018 (🟡, niet-NL); 00c-B3 |
 | B3 | **Corona**: OMT bijna geheel RIVM-gelieerd (sociaal/economen nauwelijks betrokken); Roche test-"vendor lock-in"; farma sponsort patiëntenverenigingen €1,7 mln/jr (Longkanker-info 96% farma) | RIVM/OMT-expertorde + farma | **MEDIUM** | Frontiers 2021 (G8 🟡); FTM 2020 Roche (G9 🟡); NOS/patiëntenverenigingen (G10 🟡) |
 | B4 | **Israël/Palestina**: een **milde, titel-specifieke** Israël-bevoordeling (sterkst bij Telegraaf; "vaker Israëlische dan Palestijnse bevoordeling"), die over tijd juist **afnam** (NRC: pro-Israël 1e Intifada → neutraler 2e). Al het hárde werk is **pre-2023**; post-2023 alleen thesis-niveau. "Genocide" werd pas **najaar 2024** zegbaar in commentaar (Trouw). **Subframe weerlegd:** "media zwijgen over NL-medeplichtigheid" — de **F-35-rechtszaak** kreeg juist brede, jarenlange dekking (NRC bracht het; Hof Den Haag 2024; Hoge Raad 2025; NOS doorlopend) | Israël-gealigneerd (zwak, pre-2023) | **MEDIUM, gekwalificeerd** | **G17 ✅ peer-reviewed** (Deprez/Raeymaeckers/Van Leuven 2011, *Tijdschr. v. Communicatiewetenschap*); Nieuwsmonitor 2011/Korteweg (G18 🟡); Diab-thesis 2024 (⚠️); F-35-dekking (G19 ✅); advocacy apart: Rights Forum/Media Bias Meter (⚠️) |
-| B5 | **Klimaat** wordt gemeten als **gedepolitiseerd consensusframe**: kranten besteden "little attention to climate change as a contested phenomenon"; de **overheid** is "the principal agent". De specifieke as *marktoplossing vs. systeemverandering (degrowth/nationalisatie)* is echter **niet direct gemeten** — die exclusie blijft inferentieel (sterk in beleidsdiscours, niet in media-content) | "groen kapitaal"/gevestigde orde | **MEDIUM** | **G20 🟡** (van Noije e.a. 2020, *Mens & Maatschappij* — abstract, AUP-primair geblokkeerd); Dirikx & Gelders 2010 (🟡); beleidsdiscours apart (G12) |
+| B5 | **Klimaat** wordt gemeten als **doel-consensus mét instrumenten-strijd**: kranten besteden "little attention to climate change as a contested phenomenon" en de **overheid** is "the principal agent" — maar de auteurs kwalificeren zélf dat er "ample attention" is voor *specifieke beleidsinterventies en de controverses daaromheen*. Dat is precies de `00c`-B4-hypothese in de woorden van de auteurs: consensus over het **doel**, strijd over het **instrument**. ⚠️ Steekproef = **alleen april–mei 2019** (twee maanden rond Klimaatakkoord/PS-verkiezingen) — elke claim hierop moet dat vermelden. De as *marktoplossing vs. systeemverandering (degrowth/nationalisatie)* blijft **niet gemeten** (bevestigd negatief resultaat, aug. 2026: géén NL-inhoudsanalyse codeert die as) | "groen kapitaal"/gevestigde orde | **MEDIUM, gekwalificeerd** | **G20 ✅** (van Noije e.a. 2020, *Mens & Maatschappij* — abstract nu verbatim via Semantic Scholar Graph API); **G26 🟡** (Dirikx & Gelders 2010, "Ideologies Overruled?"); beleidsdiscours apart (G12) |
+| B5′ | **De ideologie-haak onder B5**: in NL is de ideologische kleur van een krant **niet** gerelateerd aan haar klimaatdekking, terwijl dat in Frankrijk wél zo is. Een gemeten *null*-verschil tussen ideologisch uiteenlopende titels is het beste empirische aanknopingspunt voor het Ideologie-filter op dit dossier — sterker dan de frame-tellingen zelf | de gevestigde orde (via synchronisatie i.p.v. per-titel-kleur) | **MEDIUM** (abstract-niveau) | **G26 🟡** (Dirikx & Gelders 2010, *Environmental Communication* 4(2), DOI 10.1080/17524031003760838 — T&F geblokkeerd) |
 | B6 | **Bedrijfsbelangen oververtegenwoordigd in politiek nieuws** (NL+VK 1990–2017, 34.657 organisaties; bedrijven sterk + toenemend oververtegenwoordigd). Meet bron-/aandachtdominantie — niet of het "vestigingsklimaat"-frame *onweersproken* is (dat blijft ongemeten) | grootzakelijk bedrijfsleven (Sourcing/toegang) | **HARD (toegang); frame ongemeten** | **G21 ✅** (Aizenberg & Hanegraaff 2020, *Int. J. Press/Politics* + StukRoodVlees 2018, NRC+AD) |
 | B7 | **Talkshow-elite = "gesloten ecosysteem"**: ~1.300 gasten in 7 talkshows (2020–21) — journalisten (310), experts (258), media-persoonlijkheden (184), politici (159); dezelfde namen wisselen elkaar af; 1 vrouw in de top-10 | de vaste opiniemaker-/expert-elite | **HARD (gemeten), niet denktank-specifiek** | **G22 ✅** (NRC/EUR talkshow-onderzoek 2021) |
 
@@ -92,6 +93,21 @@ demografie (G25 🟡, Worlds of Journalism NL / Hermans e.a. 2011).
   Regionaal/lokaal kwetsbaarder (caveat). Bevestigt `../3_mechanismes-van-beinvloeding/sourcing-naar-bias/07_lobby-achterkamer-en-bronovermacht.md`.
 - **Media-eigenaren/kapitaal + adverteerders** — bezit/advertentiemacht hard, maar **inhouds-tilt onbewezen**
   (de zwakste routes; `../3_mechanismes-van-beinvloeding/eigendom-naar-bias/`).
+- **ESG/duurzaamheid als consensusframe** — **weerlegd als filter** (aug. 2026). ESG zakt voor de
+  "unmarked consensus frame"-toets in de NL-media: (a) Investico + Follow the Money + De Groene vielen ESG
+  frontaal aan in de *Great Green Investment Investigation* — *"Van het astronomische bedrag van 6 biljoen
+  euro dat in Europa door vermogensbeheerders volgens ESG-criteria belegd wordt in beleggingsfondsen,
+  blijkt slechts 4 procent ook daadwerkelijk een betere wereld na te streven"* (**G27 ✅**); (b) de rechter
+  oordeelde 15 van 19 KLM-duurzaamheidsclaims misleidend (ECLI:NL:RBAMS:2024:1512); (c) *greenhushing* —
+  het frame trekt zich terug, niet uit; (d) degrowth zit **ín** het NL-debat (De Groene, VPRO Tegenlicht,
+  Amsterdam adopteerde formeel het donutmodel), dus niet buiten het zegbare. Bovendien installeerde en
+  de-installeerde Larry Fink de term binnen vijf jaar (2020 → 2023/25) — een **elite-modecyclus**, geen
+  structureel filter. Verdedigbare rest-claim: *doel-consensus met instrumenten-strijd + asymmetrische
+  prominentie*, **niet** uitsluiting. Zie `07_frame-cyclus-genese-tot-instandhouding.md`.
+  > **Dit is het derde geval waarin het propagandamodel voor NL uitsluiting overvoorspelt** — na
+  > populisme/euroscepsis (`03_redelijke-midden-anti-populisme.md`) en Big Tech (Tier C). Dat patroon is
+  > zelf een bevinding: het model voorspelt in NL structureel te veel *exclusie* en te weinig
+  > *asymmetrische prominentie*. Kandidaat voor het hypothesenregister `00c`.
 
 ## De scherpste WIE blijft de uitsluiting (cross-ref `00c` §5)
 Geen van deze gemeten bevindingen verplaatst de **onderkant-3 SCP-klassen** (~34%) binnen de bandbreedte:
@@ -129,12 +145,22 @@ hun wereldbeeld is *onderwerp* ("boze burger"), geen *frame*. Dat blijft het har
 | G23 | Pointer (KRO-NCRV)/EUR (Ruigrok), "Koude-oorlog frame dominant in pers" (~2024) — 1.500 artikelen, 5 dagbladen; Koude-Oorlog-frame 24,1% | Tier C transatlantisch | ✅ (pointer.kro-ncrv.nl; studentonderzoek) |
 | G24 | Bergman (2014), "Following Washington's Lead", *Int. Communication Gazette* 76(2) — NL-pers volgde Washington/regering vóór Irak 2003, tégen de publieke opinie in | Tier C transatlantisch | 🟡 (peer-reviewed; abstract + openDemocracy verbatim; steekproefdetail niet verkregen) |
 | G25 | Worlds of Journalism NL (2016) + Hermans/Vergeer/Pleijter (2011) — ~82% journalisten hoogopgeleid, gemiddeld links van het midden (producent-demografie) | Brahmin-toets | 🟡 |
+| G26 | Dirikx & Gelders (2010), "Ideologies Overruled? An Explorative Study of the Link Between Ideology and Climate Change Reporting in Dutch and French Newspapers", *Environmental Communication* 4(2):190–205, DOI 10.1080/17524031003760838 — ideologie van NL-kranten **niet** gerelateerd aan klimaatdekking; in FR wél | B5, B5′ | 🟡 (abstract via zoekindex; T&F 403) |
+| G27 | Great Green Investment Investigation — Investico/FTM/De Groene c.s. (2022–2024): "slechts 4 procent"; 1.300 fondsen, ~300.000 beleggingen, €525 mrd; NL >50% van 'duurzame' fondsen belegt fossiel | Tier D (ESG weerlegd) | ✅ (ftm.nl + platform-investico.nl verbatim) |
 | — | Media Bias Meter (Tech4Palestine); Goudswaard-thesis EUR | B4 | ⚠️ advocacy / onbevestigd |
 
-**Methode-noot.** Verbatim opgehaald / primair bevestigd: G1, G7, G13–G17 (G17 = abstract), G19, G21–G23.
-Zoek-geïndexeerd (🟡 tot primaire verificatie): o.a. G18, G20 (AUP geblokkeerd), G24 (steekproefdetail
-niet verkregen), G25. Geen quote of cijfer gefabriceerd; PDF's die niet uitleesbaar waren zijn als 🟡
-gemarkeerd, niet als ✅.
+**Methode-noot.** Verbatim opgehaald / primair bevestigd: G1, G7, G13–G17 (G17 = abstract), G19, G21–G23,
+G27. Zoek-geïndexeerd (🟡 tot primaire verificatie): o.a. G18, G24 (steekproefdetail niet verkregen), G25,
+G26 (T&F 403). Geen quote of cijfer gefabriceerd; PDF's die niet uitleesbaar waren zijn als 🟡 gemarkeerd,
+niet als ✅.
+
+**G20 opgewaardeerd 🟡 → ✅ (aug. 2026).** AUP-online en IngentaConnect geven 403, maar het volledige
+publisher-abstract is wél op te halen via de **Semantic Scholar Graph API**:
+`api.semanticscholar.org/graph/v1/paper/DOI:10.5117/MEM2020.3.006.VANN` (CorpusId 225442171). Route hier
+genoteerd omdat ze herbruikbaar is voor andere geblokkeerde AUP-titels. Twee dingen die daarbij aan het
+licht kwamen en in B5 zijn verwerkt: de steekproef beslaat **alleen april–mei 2019**, en de auteurs
+kwalificeren hun eigen consensus-bevinding met *"It does, however, pay ample attention to specific policy
+interventions to reduce CO2-emission and the controversies that surround them."*
 
 **Twee correcties uit de tweede zoekronde (30-06):**
 - **Irak-2003-premisse herzien.** De enige peer-reviewed NL-meting (Bergman 2014, G24) vindt dat de

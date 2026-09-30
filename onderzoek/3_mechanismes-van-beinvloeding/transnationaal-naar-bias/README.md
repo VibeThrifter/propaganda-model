@@ -35,6 +35,7 @@ transnationaal-naar-bias/
 ├── 00_netto-oordeel.md                ← vraag + (voorlopig) oordeel + bewijskracht + koppeling
 ├── 01_wire-agency-en-indexing.md      ← SCHAKEL 1+2: ANP/Westerse wires + indexing-model
 ├── 02_geopolitiek-frame-en-denktanks.md ← SCHAKEL 3+4: dichotome framing + Atlantische denktanks
+├── 03_navo-amerika-apparaat.md        ← het NAVO/Amerika-apparaat: van wie naar wie (4 sporen + confound)
 └── bronnen/
     └── bronnenregister.md             ← bevestigd vs te-verifiëren + NL/analogie
 ```

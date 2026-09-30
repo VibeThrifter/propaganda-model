@@ -3,7 +3,7 @@
 // Levert zes dingen (classic script, geen module — bindingen zijn zichtbaar
 // voor inline scripts die hierna laden, net als shared_vocab.js):
 //   1. Topbal-navigatie: vult <header class="topbal" data-actief="…"> met het
-//      merk, de paginalinks (Werkbank pas na login, Beheer alleen maintainer)
+//      merk, de paginalinks (Beheer alleen maintainer, na login)
 //      en de account-chip. Pagina-eigen knoppen zet je in <div class="topbal-slot">.
 //   2. melding(tekst, soort) — toast rechtsonder, vervangt alert().
 //   3. bevestig(vraag, opties) / vraagTekst(vraag, opties) — nette dialogen,
@@ -78,7 +78,6 @@ async function hsBouwTopbal() {
 
   const me = await hsMe();
   if (me && !me.error) {
-    nav.append(link('/werkbank', 'Werkbank', 'werkbank'));
     if (me.role === 'maintainer') nav.append(link('/beheer', 'Beheer', 'beheer'));
     chip.href = '/account';
     chip.innerHTML = `${hsEsc(me.username)} <span style="color:var(--text-muted)">(${hsEsc(me.role)})</span>`;

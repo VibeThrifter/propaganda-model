@@ -26,6 +26,7 @@ eigendom-naar-bias/
 ├── 01_internationaal-causaal.md   ← Sinclair, Australië, private equity, Gentzkow (analogie, niet-NL)
 ├── 02_nederland-gat.md            ← Bergman: beweerd, niet aangetoond — het empirische gat
 ├── 03_checks-and-balances.md      ← redactiestatuten, MPM-score, ACM/RTL-remedie
+├── 04_pensioenkapitaal-geen-media-eigendom.md  ← negatief resultaat: NL-pensioenkapitaal bezit geen NL-nieuwsmedia
 └── bronnen/
     └── bronnenregister.md         ← bronnen + verbatim + verificatiestatus (deep-research, 28-06-2026)
 ```
@@ -33,6 +34,8 @@ eigendom-naar-bias/
 ## Statuslegenda
 - **kerntekst** — geverifieerde bevinding (adversarieel: meerderheid van 3 stemmen).
 - **te-verifiëren** — opgehaald maar niet (volledig) bevestigd; niet als feit presenteren.
+- **bevinding (negatief resultaat)** — een route die is onderzocht en *niet* bestaat; even
+  publicatiewaardig als een positieve vondst, want ze sluit een hypothese af.
 
 ## Methode-/eerlijkheidsnoot
 Bevindingen komen uit een deep-research-run (28-06-2026): 5 zoekangles → 21 bronnen → 103 claims →
