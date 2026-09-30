@@ -18,8 +18,9 @@ die naar `missies/logs/` tee't. De agent *is* een Claude Code-sessie, dus "sched
 
 - **Cadans & installatie:** `deploy/systemd/` (per agent een `.service` + `.timer`,
   met de cadans-tabel in `deploy/systemd/README.md`) of de frictieloze fallback
-  `deploy/crontab`. LinkedIn-scrapen staat **bewust niet** op een 24/7-schema (beleid
-  J4, eigenaar-getriggerd).
+  `deploy/crontab`. LinkedIn-scrapen heeft geen eigen timer; onbewaakt gebruik (alleen
+  door de `nieuws-scout`) loopt uitsluitend achter de snelheidsrem
+  `tools/linkedin/snelheidsrem.py` (beleid J4, gewijzigd 2026-09-30).
 - **Droogloop (post niets):**
   `python3 scripts/agent_runner.py --agent monitor-agent --brief missies/monitor_brief.md --dry-run`
   toont het exacte `claude`-commando + tokenpad.
@@ -88,6 +89,7 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `verificatie-agent` | bijdrager | `verificatie_agent_brief.md` | eigen werk her-verifiëren (403); statussen zetten/mergen; het verdict telt nergens in de score |
 | `aanklager-agent` | bijdrager | `aanklager_brief.md` | eigen claim certificeren (403); twee keer op dezelfde parent reageren (409); statussen zetten |
 | `lead-corroboratie-agent` | bijdrager | `lead_corroboratie_brief.md` | statussen zetten buiten de lead-baan; mergen/classificeren/verwijderen; een lead-tekst als bron gebruiken; een argument indienen zonder verbatim-geverifieerde bron |
+| `nieuws-scout` | bijdrager | `nieuws_scout_brief.md` (Epic 12) | privépersonen onderzoeken; LinkedIn buiten de snelheidsrem; modelstatussen zetten (alleen de status van zijn eigen wachtrij-doel); meer dan 3 doelen per ronde |
 | _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
 | _(geen account)_ | — (alleen-lezen) | `voorspelling_resolutie_brief.md` | een voorspelling scoren (`PATCH …/uitkomst` = reviewer+ én mensenwerk); levert alléén resolutie-*voorstellen* in `data/voorspelling_voorstellen.json` |
 
@@ -127,9 +129,12 @@ hetzelfde bijdragepad — de gewone REST-API, alles `voorgesteld`. Tweetraps:
    gedateerde `persoon→org`-affiliaties in (draaideur/brug-discipline; opleiding/club =
    kandidaat; bron `grijs`). Droogloop is default; idempotent + rate-limit-bestendig.
 
-**Gericht, geen bulk (beleid J4):** een handvol relevante profielen per onderzoeksvraag,
-nooit een crawl-lijst — de tool weigert een batch > 5 zonder `--ik-weet-het`. Headful,
-eigen sessie, pauze tussen requests, geen proxy's, geen 24/7-cron (eigenaar-getriggerd).
+**Gericht, geen bulk (beleid J4, gewijzigd 2026-09-30):** een handvol relevante profielen
+per onderzoeksvraag, nooit een crawl-lijst — de tool weigert een batch > 5 zonder
+`--ik-weet-het`. Headful, eigen sessie, willekeurige pauzes, geen proxy's. Automatisch
+gebruik mag alleen achter de snelheidsrem (2/uur, 10/dag, 08–22 uur, stroomonderbreker;
+exit 75 = rem, 76 = blokkade) en alleen voor personen met een publieke rol uit
+`nieuws_doelen` (`nieuws_scout_brief.md`).
 LinkedIn is **aanvulling**: de primaire structuurbronnen zijn KvK/jaarverslagen/publieke
 registers/nieuws; zelf-gerapporteerd → bronklasse `grijs`, `data/linkedin/` gitignored.
 Details: `tools/linkedin/README.md` § Scraping-beleid.

@@ -18,18 +18,24 @@ LinkedIn's voorwaarden werkt en per versie kan breken. De model-kant is de waard
 volledig testbare helft. Breekt de scraper, dan lever je met wat dan ook hetzelfde JSON
 aan en de mapper werkt ongewijzigd door.
 
-## ⚠️ Scraping-beleid (gericht, geen bulk) — J4
+## ⚠️ Scraping-beleid (gericht, geen bulk) — J4, gewijzigd 2026-09-30
 
 Dit is **beleid, niet alleen advies**: een deel ervan zit als machinale rem in de tool
-(de profiel-cap hieronder). LinkedIn-scrapen is bewust *gericht* — bulk/proxy-scrapen is
-onevenredig risico (ToS-schending, account-ban, AVG) voor weinig opbrengst. De regels:
+(de profiel-cap én de snelheidsrem hieronder). LinkedIn-scrapen is bewust *gericht* —
+bulk/proxy-scrapen is onevenredig risico (ToS-schending, account-ban, AVG) voor weinig
+opbrengst. De regels:
 
-1. **Harde bovengrens per run: een handvol relevante profielen, nooit een crawl-lijst.**
-   Concreet weigert de tool een batch **> 5 profielen** in één run (`PROFIEL_CAP`, geldt
-   voor zowel `scrape_profile.py` als `linkedin_naar_model.py`). De override
+1. **Harde bovengrens per run én per uur/dag: een handvol relevante profielen, nooit een
+   crawl-lijst.** De tool weigert een batch **> 5 profielen** in één run (`PROFIEL_CAP`,
+   geldt voor zowel `scrape_profile.py` als `linkedin_naar_model.py`); de override
    `--ik-weet-het` bestaat alleen voor uitzonderlijk, aantoonbaar gericht onderzoek —
-   níét om er een bulk-crawl mee te draaien. Kies profielen per **onderzoeksvraag**, niet
-   per lijst.
+   níét om er een bulk-crawl mee te draaien. Daarbovenop staat sinds 2026-09-30 de
+   **snelheidsrem** (`snelheidsrem.py`, zie § Snelheidsrem): **max 2 per uur en 10 per
+   dag**, apart geteld voor profiel-scrapes en zoekacties, alleen **08:00–22:00**, met
+   willekeurige pauzes en een **stroomonderbreker** (24 uur stop bij
+   captcha/checkpoint/authwall, verdubbelend bij herhaling tot max 7 dagen). Die rem geldt
+   voor élke run — ook een handmatige. Kies profielen per **onderzoeksvraag**, niet per
+   lijst.
 2. **Headful, onder je eigen sessie.** De scraper draait standaard *headful* (zichtbaar
    venster) met een handmatige login; geen headless bot-farm. De opgeslagen sessie is die
    van de eigenaar zelf.
@@ -39,10 +45,16 @@ onevenredig risico (ToS-schending, account-ban, AVG) voor weinig opbrengst. De r
 4. **Geen residentiële proxy's, geen IP-rotatie, geen bot-netwerk.** Bewust niet
    ingebouwd en bewust niet toe te voegen — dat is precies de onevenredig-risicovolle lijn
    die J4 uitsluit.
-5. **Eigenaar-getriggerd/gericht, geen 24/7-cron.** De scrape-trap staat niet op een
-   strak, onbewaakt 24/7-schema (dat lokt bans). Ze wordt gericht en bewust gestart voor
-   een concrete onderzoeksvraag — ook als agent-runs elders gescheduled worden (C1),
-   blijft scraping eigenaar-getriggerd.
+5. **Automatisch mag — alleen achter de snelheidsrem en alleen voor de nieuws-wachtrij
+   (eigenaarsbesluit 2026-09-30).** Tot september 2026 was scrapen eigenaar-getriggerd
+   (geen onbewaakte runs). De eigenaar heeft dat bewust gewijzigd: de missie-agent
+   `nieuws-scout` mag de tool nu **onbewaakt** gebruiken, maar uitsluitend (a) achter de
+   snelheidsrem hierboven, (b) gericht op personen **met een publieke rol**
+   (politici, journalisten, woordvoerders, bestuurders; daarna experts) die als doel in
+   de wachtrij `nieuws_doelen` staan — nooit privépersonen, nooit een lijst — en (c) in
+   een zichtbaar venster onder de eigen sessie van de eigenaar. Nog steeds **geen strak
+   24/7-schema**: buiten 08–22 uur weigert de rem, en boven 2/uur of 10/dag ook.
+   Kill-switch: `LINKEDIN_AUTOMATISCH=0` (env) of `python3 tools/linkedin/snelheidsrem.py uit`.
 
 **Bronprioriteit — LinkedIn is aanvulling, geen hoofdweg.** Primaire structuurbronnen
 zijn de risicoarme, gezaghebbende registers: **KvK, jaarverslagen, publieke registers
@@ -90,6 +102,18 @@ python3 tools/linkedin/scrape_profile.py "https://www.linkedin.com/in/<slug>/"
 python3 tools/linkedin/scrape_profile.py --bedrijf "https://www.linkedin.com/company/<slug>/"
 ```
 
+**2b. Een persoon zoeken** (people-search in de ingelogde sessie) → JSON-lijst op stdout,
+om het juiste profiel te vinden vóór je scrapet (naamgenoten!):
+
+```bash
+python3 tools/linkedin/scrape_profile.py zoek "Anouk Verbeek" --context "Gemeente Dijkerhoven" --max 5
+# → [{"naam": "...", "kop": "...", "locatie": "...", "url": "https://www.linkedin.com/in/<slug>/"}, ...]
+```
+
+De parser leest de gerenderde tekst + de profiel-links (`a[href*='/in/']`), niet de
+geobfusceerde CSS-klassen. Een zoekactie telt onder soort `zoek` in de snelheidsrem.
+Gebruik een resultaat alleen als naam **én** organisatie/rol overeenkomen met de context.
+
 **3. In kaart brengen** — eerst droogloop (schrijft niets), dan echt indienen:
 
 ```bash
@@ -124,6 +148,31 @@ De mapper kan zonder browser worden getest tegen de meegeleverde fixture:
 python3 tools/linkedin/linkedin_naar_model.py tools/linkedin/fixtures/voorbeeld_persoon.json --volledig
 ```
 
+## Snelheidsrem (`snelheidsrem.py`, Epic 12)
+
+Pure stdlib; toestand in `data/linkedin/_snelheidsrem.json` (gitignored, fcntl-vergrendeld).
+`scrape_profile.py` vraagt vóór élk profiel en élke zoekactie toestemming en telt ná afloop.
+
+```bash
+python3 tools/linkedin/snelheidsrem.py status          # tellingen, blokkade, volgende kans
+python3 tools/linkedin/snelheidsrem.py status --json   # machineleesbaar (nieuws-backend)
+python3 tools/linkedin/snelheidsrem.py mag profiel     # exit 0 = mag, 75 = rem
+python3 tools/linkedin/snelheidsrem.py uit             # persistente kill-switch (…) aan
+python3 tools/linkedin/snelheidsrem.py reset-blokkade  # eigenaar, na controle in de browser
+```
+
+| Situatie | Melding | Exit | Wat een agent doet |
+|---|---|---|---|
+| Rem weigert (uur/dag vol, buiten 08–22, kill-switch) | `⏳ LINKEDIN-SNELHEIDSREM — volgende kans HH:MM` | 75 | doel `vervolg=linkedin`, door met andere bronnen, niet herproberen |
+| Captcha/checkpoint/authwall na een navigatie | `⛔ LINKEDIN-BLOKKADE — …` | 76 | stoppen met LinkedIn, melden; eigenaar controleert het account |
+| Sessie verlopen (ongewijzigd) | `⚠ LINKEDIN-SESSIE VERLOPEN` | 1 | login-commando relayen aan de eigenaar |
+
+Env-overrides `LINKEDIN_MAX_PER_UUR`, `LINKEDIN_MAX_PER_DAG`, `LINKEDIN_ACTIEF_VAN`,
+`LINKEDIN_ACTIEF_TOT` mogen de rem alleen **strenger** maken; het eigenaarsplafond
+(2/uur, 10/dag, 08–22) verruimen vergt een bewuste code-wijziging. Stroomonderbreker:
+24 uur → 48 → 96 → max 168 uur (7 dagen); het niveau zakt terug naar 0 na een geslaagde
+dag. Test (geen netwerk, nep-klok + fixtures): `python3 tools/linkedin/test_snelheidsrem.py`.
+
 ## Hoe het op het model afbeeldt (de discipline)
 
 | LinkedIn | Model | Mechanisme |
@@ -150,9 +199,12 @@ Vaste regels (uit `CLAUDE.md`):
 |---|---|
 | `normalize.py` | het JSON-contract + `functie→relatietype` + datum-normalisatie (pure stdlib) |
 | `extract.py` | **eigen, robuuste persoon-extractie** via de LinkedIn-detailpagina's (`/details/experience/`, `/details/education/`) — leest de gestructureerde tekst, niet de geobfusceerde CSS-klassen |
-| `scrape_profile.py` | trap 1 — Playwright-scrape → genormaliseerd JSON (+ `login`) |
+| `scrape_profile.py` | trap 1 — Playwright-scrape → genormaliseerd JSON (+ `login`, + `zoek`) |
+| `snelheidsrem.py` | harde rem onder (automatisch) gebruik: 2/uur, 10/dag, 08–22, stroomonderbreker, kill-switch |
+| `test_snelheidsrem.py` | test van de rem + de zoek-/blokkadeparsers (fixtures, geen netwerk) |
 | `linkedin_naar_model.py` | trap 2 — mapper → API-voorstellen (droogloop default) |
 | `fixtures/voorbeeld_persoon.json` | fictief profiel om de mapper zonder browser te testen |
+| `fixtures/zoek_personen_*`, `fixtures/checkpoint_nl.txt` | fictieve zoekpagina + controlepagina voor de parsertests |
 | `requirements.txt` | geïsoleerde deps (alleen trap 1) |
 
 > **Waarom een eigen `extract.py`?** De `linkedin_scraper`-bibliotheek (v3.1.2) zoekt naar
@@ -170,4 +222,5 @@ Vaste regels (uit `CLAUDE.md`):
 > De **company-scrape** (`--bedrijf`) draait nog op de bibliotheek en kan dezelfde
 > selector-veroudering hebben.
 
-De missie-brief voor een agent staat in [`../../missies/linkedin_scout_brief.md`](../../missies/linkedin_scout_brief.md).
+De missie-brief voor een agent staat in [`../../missies/linkedin_scout_brief.md`](../../missies/linkedin_scout_brief.md);
+de onbewaakte nieuws-variant in [`../../missies/nieuws_scout_brief.md`](../../missies/nieuws_scout_brief.md).

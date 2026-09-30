@@ -37,3 +37,7 @@ data/monitor_agents_state.json
 
 # Fase 6: feed-API-keys (alleen sha256-hash, nooit committen)
 data/api_keys/
+
+# Epic 12 (nieuws-pijplijn): autokeur-auditlog + runner-locks (runtime, per host)
+data/nieuws_autokeur_log.jsonl
+data/locks/

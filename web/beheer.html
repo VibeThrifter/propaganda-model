@@ -68,6 +68,28 @@ a { color: var(--text-dim); }
 .tz-balk > span { display: block; height: 100%; background: var(--groen); }
 .prog-num { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px;
             background: rgba(224,99,95,0.16); color: var(--rood); margin-left: 6px; }
+.a-tab { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.a-tab th { text-align: left; font-weight: 600; color: var(--text-dim); font-size: 11px;
+            text-transform: uppercase; letter-spacing: 0.03em; padding: 4px 8px 6px; border-bottom: 1px solid var(--border); }
+.a-tab td { padding: 7px 8px; border-bottom: 1px solid var(--border-zwak); vertical-align: top; }
+.a-tab tr:last-child td { border-bottom: none; }
+.a-tab .a-num { font-variant-numeric: tabular-nums; text-align: right; }
+.a-stat { display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.a-stat.ok { background: rgba(120,190,120,0.16); color: var(--groen); }
+.a-stat.fout { background: rgba(224,99,95,0.16); color: var(--rood); }
+.a-stat.wacht { background: var(--bg-inzet); color: var(--text-dim); }
+.ag-rij select, .ag-rij input { background: var(--bg-inzet); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 6px; font-size: 12px; font-family: inherit; }
+.ag-rij .ag-velden { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ag-rij.uit { opacity: 0.55; }
+.ag-cadans-prev { color: var(--accent); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ag-knoppen { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.ag-uitvoer { margin-top: 8px; font-size: 11px; color: var(--text-muted); white-space: pre-wrap;
+  max-height: 130px; overflow: auto; background: var(--bg-inzet); border-radius: 6px; padding: 8px; display: none; }
+.ag-knoppen button { background: var(--bg-inzet); color: var(--text); border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.ag-knoppen #agBewaar { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ag-knoppen button:disabled { opacity: 0.6; cursor: default; }
 </style>
 </head>
 <body>
@@ -120,6 +142,11 @@ async function laad() {
         data-uitleg="Privé kalibratie-overzicht (C4): jij stuurt op de meta-laag — steekproef van auto-merges, gevlagde twijfel-/hoog-inzet-items, verlopen voorspellingen + Brier, validatiefouten en archiveer-voortgang — i.p.v. de doorvoer-merge-knop te bedienen.">ⓘ</button></h2>
     <div class="kaart"><div id="toezicht">Laden…</div></div>
 
+    <h2>Achtergrond-agents
+      <button type="button" class="uitleg" aria-label="Uitleg achtergrond-agents"
+        data-uitleg="De onbewaakte, geplande Claude Code-sessies (launchd → scripts/agent_runner.py → claude -p). Per agent: de status van de laatste ronde + de oogst (alles 'voorgesteld', telt nergens in de score), én het bewerkbare interval. Kies 'elke X minuten/uur/dagen' (of 'uit'); 'Opslaan & toepassen' schrijft het schema en herlaadt de launchd-jobs meteen. Let op: heel korte intervallen = veel tokenverbruik (elke ronde is een echte claude-sessie van ~10 min). Werkt alleen op deze Mac; de agents draaien alleen als je bent ingelogd.">ⓘ</button></h2>
+    <div class="kaart"><div id="agentSchema">Laden…</div></div>
+
     <h2>Nieuwe gebruiker</h2>
     <div class="kaart">
       <form class="nieuw" id="nieuwForm">
@@ -150,6 +177,7 @@ async function laad() {
   });
   document.getElementById('nieuwForm').addEventListener('submit', maakNieuw);
   laadToezicht();   // los; blokkeert het accountbeheer niet
+  laadAgentSchemas();
   await tekenTabel();
 }
 
@@ -161,6 +189,115 @@ function tzTegel(num, label, kleur, sub) {
   return `<div class="tegel"><div class="t-num ${kleur}">${num}</div>` +
     `<div class="t-lab">${esc(label)}</div>` +
     (sub ? `<div class="t-sub">${esc(sub)}</div>` : '') + `</div>`;
+}
+function agentTijd(iso) {
+  if (!iso) return 'nog niet gedraaid';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return esc(iso);
+  const min = Math.round((Date.now() - d.getTime()) / 60000);
+  let rel;
+  if (min < 1) rel = 'zojuist';
+  else if (min < 60) rel = min + ' min geleden';
+  else if (min < 1440) rel = Math.round(min / 60) + ' u geleden';
+  else rel = Math.round(min / 1440) + ' d geleden';
+  return `${iso.slice(0, 16).replace('T', ' ')} · ${rel}`;
+}
+// ── Agent-schema-editor ────────────────────────────────────────────────────
+// Bewerkt data/agent_schedules.json via /api/agents/schedules (PATCH) en past het
+// meteen toe op launchd via /api/agents/herlaad (POST). Maintainer-only (endpoint-poort).
+const AG_EENHEID_LABEL = { minuut: 'minuten', uur: 'uur', dag: 'dagen' };
+const AG_MIN_MINUUT = 5;   // ondergrens; server bevestigt (MIN_ELKE_MINUUT)
+function cadansTekst(s) {
+  if (!s || s.aan === false || s.eenheid === 'uit') return 'uit';
+  const n = s.elke || 1;
+  if (s.eenheid === 'minuut') return 'elke ' + n + (n === 1 ? ' minuut' : ' minuten');
+  if (s.eenheid === 'uur') return 'elke ' + n + ' uur';
+  return 'elke ' + n + (n === 1 ? ' dag' : ' dagen');
+}
+function agRijSchema(tr) {
+  const eenheid = tr.querySelector('.ag-eenheid').value;
+  if (eenheid === 'uit') return { eenheid: 'dag', elke: 1, aan: false };
+  let elke = parseInt(tr.querySelector('.ag-elke').value, 10) || 1;
+  if (eenheid === 'minuut' && elke < AG_MIN_MINUUT) elke = AG_MIN_MINUUT;
+  return { eenheid, elke, aan: true };
+}
+function agUpdateRij(tr) {
+  const eenheid = tr.querySelector('.ag-eenheid').value;
+  const uit = eenheid === 'uit';
+  tr.classList.toggle('uit', uit);
+  tr.querySelector('.ag-elke').style.display = uit ? 'none' : '';
+  tr.querySelector('.ag-vooraf').style.display = uit ? 'none' : '';
+  tr.querySelector('.ag-elke').min = eenheid === 'minuut' ? AG_MIN_MINUUT : 1;
+  tr.querySelector('.ag-cadans-prev').textContent = cadansTekst(agRijSchema(tr));
+}
+async function laadAgentSchemas() {
+  const el = document.getElementById('agentSchema');
+  if (!el) return;
+  let d;
+  try { d = await api('/api/agents/schedules', 'GET'); }
+  catch (e) { el.innerHTML = `<div class="tz-leeg">Kon de schema's niet laden (${esc(e.message)}).</div>`; return; }
+  const eenheden = d.eenheden || ['minuut', 'uur', 'dag'];
+  const rijen = (d.agents || []).map(a => {
+    const s = a.schema || {};
+    const eenhOpts = eenheden.map(e =>
+      `<option value="${e}" ${(s.aan !== false && e === s.eenheid) ? 'selected' : ''}>${esc(AG_EENHEID_LABEL[e] || e)}</option>`).join('')
+      + `<option value="uit" ${s.aan === false ? 'selected' : ''}>uit</option>`;
+    let badge;
+    if (a.ok === null || a.ok === undefined) badge = '<span class="a-stat wacht">nooit</span>';
+    else if (a.ok) badge = '<span class="a-stat ok">ok</span>';
+    else badge = `<span class="a-stat fout">${a.linkedin_blokkade ? 'LinkedIn-blokkade' : a.linkedin_verlopen ? 'LinkedIn' : 'exit ' + esc(a.exit_code)}</span>`;
+    const oogst = a.oogst != null ? ` · oogst ${esc(a.oogst)}` : '';
+    const nruns = a.n_runs ? ` · ${a.n_runs}×` : '';
+    return `<tr class="ag-rij" data-label="${esc(a.label)}">
+      <td><b>${esc(a.label)}</b><div class="meta">${esc(a.omschrijving || '')}</div></td>
+      <td>${badge}<div class="meta">${esc(agentTijd(a.laatste))}${oogst}${nruns}</div></td>
+      <td><div class="ag-velden">
+        <span class="ag-vooraf meta">elke</span>
+        <input type="number" class="ag-elke" aria-label="Interval" min="1" max="365" value="${esc(s.elke || 1)}" style="width:58px">
+        <select class="ag-eenheid" aria-label="Eenheid">${eenhOpts}</select>
+      </div></td>
+      <td class="ag-cadans-prev meta"></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<table class="a-tab"><thead><tr><th>Agent</th><th>Laatste ronde</th><th>Schema</th><th>Wordt</th></tr></thead><tbody>${rijen}</tbody></table>
+    <div class="ag-knoppen">
+      <button type="button" id="agBewaar">Opslaan &amp; toepassen</button>
+      <button type="button" id="agReset">Terug naar standaard</button>
+      <span class="meta">Past de launchd-jobs op deze Mac meteen aan.</span>
+    </div>
+    <div class="ag-uitvoer" id="agUitvoer"></div>`;
+  el.querySelectorAll('.ag-rij').forEach(agUpdateRij);
+  el.onchange = e => { const tr = e.target.closest('.ag-rij'); if (tr) agUpdateRij(tr); };
+  el.oninput = el.onchange;
+  document.getElementById('agBewaar').onclick = agBewaarToepassen;
+  document.getElementById('agReset').onclick = agReset;
+}
+async function agBewaarToepassen() {
+  const el = document.getElementById('agentSchema');
+  const schedules = {};
+  el.querySelectorAll('.ag-rij').forEach(tr => { schedules[tr.dataset.label] = agRijSchema(tr); });
+  const knop = document.getElementById('agBewaar');
+  const oud = knop.textContent; knop.disabled = true; knop.textContent = 'Bezig…';
+  try {
+    await api('/api/agents/schedules', 'PATCH', { schedules });
+    const r = await api('/api/agents/herlaad', 'POST');
+    const uit = document.getElementById('agUitvoer');
+    uit.style.display = 'block';
+    uit.textContent = (r.ok ? '✓ Toegepast op launchd.\n' : '⚠ Opgeslagen, maar toepassen gaf een fout:\n') + (r.uitvoer || '');
+    if (typeof melding === 'function') melding(r.ok ? 'Schema toegepast' : 'Opgeslagen; toepassen faalde', r.ok ? 'succes' : 'fout');
+    laadToezicht();   // ververs de cadans in het agents-paneel
+  } catch (e) {
+    (typeof melding === 'function' ? melding('Mislukt: ' + e.message, 'fout') : alert('Mislukt: ' + e.message));
+  } finally { knop.disabled = false; knop.textContent = oud; }
+}
+async function agReset() {
+  if (typeof bevestig === 'function' && !(await bevestig('Alle agent-schema’s terug naar de standaard-cadans?'))) return;
+  try {
+    await api('/api/agents/schedules', 'PATCH', { schedules: {} });
+    await api('/api/agents/herlaad', 'POST');
+    if (typeof melding === 'function') melding('Terug naar standaard', 'succes');
+    laadAgentSchemas(); laadToezicht();
+  } catch (e) { (typeof melding === 'function') && melding('Mislukt: ' + e.message, 'fout'); }
 }
 async function laadToezicht() {
   const el = document.getElementById('toezicht');
@@ -236,6 +373,7 @@ async function laadToezicht() {
          <div class="tz-meta">${s.arg_id != null ? '#' + esc(s.arg_id) : ''}${s.target ? ' · ' + esc(s.target) : ''}${s.merged_at ? ' · ' + esc(s.merged_at) : ''}</div></li>`).join('')}</ul>`
     : `<div class="tz-leeg">Nog geen auto-merges om te steekproeven.</div>`;
   h += `</div>`;
+
 
   // Hoog-inzet-blokkades die op akkoord wachten — de énige items die de eigenaar nog
   // handmatig beoordeelt (persoons-claims). De volledige beoordeling gebeurt op /overleg.

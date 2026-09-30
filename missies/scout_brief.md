@@ -21,10 +21,15 @@ verbanden die het model *compliceren*).
 > sessie dood). Ze levert gedateerde `persoon→org`-affiliaties via hetzelfde bijdragepad
 > (alles `voorgesteld`). Zelfde anti-overfit- en bronplicht als hier.
 >
-> **Beleid J4 — gericht, geen bulk.** Een handvol relevante profielen per onderzoeksvraag,
-> **nooit** een crawl-lijst; de tool weigert een batch **> 5** zonder `--ik-weet-het`.
-> Headful, onder de eigen sessie, met pauze tussen requests, **geen residentiële proxy's
-> en geen 24/7-cron** (eigenaar-getriggerd). **Bronprioriteit:** de primaire
+> **Beleid J4 — gericht, geen bulk (gewijzigd 2026-09-30).** Een handvol relevante
+> profielen per onderzoeksvraag, **nooit** een crawl-lijst; de tool weigert een batch
+> **> 5** zonder `--ik-weet-het`. Headful, onder de eigen sessie, met willekeurige pauzes,
+> **geen residentiële proxy's**. Sinds het eigenaarsbesluit van 2026-09-30 mag
+> automatisch gebruik, maar **alleen achter de snelheidsrem** `tools/linkedin/snelheidsrem.py`
+> (max 2/uur en 10/dag per soort, 08–22 uur, stroomonderbreker bij captcha/checkpoint/
+> authwall; exit 75 = rem → niet herproberen, exit 76 = blokkade → stoppen en melden) en
+> alleen voor personen met een publieke rol uit `nieuws_doelen` (missie `nieuws-scout`).
+> **Bronprioriteit:** de primaire
 > structuurbronnen zijn **KvK, jaarverslagen, publieke registers en nieuws** — zoek een
 > loopbaan/nevenfunctie éérst daar; LinkedIn is de (zelf-gerapporteerde, zwakke)
 > aanvulling. **AVG:** alleen wat mensen zelf publiek zetten; ruwe scrapes in
@@ -158,8 +163,8 @@ tee't de ronde naar `missies/logs/`. Onderwerp uit de top van
 
 **Exit-condities.** Lege oogst (geen nieuwe, staafbare knoop/edge) → afronden en
 loggen, geen projectie indienen. Rate-limit **429** → ronde stoppen en loggen, niet
-herproberen. **LinkedIn-scrapen staat NIET op deze cadans** (beleid J4,
-eigenaar-getriggerd); draai je de LinkedIn-mapper en is de sessie dood
+herproberen. **LinkedIn draait alleen binnen de snelheidsrem** (beleid J4, gewijzigd
+2026-09-30; weigert de rem met exit 75, ga dan door zonder LinkedIn); draai je de LinkedIn-mapper en is de sessie dood
 (`⚠ LINKEDIN-SESSIE VERLOPEN`) → stoppen, het login-commando
 `python3 tools/linkedin/scrape_profile.py login` relayen aan de eigenaar, niet
 herproberen (`missies/linkedin_scout_brief.md`).

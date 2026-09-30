@@ -17,6 +17,7 @@ import re
 import sqlite3
 import sys
 import time
+import unicodedata
 from pathlib import Path
 from urllib.parse import quote, urlparse
 from flask import Flask, g, jsonify, redirect, request, send_file, session
@@ -31,6 +32,8 @@ import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/valida
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
 import paginas  # programmatic-SEO: server-gerenderde pagina per element (B4)
+import subprocess  # herlaad de launchd-agents na een schema-wijziging (C1, macOS)
+import agent_schedule  # canonieke agent-lijst + schema (gedeeld met de launchd-generator)
 try:
     import dedup  # A6: semantische (paraphrase-)dedup bovenop difflib; aparte stdlib-module
 except ImportError:  # de module wordt parallel gebouwd — val terug op alleen difflib
@@ -49,6 +52,7 @@ REVIEW_ADVIES_PATH = DATA_DIR / "review_advies.json"
 BRON_SUGGESTIES_PATH = DATA_DIR / "bron_suggesties.json"
 VOORSPELLING_VOORSTELLEN_PATH = DATA_DIR / "voorspelling_voorstellen.json"
 AUTO_MERGE_LOG_PATH = DATA_DIR / "auto_merge_log.json"
+AGENT_RUNS_PATH = DATA_DIR / "agent_runs.jsonl"
 RELEASES_PATH = ROOT / "releases"
 # E1 (data-feed): de map met API-keys voor de gemeterde feed-namespace. Spiegelt
 # data/tokens/ — één JSON-bestand per key, alléén de sha256-hash opgeslagen.
@@ -160,7 +164,19 @@ _rate_emmers = {}
 # vaste bijdrage-account 'assistent', en het reviewer-tier systeemaccount 'merge-service'
 # (A7/C2: de auto-merge-service pace't zelf; de 60/min-limiet zou anders de doorvoer knellen).
 # Overige bijdragers/agents houden hun trap-limiet als flood-rem tegen een doorgeslagen agent-lus.
-RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service"}
+# Epic 12 (2026-09-30): ook 'nieuws-autokeur' — hetzelfde soort reviewer-tier systeemaccount
+# als merge-service; de service pace't zelf en het harde dagplafond (standaard 60) is de
+# echte rem. De bijdrager-accounts 'nieuws-agent'/'nieuws-scout' blijven bewust NIET
+# vrijgesteld (hun inhouds-schrijfacties houden de flood-rem); alleen hun wachtrij-
+# endpoints zijn vrij (RATE_LIMIT_VRIJE_ENDPOINTS hieronder).
+RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur"}
+# Endpoints die voor ELK account buiten de per-account-limiet vallen: de nieuws-wachtrij
+# (nieuws_doelen) is procesmetadata, geen modelinhoud — de rate limit beschermt tegen
+# score-manipulatie door volume en heeft hier geen functie, terwijl de nieuws-backend per
+# cyclus ~12–30 doelen tegelijk aanbiedt. Wie hier mag schrijven, poorten de endpoints zelf
+# (nieuws-agent/nieuws-scout/maintainer).
+RATE_LIMIT_VRIJE_ENDPOINTS = {"nieuws_doelen_upsert", "nieuws_doelen_claim_volgende",
+                              "nieuws_doelen_claim", "nieuws_doelen_patch"}
 
 
 def _rate_limit_ok(user) -> bool:
@@ -339,6 +355,7 @@ def require_user(min_rol="bijdrager"):
             g.user = dict(rij)
             # M2.4: rate limit per account op schrijfacties
             if (request.method in ("POST", "PATCH", "DELETE")
+                    and request.endpoint not in RATE_LIMIT_VRIJE_ENDPOINTS
                     and not _rate_limit_ok(g.user)):
                 return jsonify({"error": "Rate limit bereikt: maximaal "
                                          f"{RATE_LIMITS.get(g.user['role'], 30)} "
@@ -3011,40 +3028,46 @@ def _maintainer_mag_direct(conn, tabel, rid):
     return None
 
 
-def _modereer(tabel, rid):
-    """Moderatie van een 'voorgesteld' node/edge: reviewer+ keurt goed of af.
-    Niemand keurt eigen werk goed (M2.1)."""
-    data = request.json or {}
-    nieuw = data.get("status")
+def _modereer_kern(conn, tabel, rid, nieuw, gebruikersnaam, motivatie):
+    """Gedeelde moderatie-kern (refactor Epic 12, gedrag ongewijzigd): keur een
+    'voorgesteld' node/edge goed of af namens ``gebruikersnaam``. Hergebruikt door
+    ``_modereer`` (menselijke reviewer, PATCH …/status) én de nieuws-autokeur
+    (``POST /api/nieuws/autokeur/<tabel>/<id>``). Alle poorten zitten HIER, in dezelfde
+    volgorde als voorheen: statuswaarde (400) → bestaan (404) → reviewer+ (403) →
+    alleen 'voorgesteld' (400) → niemand keurt eigen werk goed (403, M2.1) → orphan-poort
+    (400) → bronplicht voor relaties (400). Daarna: statuswissel + instantiatie-backstop
+    + edit_log + (bij afwijzen) de cascade over de discussieboom.
+
+    Retourneert (ok, fout, http_code, extra); ``extra`` is bij succes het JSON-antwoord
+    ({id, status, argumenten_mee_afgewezen}). Commit blijft bij de caller (net als
+    ``_merge_core``); bij een fout is er niets geschreven."""
+    if tabel not in ("entities", "relations"):
+        raise ValueError(f"onbekende moderatietabel: {tabel}")
     if nieuw not in ("goedgekeurd", "afgewezen"):
-        return jsonify({"error": "status moet 'goedgekeurd' of 'afgewezen' zijn"}), 400
-    conn = get_db()
+        return (False, "status moet 'goedgekeurd' of 'afgewezen' zijn", 400, None)
     rij = conn.execute(f"SELECT status FROM {tabel} WHERE id = ?", (rid,)).fetchone()
     if rij is None:
-        conn.close()
-        return jsonify({"error": "Niet gevonden"}), 404
-    if not heeft_rol(conn, g.user, "reviewer"):
-        conn.close()
-        return jsonify({"error": "Modereren vereist reviewer of hoger"}), 403
+        return (False, "Niet gevonden", 404, None)
+    gebruiker = conn.execute("SELECT * FROM users WHERE username = ? AND active",
+                             (gebruikersnaam,)).fetchone()
+    if gebruiker is None or not heeft_rol(conn, gebruiker, "reviewer"):
+        return (False, "Modereren vereist reviewer of hoger", 403, None)
     if rij["status"] != "voorgesteld":
-        conn.close()
-        return jsonify({"error": f"Alleen een 'voorgesteld' item kan gemodereerd worden "
-                                 f"(huidige status: {rij['status']})"}), 400
-    if _creator_van(conn, tabel, rid) == g.user["username"]:
-        conn.close()
-        return jsonify({"error": "Niemand keurt eigen werk goed (M2.1): laat een "
-                                 "andere reviewer dit beoordelen"}), 403
+        return (False, f"Alleen een 'voorgesteld' item kan gemodereerd worden "
+                       f"(huidige status: {rij['status']})", 400, None)
+    if _creator_van(conn, tabel, rid) == gebruikersnaam:
+        return (False, "Niemand keurt eigen werk goed (M2.1): laat een "
+                       "andere reviewer dit beoordelen", 403, None)
     # Orphan-poort (bottom-up): een mechanisme-loze relatie is een kandidaat — een
     # praktijkpatroon dat nog geen theorie-huis heeft. Ze mag incuberen als 'voorgesteld'
     # (telt in niets) maar NIET de goedgekeurde graaf in: eerst een RfC die haar adopteert.
     if tabel == "relations" and nieuw == "goedgekeurd":
         if conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
                         (rid,)).fetchone()["mechanism_id"] is None:
-            conn.close()
-            return jsonify({"error": "Dit is een kandidaat-relatie zonder mechanisme "
+            return (False, "Dit is een kandidaat-relatie zonder mechanisme "
                 "(incuberende instantie). Ze kan niet worden goedgekeurd zolang er geen "
                 "theorie-element bij hoort: dien een RfC in (soort 'nieuw_theorie_element') "
-                "die deze relatie adopteert, of laat haar 'voorgesteld' incuberen."}), 400
+                "die deze relatie adopteert, of laat haar 'voorgesteld' incuberen.", 400, None)
     # Bronplicht voor relaties (praktijklaag): een edge mag de graaf alleen in als ze
     # door minstens één gesourcet root-argument (supporting/contradicting met echte
     # citatie) wordt gedragen — anders is het een lege bewering. Het argument zelf mag
@@ -3062,11 +3085,10 @@ def _modereer(tabel, rid):
                               WHERE c.argument_id = a.id))
             LIMIT 1""", (rid,)).fetchone()
         if not heeft_bron:
-            conn.close()
-            return jsonify({"error": "Deze relatie heeft nog geen gesourcet argument "
+            return (False, "Deze relatie heeft nog geen gesourcet argument "
                 "(een supporting/contradicting root met een echte citatie — quote of "
                 "vindplaats). Een edge zonder bewijs is een lege bewering: wijs af, of "
-                "laat de indiener eerst een onderbouwend argument met bron toevoegen."}), 400
+                "laat de indiener eerst een onderbouwend argument met bron toevoegen.", 400, None)
     conn.execute(f"UPDATE {tabel} SET status = ? WHERE id = ?", (nieuw, rid))
     # Klasse↔instantie-link bij goedkeuring: het choke-point waar een element telt-mee-waardig
     # wordt. Backstop naast create_relation/RfC-adoptie — vangt ook elementen die vóór die
@@ -3090,8 +3112,8 @@ def _modereer(tabel, rid):
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
         VALUES (?, ?, 'updated', ?, ?, ?, ?)
-    """, (tabel, rid, g.user["username"], json.dumps({"status": "voorgesteld"}),
-          json.dumps({"status": nieuw}), (data.get("motivatie") or "").strip() or None))
+    """, (tabel, rid, gebruikersnaam, json.dumps({"status": "voorgesteld"}),
+          json.dumps({"status": nieuw}), (motivatie or "").strip() or None))
     # Argumenten bouwen het element: wordt een entiteit/relatie afgewezen, dan vervalt ook de
     # onderbouwing. Reject de hele discussie(sub)boom mee — de root-argumenten die op dit
     # element wijzen plus al hun reacties — voor zover nog niet verworpen/vervangen. Zo blijven
@@ -3114,12 +3136,25 @@ def _modereer(tabel, rid):
             conn.execute("UPDATE arguments SET status = 'verworpen' WHERE id = ?", (ar["id"],))
             conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
                             VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)""",
-                         (ar["id"], g.user["username"], json.dumps({"status": ar["status"]}),
+                         (ar["id"], gebruikersnaam, json.dumps({"status": ar["status"]}),
                           json.dumps({"status": "verworpen"}), f"mee-afgewezen met {tabel} #{rid}"))
         mee_afgewezen = len(boom)
+    return (True, None, 200, {"id": rid, "status": nieuw, "argumenten_mee_afgewezen": mee_afgewezen})
+
+
+def _modereer(tabel, rid):
+    """Moderatie van een 'voorgesteld' node/edge: reviewer+ keurt goed of af.
+    Niemand keurt eigen werk goed (M2.1). Dunne HTTP-schil om ``_modereer_kern``."""
+    data = request.json or {}
+    conn = get_db()
+    ok, fout, code, extra = _modereer_kern(conn, tabel, rid, data.get("status"),
+                                           g.user["username"], data.get("motivatie"))
+    if not ok:
+        conn.close()
+        return jsonify({"error": fout}), code
     conn.commit()
     conn.close()
-    return jsonify({"id": rid, "status": nieuw, "argumenten_mee_afgewezen": mee_afgewezen})
+    return jsonify(extra)
 
 
 @app.route("/api/entities/<int:eid>/status", methods=["PATCH"])
@@ -4734,6 +4769,70 @@ def auto_merge_log():
         return jsonify({"error": f"Auto-merge-logboek onleesbaar: {e}"}), 500
 
 
+# C4 — overzicht van de onbewaakte achtergrond-agents. launchd draait
+# scripts/agent_runner.py; elke ronde schrijft een record in data/agent_runs.jsonl.
+# Puur procesmeta (lezend) — telt nergens in de score mee. De cadans komt uit
+# agent_schedule (dezelfde bron als de launchd-generator + de schema-editor).
+def _agent_runs_overzicht(limiet_historie=5):
+    """Lees data/agent_runs.jsonl → per-agent samenvatting (laatste run + korte
+    historie + tellingen) voor het toezicht-paneel. Faalveilig: ontbreekt het bestand
+    of is een regel stuk, dan sla je 'm over."""
+    runs = []
+    if AGENT_RUNS_PATH.exists():
+        try:
+            for regel in AGENT_RUNS_PATH.read_text(encoding="utf-8").splitlines():
+                regel = regel.strip()
+                if not regel:
+                    continue
+                try:
+                    runs.append(json.loads(regel))
+                except json.JSONDecodeError:
+                    continue
+        except OSError:
+            runs = []
+    overrides = agent_schedule.laad_overrides()
+    cadans_van = lambda label: agent_schedule.cadans_tekst(
+        agent_schedule.effectief_schema(label, overrides))
+    per = {}
+    for r in runs:  # bestandsvolgorde = chronologisch
+        label = r.get("label") or r.get("account") or "onbekend"
+        per.setdefault(label, []).append(r)
+    per_agent = []
+    vastgelopen = 0
+    for label, lijst in per.items():
+        laatste = lijst[-1]
+        exit_code = laatste.get("exit_code")
+        # Een LinkedIn-blokkade (stroomonderbreker, Epic 12) vraagt eigenaarsaandacht → niet ok.
+        ok = ((exit_code == 0) and not laatste.get("linkedin_verlopen")
+              and not laatste.get("linkedin_blokkade"))
+        if not ok:
+            vastgelopen += 1
+        per_agent.append({
+            "label": label, "cadans": cadans_van(label),
+            "laatste": laatste.get("beeindigd"), "exit_code": exit_code,
+            "duur_s": laatste.get("duur_s"), "oogst": laatste.get("oogst"),
+            "linkedin_verlopen": bool(laatste.get("linkedin_verlopen")),
+            "linkedin_blokkade": bool(laatste.get("linkedin_blokkade")),
+            "linkedin_rem": bool(laatste.get("linkedin_rem")),
+            "ok": ok, "n_runs": len(lijst),
+            "historie": [
+                {"beeindigd": x.get("beeindigd"), "exit_code": x.get("exit_code"),
+                 "oogst": x.get("oogst"), "duur_s": x.get("duur_s"),
+                 "ronde": x.get("ronde")}
+                for x in lijst[-limiet_historie:][::-1]
+            ],
+        })
+    for a in agent_schedule.AGENTS:  # geplande agents die nog nooit draaiden
+        if a["label"] not in per:
+            per_agent.append({"label": a["label"], "cadans": cadans_van(a["label"]),
+                              "laatste": None, "exit_code": None, "duur_s": None,
+                              "oogst": None, "linkedin_verlopen": False,
+                              "linkedin_blokkade": False, "linkedin_rem": False, "ok": None,
+                              "n_runs": 0, "historie": []})
+    per_agent.sort(key=lambda a: (a["laatste"] or ""), reverse=True)
+    return {"per_agent": per_agent, "vastgelopen": vastgelopen, "totaal_runs": len(runs)}
+
+
 @app.route("/api/toezicht")
 @require_user("reviewer")
 def toezicht():
@@ -4793,7 +4892,69 @@ def toezicht():
                       "waarschuwingen": totalen.get("waarschuwing", 0),
                       "info": totalen.get("info", 0)},
         "archief_dekking": archief,
+        "agent_runs": _agent_runs_overzicht(),
     })
+
+
+@app.route("/api/agents/schedules", methods=["GET"])
+@require_user("maintainer")
+def agents_schedules_get():
+    """C1 — de bewerkbare schema's van de achtergrond-agents (maintainer). Per agent de
+    meta + het effectieve schema + de default (zodat de /beheer-editor kan tonen/resetten).
+    Puur infra; telt nergens in het model mee."""
+    overrides = agent_schedule.laad_overrides()
+    status = {a["label"]: a for a in _agent_runs_overzicht()["per_agent"]}
+    uit = []
+    for a in agent_schedule.AGENTS:
+        schema = agent_schedule.effectief_schema(a["label"], overrides)
+        st = status.get(a["label"], {})
+        uit.append({
+            "label": a["label"], "naam": a["naam"], "soort": a["soort"],
+            "omschrijving": a.get("omschrijving"),
+            "schema": schema, "cadans": agent_schedule.cadans_tekst(schema),
+            "default": a.get("default"),
+            # laatste-ronde-status (uit data/agent_runs.jsonl) — één rij per agent
+            "laatste": st.get("laatste"), "ok": st.get("ok"),
+            "exit_code": st.get("exit_code"), "oogst": st.get("oogst"),
+            "duur_s": st.get("duur_s"), "n_runs": st.get("n_runs", 0),
+            "linkedin_verlopen": st.get("linkedin_verlopen", False),
+            "linkedin_blokkade": st.get("linkedin_blokkade", False),
+        })
+    return jsonify({"agents": uit, "eenheden": agent_schedule.EENHEDEN,
+                    "min_minuut": agent_schedule.MIN_ELKE_MINUUT})
+
+
+@app.route("/api/agents/schedules", methods=["PATCH"])
+@require_user("maintainer")
+def agents_schedules_patch():
+    """Schrijf per-label schema-overrides (maintainer; agents zijn bijdrager → geen
+    toegang). agent_schedule valideert/normaliseert. Slaat alleen op — het toepassen op
+    launchd loopt via POST /api/agents/herlaad."""
+    body = request.get_json(silent=True) or {}
+    nieuw = body.get("schedules") if isinstance(body.get("schedules"), dict) else body
+    if not isinstance(nieuw, dict):
+        return jsonify({"error": "verwacht een object {label: schema}"}), 400
+    schoon = agent_schedule.schrijf_overrides(nieuw)
+    return jsonify({"ok": True, "overrides": schoon})
+
+
+@app.route("/api/agents/herlaad", methods=["POST"])
+@require_user("maintainer")
+def agents_herlaad():
+    """Pas de opgeslagen schema's toe op launchd: draai de generator
+    (--geen-server --laden) via subprocess. macOS-only; faal-veilig — bij een fout keert
+    de melding terug (geen 500) en het opgeslagen schema blijft staan (handmatig
+    toepasbaar). --geen-server zodat de draaiende server-job zichzelf niet herstart."""
+    script = str(ROOT / "deploy" / "launchd" / "genereer_launchd.py")
+    try:
+        r = subprocess.run([sys.executable, script, "--geen-server", "--laden"],
+                           cwd=str(ROOT), capture_output=True, text=True, timeout=120)
+        return jsonify({"ok": r.returncode == 0, "returncode": r.returncode,
+                        "uitvoer": (r.stdout + r.stderr)[-4000:]})
+    except (OSError, subprocess.SubprocessError) as e:
+        return jsonify({"ok": False, "uitvoer":
+                        f"Kon de generator niet draaien: {e}\nDraai handmatig: "
+                        "python3 deploy/launchd/genereer_launchd.py --geen-server --laden"})
 
 
 @app.route("/api/afgewezen")
@@ -5936,6 +6097,837 @@ def patch_lead(lead_id):
     rij = dict(conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone())
     conn.close()
     return jsonify(rij)
+
+
+# ══ Nieuws-pijplijn (Epic 12 "Wie is dit?", eigenaarsbesluit 2026-09-30) ══════════
+# De nieuws-aggregator (zusterproject) maakt elke naam in het nieuws klikbaar en toont
+# het netwerk uit dit model. Ontbreekt een naam of heeft hij < 3 goedgekeurde verbanden,
+# dan zet de nieuws-backend (account 'nieuws-agent') een onderzoeksdoel in de wachtrij
+# `nieuws_doelen`; de missie-agent 'nieuws-scout' (missies/nieuws_scout_brief.md) claimt
+# en werkt die af via het GEWONE bijdragepad (alles 'voorgesteld'). Daarna mag een
+# deterministische, gepoorte service (account 'nieuws-autokeur', reviewer-tier) veilige
+# structuurfeiten goedkeuren — een BEWUSTE, geaudite uitzondering op "AI stelt voor, mens
+# beslist" (expliciet eigenaarsbesluit 2026-09-30): alleen neutrale structuur-relatietypes
+# mét mechanisme en bron-URL, argumenten worden NIET gemerged, eerlijk edit_log,
+# kill-switch, dagplafond, intrekken door een maintainer.
+
+NIEUWS_AGENT = "nieuws-agent"
+NIEUWS_SCOUT = "nieuws-scout"
+NIEUWS_AUTOKEUR = "nieuws-autokeur"
+NIEUWS_DOEL_STATUSSEN = ("open", "bezig", "klaar", "niets_gevonden", "overgeslagen",
+                         "twijfel", "fout")
+NIEUWS_DOEL_ACTIEF = ("open", "bezig")           # de rest = afgerond
+NIEUWS_DOEL_SOORTEN = ("persoon", "organisatie")
+NIEUWS_DOEL_VERVOLG = ("linkedin",)              # plus null
+NIEUWS_RESULTAAT_SLEUTELS = ("entity_ids", "relation_ids", "source_ids", "argument_ids")
+NIEUWS_CLAIM_VERLOOP_UUR = 3                     # 'bezig' ouder dan dit telt weer als open
+NIEUWS_CONTEXT_MAX_TEKENS = 50000
+NIEUWS_PRIVE_CATEGORIEEN = ("prive", "privé", "privepersoon", "privépersoon")
+
+
+def _nu_iso():
+    return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+def _nieuws_iso(waarde):
+    """Normaliseer een ISO-tijd uit een query-param naar lokale 'YYYY-MM-DDTHH:MM:SS'
+    (de opslagvorm), zodat tekstvergelijking klopt. Accepteert 'Z'/offsets/microseconden
+    en een kale datum. None bij onleesbaar."""
+    s = (waarde or "").strip()
+    if not s:
+        return None
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone().replace(tzinfo=None)
+    return dt.isoformat(timespec="seconds")
+
+
+def _nieuws_doel_dict(rij):
+    d = dict(rij)
+    for k in ("context", "resultaat"):
+        if d.get(k):
+            try:
+                d[k] = json.loads(d[k])
+            except (TypeError, ValueError):
+                pass
+    return d
+
+
+def _nieuws_doel(conn, did):
+    rij = conn.execute("SELECT * FROM nieuws_doelen WHERE id = ?", (did,)).fetchone()
+    return _nieuws_doel_dict(rij) if rij else None
+
+
+def _mag_nieuws(conn, account):
+    """Dit specifieke machine-account, of een maintainer."""
+    return g.user["username"] == account or heeft_rol(conn, g.user, "maintainer")
+
+
+def _nieuws_log(conn, did, actie, oud, nieuw, reden):
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('nieuws_doelen', ?, ?, ?, ?, ?, ?)
+    """, (did, actie, g.user["username"],
+          json.dumps(oud, ensure_ascii=False) if oud is not None else None,
+          json.dumps(nieuw, ensure_ascii=False) if nieuw is not None else None, reden))
+
+
+def _nieuws_tekst(data, veld, maxlen, verplicht=False):
+    """(waarde, fout). Lege string → None; te lang of geen string → fout."""
+    w = data.get(veld)
+    if w is None or (isinstance(w, str) and not w.strip()):
+        return (None, f"'{veld}' is verplicht" if verplicht else None)
+    if not isinstance(w, str):
+        return (None, f"'{veld}' moet tekst zijn")
+    w = w.strip()
+    if len(w) > maxlen:
+        return (None, f"'{veld}' is te lang (max {maxlen} tekens)")
+    return (w, None)
+
+
+@app.route("/api/nieuws/doelen", methods=["POST"])
+@require_user()
+def nieuws_doelen_upsert():
+    """Zet een onderzoeksdoel in de wachtrij (upsert op `sleutel`). Alleen 'nieuws-agent'
+    of een maintainer. Nieuw → 201 {doel}. Bestaat en open/bezig → 200 {doel, bijgewerkt}
+    (prioriteit = max, naam/rol/context/entity_id bijgewerkt). Afgerond → 409 {error, doel},
+    tenzij "opnieuw": true → heropend ('open'), 200. Privépersonen (rol_categorie 'prive')
+    worden nooit onderzocht → 400 (eigenaarsbesluit; defense-in-depth naast de triage van
+    de nieuws-backend)."""
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    if not _mag_nieuws(conn, NIEUWS_AGENT):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{NIEUWS_AGENT}' of een maintainer "
+                                 "zet doelen in de nieuws-wachtrij"}), 403
+    fouten = []
+    velden = {}
+    for veld, maxlen, verplicht in (("sleutel", 200, True), ("naam", 300, True),
+                                    ("rol_categorie", 40, False), ("rol_hint", 300, False)):
+        velden[veld], fout = _nieuws_tekst(data, veld, maxlen, verplicht=verplicht)
+        if fout:
+            fouten.append(fout)
+    sleutel, naam = velden["sleutel"], velden["naam"]
+    rol_cat, rol_hint = velden["rol_categorie"], velden["rol_hint"]
+    soort = data.get("soort")
+    if soort is not None and soort not in NIEUWS_DOEL_SOORTEN:
+        fouten.append(f"'soort' moet een van {NIEUWS_DOEL_SOORTEN} zijn")
+    if rol_cat and rol_cat.lower() in NIEUWS_PRIVE_CATEGORIEEN:
+        fouten.append("privépersonen worden nooit onderzocht (eigenaarsbesluit 2026-09-30)")
+    context_json = None
+    if data.get("context") is not None:
+        if not isinstance(data["context"], dict):
+            fouten.append("'context' moet een object zijn")
+        else:
+            context_json = json.dumps(data["context"], ensure_ascii=False)
+            if len(context_json) > NIEUWS_CONTEXT_MAX_TEKENS:
+                fouten.append(f"'context' is te groot (max {NIEUWS_CONTEXT_MAX_TEKENS} tekens)")
+    prioriteit = None
+    if data.get("prioriteit") is not None:
+        p = data["prioriteit"]
+        if isinstance(p, bool) or not isinstance(p, (int, float)):
+            fouten.append("'prioriteit' moet een getal zijn")
+        else:
+            prioriteit = float(p)
+    entity_id = data.get("entity_id")
+    if entity_id is not None:
+        if isinstance(entity_id, bool) or not isinstance(entity_id, int):
+            fouten.append("'entity_id' moet een geheel getal of null zijn")
+        elif not conn.execute("SELECT 1 FROM entities WHERE id = ?", (entity_id,)).fetchone():
+            fouten.append(f"entiteit {entity_id} bestaat niet")
+    if fouten:
+        conn.close()
+        return jsonify({"error": "; ".join(fouten)}), 400
+
+    nu = _nu_iso()
+    conn.isolation_level = None      # expliciete transactie: upsert atomair (UNIQUE-race)
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        rij = conn.execute("SELECT * FROM nieuws_doelen WHERE sleutel = ?",
+                           (sleutel,)).fetchone()
+        if rij is None:
+            if soort is None:
+                conn.execute("ROLLBACK")
+                conn.close()
+                return jsonify({"error": "'soort' is verplicht bij een nieuw doel "
+                                         f"(een van {NIEUWS_DOEL_SOORTEN})"}), 400
+            cur = conn.execute("""
+                INSERT INTO nieuws_doelen (sleutel, naam, soort, rol_categorie, rol_hint,
+                    context, prioriteit, entity_id, status, aangevraagd_door, pogingen,
+                    aangemaakt, bijgewerkt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, 0, ?, ?)
+            """, (sleutel, naam, soort, rol_cat, rol_hint, context_json,
+                  prioriteit if prioriteit is not None else 0.0, entity_id,
+                  g.user["username"], nu, nu))
+            did = cur.lastrowid
+            _nieuws_log(conn, did, "created", None,
+                        {"sleutel": sleutel, "naam": naam, "soort": soort, "status": "open"},
+                        "nieuws-doel in de wachtrij gezet")
+            conn.execute("COMMIT")
+            doel = _nieuws_doel(conn, did)
+            conn.close()
+            return jsonify({"doel": doel}), 201
+
+        heropen = False
+        if rij["status"] not in NIEUWS_DOEL_ACTIEF:
+            if data.get("opnieuw") is not True:
+                conn.execute("ROLLBACK")
+                doel = _nieuws_doel_dict(rij)
+                conn.close()
+                return jsonify({"error": f"Dit doel is al afgerond (status '{rij['status']}'); "
+                                         "stuur \"opnieuw\": true om het te heropenen",
+                                "doel": doel}), 409
+            heropen = True
+        sets = ["naam = ?", "bijgewerkt = ?"]
+        vals = [naam, nu]
+        if soort is not None:
+            sets.append("soort = ?"); vals.append(soort)
+        if rol_cat is not None:
+            sets.append("rol_categorie = ?"); vals.append(rol_cat)
+        if rol_hint is not None:
+            sets.append("rol_hint = ?"); vals.append(rol_hint)
+        if context_json is not None:
+            sets.append("context = ?"); vals.append(context_json)
+        if prioriteit is not None:
+            sets.append("prioriteit = MAX(prioriteit, ?)"); vals.append(prioriteit)
+        if "entity_id" in data and entity_id is not None:
+            sets.append("entity_id = ?"); vals.append(entity_id)
+        if heropen:
+            sets += ["status = 'open'", "geclaimd_door = NULL", "geclaimd_op = NULL"]
+        conn.execute(f"UPDATE nieuws_doelen SET {', '.join(sets)} WHERE id = ?",
+                     vals + [rij["id"]])
+        # Een gewone verversing van een open/bezig doel (elke nieuws-cyclus) logt NIET in
+        # edit_log (anders duizenden ruisregels per dag); `bijgewerkt` legt haar vast.
+        # Heropenen is een statuswissel en logt wél.
+        if heropen:
+            _nieuws_log(conn, rij["id"], "updated", {"status": rij["status"]},
+                        {"status": "open"}, "nieuws-doel heropend (opnieuw: true)")
+        conn.execute("COMMIT")
+    except sqlite3.Error:
+        try:
+            conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        conn.close()
+        raise
+    doel = _nieuws_doel(conn, rij["id"])
+    conn.close()
+    antwoord = {"doel": doel, "bijgewerkt": True}
+    if heropen:
+        antwoord["heropend"] = True
+    return jsonify(antwoord), 200
+
+
+@app.route("/api/nieuws/doelen", methods=["GET"])
+@require_user()
+def nieuws_doelen_lijst():
+    """De wachtrij (elk ingelogd account). ?status=a,b &limit=50 (max 500)
+    &bijgewerkt_na=ISO &sleutel=<s>[,<s>…]. Prioriteit aflopend."""
+    waar, vals = [], []
+    status = (request.args.get("status") or "").strip()
+    if status:
+        lijst = [s.strip() for s in status.split(",") if s.strip()]
+        onbekend = [s for s in lijst if s not in NIEUWS_DOEL_STATUSSEN]
+        if onbekend:
+            return jsonify({"error": f"onbekende status {onbekend}; kies uit "
+                                     f"{NIEUWS_DOEL_STATUSSEN}"}), 400
+        waar.append(f"status IN ({','.join('?' * len(lijst))})"); vals += lijst
+    sleutel = (request.args.get("sleutel") or "").strip()
+    if sleutel:
+        lijst = [s.strip() for s in sleutel.split(",") if s.strip()]
+        waar.append(f"sleutel IN ({','.join('?' * len(lijst))})"); vals += lijst
+    if request.args.get("bijgewerkt_na"):
+        grens = _nieuws_iso(request.args.get("bijgewerkt_na"))
+        if grens is None:
+            return jsonify({"error": "'bijgewerkt_na' is geen geldige ISO-tijd"}), 400
+        waar.append("bijgewerkt > ?"); vals.append(grens)
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        return jsonify({"error": "'limit' moet een geheel getal zijn"}), 400
+    limit = max(1, min(500, limit))
+    conn = get_db()
+    rijen = conn.execute(
+        "SELECT * FROM nieuws_doelen"
+        + (f" WHERE {' AND '.join(waar)}" if waar else "")
+        + " ORDER BY prioriteit DESC, aangemaakt ASC, id ASC LIMIT ?", vals + [limit]).fetchall()
+    conn.close()
+    return jsonify({"doelen": [_nieuws_doel_dict(r) for r in rijen]})
+
+
+@app.route("/api/nieuws/doelen/<int:did>", methods=["GET"])
+@require_user()
+def nieuws_doel_get(did):
+    conn = get_db()
+    doel = _nieuws_doel(conn, did)
+    conn.close()
+    if doel is None:
+        return jsonify({"error": "Doel niet gevonden"}), 404
+    return jsonify({"doel": doel})
+
+
+@app.route("/api/nieuws/doelen/claim_volgende", methods=["POST"])
+@require_user()
+def nieuws_doelen_claim_volgende():
+    """Claim ATOMAIR (één BEGIN IMMEDIATE-transactie) de hoogste open doelen:
+    prioriteit aflopend, oudste eerst; een 'bezig'-doel waarvan de claim ouder is dan
+    NIEUWS_CLAIM_VERLOOP_UUR telt weer als open (vastgelopen ronde). ?limit=3 (max 10).
+    Alleen 'nieuws-scout' of een maintainer."""
+    conn = get_db()
+    if not _mag_nieuws(conn, NIEUWS_SCOUT):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{NIEUWS_SCOUT}' of een maintainer "
+                                 "claimt nieuws-doelen"}), 403
+    try:
+        limit = int(request.args.get("limit", 3))
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "'limit' moet een geheel getal zijn"}), 400
+    limit = max(1, min(10, limit))
+    nu = datetime.datetime.now()
+    nu_iso = nu.isoformat(timespec="seconds")
+    verlopen = (nu - datetime.timedelta(hours=NIEUWS_CLAIM_VERLOOP_UUR)).isoformat(
+        timespec="seconds")
+    conn.isolation_level = None
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        rijen = conn.execute("""
+            SELECT id, status FROM nieuws_doelen
+            WHERE status = 'open'
+               OR (status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))
+            ORDER BY prioriteit DESC, aangemaakt ASC, id ASC
+            LIMIT ?""", (verlopen, limit)).fetchall()
+        for r in rijen:
+            conn.execute("""UPDATE nieuws_doelen SET status = 'bezig', geclaimd_door = ?,
+                            geclaimd_op = ?, pogingen = pogingen + 1, bijgewerkt = ?
+                            WHERE id = ?""", (g.user["username"], nu_iso, nu_iso, r["id"]))
+            _nieuws_log(conn, r["id"], "updated", {"status": r["status"]},
+                        {"status": "bezig"},
+                        "nieuws-doel geclaimd" + (" (verlopen claim overgenomen)"
+                                                  if r["status"] == "bezig" else ""))
+        conn.execute("COMMIT")
+    except sqlite3.Error:
+        try:
+            conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        conn.close()
+        raise
+    doelen = [_nieuws_doel(conn, r["id"]) for r in rijen]
+    conn.close()
+    return jsonify({"doelen": doelen})
+
+
+@app.route("/api/nieuws/doelen/<int:did>/claim", methods=["POST"])
+@require_user()
+def nieuws_doelen_claim(did):
+    """Claim één doel: 'open' → 'bezig', anders 409. 'nieuws-scout' of maintainer."""
+    conn = get_db()
+    if not _mag_nieuws(conn, NIEUWS_SCOUT):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{NIEUWS_SCOUT}' of een maintainer "
+                                 "claimt nieuws-doelen"}), 403
+    nu = _nu_iso()
+    conn.isolation_level = None
+    conn.execute("BEGIN IMMEDIATE")
+    rij = conn.execute("SELECT * FROM nieuws_doelen WHERE id = ?", (did,)).fetchone()
+    if rij is None:
+        conn.execute("ROLLBACK")
+        conn.close()
+        return jsonify({"error": "Doel niet gevonden"}), 404
+    if rij["status"] != "open":
+        conn.execute("ROLLBACK")
+        doel = _nieuws_doel_dict(rij)
+        conn.close()
+        return jsonify({"error": f"Alleen een 'open' doel is te claimen (status "
+                                 f"'{rij['status']}')", "doel": doel}), 409
+    conn.execute("""UPDATE nieuws_doelen SET status = 'bezig', geclaimd_door = ?,
+                    geclaimd_op = ?, pogingen = pogingen + 1, bijgewerkt = ? WHERE id = ?""",
+                 (g.user["username"], nu, nu, did))
+    _nieuws_log(conn, did, "updated", {"status": "open"}, {"status": "bezig"},
+                "nieuws-doel geclaimd")
+    conn.execute("COMMIT")
+    doel = _nieuws_doel(conn, did)
+    conn.close()
+    return jsonify({"doel": doel})
+
+
+@app.route("/api/nieuws/doelen/<int:did>", methods=["PATCH"])
+@require_user()
+def nieuws_doelen_patch(did):
+    """Werk een doel bij: {status?, verslag?, resultaat?, entity_id?, vervolg?}.
+    'nieuws-scout' of maintainer. `resultaat` = object met (een deel van) de vier
+    id-lijsten {entity_ids, relation_ids, source_ids, argument_ids}; ontbrekende lijsten
+    worden []. Zet je 'open' terug, dan vervalt de claim."""
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    if not _mag_nieuws(conn, NIEUWS_SCOUT):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{NIEUWS_SCOUT}' of een maintainer "
+                                 "werkt nieuws-doelen bij"}), 403
+    rij = conn.execute("SELECT * FROM nieuws_doelen WHERE id = ?", (did,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": "Doel niet gevonden"}), 404
+    toegestaan = {"status", "verslag", "resultaat", "entity_id", "vervolg"}
+    onbekend = sorted(set(data) - toegestaan)
+    if onbekend:
+        conn.close()
+        return jsonify({"error": f"onbekende velden {onbekend}; toegestaan: "
+                                 f"{sorted(toegestaan)}"}), 400
+    if not data:
+        conn.close()
+        return jsonify({"error": "Niets te wijzigen"}), 400
+    sets, vals, fouten = [], [], []
+    if "status" in data:
+        if data["status"] not in NIEUWS_DOEL_STATUSSEN:
+            fouten.append(f"'status' moet een van {NIEUWS_DOEL_STATUSSEN} zijn")
+        else:
+            sets.append("status = ?"); vals.append(data["status"])
+            if data["status"] == "open":
+                sets += ["geclaimd_door = NULL", "geclaimd_op = NULL"]
+    if "verslag" in data:
+        verslag, f = _nieuws_tekst(data, "verslag", 4000)
+        if f:
+            fouten.append(f)
+        else:
+            sets.append("verslag = ?"); vals.append(verslag)
+    if "vervolg" in data:
+        if data["vervolg"] is not None and data["vervolg"] not in NIEUWS_DOEL_VERVOLG:
+            fouten.append("'vervolg' moet null of 'linkedin' zijn")
+        else:
+            sets.append("vervolg = ?"); vals.append(data["vervolg"])
+    if "entity_id" in data:
+        eid = data["entity_id"]
+        if eid is not None and (isinstance(eid, bool) or not isinstance(eid, int)):
+            fouten.append("'entity_id' moet een geheel getal of null zijn")
+        elif eid is not None and not conn.execute(
+                "SELECT 1 FROM entities WHERE id = ?", (eid,)).fetchone():
+            fouten.append(f"entiteit {eid} bestaat niet")
+        else:
+            sets.append("entity_id = ?"); vals.append(eid)
+    if "resultaat" in data:
+        res = data["resultaat"]
+        if res is None:
+            sets.append("resultaat = NULL")
+        elif not isinstance(res, dict):
+            fouten.append("'resultaat' moet een object zijn met "
+                          f"{list(NIEUWS_RESULTAAT_SLEUTELS)}")
+        else:
+            vreemd = sorted(set(res) - set(NIEUWS_RESULTAAT_SLEUTELS))
+            if vreemd:
+                fouten.append(f"'resultaat' heeft onbekende sleutels {vreemd}")
+            schoon = {}
+            for k in NIEUWS_RESULTAAT_SLEUTELS:
+                lijst = res.get(k, [])
+                if not isinstance(lijst, list) or any(
+                        isinstance(x, bool) or not isinstance(x, int) for x in lijst):
+                    fouten.append(f"'resultaat.{k}' moet een lijst gehele getallen zijn")
+                    continue
+                schoon[k] = sorted(set(lijst))
+            if not fouten:
+                sets.append("resultaat = ?"); vals.append(json.dumps(schoon))
+    if fouten:
+        conn.close()
+        return jsonify({"error": "; ".join(fouten)}), 400
+    nu = _nu_iso()
+    sets.append("bijgewerkt = ?"); vals.append(nu)
+    conn.execute(f"UPDATE nieuws_doelen SET {', '.join(sets)} WHERE id = ?", vals + [did])
+    oud = {k: rij[k] for k in ("status", "vervolg", "entity_id")}
+    nieuw = {k: data[k] for k in ("status", "vervolg", "entity_id") if k in data}
+    if "resultaat" in data:
+        nieuw["resultaat"] = data["resultaat"]
+    _nieuws_log(conn, did, "updated", oud, nieuw, "nieuws-doel bijgewerkt")
+    conn.commit()
+    doel = _nieuws_doel(conn, did)
+    conn.close()
+    return jsonify({"doel": doel})
+
+
+# ── Nieuws-autokeur: automatisch goedkeuren (eigenaarsbesluit 2026-09-30) ──────────
+# Deterministisch predikaat (spiegel van auto_merge_toegestaan) + endpoint dat het
+# predikaat ZELF checkt (defense-in-depth) en goedkeurt via _modereer_kern, zodat élke
+# bestaande moderatiepoort (eigen-werk, orphan, bronplicht, instantiaties, edit_log) ook
+# hier geldt. Alleen ENTITEITEN en RELATIES; argumenten worden nooit gemerged — de score
+# blijft op de 0,05-vloer tot een mens merget.
+
+NIEUWS_AUTOKEUR_RELATIETYPES = ("personeel", "dienstverband", "bestuurder", "adviseur",
+                                "woordvoerder_van", "lidmaatschap", "eigendom")
+NIEUWS_AUTOKEUR_MOTIVATIE = "auto-keur nieuws-pijplijn (eigenaarsbesluit 2026-09-30)"
+NIEUWS_AUTOKEUR_REDEN_PREFIX = "auto-keur nieuws-pijplijn"
+NIEUWS_INTREK_REDEN_PREFIX = "intrekken auto-keur nieuws-pijplijn"
+NIEUWS_AUTOKEUR_PLAFOND_DEFAULT = 60
+NIEUWS_NAAM_DREMPEL = 0.9
+NIEUWS_AUTOKEUR_LOG_PATH = DATA_DIR / "nieuws_autokeur_log.jsonl"
+
+
+def _nieuws_autokeur_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_NIEUWS_AUTOKEUR_PLAFOND",
+                                         NIEUWS_AUTOKEUR_PLAFOND_DEFAULT)))
+    except ValueError:
+        return NIEUWS_AUTOKEUR_PLAFOND_DEFAULT
+
+
+def _nieuws_autokeur_vandaag(conn):
+    """Aantal automatische goedkeuringen vandaag (lokale kalenderdag), uit edit_log."""
+    return conn.execute("""
+        SELECT COUNT(*) FROM edit_log
+        WHERE action = 'updated' AND table_name IN ('entities', 'relations')
+          AND reason LIKE ? AND date(created_at, 'localtime') = date('now', 'localtime')
+    """, (NIEUWS_AUTOKEUR_REDEN_PREFIX + "%",)).fetchone()[0]
+
+
+def _nieuws_klaar_ids(conn):
+    """{'entity_ids': set, 'relation_ids': set} uit het resultaat van alle 'klaar'-doelen."""
+    uit = {"entity_ids": set(), "relation_ids": set()}
+    for r in conn.execute("SELECT resultaat FROM nieuws_doelen WHERE status = 'klaar' "
+                          "AND resultaat IS NOT NULL"):
+        try:
+            res = json.loads(r["resultaat"])
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(res, dict):
+            continue
+        for k in uit:
+            uit[k].update(x for x in (res.get(k) or []) if isinstance(x, int))
+    return uit
+
+
+def _naam_sleutel(naam):
+    """Hoofdletter-, diakriet- en leestekenongevoelige naamvorm."""
+    s = unicodedata.normalize("NFKD", naam or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).lower()
+    return " ".join(re.sub(r"[^\w]+", " ", s).split())
+
+
+def _laatste_goedkeurder(conn, tabel, rid):
+    """(changed_by, reason) van de nieuwste edit_log-rij die dit element op
+    'goedgekeurd' zette, of (None, None)."""
+    for r in conn.execute("""SELECT changed_by, new_value, reason FROM edit_log
+                             WHERE table_name = ? AND record_id = ?
+                               AND action IN ('updated', 'created')
+                             ORDER BY id DESC""", (tabel, rid)):
+        try:
+            nv = json.loads(r["new_value"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(nv, dict) and nv.get("status") == "goedgekeurd":
+            return r["changed_by"], r["reason"]
+    return None, None
+
+
+def _smaad_in_boom(conn, kolom, rid):
+    """Draagt een argument in de discussieboom van dit element een smaad_hold?"""
+    return conn.execute(f"""
+        WITH RECURSIVE boom(id) AS (
+            SELECT id FROM arguments WHERE {kolom} = ? AND parent_argument_id IS NULL
+            UNION ALL
+            SELECT a.id FROM arguments a JOIN boom b ON a.parent_argument_id = b.id
+        )
+        SELECT COUNT(*) FROM arguments WHERE id IN (SELECT id FROM boom)
+          AND COALESCE(smaad_hold, 0) = 1""", (rid,)).fetchone()[0] > 0
+
+
+def _nieuws_autokeur_basis(conn, tabel, rid, klaar_ids):
+    """De INTRINSIEKE voorwaarden van één element (zonder de koppel-voorwaarden tussen
+    entiteit en relatie). Lege lijst = in orde."""
+    rij = conn.execute(f"SELECT * FROM {tabel} WHERE id = ?", (rid,)).fetchone()
+    if rij is None:
+        return ["niet gevonden"]
+    redenen = []
+    if rij["status"] != "voorgesteld":
+        redenen.append(f"status is '{rij['status']}', niet 'voorgesteld'")
+    if rij["vervangen"]:
+        redenen.append("vervangen (M2.6)")
+    maker = _creator_van(conn, tabel, rid)
+    if maker != NIEUWS_SCOUT:
+        redenen.append(f"aangemaakt door '{maker}', niet door '{NIEUWS_SCOUT}'")
+    lijst = "entity_ids" if tabel == "entities" else "relation_ids"
+    if rid not in klaar_ids[lijst]:
+        redenen.append("staat niet in het resultaat van een nieuws-doel met status 'klaar'")
+    if conn.execute("SELECT 1 FROM edit_log WHERE table_name = ? AND record_id = ? "
+                    "AND reason LIKE ? LIMIT 1",
+                    (tabel, rid, NIEUWS_INTREK_REDEN_PREFIX + "%")).fetchone():
+        redenen.append("eerder door een maintainer ingetrokken — nooit opnieuw automatisch")
+    kolom = "entity_id" if tabel == "entities" else "relation_id"
+    if _smaad_in_boom(conn, kolom, rid):
+        redenen.append("smaad_hold op een argument (smaad-firewall) — mensenwerk")
+
+    if tabel == "relations":
+        if rij["relation_type"] not in NIEUWS_AUTOKEUR_RELATIETYPES:
+            redenen.append(f"relatietype '{rij['relation_type']}' valt buiten de neutrale "
+                           f"structuurtypes {NIEUWS_AUTOKEUR_RELATIETYPES} — mensenwerk")
+        if rij["mechanism_id"] is None:
+            redenen.append("geen mechanisme (kandidaat) — niet goedkeurbaar")
+        n_steun = conn.execute("""
+            SELECT COUNT(*) FROM arguments a
+            WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
+              AND a.stance = 'supporting' AND a.property IS NULL
+              AND a.status <> 'verworpen' AND a.contributed_by = ?
+              AND EXISTS (SELECT 1 FROM citations c
+                          JOIN source_locations sl ON sl.source_id = c.source_id
+                          WHERE c.argument_id = a.id AND sl.location_type = 'url'
+                            AND TRIM(COALESCE(sl.location, '')) <> '')
+        """, (rid, NIEUWS_SCOUT)).fetchone()[0]
+        if not n_steun:
+            redenen.append(f"geen supporting root-argument van '{NIEUWS_SCOUT}' met een "
+                           "citatie naar een bron met URL-vindplaats")
+        n_tegen = conn.execute("""
+            SELECT COUNT(*) FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL
+              AND NOT vervangen AND stance = 'contradicting' AND status <> 'verworpen'
+        """, (rid,)).fetchone()[0]
+        if n_tegen:
+            redenen.append("er ligt een tegenargument op deze relatie — mensenwerk")
+    else:
+        if not (rij["type"] or "").strip():
+            redenen.append("geen entiteittype")
+        if rij["primary_role_id"] is None:
+            redenen.append("geen rol-suggestie (primary_role_id)")
+        sleutel = _naam_sleutel(rij["name"])
+        for ander in conn.execute("""SELECT id, name FROM entities
+                                     WHERE status = 'goedgekeurd' AND NOT vervangen
+                                       AND id <> ?""", (rid,)):
+            if _naam_sleutel(ander["name"]) == sleutel:
+                gelijk = 1.0
+            elif dedup is not None:
+                gelijk = dedup.gelijkenis(rij["name"], ander["name"])
+            else:
+                gelijk = difflib.SequenceMatcher(None, rij["name"].lower(),
+                                                 ander["name"].lower()).ratio()
+            if gelijk >= NIEUWS_NAAM_DREMPEL:
+                redenen.append(f"lijkt op bestaande entiteit #{ander['id']} "
+                               f"'{ander['name']}' (gelijkenis {gelijk:.2f}) — "
+                               "mogelijk duplicaat, mensenwerk")
+                break
+    return redenen
+
+
+def _eindpunt_ok(conn, eid, klaar_ids, *, behalve=None):
+    """Is dit eindpunt goedgekeurd, of in dezelfde ronde automatisch goedkeurbaar?
+    Geeft None als ok, anders een reden."""
+    if behalve is not None and eid == behalve:
+        return None
+    e = conn.execute("SELECT status, vervangen FROM entities WHERE id = ?", (eid,)).fetchone()
+    if e is None:
+        return f"entiteit #{eid} bestaat niet"
+    if e["status"] == "goedgekeurd" and not e["vervangen"]:
+        return None
+    if e["status"] == "voorgesteld":
+        sub = _nieuws_autokeur_basis(conn, "entities", eid, klaar_ids)
+        if not sub:
+            return None
+        return (f"entiteit #{eid} is niet goedgekeurd en niet automatisch goedkeurbaar "
+                f"({'; '.join(sub)})")
+    return f"entiteit #{eid} heeft status '{e['status']}'"
+
+
+def nieuws_autokeur_toegestaan(conn, tabel, rid, strikt=False):
+    """Mag de nieuws-autokeur dit element goedkeuren? → (ok, redenen).
+
+    Gemeenschappelijk: status 'voorgesteld' en niet vervangen; aangemaakt door
+    'nieuws-scout'; vermeld in het `resultaat` van een nieuws-doel met status 'klaar';
+    nooit eerder door een maintainer ingetrokken; geen smaad_hold in de boom.
+    Relaties: type ∈ NIEUWS_AUTOKEUR_RELATIETYPES, mechanism_id gezet, ≥1 supporting
+    evidentiële root (niet vervangen/verworpen) van 'nieuws-scout' met een citatie naar
+    een bron met URL-vindplaats, geen tegenargument, en beide eindpunten goedgekeurd of
+    in dezelfde ronde goedkeurbaar (de service keurt entiteiten eerst).
+    Entiteiten: type + rol-suggestie gezet, gekoppeld aan ≥1 relatie die (in dezelfde
+    ronde) goedkeurbaar is, en geen bijna-duplicaat van een goedgekeurde entiteitnaam
+    (gelijkenis ≥ 0,9 of hoofdletter-/diakriet-ongevoelig gelijk) → anders parkeren.
+    ``strikt=True`` (het goedkeur-endpoint zelf): een relatie mag pas als beide eindpunten
+    NU al goedgekeurd zijn — zo kan geen relatie vóór haar entiteit de graaf in (geen
+    bungelende edge), ook niet bij een verkeerde aanroepvolgorde. De alleen-lezen check
+    (GET, droogloop) gebruikt de ronde-brede lezing."""
+    if tabel not in ("entities", "relations"):
+        return (False, [f"onbekende tabel '{tabel}' (entities | relations)"])
+    klaar = _nieuws_klaar_ids(conn)
+    redenen = _nieuws_autokeur_basis(conn, tabel, rid, klaar)
+    if redenen == ["niet gevonden"]:
+        return (False, redenen)
+    if tabel == "relations":
+        rel = conn.execute("SELECT source_id, target_id FROM relations WHERE id = ?",
+                           (rid,)).fetchone()
+        for kant, eid in (("bron", rel["source_id"]), ("doel", rel["target_id"])):
+            fout = _eindpunt_ok(conn, eid, klaar)
+            if fout:
+                redenen.append(f"{kant}-eindpunt: {fout}")
+            elif strikt and conn.execute("SELECT status FROM entities WHERE id = ?",
+                                         (eid,)).fetchone()["status"] != "goedgekeurd":
+                redenen.append(f"{kant}-eindpunt #{eid} is nog niet goedgekeurd — volgorde: "
+                               "de autokeur keurt eerst de entiteiten goed, dan de relaties")
+    else:
+        gekoppeld = False
+        for r in conn.execute("""SELECT id, source_id, target_id FROM relations
+                                 WHERE (source_id = ? OR target_id = ?)
+                                   AND status = 'voorgesteld' AND NOT vervangen""",
+                              (rid, rid)).fetchall():
+            if _nieuws_autokeur_basis(conn, "relations", r["id"], klaar):
+                continue
+            ander = r["target_id"] if r["source_id"] == rid else r["source_id"]
+            if _eindpunt_ok(conn, ander, klaar, behalve=rid) is None:
+                gekoppeld = True
+                break
+        if not gekoppeld:
+            redenen.append("niet gekoppeld aan een relatie die (in dezelfde ronde) "
+                           "automatisch goedkeurbaar is")
+    return (not redenen, redenen)
+
+
+def _nieuws_autokeur_tabel(tabel):
+    return tabel in ("entities", "relations")
+
+
+@app.route("/api/nieuws/autokeur/<tabel>/<int:rid>", methods=["GET"])
+@require_user("reviewer")
+def nieuws_autokeur_check(tabel, rid):
+    """Alleen-lezen predikaat-check (reviewer): {tabel, id, status, toegestaan, redenen}.
+    Voor de droogloop van scripts/nieuws_autokeur_service.py; wijzigt niets en telt niet
+    mee in het dagplafond."""
+    if not _nieuws_autokeur_tabel(tabel):
+        return jsonify({"error": "tabel moet 'entities' of 'relations' zijn"}), 400
+    conn = get_db()
+    rij = conn.execute(f"SELECT status FROM {tabel} WHERE id = ?", (rid,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": "Niet gevonden"}), 404
+    ok, redenen = nieuws_autokeur_toegestaan(conn, tabel, rid)
+    conn.close()
+    return jsonify({"tabel": tabel, "id": rid, "status": rij["status"],
+                    "toegestaan": ok, "redenen": redenen})
+
+
+@app.route("/api/nieuws/autokeur/<tabel>/<int:rid>", methods=["POST"])
+@require_user("reviewer")
+def nieuws_autokeur(tabel, rid):
+    """Automatisch goedkeuren via de nieuws-pijplijn (reviewer-tier; bedoeld voor het
+    machine-account 'nieuws-autokeur'). Kill-switch PROPAGANDA_NIEUWS_AUTOKEUR=0 → 503;
+    boven het dagplafond (PROPAGANDA_NIEUWS_AUTOKEUR_PLAFOND, standaard 60) → 429;
+    predikaat niet ok → 409 {goedgekeurd: false, redenen}. Anders keurt _modereer_kern
+    goed met motivatie 'auto-keur nieuws-pijplijn (eigenaarsbesluit 2026-09-30)' →
+    200 {goedgekeurd: true}. Het predikaat wordt hier ALTIJD zelf gecheckt."""
+    if os.environ.get("PROPAGANDA_NIEUWS_AUTOKEUR", "1") == "0":
+        return jsonify({"goedgekeurd": False,
+                        "error": "nieuws-autokeur uitgeschakeld (PROPAGANDA_NIEUWS_AUTOKEUR=0)"}), 503
+    if not _nieuws_autokeur_tabel(tabel):
+        return jsonify({"error": "tabel moet 'entities' of 'relations' zijn"}), 400
+    conn = get_db()
+    if conn.execute(f"SELECT 1 FROM {tabel} WHERE id = ?", (rid,)).fetchone() is None:
+        conn.close()
+        return jsonify({"error": "Niet gevonden"}), 404
+    plafond = _nieuws_autokeur_plafond()
+    vandaag = _nieuws_autokeur_vandaag(conn)
+    if vandaag >= plafond:
+        conn.close()
+        return jsonify({"goedgekeurd": False, "plafond": plafond, "vandaag": vandaag,
+                        "error": f"dagplafond bereikt ({vandaag}/{plafond} automatische "
+                                 "goedkeuringen vandaag) — rest blijft voor de mens"}), 429
+    ok, redenen = nieuws_autokeur_toegestaan(conn, tabel, rid, strikt=True)
+    if not ok:
+        conn.close()
+        return jsonify({"goedgekeurd": False, "redenen": redenen}), 409
+    ok, fout, code, _extra = _modereer_kern(conn, tabel, rid, "goedgekeurd",
+                                            g.user["username"], NIEUWS_AUTOKEUR_MOTIVATIE)
+    if not ok:
+        conn.close()
+        return jsonify({"goedgekeurd": False, "redenen": [fout], "kern_http": code}), 409
+    conn.commit()
+    conn.close()
+    return jsonify({"goedgekeurd": True, "tabel": tabel, "id": rid}), 200
+
+
+@app.route("/api/nieuws/autokeur/intrekken", methods=["POST"])
+@require_user("maintainer")
+def nieuws_autokeur_intrekken():
+    """Draai een automatische goedkeuring terug (maintainer): {tabel, id, motivatie}.
+    Alleen voor een element waarvan de NIEUWSTE goedkeuring van 'nieuws-autokeur' kwam;
+    status → 'voorgesteld' (terug in de menselijke wachtrij), edit_log onder de maintainer
+    met de motivatie. Een ingetrokken element keurt de autokeur nooit opnieuw goed.
+    Een entiteit neemt haar automatisch goedgekeurde relaties mee; hangt er een door een
+    mens goedgekeurde relatie aan, dan weigert dit (409) — trek die eerst zelf in/af."""
+    data = request.get_json(silent=True) or {}
+    tabel, rid = data.get("tabel"), data.get("id")
+    motivatie = data.get("motivatie")
+    if not _nieuws_autokeur_tabel(tabel):
+        return jsonify({"error": "tabel moet 'entities' of 'relations' zijn"}), 400
+    if isinstance(rid, bool) or not isinstance(rid, int):
+        return jsonify({"error": "id moet een geheel getal zijn"}), 400
+    if not isinstance(motivatie, str) or not motivatie.strip():
+        return jsonify({"error": "motivatie is verplicht"}), 400
+    motivatie = motivatie.strip()
+    conn = get_db()
+    rij = conn.execute(f"SELECT status FROM {tabel} WHERE id = ?", (rid,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": "Niet gevonden"}), 404
+    if rij["status"] != "goedgekeurd":
+        conn.close()
+        return jsonify({"error": f"Alleen een goedgekeurd element is in te trekken "
+                                 f"(status '{rij['status']}')"}), 409
+    door, _ = _laatste_goedkeurder(conn, tabel, rid)
+    if door != NIEUWS_AUTOKEUR:
+        conn.close()
+        return jsonify({"error": f"De laatste goedkeuring kwam niet van '{NIEUWS_AUTOKEUR}' "
+                                 f"(maar van '{door}') — gebruik de gewone moderatie"}), 409
+    mee = []
+    if tabel == "entities":
+        menselijk = []
+        for r in conn.execute("""SELECT id FROM relations WHERE (source_id = ? OR target_id = ?)
+                                 AND status = 'goedgekeurd'""", (rid, rid)).fetchall():
+            d, _ = _laatste_goedkeurder(conn, "relations", r["id"])
+            (mee if d == NIEUWS_AUTOKEUR else menselijk).append(r["id"])
+        if menselijk:
+            conn.close()
+            return jsonify({"error": "Aan deze entiteit hangen goedgekeurde relaties die niet "
+                                     "door de autokeur zijn goedgekeurd; trek die eerst in of "
+                                     "keur ze af", "relaties": menselijk}), 409
+    reden = f"{NIEUWS_INTREK_REDEN_PREFIX}: {motivatie}"
+    for t, i, r in [("relations", x, f"{reden} (mee met entities #{rid})") for x in mee] + [
+            (tabel, rid, reden)]:
+        conn.execute(f"UPDATE {t} SET status = 'voorgesteld' WHERE id = ?", (i,))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES (?, ?, 'updated', ?, ?, ?, ?)
+        """, (t, i, g.user["username"], json.dumps({"status": "goedgekeurd"}),
+              json.dumps({"status": "voorgesteld"}), r))
+    conn.commit()
+    conn.close()
+    return jsonify({"ingetrokken": True, "tabel": tabel, "id": rid,
+                    "mee_ingetrokken": {"relations": mee}})
+
+
+@app.route("/api/nieuws/autokeur/log")
+@require_user("reviewer")
+def nieuws_autokeur_log():
+    """De laatste regels van data/nieuws_autokeur_log.jsonl (reviewer+), nieuwste eerst.
+    ?limit=100 (max 1000). Plus de teller van vandaag en het plafond."""
+    try:
+        limit = max(1, min(1000, int(request.args.get("limit", 100))))
+    except ValueError:
+        return jsonify({"error": "'limit' moet een geheel getal zijn"}), 400
+    regels = []
+    if NIEUWS_AUTOKEUR_LOG_PATH.exists():
+        try:
+            for regel in NIEUWS_AUTOKEUR_LOG_PATH.read_text(encoding="utf-8").splitlines():
+                regel = regel.strip()
+                if regel:
+                    try:
+                        regels.append(json.loads(regel))
+                    except json.JSONDecodeError:
+                        continue
+        except OSError as e:
+            return jsonify({"error": f"Autokeur-log onleesbaar: {e}"}), 500
+    conn = get_db()
+    vandaag = _nieuws_autokeur_vandaag(conn)
+    conn.close()
+    return jsonify({"regels": regels[-limit:][::-1], "vandaag": vandaag,
+                    "plafond": _nieuws_autokeur_plafond(),
+                    "uitgeschakeld": os.environ.get("PROPAGANDA_NIEUWS_AUTOKEUR", "1") == "0"})
 
 
 if __name__ == "__main__":

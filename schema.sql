@@ -844,6 +844,41 @@ CREATE TABLE leads (
 );
 
 --------------------------------------------------------------
+-- NIEUWS_DOELEN (Epic 12 "Wie is dit?", eigenaarsbesluit 2026-09-30): de
+-- onderzoekswachtrij die de nieuws-aggregator vult (account 'nieuws-agent') en de
+-- missie-agent 'nieuws-scout' afwerkt. PROCESMETADATA, geen inhoud: telt in niets
+-- mee (scoring/influence/viz lezen deze tabel niet). Wat de scout vindt gaat via
+-- het gewone bijdragepad (alles 'voorgesteld'); `resultaat` wijst alleen naar die
+-- ids. `context`/`resultaat` zijn JSON-objecten als TEXT. Tijden = lokale ISO-tekst
+-- (YYYY-MM-DDTHH:MM:SS). Bewust geen FK op entity_id (een entiteit-DELETE mag niet
+-- op een wachtrij-rij stuklopen). Aangelegd via schema.sql (verse build) én
+-- scripts/migrate_add_nieuws_doelen.py (bestaande DB).
+--------------------------------------------------------------
+
+CREATE TABLE nieuws_doelen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sleutel TEXT NOT NULL UNIQUE,         -- 'person:<slug>' | 'org:<slug>' (upsert-sleutel)
+    naam TEXT NOT NULL,
+    soort TEXT NOT NULL CHECK(soort IN ('persoon', 'organisatie')),
+    rol_categorie TEXT,                   -- politicus/journalist/woordvoerder/bestuurder/...
+    rol_hint TEXT,                        -- bv. 'wethouder Dijkerhoven'
+    context TEXT,                         -- JSON: {events, artikelen, organisaties, rolzinnen}
+    prioriteit REAL NOT NULL DEFAULT 0,
+    entity_id INTEGER,                    -- bestaande/gevonden pm-entiteit (NULL = onbekend)
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN (
+        'open', 'bezig', 'klaar', 'niets_gevonden', 'overgeslagen', 'twijfel', 'fout')),
+    vervolg TEXT CHECK(vervolg IS NULL OR vervolg IN ('linkedin')),
+    verslag TEXT,                         -- kort, neutraal verslag van de scout
+    resultaat TEXT,                       -- JSON: {entity_ids, relation_ids, source_ids, argument_ids}
+    aangevraagd_door TEXT REFERENCES users(username),
+    geclaimd_door TEXT REFERENCES users(username),
+    geclaimd_op TEXT,
+    pogingen INTEGER NOT NULL DEFAULT 0,
+    aangemaakt TEXT NOT NULL,
+    bijgewerkt TEXT NOT NULL
+);
+
+--------------------------------------------------------------
 -- INDEXEN
 --------------------------------------------------------------
 
@@ -887,6 +922,7 @@ CREATE INDEX idx_lineage_nieuw ON lineage(element_type, nieuw_id);
 CREATE INDEX idx_predictions_status ON predictions(status);
 CREATE INDEX idx_leads_status ON leads(status);
 CREATE INDEX idx_leads_ip ON leads(ingezonden_ip_hash);
+CREATE INDEX idx_nieuws_doelen_status ON nieuws_doelen(status, prioriteit);
 
 --------------------------------------------------------------
 -- SEED DATA: ROLLEN (theoretisch model)

@@ -17,7 +17,17 @@ Scrapen:
     python3 tools/linkedin/scrape_profile.py "https://www.linkedin.com/in/<slug>/"
     python3 tools/linkedin/scrape_profile.py --bedrijf "https://www.linkedin.com/company/<slug>/"
 
+Zoeken (people-search in de ingelogde sessie → JSON-lijst op stdout):
+    python3 tools/linkedin/scrape_profile.py zoek "<naam>" [--context "<organisatie>"] [--max 5]
+
 Uitvoer: data/linkedin/<slug>.json (gitignored — persoonsdata).
+
+Snelheidsrem (Epic 12, eigenaarsbesluit 2026-09-30 — wijzigt J4): elke profiel-scrape
+en elke zoekactie vraagt eerst `snelheidsrem.py` om toestemming (max 2/uur, 10/dag per
+soort, 08–22 uur, stroomonderbreker). Exit-codes:
+    75 = snelheidsrem weigert nu ("⏳ LINKEDIN-SNELHEIDSREM — volgende kans HH:MM")
+    76 = blokkade gedetecteerd (captcha/checkpoint/authwall) → stroomonderbreker
+         gesprongen ("⛔ LINKEDIN-BLOKKADE …"); los van de dode-sessie-melding.
 
 LET OP (staat ook in de README): geautomatiseerd scrapen schendt LinkedIn's
 gebruiksvoorwaarden en kan je account kosten. Gebruik het gericht, met mate, en alleen
@@ -36,6 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import normalize  # noqa: E402  (buurmodule)
 import extract    # noqa: E402  (eigen, robuuste extractie via de detailpagina's)
+import snelheidsrem  # noqa: E402  (Epic 12: harde rem onder automatisch gebruik)
 
 ROOT = Path(__file__).resolve().parents[2]
 UITVOER_DIR = ROOT / "data" / "linkedin"
@@ -47,7 +58,8 @@ LOGIN_TIMEOUT_S = 600  # 10 minuten om handmatig in te loggen (incl. 2FA/CAPTCHA
 # (menselijk tempo, minder botdetectie). Verandert NIETS aan de headful-default of de
 # is_logged_in-poort.
 PROFIEL_CAP = 5
-PAUZE_TUSSEN_PROFIELEN_S = 5
+PAUZE_TUSSEN_PROFIELEN_S = 45   # basis; de echte pauze is willekeurig (snelheidsrem.pauze)
+ZOEK_MAX = 10                   # bovengrens op --max bij `zoek`
 
 
 def _eis_bibliotheek():
@@ -103,6 +115,76 @@ async def _login():
     print("  Test met: python3 tools/linkedin/scrape_profile.py \"<een-LinkedIn-profiel-URL>\"")
 
 
+async def _open_feed(page, is_logged_in):
+    """Open /feed/ en controleer de sessie. Volgorde telt: eerst een échte
+    beveiligingscontrole (checkpoint/captcha → stroomonderbreker, exit 76), dán de
+    sessie-check (login/authwall op /feed/ = verlopen sessie → de ongewijzigde
+    "⚠ LINKEDIN-SESSIE VERLOPEN"-melding)."""
+    await page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
+    await asyncio.sleep(snelheidsrem.pauze(2.0))
+    await extract.controleer_blokkade(page, authwall_is_blokkade=False)
+    # Sessiecookies verlopen (LinkedIn: ~dagen–weken). Een verlopen cookie laadt
+    # zonder fout, maar LinkedIn stuurt je dan naar de authwall — de detailpagina's
+    # renderen dan de login i.p.v. het profiel, en de extractie levert stil een
+    # leeg profiel (0 ervaringen). Vang dat hier af met een expliciete check, zodat
+    # je een duidelijke fout krijgt i.p.v. misleidend-lege output.
+    if not await is_logged_in(page):
+        sys.exit(normalize.sessie_verlopen_bericht(
+            "LinkedIn toont de login/authwall i.p.v. het profiel — de opgeslagen "
+            "sessie is verlopen of ongeldig."))
+
+
+async def _zoek(naam: str, context: str | None, max_n: int, sessie: Path, headless: bool):
+    BrowserManager, _, _, _ = _eis_bibliotheek()
+    from linkedin_scraper import is_logged_in  # type: ignore
+    if not sessie.exists():
+        sys.exit(f"Geen sessie gevonden ({sessie}). Draai eerst: "
+                 f"python3 {Path(__file__).name} login")
+    async with BrowserManager(headless=headless) as browser:
+        await browser.load_session(str(sessie))
+        await _open_feed(browser.page, is_logged_in)
+        await asyncio.sleep(snelheidsrem.pauze(3.0))
+        return await extract.zoek_personen(browser.page, naam, context, max_n=max_n)
+
+
+def _rem_of_stop(rem, soort):
+    """Vraag de snelheidsrem om toestemming; weiger → melding + exit 75."""
+    ok, reden, volgende = rem.mag_nu(soort)
+    if not ok:
+        print(snelheidsrem.rem_bericht(reden, volgende), flush=True)
+        sys.exit(snelheidsrem.EXIT_REM)
+
+
+def _blokkade_stop(rem, reden):
+    """Stroomonderbreker: registreer de blokkade + melding + exit 76."""
+    tot = rem.blokkeer(reden)
+    print(snelheidsrem.blokkade_bericht(reden, tot), flush=True)
+    sys.exit(snelheidsrem.EXIT_BLOKKADE)
+
+
+def _main_zoek(argv):
+    p = argparse.ArgumentParser(prog="scrape_profile.py zoek",
+                                description="LinkedIn people-search (ingelogde sessie) → "
+                                            "JSON-lijst [{naam, kop, locatie, url}] op stdout.")
+    p.add_argument("naam", help="volledige naam van de persoon")
+    p.add_argument("--context", help="organisatie/rol om naamgenoten te scheiden")
+    p.add_argument("--max", type=int, default=5, help=f"max. aantal resultaten (≤ {ZOEK_MAX})")
+    p.add_argument("--sessie", type=Path, default=SESSIE_BESTAND)
+    p.add_argument("--headless", action="store_true",
+                   help="zonder zichtbaar venster (afgeraden: headful is de norm)")
+    args = p.parse_args(argv)
+    rem = snelheidsrem.Snelheidsrem()
+    _rem_of_stop(rem, "zoek")
+    try:
+        resultaten = asyncio.run(_zoek(args.naam, args.context,
+                                       max(1, min(ZOEK_MAX, args.max)), args.sessie,
+                                       args.headless))
+    except extract.LinkedInBlokkade as b:
+        _blokkade_stop(rem, b.reden)
+    rem.registreer("zoek")
+    print(json.dumps(resultaten, ensure_ascii=False, indent=2))
+
+
 async def _scrape(url: str, is_bedrijf: bool, uit: Path, sessie: Path, headless: bool):
     BrowserManager, PersonScraper, CompanyScraper, _ = _eis_bibliotheek()
     from linkedin_scraper import is_logged_in  # type: ignore
@@ -111,20 +193,12 @@ async def _scrape(url: str, is_bedrijf: bool, uit: Path, sessie: Path, headless:
                  f"python3 {Path(__file__).name} login")
     async with BrowserManager(headless=headless) as browser:
         await browser.load_session(str(sessie))
-        # Sessiecookies verlopen (LinkedIn: ~dagen–weken). Een verlopen cookie laadt
-        # zonder fout, maar LinkedIn stuurt je dan naar de authwall — de detailpagina's
-        # renderen dan de login i.p.v. het profiel, en de extractie levert stil een
-        # leeg profiel (0 ervaringen). Vang dat hier af met een expliciete check, zodat
-        # je een duidelijke fout krijgt i.p.v. misleidend-lege output.
-        await browser.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
-        await asyncio.sleep(2)
-        if not await is_logged_in(browser.page):
-            sys.exit(normalize.sessie_verlopen_bericht(
-                "LinkedIn toont de login/authwall i.p.v. het profiel — de opgeslagen "
-                "sessie is verlopen of ongeldig."))
+        # Sessie- én blokkadecheck op /feed/ vóór het profiel (zie _open_feed).
+        await _open_feed(browser.page, is_logged_in)
         if is_bedrijf:
             # Company draait nog op de bibliotheek (idem caveat: selectors kunnen verouderd zijn).
             obj = await CompanyScraper(browser.page).scrape(url)
+            await extract.controleer_blokkade(browser.page)
             profiel = normalize.bedrijf_naar_profiel(obj, linkedin_url=url)
         else:
             # Persoon via de eigen detailpagina-extractie (robuuster dan de lib-selectors).
@@ -157,6 +231,9 @@ def main():
     p.add_argument("--ik-weet-het", action="store_true",
                    help=f"override de per-run profiel-cap ({PROFIEL_CAP}); gericht werken "
                         f"blijft de norm — gebruik dit niet om te bulk-crawlen")
+    if len(sys.argv) > 1 and sys.argv[1] == "zoek":
+        _main_zoek(sys.argv[2:])
+        return
     args = p.parse_args()
 
     if not args.url:
@@ -178,12 +255,25 @@ def main():
         sys.exit("--out werkt alleen met één URL; laat 'm weg voor een batch "
                  "(elk profiel gaat dan naar data/linkedin/<slug>.json).")
 
+    rem = snelheidsrem.Snelheidsrem()
     for i, url in enumerate(urls):
         uit = args.out or (UITVOER_DIR / f"{_slug(url)}.json")
-        asyncio.run(_scrape(url, args.bedrijf, uit, args.sessie, args.headless))
-        # Pauze tussen requests: menselijk tempo, minder kans op botdetectie/ban.
+        # Epic 12: de snelheidsrem beslist vóór élk profiel (2/uur, 10/dag, 08–22 uur,
+        # stroomonderbreker). Weigert ze, dan stopt de run met exit 75 (geen lus).
+        _rem_of_stop(rem, "profiel")
+        try:
+            asyncio.run(_scrape(url, args.bedrijf, uit, args.sessie, args.headless))
+        except extract.LinkedInBlokkade as b:
+            _blokkade_stop(rem, b.reden)
+        except SystemExit:
+            raise            # dode sessie: LinkedIn is niet 'gebruikt' → niet tellen
+        except Exception:
+            rem.registreer("profiel")   # LinkedIn wél geraakt, daarna mislukt: telt mee
+            raise
+        rem.registreer("profiel")
+        # Pauze tussen requests: menselijk tempo, willekeurig (geen vast ritme).
         if i < len(urls) - 1:
-            time.sleep(PAUZE_TUSSEN_PROFIELEN_S)
+            time.sleep(snelheidsrem.pauze(PAUZE_TUSSEN_PROFIELEN_S))
 
 
 if __name__ == "__main__":

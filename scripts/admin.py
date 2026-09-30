@@ -27,6 +27,8 @@ Voorbeelden:
     python3 scripts/admin.py voorstel 15           # één RfC tonen
     python3 scripts/admin.py voorstel-akkoord 15   # RfC goedkeuren (telt; maintainer = quorum)
     python3 scripts/admin.py voorstel-afwijzen 15 -m "..."
+    python3 scripts/admin.py autokeur-log          # nieuws-autokeur: laatste beslissingen
+    python3 scripts/admin.py intrekken relations 812 -m "..."  # automatische goedkeuring terugdraaien
 """
 import argparse
 import json
@@ -186,6 +188,29 @@ def cmd_voorstel_afwijzen(args, token, base):
     return _ok(st, p, f"voorstel #{args.id} afgewezen")
 
 
+def cmd_autokeur_log(args, token, base):
+    """Epic 12: de beslissingen van de nieuws-autokeur (GET /api/nieuws/autokeur/log)."""
+    st, d = _req("GET", f"/api/nieuws/autokeur/log?limit={args.n}", token, base)
+    if st != 200 or args.json:
+        return _ok(st, d)
+    print(f"Automatische goedkeuringen vandaag: {d.get('vandaag')}/{d.get('plafond')}"
+          + ("  [KILL-SWITCH: uitgeschakeld]" if d.get("uitgeschakeld") else ""))
+    for r in d.get("regels", []):
+        wat = f"{r.get('tabel', '')} #{r.get('id', '')}" if r.get("tabel") else ""
+        extra = "; ".join(r.get("redenen") or []) or r.get("error") or ""
+        print(f"  {r.get('ts', '?')}  {r.get('uitkomst', '?'):<12} {wat:<18} {extra[:90]}")
+    return 0
+
+
+def cmd_intrekken(args, token, base):
+    """Epic 12: een automatische goedkeuring van nieuws-autokeur terugdraaien (maintainer)."""
+    body = {"tabel": args.tabel, "id": args.id, "motivatie": args.motivatie}
+    st, p = _req("POST", "/api/nieuws/autokeur/intrekken", token, base, body=body)
+    mee = (p.get("mee_ingetrokken") or {}).get("relations") or []
+    return _ok(st, p, f"{args.tabel} #{args.id} ingetrokken → terug naar 'voorgesteld'"
+                      + (f" (mee: relaties {mee})" if mee else ""))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Admin-client (maintainer) voor de review-wachtrij.")
     ap.add_argument("--token", default=str(DEFAULT_TOKEN), help=f"pad naar Bearer-token (default {DEFAULT_TOKEN})")
@@ -214,6 +239,14 @@ def main():
     p.add_argument("-m", "--motivatie"); p.set_defaults(fn=cmd_voorstel_akkoord)
     p = sub.add_parser("voorstel-afwijzen", help="RfC afwijzen"); p.add_argument("id", type=int)
     p.add_argument("-m", "--motivatie", required=True); p.set_defaults(fn=cmd_voorstel_afwijzen)
+
+    p = sub.add_parser("autokeur-log", help="nieuws-autokeur: laatste beslissingen (reviewer+)")
+    p.add_argument("--n", type=int, default=50, help="aantal regels (default 50)")
+    p.add_argument("--json", action="store_true", help="ruwe JSON")
+    p.set_defaults(fn=cmd_autokeur_log)
+    p = sub.add_parser("intrekken", help="automatische goedkeuring (nieuws-autokeur) terugdraaien")
+    p.add_argument("tabel", choices=["entities", "relations"]); p.add_argument("id", type=int)
+    p.add_argument("-m", "--motivatie", required=True); p.set_defaults(fn=cmd_intrekken)
 
     args = ap.parse_args()
     sys.exit(args.fn(args, _token(args.token), args.base))

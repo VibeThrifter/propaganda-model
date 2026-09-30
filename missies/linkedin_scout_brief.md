@@ -10,7 +10,19 @@ Dit is een verbijzondering van de gewone scout-missie (`scout_brief.md`): dezelf
 anti-overfit-plicht, dezelfde "ik stel voor, een mens beslist"-regel, maar met LinkedIn
 als (zwakke, zelf-gerapporteerde) bron. Lees eerst `scout_brief.md`.
 
-## Scraping-beleid: gericht, geen bulk (lees dit eerst — J4)
+## Scraping-beleid: gericht, geen bulk (lees dit eerst — J4, gewijzigd 2026-09-30)
+
+> **Eigenaarsbesluit 2026-09-30.** Automatisch (onbewaakt) LinkedIn-gebruik mag nu —
+> maar uitsluitend achter de **snelheidsrem** `tools/linkedin/snelheidsrem.py`: max
+> **2 per uur en 10 per dag** (apart voor profiel-scrapes en zoekacties), alleen
+> **08:00–22:00**, willekeurige pauzes, en een **stroomonderbreker** (24 uur stop bij
+> captcha/checkpoint/authwall, verdubbelend bij herhaling tot max 7 dagen). Alleen voor
+> personen **met een publieke rol** die als doel in `nieuws_doelen` staan (missie
+> `nieuws-scout`, `missies/nieuws_scout_brief.md`); zichtbaar venster onder de eigen
+> sessie; geen proxy's. `scrape_profile.py` stopt met exit **75** als de rem weigert
+> (*"⏳ LINKEDIN-SNELHEIDSREM — volgende kans HH:MM"* → ga door met andere bronnen, niet
+> herproberen) en met exit **76** bij een blokkade (*"⛔ LINKEDIN-BLOKKADE"* → stop met
+> LinkedIn en meld het). Kill-switch: `LINKEDIN_AUTOMATISCH=0` of `snelheidsrem.py uit`.
 
 - **Gericht, harde bovengrens.** Een handvol relevante profielen per onderzoeksvraag,
   **nooit** een crawl-lijst. De tool dwingt dit af: een batch **> 5 profielen** in één run
@@ -19,10 +31,11 @@ als (zwakke, zelf-gerapporteerde) bron. Lees eerst `scout_brief.md`.
   een account blokkeren; bulk/proxy-scrapen is onevenredig risico (ToS, ban, AVG) voor
   weinig opbrengst.
 - **Headful, eigen sessie, pauze, geen proxy's.** De scraper draait *headful* onder de
-  sessie van de eigenaar, met een pauze tussen requests; **geen residentiële proxy's,
-  geen IP-rotatie, geen 24/7-cron.** Scraping blijft **eigenaar-getriggerd/gericht** —
-  ook als andere agent-runs gescheduled worden, staat de scrape-trap niet op een strak,
-  onbewaakt schema. **De agent mag/kan zowel trap 1 (scrape) als trap 2 (mapper) zelf
+  sessie van de eigenaar, met willekeurige pauzes tussen requests; **geen residentiële
+  proxy's, geen IP-rotatie, geen strak 24/7-schema.** Onbewaakt gebruik mag alleen via de
+  nieuws-scout en alleen binnen de snelheidsrem (zie het kader hierboven); voor al het
+  andere blijft scraping **gericht en bewust gestart** voor een concrete onderzoeksvraag.
+  **De agent mag/kan zowel trap 1 (scrape) als trap 2 (mapper) zelf
   draaien via Bash** — zolang de opgeslagen sessie leeft, is er geen mens nodig om te
   scrapen of in te dienen. **Alléén de interactieve login** (`scrape_profile.py login`,
   headful + 2FA/CAPTCHA) is mensenwerk; is de sessie verlopen, relay dan dat ene commando
@@ -81,14 +94,16 @@ als (zwakke, zelf-gerapporteerde) bron. Lees eerst `scout_brief.md`.
 - **Bron verplicht, verbatim.** Elke affiliatie draagt een `supporting`-argument met een
   citatie naar het profiel. Fabriceer geen quotes; gebruik de eigen tekst van het profiel.
 
-## Cadans (onbewaakt, C1) — bewust NIET op een 24/7-schema
+## Cadans (onbewaakt, C1) — alleen achter de snelheidsrem
 
-Anders dan de andere missies staat het LinkedIn-scrapen **bewust niet** op een
-onbewaakte systemd-timer/cron (beleid J4). De scrape-trap blijft **eigenaar-getriggerd
-en gericht**: headful, eigen sessie, pauze tussen requests, geen residentiële proxy's,
-geen 24/7-cron. De gewone `scout-agent`-cadans (per kwartaal, `agent-scout.timer`) draait
-de web-/registerronde; de LinkedIn-mapper draait de scout er alléén bij op verzoek,
-zolang `tools/linkedin/session.json` leeft. Is die sessie dood
+Sinds het eigenaarsbesluit van 2026-09-30 draait LinkedIn wél onbewaakt mee, maar
+**alleen** in de rondes van de `nieuws-scout` (elke 2 uur, alleen als er open
+`nieuws_doelen` zijn) en **alleen** binnen de snelheidsrem: max 2/uur en 10/dag per soort,
+08–22 uur, willekeurige pauzes, stroomonderbreker bij captcha/checkpoint/authwall. De rem
+is de cadans: weigert ze (exit 75), dan wacht LinkedIn tot de volgende kans — de scout
+zet het doel op `vervolg=linkedin` en gaat verder met andere bronnen. De gewone
+`scout-agent`-ronde (per kwartaal) draait de web-/registerronde; die gebruikt LinkedIn
+alleen gericht, ook binnen dezelfde rem, zolang `tools/linkedin/session.json` leeft. Is die sessie dood
 (`⚠ LINKEDIN-SESSIE VERLOPEN`), dan stopt zowel trap 1 als trap 2 en relay je het
 login-commando `python3 tools/linkedin/scrape_profile.py login` letterlijk aan de
 eigenaar — de scheduler herprobeert dit nooit in een lus (de interactieve login is

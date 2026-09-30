@@ -15,7 +15,15 @@ of cron-entry aanroept:
   * vangt exit-code + duur + oogst-telling (edit_log-delta van het account) en
     schrijft een run-record (log-footer + data/agent_runs.jsonl, C4-toezicht);
   * detecteert een dode LinkedIn-sessie en relayt het login-commando i.p.v. te
-    herproberen.
+    herproberen; detecteert ook de LinkedIn-snelheidsrem (exit 75,
+    "LINKEDIN-SNELHEIDSREM") en de stroomonderbreker ("LINKEDIN-BLOKKADE") en zet die
+    als `linkedin_rem`/`linkedin_blokkade` in het run-record (Epic 12);
+  * één ronde per label tegelijk: een fcntl-lock `data/locks/<label>.lock` (bezet →
+    melding + exit 0, geen claude);
+  * `--alleen-bij-open-doelen` (nieuws-scout): start alleen als de wachtrij
+    `nieuws_doelen` open werk heeft (open, of 'bezig' met een claim > 3 uur) — anders
+    exit 0 zonder claude en zonder logbestand; `--max-rondes-per-dag N` en
+    `--actieve-uren 8-22` begrenzen het verbruik (Epic 12: max 4 rondes/dag, 08–22 uur).
 
 Alles blijft binnen het agent-contract: de sessie draagt bij onder haar eigen token,
 alles landt `voorgesteld`, geen statuswijzigingen. De wrapper zelf schrijft niets in
@@ -27,10 +35,14 @@ Gebruik:
   python3 scripts/agent_runner.py --agent assistent --label ideoloog --brief missies/ideoloog_brief.md
   python3 scripts/agent_runner.py --label reviewbeoordelaar --geen-token \\
       --brief missies/reviewbeoordelaar_brief.md
+  python3 scripts/agent_runner.py --agent nieuws-scout --label nieuws-scout \\
+      --brief missies/nieuws_scout_brief.md --alleen-bij-open-doelen --dry-run
 """
 import argparse
 import datetime
+import fcntl
 import json
+import os
 import re
 import shlex
 import sqlite3
@@ -44,9 +56,13 @@ TOKENS_DIR = ROOT / "data" / "tokens"
 LOGS_DIR = ROOT / "missies" / "logs"
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 RUNS_JSONL = ROOT / "data" / "agent_runs.jsonl"
+LOCKS_DIR = ROOT / "data" / "locks"
 
 LINKEDIN_SESSIE_DOOD = "LINKEDIN-SESSIE VERLOPEN"
 LINKEDIN_LOGIN_CMD = "python3 tools/linkedin/scrape_profile.py login"
+LINKEDIN_REM = "LINKEDIN-SNELHEIDSREM"        # tools/linkedin/snelheidsrem.py (exit 75)
+LINKEDIN_BLOKKADE = "LINKEDIN-BLOKKADE"       # stroomonderbreker gesprongen (exit 76)
+NIEUWS_CLAIM_VERLOOP_UUR = 3                  # spiegelt server.py (claim_volgende)
 
 
 def brief_hash(brief: Path) -> str:
@@ -68,17 +84,95 @@ def volgende_ronde(datum: str, label: str) -> str:
 
 
 def edit_log_telling(account: str) -> int:
-    """Aantal edit_log-schrijfacties van een account (voor de oogst-delta)."""
+    """Aantal edit_log-schrijfacties van een account (voor de oogst-delta). Wachtrij-
+    administratie (nieuws_doelen: claims/PATCH) is geen oogst en telt niet mee."""
     if not DB_PATH.exists() or not account:
         return 0
     try:
         conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
-        n = conn.execute("SELECT COUNT(*) FROM edit_log WHERE changed_by = ?",
-                         (account,)).fetchone()[0]
+        n = conn.execute("SELECT COUNT(*) FROM edit_log WHERE changed_by = ? "
+                         "AND table_name <> 'nieuws_doelen'", (account,)).fetchone()[0]
         conn.close()
         return int(n)
     except sqlite3.Error:
         return 0
+
+
+def open_nieuws_doelen():
+    """Aantal doelen in de nieuws-wachtrij met werk (open, of 'bezig' met een claim
+    ouder dan NIEUWS_CLAIM_VERLOOP_UUR). Alleen-lezen. None = tabel/DB ontbreekt."""
+    if not DB_PATH.exists():
+        return None
+    grens = (datetime.datetime.now() - datetime.timedelta(hours=NIEUWS_CLAIM_VERLOOP_UUR)
+             ).isoformat(timespec="seconds")
+    try:
+        conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+        try:
+            return int(conn.execute(
+                "SELECT COUNT(*) FROM nieuws_doelen WHERE status = 'open' OR "
+                "(status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))",
+                (grens,)).fetchone()[0])
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+
+
+def rondes_vandaag(label: str, datum: str) -> int:
+    """Aantal echte rondes (run-records) van dit label op deze datum."""
+    if not RUNS_JSONL.exists():
+        return 0
+    n = 0
+    try:
+        for regel in RUNS_JSONL.read_text(encoding="utf-8").splitlines():
+            try:
+                r = json.loads(regel)
+            except json.JSONDecodeError:
+                continue
+            if r.get("label") == label and r.get("datum") == datum:
+                n += 1
+    except OSError:
+        return 0
+    return n
+
+
+def parse_uren(spec: str):
+    """'8-22' → (8, 22): van (incl.) tot (excl.). Ongeldig → argparse-fout."""
+    m = re.fullmatch(r"\s*(\d{1,2})\s*-\s*(\d{1,2})\s*", spec or "")
+    if not m or not (0 <= int(m.group(1)) < int(m.group(2)) <= 24):
+        raise argparse.ArgumentTypeError("verwacht VAN-TOT in hele uren, bv. 8-22")
+    return int(m.group(1)), int(m.group(2))
+
+
+def neem_lock(label: str):
+    """Niet-blokkerende fcntl-lock per label. → open bestand (vasthouden tot exit) of
+    None als een andere ronde van dit label al loopt."""
+    LOCKS_DIR.mkdir(parents=True, exist_ok=True)
+    f = open(LOCKS_DIR / f"{label}.lock", "a+")
+    try:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    f.seek(0)
+    f.truncate()
+    f.write(f"{os.getpid()} {datetime.datetime.now().isoformat(timespec='seconds')}\n")
+    f.flush()
+    return f
+
+
+def lock_bezet(label: str) -> bool:
+    """Alleen voor de droogloop: is de lock nu bezet? (neemt en geeft direct vrij)"""
+    pad = LOCKS_DIR / f"{label}.lock"
+    if not pad.exists():
+        return False
+    with open(pad, "a+") as f:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    return False
 
 
 def bouw_prompt(account, brief, label, ronde, datum, bhash, geen_token) -> str:
@@ -152,11 +246,29 @@ def main():
     ap.add_argument("--claude-bin", default="claude",
                     help="Pad naar de claude-CLI (default: claude op PATH).")
     ap.add_argument("--model", default="",
-                    help="Optioneel model doorgeven aan `claude -p`.")
+                    help="Optioneel model doorgeven aan `claude -p` (bv. opus).")
+    ap.add_argument("--effort", default="",
+                    help="Optioneel reasoning-effort doorgeven aan `claude -p` (bv. high).")
+    ap.add_argument("--skip-permissions", action="store_true",
+                    help="Voeg --dangerously-skip-permissions toe aan de claude-sessie. "
+                         "NODIG voor echt onbewaakte runs (launchd/cron): anders "
+                         "blokkeren tool-permissieprompts (WebFetch/Bash/Write) de ronde. "
+                         "Alleen op een vertrouwde eigen machine; de missie-brief + de "
+                         "API-poorten (alles landt 'voorgesteld', het agent-token kan niet "
+                         "mergen) begrenzen de blast radius.")
     ap.add_argument("--timeout", type=int, default=0,
                     help="Harde timeout in seconden (0 = geen; systemd doet dit meestal).")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print het exacte claude-commando + tokenpad, draai niets.")
+    ap.add_argument("--alleen-bij-open-doelen", action="store_true",
+                    help="Epic 12 (nieuws-scout): alleen starten als de wachtrij "
+                         "nieuws_doelen open werk heeft; anders exit 0 zonder claude en "
+                         "zonder logbestand.")
+    ap.add_argument("--max-rondes-per-dag", type=int, default=0,
+                    help="Max. echte rondes per kalenderdag voor dit label (0 = onbegrensd); "
+                         "daarboven exit 0 zonder claude.")
+    ap.add_argument("--actieve-uren", type=parse_uren, default=None, metavar="VAN-TOT",
+                    help="Alleen starten binnen deze lokale uren, bv. 8-22; daarbuiten exit 0.")
     args = ap.parse_args()
 
     brief = Path(args.brief)
@@ -184,10 +296,30 @@ def main():
                          args.geen_token)
 
     cmd = [args.claude_bin, "-p", prompt]
+    if args.skip_permissions:
+        cmd.append("--dangerously-skip-permissions")
     if args.model:
         cmd += ["--model", args.model]
+    if args.effort:
+        cmd += ["--effort", args.effort]
 
     logpad = LOGS_DIR / f"{datum}_{label}_{ronde}.md"
+
+    # Poorten vóór de sessie (Epic 12): elk levert een reden om NIET te draaien.
+    def overslaan_reden():
+        if args.actieve_uren:
+            van, tot = args.actieve_uren
+            if not (van <= datetime.datetime.now().hour < tot):
+                return f"buiten de actieve uren ({van:02d}:00–{tot:02d}:00)"
+        if args.max_rondes_per_dag and rondes_vandaag(label, datum) >= args.max_rondes_per_dag:
+            return (f"dagmaximum bereikt ({rondes_vandaag(label, datum)}/"
+                    f"{args.max_rondes_per_dag} rondes vandaag)")
+        if args.alleen_bij_open_doelen:
+            n = open_nieuws_doelen()
+            if not n:
+                return ("geen open nieuws-doelen" if n == 0
+                        else "wachtrij nieuws_doelen niet leesbaar (migratie gedraaid?)")
+        return None
 
     if args.dry_run:
         print("== DROOGLOOP (er wordt niets gedraaid en niets gepost) ==")
@@ -197,9 +329,26 @@ def main():
         print(f"Brief:      {brief.relative_to(ROOT)}  (blob {bhash})")
         print(f"Logbestand: {logpad.relative_to(ROOT)}")
         print(f"Timeout:    {args.timeout or '(geen)'} s")
+        print(f"Lock:       data/locks/{label}.lock "
+              f"({'BEZET — een ronde loopt al' if lock_bezet(label) else 'vrij'})")
+        if args.alleen_bij_open_doelen:
+            n = open_nieuws_doelen()
+            print(f"Open doelen: {'onleesbaar' if n is None else n}")
+        reden = overslaan_reden()
+        print(f"Zou starten: {'NEE — ' + reden + ' (exit 0, geen claude)' if reden else 'ja'}")
         print("\nCommando:")
         print("  " + " ".join(shlex.quote(c) for c in cmd))
         return
+
+    lock = neem_lock(label)
+    if lock is None:
+        print(f"[runner] Er loopt al een ronde van '{label}' (lock data/locks/{label}.lock "
+              "bezet) — deze start wordt overgeslagen. Geen claude-sessie.")
+        sys.exit(0)
+    reden = overslaan_reden()
+    if reden:
+        print(f"[runner] {label}: {reden} — geen claude-sessie, geen logbestand.")
+        sys.exit(0)
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     voor = edit_log_telling(account)
@@ -235,6 +384,8 @@ def main():
         na = edit_log_telling(account)
         oogst = max(0, na - voor)
         linkedin_dood = LINKEDIN_SESSIE_DOOD in output
+        linkedin_rem = LINKEDIN_REM in output
+        linkedin_blokkade = LINKEDIN_BLOKKADE in output
 
         logfile.write("## Runner-metadata\n\n")
         logfile.write(f"- Exit-code: {exit_code}\n")
@@ -243,6 +394,13 @@ def main():
         if linkedin_dood:
             logfile.write(f"- ⚠ LinkedIn-sessie verlopen — RELAY aan de eigenaar: "
                           f"`{LINKEDIN_LOGIN_CMD}` (niet herproberen)\n")
+        if linkedin_rem:
+            logfile.write("- ⏳ LinkedIn-snelheidsrem weigerde (exit 75) — doelen met "
+                          "vervolg=linkedin wachten op de volgende kans\n")
+        if linkedin_blokkade:
+            logfile.write("- ⛔ LinkedIn-blokkade: stroomonderbreker gesprongen — eigenaar: "
+                          "account controleren, `python3 tools/linkedin/snelheidsrem.py "
+                          "status`\n")
         logfile.write(f"- Beëindigd: "
                       f"{datetime.datetime.now().isoformat(timespec='seconds')}\n")
 
@@ -250,7 +408,8 @@ def main():
         "datum": datum, "label": label, "account": account, "ronde": ronde,
         "brief": str(brief.relative_to(ROOT)), "brief_hash": bhash,
         "exit_code": exit_code, "duur_s": duur, "oogst": oogst,
-        "linkedin_verlopen": linkedin_dood, "log": str(logpad.relative_to(ROOT)),
+        "linkedin_verlopen": linkedin_dood, "linkedin_rem": linkedin_rem,
+        "linkedin_blokkade": linkedin_blokkade, "log": str(logpad.relative_to(ROOT)),
         "beeindigd": datetime.datetime.now().isoformat(timespec="seconds"),
     }
     try:
@@ -261,6 +420,9 @@ def main():
 
     print(f"\n== ronde klaar: exit {exit_code}, {duur}s, oogst {oogst} "
           f"→ {logpad.relative_to(ROOT)} ==")
+    if linkedin_blokkade:
+        print("⛔ LINKEDIN-BLOKKADE in deze ronde — de stroomonderbreker staat; eigenaar: "
+              "controleer het account (python3 tools/linkedin/snelheidsrem.py status).")
     if linkedin_dood:
         print(f"⚠ LINKEDIN-SESSIE VERLOPEN — geef dit commando aan de eigenaar en "
               f"herprobeer NIET:\n    {LINKEDIN_LOGIN_CMD}")

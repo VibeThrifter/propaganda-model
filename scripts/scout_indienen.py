@@ -39,7 +39,11 @@ Gebruik:
     python3 scripts/scout_indienen.py data/scout/sterkste-routes-r1.json            # droogloop
     python3 scripts/scout_indienen.py data/scout/sterkste-routes-r1.json --indienen # echt
 
-Opties: --api (default http://localhost:5000), --token (default data/tokens/assistent.token).
+Opties: --api (default http://localhost:5000), --token (default data/tokens/assistent.token),
+--resultaat-json <pad> (schrijft de id's van wat deze run NIEUW aanmaakte als
+{"entity_ids", "relation_ids", "source_ids", "argument_ids"} — precies de vorm van
+`resultaat` in PATCH /api/nieuws/doelen/<id>; bestaande, hergebruikte knopen staan er
+bewust niet in).
 """
 from __future__ import annotations
 
@@ -287,6 +291,8 @@ def main():
     ap.add_argument("--indienen", action="store_true", help="echt schrijven (default: droogloop)")
     ap.add_argument("--api", default=DEFAULT_API)
     ap.add_argument("--token", type=Path, default=DEFAULT_TOKEN)
+    ap.add_argument("--resultaat-json", type=Path, default=None,
+                    help="schrijf de nieuw aangemaakte id's als nieuws-doel-resultaat (JSON)")
     args = ap.parse_args()
 
     data = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -316,6 +322,16 @@ def main():
             print(f"  {soort} #{oid}: {naam}")
     if droog:
         print("\n(droogloop — er is niets geschreven. Voeg --indienen toe om echt in te dienen.)")
+    elif args.resultaat_json:
+        soort_naar_lijst = {"entiteit": "entity_ids", "relatie": "relation_ids",
+                            "bron": "source_ids", "argument": "argument_ids"}
+        resultaat = {k: [] for k in ("entity_ids", "relation_ids", "source_ids", "argument_ids")}
+        for soort, _naam, oid in ind.aangemaakt:
+            if isinstance(oid, int) and soort in soort_naar_lijst:
+                resultaat[soort_naar_lijst[soort]].append(oid)
+        args.resultaat_json.parent.mkdir(parents=True, exist_ok=True)
+        args.resultaat_json.write_text(json.dumps(resultaat, indent=2), encoding="utf-8")
+        print(f"\n── resultaat-id's → {args.resultaat_json} ──\n  {json.dumps(resultaat)}")
 
 
 if __name__ == "__main__":
