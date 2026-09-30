@@ -6377,6 +6377,9 @@ def nieuws_doelen_claim_volgende():
     """Claim ATOMAIR (één BEGIN IMMEDIATE-transactie) de hoogste open doelen:
     prioriteit aflopend, oudste eerst; een 'bezig'-doel waarvan de claim ouder is dan
     NIEUWS_CLAIM_VERLOOP_UUR telt weer als open (vastgelopen ronde). ?limit=3 (max 10).
+    Met ?linkedin=1 (de agent zag dat de snelheidsrem LinkedIn nu toelaat) worden daarna
+    ook afgeronde doelen met vervolg='linkedin' geclaimd: die krijgen alleen nog de
+    LinkedIn-stap (vervolg blijft 'linkedin' tot de PATCH het op null zet).
     Alleen 'nieuws-scout' of een maintainer."""
     conn = get_db()
     if not _mag_nieuws(conn, NIEUWS_SCOUT):
@@ -6389,6 +6392,7 @@ def nieuws_doelen_claim_volgende():
         conn.close()
         return jsonify({"error": "'limit' moet een geheel getal zijn"}), 400
     limit = max(1, min(10, limit))
+    met_linkedin = request.args.get("linkedin") in ("1", "true", "ja")
     nu = datetime.datetime.now()
     nu_iso = nu.isoformat(timespec="seconds")
     verlopen = (nu - datetime.timedelta(hours=NIEUWS_CLAIM_VERLOOP_UUR)).isoformat(
@@ -6400,8 +6404,9 @@ def nieuws_doelen_claim_volgende():
             SELECT id, status FROM nieuws_doelen
             WHERE status = 'open'
                OR (status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))
-            ORDER BY prioriteit DESC, aangemaakt ASC, id ASC
-            LIMIT ?""", (verlopen, limit)).fetchall()
+               OR (? AND status = 'klaar' AND vervolg = 'linkedin')
+            ORDER BY (status = 'klaar'), prioriteit DESC, aangemaakt ASC, id ASC
+            LIMIT ?""", (verlopen, 1 if met_linkedin else 0, limit)).fetchall()
         for r in rijen:
             conn.execute("""UPDATE nieuws_doelen SET status = 'bezig', geclaimd_door = ?,
                             geclaimd_op = ?, pogingen = pogingen + 1, bijgewerkt = ?
@@ -6409,7 +6414,9 @@ def nieuws_doelen_claim_volgende():
             _nieuws_log(conn, r["id"], "updated", {"status": r["status"]},
                         {"status": "bezig"},
                         "nieuws-doel geclaimd" + (" (verlopen claim overgenomen)"
-                                                  if r["status"] == "bezig" else ""))
+                                                  if r["status"] == "bezig" else
+                                                  " (LinkedIn-vervolg)"
+                                                  if r["status"] == "klaar" else ""))
         conn.execute("COMMIT")
     except sqlite3.Error:
         try:

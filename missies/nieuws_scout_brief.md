@@ -53,13 +53,23 @@ wachtrij, de afbakening en de snelheidsrem toe.
 
 **Maximaal 3 doelen per ronde.**
 
-1. **Claim:** `POST /api/nieuws/doelen/claim_volgende?limit=3` (Bearer-token) →
-   `{"doelen": [...]}`. Leeg → log "geen open doelen" en rond af (lege oogst is prima).
+1. **Claim:** kijk eerst of LinkedIn nu mag: `python3 tools/linkedin/snelheidsrem.py mag zoek
+   && python3 tools/linkedin/snelheidsrem.py mag profiel` (exit 0 = ja). Claim dan
+   `POST /api/nieuws/doelen/claim_volgende?limit=3` — met `&linkedin=1` als LinkedIn mag
+   (Bearer-token) → `{"doelen": [...]}`. Leeg → log "geen open doelen" en rond af (lege
+   oogst is prima).
    Elk doel heeft `sleutel`, `naam`, `soort` (`persoon`|`organisatie`), `rol_categorie`,
    `rol_hint`, `context` (`events`, `artikelen` met url/bron/datum/titel, `organisaties`,
    `rolzinnen`), `entity_id` (bestaande pm-entiteit of null), `vervolg`, en bij een
    heropend doel het eerdere `verslag`/`resultaat`.
 2. **Werk elk doel af** volgens de zes stappen hieronder.
+3. **LinkedIn-vervolg:** een geclaimd doel met `vervolg: "linkedin"` én een bestaand
+   `resultaat` is al onderzocht; alleen de LinkedIn-stap ontbrak (de rem weigerde toen).
+   Doe dan alleen stap 4 (LinkedIn) en het indienen van wat dat oplevert, en PATCH daarna
+   `status: "klaar"`, `vervolg: null`, het eerdere `verslag` aangevuld met één zin over
+   LinkedIn, en `resultaat` = de oude id's plus de nieuwe (samengevoegd, niets weglaten).
+   Weigert de rem alsnog (exit 75): PATCH `status: "klaar"` met `vervolg: "linkedin"`
+   ongewijzigd. Levert LinkedIn niets bruikbaars op: `vervolg: null` en noteer dat.
 3. **Sluit elk doel af** met een PATCH (stap 6) — ook bij `overgeslagen`/`twijfel`/
    `niets_gevonden`. Een doel dat je claimde maar niet afmaakt (tijd op, fout), zet je
    op `fout` met een korte reden; blijft het `bezig`, dan komt het na 3 uur vanzelf terug.

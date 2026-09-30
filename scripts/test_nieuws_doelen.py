@@ -282,6 +282,29 @@ def main():
         eis(len(resultaten) == 6 and len(set(resultaten)) == 6,
             f"6 open doelen, 18 gelijktijdige claims → elk doel precies één keer ({len(resultaten)})")
 
+        print("9b. claim_volgende — LinkedIn-vervolg alleen met ?linkedin=1, na open doelen")
+        conn = sqlite3.connect(db)
+        conn.execute("""INSERT INTO nieuws_doelen (sleutel, naam, soort, prioriteit, status,
+                        vervolg, resultaat, aangemaakt, bijgewerkt) VALUES ('person:vervolg',
+                        'Vervolg', 'persoon', 99, 'klaar', 'linkedin',
+                        '{"entity_ids": [], "relation_ids": [1], "source_ids": [], "argument_ids": []}',
+                        '2026-09-30T10:00:00', '2026-09-30T10:00:00')""")
+        conn.execute("""INSERT INTO nieuws_doelen (sleutel, naam, soort, prioriteit, status,
+                        aangemaakt, bijgewerkt) VALUES ('person:nieuw-open', 'Nieuw', 'persoon', 5,
+                        'open', '2026-09-30T10:00:00', '2026-09-30T10:00:00')""")
+        vervolg = conn.execute("SELECT id FROM nieuws_doelen WHERE sleutel = 'person:vervolg'").fetchone()[0]
+        conn.commit()
+        conn.close()
+        r = client.post("/api/nieuws/doelen/claim_volgende?limit=5", headers=kop["nieuws-scout"])
+        ids = [d["id"] for d in r.get_json()["doelen"]]
+        eis(vervolg not in ids and len(ids) == 1, "zonder ?linkedin=1 geen afgeronde vervolgdoelen")
+        r = client.post("/api/nieuws/doelen/claim_volgende?limit=5&linkedin=1", headers=kop["nieuws-scout"])
+        doelen = r.get_json()["doelen"]
+        eis([d["id"] for d in doelen] == [vervolg], f"met ?linkedin=1 het vervolgdoel ({[d['id'] for d in doelen]})")
+        eis(doelen[0]["status"] == "bezig" and doelen[0]["vervolg"] == "linkedin"
+            and doelen[0]["resultaat"]["relation_ids"] == [1],
+            "vervolgdoel: bezig, vervolg blijft 'linkedin', eerder resultaat blijft")
+
         print("10. Enkel claimen")
         conn = sqlite3.connect(db)
         conn.execute("""INSERT INTO nieuws_doelen (sleutel, naam, soort, prioriteit, status,

@@ -98,6 +98,19 @@ def edit_log_telling(account: str) -> int:
         return 0
 
 
+def linkedin_mag_nu() -> bool:
+    """Laat de LinkedIn-snelheidsrem nu een zoekopdracht én een profiel toe? (Alleen-lezen;
+    False als de rem niet te laden is.) Zo start er geen ronde voor een LinkedIn-vervolg
+    dat toch geweigerd zou worden."""
+    try:
+        sys.path.insert(0, str(ROOT / "tools" / "linkedin"))
+        import snelheidsrem  # noqa: E402
+        rem = snelheidsrem.Snelheidsrem()
+        return bool(rem.mag_nu("zoek")[0] and rem.mag_nu("profiel")[0])
+    except Exception:
+        return False
+
+
 def open_nieuws_doelen():
     """Aantal doelen in de nieuws-wachtrij met werk (open, of 'bezig' met een claim
     ouder dan NIEUWS_CLAIM_VERLOOP_UUR). Alleen-lezen. None = tabel/DB ontbreekt."""
@@ -108,10 +121,16 @@ def open_nieuws_doelen():
     try:
         conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
         try:
-            return int(conn.execute(
+            n = int(conn.execute(
                 "SELECT COUNT(*) FROM nieuws_doelen WHERE status = 'open' OR "
                 "(status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))",
                 (grens,)).fetchone()[0])
+            if linkedin_mag_nu():
+                # afgeronde doelen die alleen nog de LinkedIn-stap nodig hebben
+                n += int(conn.execute(
+                    "SELECT COUNT(*) FROM nieuws_doelen WHERE status = 'klaar' "
+                    "AND vervolg = 'linkedin'").fetchone()[0])
+            return n
         finally:
             conn.close()
     except sqlite3.Error:
