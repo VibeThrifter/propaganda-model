@@ -48,6 +48,14 @@ wachtrij, de afbakening en de snelheidsrem toe.
   veroordeelden in strafzaken, leden van het Koninklijk Huis — zijn `overgeslagen`
   (verslag: "geen rol in het netwerk"), ook als ze vaak in het nieuws staan. Twijfel je
   (een sporter die ook bestuurder is), onderzoek dan alleen die bestuursrol.
+- **Buitenlandse personen** zonder rol in het Nederlandse netwerk (buitenlandse politici,
+  staatshoofden, bestuurders van buitenlandse organisaties die niets met Nederlandse media,
+  politiek of bedrijfsleven te maken hebben) zijn `overgeslagen` ("buitenland, geen NL-rol").
+  Wel onderzoeken: buitenlandse eigenaren/investeerders van Nederlandse media en
+  buitenlanders met een aantoonbare Nederlandse functie.
+- **Geen actor** (fotocredit, naslagwerk zoals "Wikimedia Commons") of een verminkte naam
+  ("Heinen van Financiën" = dubbel van Eelco Heinen) → `overgeslagen`; onderzoek het dubbel niet
+  opnieuw.
 
 ## De ronde
 
