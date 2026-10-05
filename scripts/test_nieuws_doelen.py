@@ -4,7 +4,9 @@ End-to-end-test van de nieuws-wachtrij `nieuws_doelen` (Epic 12 "Wie is dit?", s
 de migratie (idempotent, DDL == schema.sql), de REST-endpoints (upsert/409/opnieuw,
 lijst + filters, claim_volgende atomair + verlopen claim, claim, PATCH-validatie), de
 poorten per account (nieuws-agent / nieuws-scout / maintainer / overige) en de
-rate-limit-vrijstelling van de wachtrij-endpoints.
+rate-limit-vrijstelling van de wachtrij-endpoints. Plus de bewijsdoelen (soort 'relatie',
+nieuws-aggregator Story 14.13): de herbouw-migratie scripts/migrate_nieuws_doelen_relatie.py,
+de validatie van 'relatie:<id>', en dat alleen 'nieuws-bewijs' ze claimt en afwerkt.
 
 Bouwt een verse database in een tijdelijke map (schema.sql). De live database wordt
 NOOIT aangeraakt.
@@ -68,9 +70,79 @@ def test_migratie(tmp):
         "migratie-DDL == schema.sql-DDL (schema-pariteit)")
 
 
+OUDE_DDL = """
+CREATE TABLE nieuws_doelen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sleutel TEXT NOT NULL UNIQUE,
+    naam TEXT NOT NULL,
+    soort TEXT NOT NULL CHECK(soort IN ('persoon', 'organisatie')),
+    rol_categorie TEXT,
+    rol_hint TEXT,
+    context TEXT,
+    prioriteit REAL NOT NULL DEFAULT 0,
+    entity_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN (
+        'open', 'bezig', 'klaar', 'niets_gevonden', 'overgeslagen', 'twijfel', 'fout')),
+    vervolg TEXT CHECK(vervolg IS NULL OR vervolg IN ('linkedin')),
+    verslag TEXT,
+    resultaat TEXT,
+    aangevraagd_door TEXT REFERENCES users(username),
+    geclaimd_door TEXT REFERENCES users(username),
+    geclaimd_op TEXT,
+    pogingen INTEGER NOT NULL DEFAULT 0,
+    aangemaakt TEXT NOT NULL,
+    bijgewerkt TEXT NOT NULL
+)"""
+
+
+def test_migratie_relatie(tmp):
+    print("1b. Migratie scripts/migrate_nieuws_doelen_relatie.py (herbouw voor soort 'relatie')")
+    import validation
+    migr = laad_script("migrate_nieuws_doelen_relatie")
+    db = Path(tmp) / "voor-relatie.db"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT UNIQUE)")
+    conn.execute("INSERT INTO users (username) VALUES ('nieuws-agent')")
+    conn.execute(OUDE_DDL)
+    conn.execute("CREATE INDEX idx_nieuws_doelen_status ON nieuws_doelen(status, prioriteit)")
+    for did, sleutel in ((1, "person:a"), (2, "org:b"), (5, "person:c")):
+        conn.execute("INSERT INTO nieuws_doelen (id, sleutel, naam, soort, status, "
+                     "aangevraagd_door, verslag, aangemaakt, bijgewerkt) VALUES "
+                     "(?, ?, ?, 'persoon', 'klaar', 'nieuws-agent', 'v', 't', 't')",
+                     (did, sleutel, sleutel.upper()))
+    conn.commit()
+    conn.close()
+    eerste = migr.migreer(db)
+    eis(len(eerste) == 1 and "herbouwd (3 rijen)" in eerste[0], f"eerste run herbouwt ({eerste})")
+    eis(migr.migreer(db) == [], "tweede run is een no-op (idempotent)")
+    conn = sqlite3.connect(db)
+    rijen = conn.execute("SELECT id, sleutel, status, verslag, relation_id FROM nieuws_doelen "
+                         "ORDER BY id").fetchall()
+    eis(rijen == [(1, "person:a", "klaar", "v", None), (2, "org:b", "klaar", "v", None),
+                  (5, "person:c", "klaar", "v", None)], "rijen en ids blijven, relation_id leeg")
+    nieuw = conn.execute("INSERT INTO nieuws_doelen (sleutel, naam, soort, relation_id, "
+                         "aangemaakt, bijgewerkt) VALUES ('relatie:9', 'X', 'relatie', 9, "
+                         "'t', 't')").lastrowid
+    eis(nieuw == 6, f"de AUTOINCREMENT-teller loopt door na de herbouw ({nieuw})")
+    index = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'index' "
+                         "AND name = 'idx_nieuws_doelen_status'").fetchone()
+    eis(index is not None, "index opnieuw aangelegd")
+    ddl_live = conn.execute("SELECT sql FROM sqlite_master WHERE name = 'nieuws_doelen'"
+                            ).fetchone()[0]
+    conn.close()
+    vers = sqlite3.connect(":memory:")
+    vers.executescript((ROOT / "schema.sql").read_text())
+    ddl_schema = vers.execute("SELECT sql FROM sqlite_master WHERE name = 'nieuws_doelen'"
+                              ).fetchone()[0]
+    vers.close()
+    eis(validation._normaliseer_ddl(ddl_live) == validation._normaliseer_ddl(ddl_schema),
+        "herbouwde DDL == schema.sql-DDL (schema-pariteit)")
+
+
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         test_migratie(tmp)
+        test_migratie_relatie(tmp)
 
         db = Path(tmp) / "vers.db"
         print("2. Verse build (schema.sql)")
@@ -87,14 +159,22 @@ def main():
         conn.row_factory = sqlite3.Row
         tokens = {}
         for naam, rol in (("nieuws-agent", "bijdrager"), ("nieuws-scout", "bijdrager"),
-                          ("nieuws-autokeur", "reviewer"), ("t-ander", "bijdrager"),
-                          ("t-admin", "maintainer")):
+                          ("nieuws-bewijs", "bijdrager"), ("nieuws-autokeur", "reviewer"),
+                          ("t-ander", "bijdrager"), ("t-admin", "maintainer")):
             tokens[naam] = auth.new_token()
             conn.execute("INSERT INTO users (username, kind, role, provenance, token_hash)"
                          " VALUES (?, 'agent', ?, 'test', ?)",
                          (naam, rol, auth.hash_token(tokens[naam])))
         ent = conn.execute("INSERT INTO entities (name, type, status) VALUES "
                            "('Test Gemeente', 'overheidsinstelling', 'goedgekeurd')").lastrowid
+        medium = conn.execute("INSERT INTO entities (name, type, status) VALUES "
+                              "('Test Omroep', 'mediaorganisatie', 'goedgekeurd')").lastrowid
+        rel = conn.execute("INSERT INTO relations (source_id, target_id, relation_type, status) "
+                           "VALUES (?, ?, 'beinvloeding', 'goedgekeurd')",
+                           (ent, medium)).lastrowid
+        rel_oud = conn.execute("INSERT INTO relations (source_id, target_id, relation_type, "
+                               "status, vervangen) VALUES (?, ?, 'citeert', 'goedgekeurd', 1)",
+                               (ent, medium)).lastrowid
         conn.commit()
         conn.close()
 
@@ -387,6 +467,90 @@ def main():
             and ("updated", "nieuws-scout") in acties and ("updated", "t-admin") in acties
             and acties[-1] == ("updated", "nieuws-agent"),
             f"created + claims/PATCH/heropenen gelogd onder het juiste account ({len(acties)} rijen)")
+
+        print("14. Bewijsdoelen (soort 'relatie') — validatie")
+
+        def bewijs_body(rid, **extra):
+            b = {"sleutel": f"relatie:{rid}", "naam": "Test Gemeente beïnvloedt Test Omroep",
+                 "soort": "relatie", "prioriteit": 70.0,
+                 "context": {"events": [{"titel": "Raadsdebat", "url": "https://x.test/e"}],
+                             "artikelen": [], "bewijs": "1 bron: persbericht · niet gecontroleerd",
+                             "ontbreekt": ["een onafhankelijke bron"]}}
+            b.update(extra)
+            return b
+
+        gevallen = [
+            (bewijs_body(rel, soort="persoon"), "sleutel 'relatie:<id>' met soort persoon"),
+            ({**bewijs_body(rel), "sleutel": "person:x"}, "soort relatie zonder relatie-sleutel"),
+            (bewijs_body(999999), "relatie bestaat niet"),
+            (bewijs_body(rel_oud), "vervangen relatie"),
+            (bewijs_body(rel, relation_id=rel + 1), "relation_id wijkt af van de sleutel"),
+            (bewijs_body(rel, relation_id="1"), "relation_id geen getal"),
+            ({**doel_body("person:x"), "relation_id": rel}, "relation_id bij een naam"),
+        ]
+        for body, label in gevallen:
+            r = client.post("/api/nieuws/doelen", json=body, headers=kop["nieuws-agent"])
+            eis(r.status_code == 400, f"{label} → 400 ({r.status_code}: {r.get_json().get('error')})")
+        r = client.post("/api/nieuws/doelen", json=bewijs_body(rel), headers=kop["nieuws-bewijs"])
+        eis(r.status_code == 403, f"nieuws-bewijs zet zelf geen doelen in de rij ({r.status_code})")
+        r = client.post("/api/nieuws/doelen", json=bewijs_body(rel), headers=kop["nieuws-agent"])
+        j = r.get_json()
+        eis(r.status_code == 201 and j["doel"]["soort"] == "relatie"
+            and j["doel"]["relation_id"] == rel and j["doel"]["context"]["ontbreekt"],
+            f"nieuws-agent: bewijsdoel → 201, relation_id uit de sleutel ({r.status_code})")
+        bewijs = j["doel"]["id"]
+        r = client.post("/api/nieuws/doelen", json=bewijs_body(rel, prioriteit=90.0, soort=None),
+                        headers=kop["nieuws-agent"])
+        eis(r.status_code == 200 and r.get_json()["doel"]["prioriteit"] == 90.0,
+            "bestaand bewijsdoel bijwerken zonder soort → 200, prioriteit = max")
+        r = client.get("/api/nieuws/doelen?soort=relatie", headers=kop["t-ander"])
+        eis([d["id"] for d in r.get_json()["doelen"]] == [bewijs], "?soort=relatie filtert")
+        r = client.get("/api/nieuws/doelen?soort=raar", headers=kop["t-ander"])
+        eis(r.status_code == 400, f"onbekende soort in filter → 400 ({r.status_code})")
+
+        print("15. Bewijsdoelen — alleen nieuws-bewijs claimt en werkt ze af")
+        r = client.post("/api/nieuws/doelen/claim_volgende?limit=10", headers=kop["nieuws-scout"])
+        eis(r.status_code == 200 and bewijs not in [d["id"] for d in r.get_json()["doelen"]],
+            "de nieuws-scout claimt nooit een bewijsdoel")
+        r = client.post("/api/nieuws/doelen/claim_volgende?soort=relatie", headers=kop["nieuws-scout"])
+        eis(r.status_code == 403, f"nieuws-scout mag geen bewijsdoelen claimen ({r.status_code})")
+        r = client.post("/api/nieuws/doelen/claim_volgende", headers=kop["nieuws-bewijs"])
+        eis(r.status_code == 403, f"nieuws-bewijs claimt geen namen ({r.status_code})")
+        r = client.post("/api/nieuws/doelen/claim_volgende?soort=persoon,relatie",
+                        headers=kop["nieuws-bewijs"])
+        eis(r.status_code == 400, f"namen en relaties in één claim → 400 ({r.status_code})")
+        r = client.post(f"/api/nieuws/doelen/{bewijs}/claim", headers=kop["nieuws-scout"])
+        eis(r.status_code == 403, f"enkel claimen: nieuws-scout niet ({r.status_code})")
+        r = client.post(f"/api/nieuws/doelen/{los}/claim", headers=kop["nieuws-bewijs"])
+        eis(r.status_code == 403, f"enkel claimen: nieuws-bewijs geen naam ({r.status_code})")
+        r = client.post("/api/nieuws/doelen/claim_volgende?soort=relatie&limit=2",
+                        headers=kop["nieuws-bewijs"])
+        doelen = r.get_json()["doelen"]
+        eis(r.status_code == 200 and [d["id"] for d in doelen] == [bewijs]
+            and doelen[0]["geclaimd_door"] == "nieuws-bewijs",
+            f"nieuws-bewijs claimt het bewijsdoel ({[d['id'] for d in doelen]})")
+        r = client.patch(f"/api/nieuws/doelen/{bewijs}", json={"status": "klaar"},
+                         headers=kop["nieuws-scout"])
+        eis(r.status_code == 403, f"nieuws-scout mag een bewijsdoel niet patchen ({r.status_code})")
+        r = client.patch(f"/api/nieuws/doelen/{bewijs}",
+                         json={"status": "klaar", "verslag": "Bron draagt de claim niet; "
+                               "twee berichten gevonden.",
+                               "resultaat": {"source_ids": [4], "argument_ids": [8, 9],
+                                             "relation_ids": [rel]}},
+                         headers=kop["nieuws-bewijs"])
+        d = r.get_json().get("doel", {})
+        eis(r.status_code == 200 and d["status"] == "klaar"
+            and d["resultaat"]["argument_ids"] == [8, 9],
+            f"nieuws-bewijs sluit het bewijsdoel af ({r.status_code})")
+        r = client.patch(f"/api/nieuws/doelen/{anouk}", json={"verslag": "x"},
+                         headers=kop["nieuws-bewijs"])
+        eis(r.status_code == 403, f"nieuws-bewijs mag een naam-doel niet patchen ({r.status_code})")
+        with server.app.test_request_context():
+            conn = server.get_db()
+            klaar = server._nieuws_klaar_ids(conn)
+            conn.close()
+        eis(rel not in klaar["relation_ids"],
+            "de autokeur kijkt nooit naar de resultaten van een bewijsdoel")
 
         print("\nALLE NIEUWS-DOELEN-TESTS GESLAAGD")
 

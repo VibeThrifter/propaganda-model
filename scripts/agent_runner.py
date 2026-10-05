@@ -24,6 +24,8 @@ of cron-entry aanroept:
     `nieuws_doelen` open werk heeft (open, of 'bezig' met een claim > 3 uur) — anders
     exit 0 zonder claude en zonder logbestand; `--max-rondes-per-dag N` en
     `--actieve-uren 8-22` begrenzen het verbruik (Epic 12: max 4 rondes/dag, 08–22 uur).
+    `--doel-soort relatie` telt de bewijsdoelen (missie `nieuws-bewijs`) in plaats van
+    de namen (persoon/organisatie) van de nieuws-scout.
 
 Alles blijft binnen het agent-contract: de sessie draagt bij onder haar eigen token,
 alles landt `voorgesteld`, geen statuswijzigingen. De wrapper zelf schrijft niets in
@@ -37,6 +39,8 @@ Gebruik:
       --brief missies/reviewbeoordelaar_brief.md
   python3 scripts/agent_runner.py --agent nieuws-scout --label nieuws-scout \\
       --brief missies/nieuws_scout_brief.md --alleen-bij-open-doelen --dry-run
+  python3 scripts/agent_runner.py --agent nieuws-bewijs --label nieuws-bewijs \\
+      --brief missies/nieuws_bewijs_brief.md --alleen-bij-open-doelen --doel-soort relatie --dry-run
 """
 import argparse
 import datetime
@@ -63,6 +67,7 @@ LINKEDIN_LOGIN_CMD = "python3 tools/linkedin/scrape_profile.py login"
 LINKEDIN_REM = "LINKEDIN-SNELHEIDSREM"        # tools/linkedin/snelheidsrem.py (exit 75)
 LINKEDIN_BLOKKADE = "LINKEDIN-BLOKKADE"       # stroomonderbreker gesprongen (exit 76)
 NIEUWS_CLAIM_VERLOOP_UUR = 3                  # spiegelt server.py (claim_volgende)
+NIEUWS_DOEL_SOORTEN = {"namen": ("persoon", "organisatie"), "relatie": ("relatie",)}
 
 
 def brief_hash(brief: Path) -> str:
@@ -111,25 +116,30 @@ def linkedin_mag_nu() -> bool:
         return False
 
 
-def open_nieuws_doelen():
+def open_nieuws_doelen(doel_soort: str = "namen"):
     """Aantal doelen in de nieuws-wachtrij met werk (open, of 'bezig' met een claim
-    ouder dan NIEUWS_CLAIM_VERLOOP_UUR). Alleen-lezen. None = tabel/DB ontbreekt."""
+    ouder dan NIEUWS_CLAIM_VERLOOP_UUR) van één soort-familie: 'namen' (persoon,
+    organisatie — nieuws-scout) of 'relatie' (bewijsdoelen — nieuws-bewijs).
+    Alleen-lezen. None = tabel/DB ontbreekt."""
     if not DB_PATH.exists():
         return None
+    soorten = NIEUWS_DOEL_SOORTEN[doel_soort]
+    plekken = ",".join("?" * len(soorten))
     grens = (datetime.datetime.now() - datetime.timedelta(hours=NIEUWS_CLAIM_VERLOOP_UUR)
              ).isoformat(timespec="seconds")
     try:
         conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
         try:
             n = int(conn.execute(
-                "SELECT COUNT(*) FROM nieuws_doelen WHERE status = 'open' OR "
-                "(status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))",
-                (grens,)).fetchone()[0])
-            if linkedin_mag_nu():
+                f"SELECT COUNT(*) FROM nieuws_doelen WHERE soort IN ({plekken}) AND "
+                "(status = 'open' OR "
+                "(status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?)))",
+                (*soorten, grens)).fetchone()[0])
+            if doel_soort == "namen" and linkedin_mag_nu():
                 # afgeronde doelen die alleen nog de LinkedIn-stap nodig hebben
                 n += int(conn.execute(
-                    "SELECT COUNT(*) FROM nieuws_doelen WHERE status = 'klaar' "
-                    "AND vervolg = 'linkedin'").fetchone()[0])
+                    f"SELECT COUNT(*) FROM nieuws_doelen WHERE soort IN ({plekken}) "
+                    "AND status = 'klaar' AND vervolg = 'linkedin'", soorten).fetchone()[0])
             return n
         finally:
             conn.close()
@@ -283,6 +293,10 @@ def main():
                     help="Epic 12 (nieuws-scout): alleen starten als de wachtrij "
                          "nieuws_doelen open werk heeft; anders exit 0 zonder claude en "
                          "zonder logbestand.")
+    ap.add_argument("--doel-soort", choices=sorted(NIEUWS_DOEL_SOORTEN), default="namen",
+                    help="Welke doelen --alleen-bij-open-doelen telt: 'namen' (persoon, "
+                         "organisatie; nieuws-scout) of 'relatie' (bewijsdoelen; "
+                         "nieuws-bewijs).")
     ap.add_argument("--max-rondes-per-dag", type=int, default=0,
                     help="Max. echte rondes per kalenderdag voor dit label (0 = onbegrensd); "
                          "daarboven exit 0 zonder claude.")
@@ -334,7 +348,7 @@ def main():
             return (f"dagmaximum bereikt ({rondes_vandaag(label, datum)}/"
                     f"{args.max_rondes_per_dag} rondes vandaag)")
         if args.alleen_bij_open_doelen:
-            n = open_nieuws_doelen()
+            n = open_nieuws_doelen(args.doel_soort)
             if not n:
                 return ("geen open nieuws-doelen" if n == 0
                         else "wachtrij nieuws_doelen niet leesbaar (migratie gedraaid?)")
@@ -351,8 +365,8 @@ def main():
         print(f"Lock:       data/locks/{label}.lock "
               f"({'BEZET — een ronde loopt al' if lock_bezet(label) else 'vrij'})")
         if args.alleen_bij_open_doelen:
-            n = open_nieuws_doelen()
-            print(f"Open doelen: {'onleesbaar' if n is None else n}")
+            n = open_nieuws_doelen(args.doel_soort)
+            print(f"Open doelen ({args.doel_soort}): {'onleesbaar' if n is None else n}")
         reden = overslaan_reden()
         print(f"Zou starten: {'NEE — ' + reden + ' (exit 0, geen claude)' if reden else 'ja'}")
         print("\nCommando:")

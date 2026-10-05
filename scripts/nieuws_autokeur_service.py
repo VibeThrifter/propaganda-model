@@ -89,8 +89,10 @@ def _schrijf_log(regel):
 
 
 def verzamel(token, base):
-    """→ (doel_ids, {tabel: {id: [doel_ids]}}) uit de 'klaar'-doelen."""
-    st, d = _req("GET", "/api/nieuws/doelen?status=klaar&limit=500", token, base)
+    """→ (doel_ids, {tabel: {id: [doel_ids]}}) uit de 'klaar'-doelen van de nieuws-scout
+    (namen). Bewijsdoelen (soort 'relatie') blijven mensenwerk en komen hier niet langs."""
+    st, d = _req("GET", "/api/nieuws/doelen?status=klaar&soort=persoon,organisatie&limit=500",
+                 token, base)
     if st != 200:
         raise ServiceFout(f"GET /api/nieuws/doelen gaf HTTP {st}: {d.get('error', d)}")
     items = {"entities": {}, "relations": {}}

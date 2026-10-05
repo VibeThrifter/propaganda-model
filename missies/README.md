@@ -90,6 +90,7 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 | `aanklager-agent` | bijdrager | `aanklager_brief.md` | eigen claim certificeren (403); twee keer op dezelfde parent reageren (409); statussen zetten |
 | `lead-corroboratie-agent` | bijdrager | `lead_corroboratie_brief.md` | statussen zetten buiten de lead-baan; mergen/classificeren/verwijderen; een lead-tekst als bron gebruiken; een argument indienen zonder verbatim-geverifieerde bron |
 | `nieuws-scout` | bijdrager | `nieuws_scout_brief.md` (Epic 12) | privépersonen onderzoeken; LinkedIn buiten de snelheidsrem; modelstatussen zetten (alleen de status van zijn eigen wachtrij-doel); meer dan 3 doelen per ronde |
+| `nieuws-bewijs` | bijdrager | `nieuws_bewijs_brief.md` (nieuws-aggregator Story 14.13) | knopen of verbanden aanmaken; modelstatussen zetten (alleen de status van zijn eigen bewijsdoel); namen claimen; meer dan 2 doelen per ronde; negatieve resultaten als modelbijdrage |
 | _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
 | _(geen account)_ | — (alleen-lezen) | `voorspelling_resolutie_brief.md` | een voorspelling scoren (`PATCH …/uitkomst` = reviewer+ én mensenwerk); levert alléén resolutie-*voorstellen* in `data/voorspelling_voorstellen.json` |
 

@@ -30,6 +30,12 @@ Manifest-schema:
                       "property", "property_value"}]
     }
 
+Een REACTIE op een bestaand argument (bv. een ondergraving: "de bron draagt de claim
+niet", stance contradicting + verplichte reasoning) gaat ook via "argumenten", met
+"doel": {"parent_argument_id": <id>} — zonder property (de API weigert dat bij een reply).
+Een bron mag een "cluster" meekrijgen (cluster_key, M1.2); zonder leidt de server die af
+uit auteur/uitgever.
+
 Modelleerdiscipline (CLAUDE.md): certainty/influence NIET zetten (0,05-vloer);
 mechanisme-loos = kandidaat; elke supporting/contradicting root ≥1 echte citatie;
 een 409 (duplicaat) wordt gelogd en overgeslagen, nooit met negeer_duplicaten
@@ -61,7 +67,8 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 DEFAULT_TOKEN = ROOT / "data" / "tokens" / "assistent.token"
 DEFAULT_API = "http://localhost:5000"
 
-DOEL_VELDEN = ("relation_id", "entity_id", "role_id", "mechanism_id", "emergent_effect_id")
+DOEL_VELDEN = ("relation_id", "entity_id", "role_id", "mechanism_id", "emergent_effect_id",
+               "parent_argument_id")
 
 
 class Api:
@@ -180,6 +187,8 @@ class Indiener:
                     body[k_body] = b[k_src]
             if b.get("url"):
                 body["location"] = {"type": "url", "value": b["url"]}
+            if b.get("cluster"):
+                body["cluster_key"] = b["cluster"]
             if b.get("onderwerp"):
                 body["onderwerp_voorgesteld"] = b["onderwerp"]
             if b.get("betrouwbaarheid"):

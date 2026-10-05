@@ -850,21 +850,26 @@ CREATE TABLE leads (
 -- mee (scoring/influence/viz lezen deze tabel niet). Wat de scout vindt gaat via
 -- het gewone bijdragepad (alles 'voorgesteld'); `resultaat` wijst alleen naar die
 -- ids. `context`/`resultaat` zijn JSON-objecten als TEXT. Tijden = lokale ISO-tekst
--- (YYYY-MM-DDTHH:MM:SS). Bewust geen FK op entity_id (een entiteit-DELETE mag niet
+-- (YYYY-MM-DDTHH:MM:SS). Bewust geen FK op entity_id/relation_id (een DELETE mag niet
 -- op een wachtrij-rij stuklopen). Aangelegd via schema.sql (verse build) én
--- scripts/migrate_add_nieuws_doelen.py (bestaande DB).
+-- scripts/migrate_add_nieuws_doelen.py (bestaande DB); de soort 'relatie' (Story 14.13
+-- van de nieuws-aggregator: bewijs zoeken voor een dun onderbouwd verband dat lezers in
+-- het nieuws zien, missie 'nieuws-bewijs') kwam erbij via
+-- scripts/migrate_nieuws_doelen_relatie.py.
 --------------------------------------------------------------
 
 CREATE TABLE nieuws_doelen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sleutel TEXT NOT NULL UNIQUE,         -- 'person:<slug>' | 'org:<slug>' (upsert-sleutel)
-    naam TEXT NOT NULL,
-    soort TEXT NOT NULL CHECK(soort IN ('persoon', 'organisatie')),
+    sleutel TEXT NOT NULL UNIQUE,         -- 'person:<slug>' | 'org:<slug>' | 'relatie:<id>'
+    naam TEXT NOT NULL,                   -- naam, of bij een relatie het verband als zin
+    soort TEXT NOT NULL CHECK(soort IN ('persoon', 'organisatie', 'relatie')),
     rol_categorie TEXT,                   -- politicus/journalist/woordvoerder/bestuurder/...
     rol_hint TEXT,                        -- bv. 'wethouder Dijkerhoven'
     context TEXT,                         -- JSON: {events, artikelen, organisaties, rolzinnen}
+                                          -- relatie: {events, artikelen, bewijs, ontbreekt}
     prioriteit REAL NOT NULL DEFAULT 0,
     entity_id INTEGER,                    -- bestaande/gevonden pm-entiteit (NULL = onbekend)
+    relation_id INTEGER,                  -- soort 'relatie': het verband (anders NULL)
     status TEXT NOT NULL DEFAULT 'open' CHECK(status IN (
         'open', 'bezig', 'klaar', 'niets_gevonden', 'overgeslagen', 'twijfel', 'fout')),
     vervolg TEXT CHECK(vervolg IS NULL OR vervolg IN ('linkedin')),

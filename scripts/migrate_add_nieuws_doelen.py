@@ -8,7 +8,8 @@ influence en viz lezen haar niet). Wat de scout vindt, gaat via het gewone
 bijdragepad (alles `voorgesteld`); `resultaat` wijst alleen naar die ids.
 
 Puur additief (CREATE TABLE + CREATE INDEX, beide IF NOT EXISTS) → idempotent, geen
-tabel-rebuild. Backup-then-migrate per conventie: eerst een kopie naar
+tabel-rebuild. Een bestaande tabel van vóór de soort 'relatie' werkt
+scripts/migrate_nieuws_doelen_relatie.py bij. Backup-then-migrate per conventie: eerst een kopie naar
 data/propaganda_model_backup_<timestamp>.db (via de SQLite-backup-API, zodat ook de
 WAL-inhoud meegaat). De DDL is identiek aan schema.sql (check_schema_pariteit).
 
@@ -26,12 +27,13 @@ CREATE TABLE IF NOT EXISTS nieuws_doelen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sleutel TEXT NOT NULL UNIQUE,
     naam TEXT NOT NULL,
-    soort TEXT NOT NULL CHECK(soort IN ('persoon', 'organisatie')),
+    soort TEXT NOT NULL CHECK(soort IN ('persoon', 'organisatie', 'relatie')),
     rol_categorie TEXT,
     rol_hint TEXT,
     context TEXT,
     prioriteit REAL NOT NULL DEFAULT 0,
     entity_id INTEGER,
+    relation_id INTEGER,
     status TEXT NOT NULL DEFAULT 'open' CHECK(status IN (
         'open', 'bezig', 'klaar', 'niets_gevonden', 'overgeslagen', 'twijfel', 'fout')),
     vervolg TEXT CHECK(vervolg IS NULL OR vervolg IN ('linkedin')),

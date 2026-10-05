@@ -108,6 +108,18 @@ AGENTS = [
               "--max-rondes-per-dag", "4", "--actieve-uren", "8-22"], "timeout": 2400,
      "omschrijving": "Wie is dit? — namen uit het nieuws uitzoeken (wachtrij nieuws_doelen)",
      "default": {"eenheid": "uur", "elke": 2, "aan": True}},
+    # Nieuws-aggregator Story 14.13 ("dun bewijs"): bewijs vóór én tegen zoeken voor dun
+    # onderbouwde verbanden die lezers in het nieuws zien (wachtrij nieuws_doelen, soort
+    # 'relatie'). Alles landt 'voorgesteld'; de autokeur raakt het nooit. Standaard UIT:
+    # de nieuws-backend start de rondes zelf binnen haar budget (NIEUWS_BEWIJS_*); zet
+    # deze launchd-taak alleen aan als je rondes ook zonder de nieuws-backend wilt.
+    {"naam": "nieuws-bewijs", "label": "nieuws-bewijs", "soort": "runner",
+     "spec": ["--agent", "nieuws-bewijs", "--label", "nieuws-bewijs",
+              "--brief", "missies/nieuws_bewijs_brief.md", "--alleen-bij-open-doelen",
+              "--doel-soort", "relatie", "--max-rondes-per-dag", "2",
+              "--actieve-uren", "8-22"], "timeout": 2700,
+     "omschrijving": "Dun bewijs — bewijs vóór en tegen voor verbanden uit het nieuws",
+     "default": {"eenheid": "uur", "elke": 4, "aan": False}},
     {"naam": "nieuws-autokeur", "label": "nieuws-autokeur", "soort": "script",
      "spec": ["scripts/nieuws_autokeur_service.py", "--once"], "timeout": 600,
      "omschrijving": "Automatisch goedkeuren van neutrale structuurfeiten (geen claude)",

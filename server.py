@@ -6110,14 +6110,24 @@ def patch_lead(lead_id):
 # beslist" (expliciet eigenaarsbesluit 2026-09-30): alleen neutrale structuur-relatietypes
 # mét mechanisme en bron-URL, argumenten worden NIET gemerged, eerlijk edit_log,
 # kill-switch, dagplafond, intrekken door een maintainer.
+#
+# Bewijsdoelen (soort 'relatie', nieuws-aggregator Story 14.13): een verband dat lezers
+# in het nieuws zien en dat dun onderbouwd is (één bron, een bron die de claim niet
+# draagt, niets gecontroleerd), sleutel 'relatie:<id>'. Die doelen claimt alléén de
+# missie-agent 'nieuws-bewijs' (missies/nieuws_bewijs_brief.md): bewijs vóór én tegen,
+# alles 'voorgesteld' — invloeds-/sourcingclaims blijven mensenwerk, de autokeur raakt
+# ze nooit. De nieuws-scout claimt alleen personen en organisaties.
 
 NIEUWS_AGENT = "nieuws-agent"
 NIEUWS_SCOUT = "nieuws-scout"
+NIEUWS_BEWIJS = "nieuws-bewijs"
 NIEUWS_AUTOKEUR = "nieuws-autokeur"
 NIEUWS_DOEL_STATUSSEN = ("open", "bezig", "klaar", "niets_gevonden", "overgeslagen",
                          "twijfel", "fout")
 NIEUWS_DOEL_ACTIEF = ("open", "bezig")           # de rest = afgerond
-NIEUWS_DOEL_SOORTEN = ("persoon", "organisatie")
+NIEUWS_DOEL_SOORTEN = ("persoon", "organisatie", "relatie")
+NIEUWS_NAAM_SOORTEN = ("persoon", "organisatie")  # het werk van de nieuws-scout
+NIEUWS_RELATIE_SLEUTEL = re.compile(r"relatie:(\d+)")
 NIEUWS_DOEL_VERVOLG = ("linkedin",)              # plus null
 NIEUWS_RESULTAAT_SLEUTELS = ("entity_ids", "relation_ids", "source_ids", "argument_ids")
 NIEUWS_CLAIM_VERLOOP_UUR = 3                     # 'bezig' ouder dan dit telt weer als open
@@ -6168,6 +6178,20 @@ def _mag_nieuws(conn, account):
     return g.user["username"] == account or heeft_rol(conn, g.user, "maintainer")
 
 
+def _nieuws_werker(soort):
+    """Het missie-account dat doelen van deze soort claimt en afwerkt."""
+    return NIEUWS_BEWIJS if soort == "relatie" else NIEUWS_SCOUT
+
+
+def _nieuws_soorten_param(waarde):
+    """?soort=a,b → (lijst, fout). Leeg → de namen (persoon, organisatie)."""
+    lijst = [x.strip() for x in (waarde or "").split(",") if x.strip()]
+    onbekend = [x for x in lijst if x not in NIEUWS_DOEL_SOORTEN]
+    if onbekend:
+        return None, f"onbekende soort {onbekend}; kies uit {NIEUWS_DOEL_SOORTEN}"
+    return lijst, None
+
+
 def _nieuws_log(conn, did, actie, oud, nieuw, reden):
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
@@ -6198,7 +6222,8 @@ def nieuws_doelen_upsert():
     (prioriteit = max, naam/rol/context/entity_id bijgewerkt). Afgerond → 409 {error, doel},
     tenzij "opnieuw": true → heropend ('open'), 200. Privépersonen (rol_categorie 'prive')
     worden nooit onderzocht → 400 (eigenaarsbesluit; defense-in-depth naast de triage van
-    de nieuws-backend)."""
+    de nieuws-backend). Een bewijsdoel (soort 'relatie') heeft de sleutel 'relatie:<id>'
+    van een bestaande, niet-vervangen relatie; `relation_id` volgt uit die sleutel."""
     data = request.get_json(silent=True) or {}
     conn = get_db()
     if not _mag_nieuws(conn, NIEUWS_AGENT):
@@ -6240,6 +6265,30 @@ def nieuws_doelen_upsert():
             fouten.append("'entity_id' moet een geheel getal of null zijn")
         elif not conn.execute("SELECT 1 FROM entities WHERE id = ?", (entity_id,)).fetchone():
             fouten.append(f"entiteit {entity_id} bestaat niet")
+    relation_id = data.get("relation_id")
+    if relation_id is not None and (isinstance(relation_id, bool)
+                                    or not isinstance(relation_id, int)):
+        fouten.append("'relation_id' moet een geheel getal of null zijn")
+        relation_id = None
+    relatie_sleutel = NIEUWS_RELATIE_SLEUTEL.fullmatch(sleutel or "")
+    if relatie_sleutel or soort == "relatie" or relation_id is not None:
+        # sleutel 'relatie:<id>', soort 'relatie' en relation_id horen bij elkaar
+        if not relatie_sleutel:
+            fouten.append("een bewijsdoel (soort 'relatie') heeft de sleutel "
+                          "'relatie:<relation_id>'")
+        elif soort not in (None, "relatie"):
+            fouten.append("de sleutel 'relatie:<id>' hoort bij soort 'relatie'")
+        else:
+            rid = int(relatie_sleutel.group(1))
+            if relation_id is not None and relation_id != rid:
+                fouten.append(f"'relation_id' {relation_id} wijkt af van de sleutel")
+            relation_id = rid
+            rel = conn.execute("SELECT vervangen FROM relations WHERE id = ?",
+                               (rid,)).fetchone()
+            if rel is None:
+                fouten.append(f"relatie {rid} bestaat niet")
+            elif rel["vervangen"]:
+                fouten.append(f"relatie {rid} is vervangen")
     if fouten:
         conn.close()
         return jsonify({"error": "; ".join(fouten)}), 400
@@ -6258,11 +6307,11 @@ def nieuws_doelen_upsert():
                                          f"(een van {NIEUWS_DOEL_SOORTEN})"}), 400
             cur = conn.execute("""
                 INSERT INTO nieuws_doelen (sleutel, naam, soort, rol_categorie, rol_hint,
-                    context, prioriteit, entity_id, status, aangevraagd_door, pogingen,
-                    aangemaakt, bijgewerkt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, 0, ?, ?)
+                    context, prioriteit, entity_id, relation_id, status, aangevraagd_door,
+                    pogingen, aangemaakt, bijgewerkt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, 0, ?, ?)
             """, (sleutel, naam, soort, rol_cat, rol_hint, context_json,
-                  prioriteit if prioriteit is not None else 0.0, entity_id,
+                  prioriteit if prioriteit is not None else 0.0, entity_id, relation_id,
                   g.user["username"], nu, nu))
             did = cur.lastrowid
             _nieuws_log(conn, did, "created", None,
@@ -6297,6 +6346,8 @@ def nieuws_doelen_upsert():
             sets.append("prioriteit = MAX(prioriteit, ?)"); vals.append(prioriteit)
         if "entity_id" in data and entity_id is not None:
             sets.append("entity_id = ?"); vals.append(entity_id)
+        if relation_id is not None:
+            sets.append("relation_id = ?"); vals.append(relation_id)
         if heropen:
             sets += ["status = 'open'", "geclaimd_door = NULL", "geclaimd_op = NULL"]
         conn.execute(f"UPDATE nieuws_doelen SET {', '.join(sets)} WHERE id = ?",
@@ -6326,9 +6377,14 @@ def nieuws_doelen_upsert():
 @app.route("/api/nieuws/doelen", methods=["GET"])
 @require_user()
 def nieuws_doelen_lijst():
-    """De wachtrij (elk ingelogd account). ?status=a,b &limit=50 (max 500)
+    """De wachtrij (elk ingelogd account). ?status=a,b &soort=a,b &limit=50 (max 500)
     &bijgewerkt_na=ISO &sleutel=<s>[,<s>…]. Prioriteit aflopend."""
     waar, vals = [], []
+    soorten, fout = _nieuws_soorten_param(request.args.get("soort"))
+    if fout:
+        return jsonify({"error": fout}), 400
+    if soorten:
+        waar.append(f"soort IN ({','.join('?' * len(soorten))})"); vals += soorten
     status = (request.args.get("status") or "").strip()
     if status:
         lijst = [s.strip() for s in status.split(",") if s.strip()]
@@ -6380,12 +6436,24 @@ def nieuws_doelen_claim_volgende():
     Met ?linkedin=1 (de agent zag dat de snelheidsrem LinkedIn nu toelaat) worden daarna
     ook afgeronde doelen met vervolg='linkedin' geclaimd: die krijgen alleen nog de
     LinkedIn-stap (vervolg blijft 'linkedin' tot de PATCH het op null zet).
-    Alleen 'nieuws-scout' of een maintainer."""
+    Zonder ?soort claimt dit namen (persoon, organisatie): alleen 'nieuws-scout' of een
+    maintainer. ?soort=relatie claimt bewijsdoelen: alleen 'nieuws-bewijs' of een
+    maintainer. Eén soort-familie per aanroep."""
     conn = get_db()
-    if not _mag_nieuws(conn, NIEUWS_SCOUT):
+    soorten, fout = _nieuws_soorten_param(request.args.get("soort"))
+    if fout:
         conn.close()
-        return jsonify({"error": f"Alleen het account '{NIEUWS_SCOUT}' of een maintainer "
-                                 "claimt nieuws-doelen"}), 403
+        return jsonify({"error": fout}), 400
+    soorten = soorten or list(NIEUWS_NAAM_SOORTEN)
+    werkers = {_nieuws_werker(x) for x in soorten}
+    if len(werkers) != 1:
+        conn.close()
+        return jsonify({"error": "claim namen (persoon, organisatie) en relaties apart"}), 400
+    werker = werkers.pop()
+    if not _mag_nieuws(conn, werker):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{werker}' of een maintainer "
+                                 f"claimt deze nieuws-doelen ({', '.join(soorten)})"}), 403
     try:
         limit = int(request.args.get("limit", 3))
     except ValueError:
@@ -6400,13 +6468,14 @@ def nieuws_doelen_claim_volgende():
     conn.isolation_level = None
     conn.execute("BEGIN IMMEDIATE")
     try:
-        rijen = conn.execute("""
+        rijen = conn.execute(f"""
             SELECT id, status FROM nieuws_doelen
-            WHERE status = 'open'
-               OR (status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))
-               OR (? AND status = 'klaar' AND vervolg = 'linkedin')
+            WHERE soort IN ({','.join('?' * len(soorten))})
+              AND (status = 'open'
+                   OR (status = 'bezig' AND (geclaimd_op IS NULL OR geclaimd_op < ?))
+                   OR (? AND status = 'klaar' AND vervolg = 'linkedin'))
             ORDER BY (status = 'klaar'), prioriteit DESC, aangemaakt ASC, id ASC
-            LIMIT ?""", (verlopen, 1 if met_linkedin else 0, limit)).fetchall()
+            LIMIT ?""", (*soorten, verlopen, 1 if met_linkedin else 0, limit)).fetchall()
         for r in rijen:
             conn.execute("""UPDATE nieuws_doelen SET status = 'bezig', geclaimd_door = ?,
                             geclaimd_op = ?, pogingen = pogingen + 1, bijgewerkt = ?
@@ -6433,12 +6502,9 @@ def nieuws_doelen_claim_volgende():
 @app.route("/api/nieuws/doelen/<int:did>/claim", methods=["POST"])
 @require_user()
 def nieuws_doelen_claim(did):
-    """Claim één doel: 'open' → 'bezig', anders 409. 'nieuws-scout' of maintainer."""
+    """Claim één doel: 'open' → 'bezig', anders 409. Het account van de soort
+    ('nieuws-scout' voor namen, 'nieuws-bewijs' voor relaties) of een maintainer."""
     conn = get_db()
-    if not _mag_nieuws(conn, NIEUWS_SCOUT):
-        conn.close()
-        return jsonify({"error": f"Alleen het account '{NIEUWS_SCOUT}' of een maintainer "
-                                 "claimt nieuws-doelen"}), 403
     nu = _nu_iso()
     conn.isolation_level = None
     conn.execute("BEGIN IMMEDIATE")
@@ -6447,6 +6513,12 @@ def nieuws_doelen_claim(did):
         conn.execute("ROLLBACK")
         conn.close()
         return jsonify({"error": "Doel niet gevonden"}), 404
+    werker = _nieuws_werker(rij["soort"])
+    if not _mag_nieuws(conn, werker):
+        conn.execute("ROLLBACK")
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{werker}' of een maintainer "
+                                 "claimt dit nieuws-doel"}), 403
     if rij["status"] != "open":
         conn.execute("ROLLBACK")
         doel = _nieuws_doel_dict(rij)
@@ -6468,19 +6540,20 @@ def nieuws_doelen_claim(did):
 @require_user()
 def nieuws_doelen_patch(did):
     """Werk een doel bij: {status?, verslag?, resultaat?, entity_id?, vervolg?}.
-    'nieuws-scout' of maintainer. `resultaat` = object met (een deel van) de vier
+    Het account van de soort ('nieuws-scout' / 'nieuws-bewijs') of een maintainer. `resultaat` = object met (een deel van) de vier
     id-lijsten {entity_ids, relation_ids, source_ids, argument_ids}; ontbrekende lijsten
     worden []. Zet je 'open' terug, dan vervalt de claim."""
     data = request.get_json(silent=True) or {}
     conn = get_db()
-    if not _mag_nieuws(conn, NIEUWS_SCOUT):
-        conn.close()
-        return jsonify({"error": f"Alleen het account '{NIEUWS_SCOUT}' of een maintainer "
-                                 "werkt nieuws-doelen bij"}), 403
     rij = conn.execute("SELECT * FROM nieuws_doelen WHERE id = ?", (did,)).fetchone()
     if rij is None:
         conn.close()
         return jsonify({"error": "Doel niet gevonden"}), 404
+    werker = _nieuws_werker(rij["soort"])
+    if not _mag_nieuws(conn, werker):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{werker}' of een maintainer "
+                                 "werkt dit nieuws-doel bij"}), 403
     toegestaan = {"status", "verslag", "resultaat", "entity_id", "vervolg"}
     onbekend = sorted(set(data) - toegestaan)
     if onbekend:
@@ -6591,10 +6664,13 @@ def _nieuws_autokeur_vandaag(conn):
 
 
 def _nieuws_klaar_ids(conn):
-    """{'entity_ids': set, 'relation_ids': set} uit het resultaat van alle 'klaar'-doelen."""
+    """{'entity_ids': set, 'relation_ids': set} uit het resultaat van alle 'klaar'-doelen
+    van de nieuws-scout (namen). Bewijsdoelen (soort 'relatie') tellen nooit mee: wat
+    'nieuws-bewijs' vindt, blijft mensenwerk."""
     uit = {"entity_ids": set(), "relation_ids": set()}
     for r in conn.execute("SELECT resultaat FROM nieuws_doelen WHERE status = 'klaar' "
-                          "AND resultaat IS NOT NULL"):
+                          "AND resultaat IS NOT NULL "
+                          "AND soort IN ('persoon', 'organisatie')"):
         try:
             res = json.loads(r["resultaat"])
         except (TypeError, ValueError):
