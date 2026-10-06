@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """Automatische beoordeling — één beoordelingsronde zonder mens (eigenaarsbesluit
-2026-10-06: "ik ga niks handmatig beoordelen").
+2026-10-06: "ik ga niks handmatig beoordelen"; vervolg dezelfde dag: "haal de mens uit de
+loop en laat agents alles doen in het propagandamodel").
 
-Wat agents voorstellen ('voorgesteld') wordt hier beslist, via de bestaande poorten:
+Wat agents voorstellen ('voorgesteld') wordt hier beslist, via de bestaande poorten, en wat
+al in het model staat wordt gecontroleerd en zo nodig van een bron voorzien:
 
+0. **Bronzoeker** (scripts/bronzoeker.py): argumenten zonder (goede) bron krijgen er een
+   via een revisie, als de zoeker een bron vindt waarin het script het citaat letterlijk
+   terugvindt. De revisie gaat hierna door A1 en A7 als elk ander voorstel.
 1. **A1 — bronchecker** (scripts/bronchecker.py): elke voorgestelde evidentiële root en
-   elke ondergraving wordt onafhankelijk tegen de echte bron gecontroleerd.
+   elke ondergraving wordt onafhankelijk tegen de echte bron gecontroleerd. Daarna:
+   wat de beoordeling verwierp op een te streng oordeel van bronchecker v1 opnieuw (en
+   heropend als de bron nu wel bevestigd is), en gemergede argumenten die nooit
+   gecontroleerd zijn (``--max-controle`` per ronde, wat het nieuws toont eerst).
 2. **A2 — aanklager**: staan er invloedsclaims klaar die de bronchecker op 'klopt' zette
    maar die nog geen tegenspraak hadden, dan één ronde van de aanklager-agent (Opus) —
    hooguit ``--a2-rondes-per-dag`` per dag en alleen binnen de actieve uren. Neutrale
@@ -13,6 +21,10 @@ Wat agents voorstellen ('voorgesteld') wordt hier beslist, via de bestaande poor
 3. **A7 — mergen** via ``POST /api/arguments/<id>/auto_merge`` (merge-service): de server
    checkt het predikaat zelf (A1 ∧ A2 ∧ dedup ∧ citatiepoort ∧ smaad-firewall, met de twee
    routes van 2026-10-06 voor structuurfeiten en ondergravingen).
+   **Verificatie**: gemergede argumenten krijgen hun status van het onafhankelijke
+   A1-oordeel via ``POST /api/beoordeling/verificatie/<id>``: 'geverifieerd' als de bron de
+   bewering draagt, 'bronvermelding_nodig' als ze dat aantoonbaar niet doet (dan zoekt de
+   bronzoeker een betere). Een statusbesluit van een mens blijft staan.
 4. **Relaties en entiteiten** met gecontroleerd bewijs gaan de graaf in via
    ``POST /api/beoordeling/autokeur/<tabel>/<id>`` (entiteiten eerst).
 5. **Opruimen** (status-PATCH door merge-service, altijd met reden, terug te draaien met
@@ -22,7 +34,15 @@ Wat agents voorstellen ('voorgesteld') wordt hier beslist, via de bestaande poor
    - wat na de wachttijd (``--wachttijd-dagen``, standaard 14) nog niet door de poort komt
      → verworpen (argumenten) of afgewezen (relaties, entiteiten). Een argument dat alleen
      nog op een A2-ronde wacht, krijgt die wachttijd vanaf zijn A1-oordeel.
-   Nooit opgeruimd: kandidaat-relaties zonder mechanisme (incubatie, bewust) en RfC's.
+   Nooit opgeruimd: kandidaat-relaties zonder mechanisme en RfC's (die beslissen agents nu
+   zelf, zie hieronder).
+6. **Agents doen alles** (eigenaarsbesluit 2026-10-06, vervolg): de **smaadtoets**
+   (scripts/smaadtoets.py, Opus) toetst persoonsclaims — feitelijk, gedragen door de bron,
+   over de publieke rol → smaad_hold eraf en de gewone poorten; anders teruggekoppeld (verworpen
+   met de reden); de **mechanisme-toewijzer** geeft kandidaat-verbanden een mechanisme; twee
+   **RfC-beoordelaars** (rfc-toetser, rfc-criticus) reviewen open voorstellen, waarna
+   ``POST /api/beoordeling/rfc/<id>`` aanneemt of afwijst. A7 beslist ook over duiding,
+   aspecten, theorie-argumenten en steunende reacties (A1 én A2).
 
 Eén ronde tegelijk (lock). Logboek: data/automatische_beoordeling_log.jsonl.
 
@@ -35,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import difflib
 import fcntl
 import json
 import os
@@ -50,6 +71,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import bronchecker  # noqa: E402
+import bronzoeker  # noqa: E402
+import mechanisme_toewijzer  # noqa: E402
+import rfc_beoordeling  # noqa: E402
+import smaadtoets  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 API = "http://127.0.0.1:5000"
@@ -88,6 +113,13 @@ def req(method, pad, token, body=None):
             return e.code, {}
 
 
+def startmoment(*tijden: str | None) -> str | None:
+    """Het laatste van de gegeven momenten (ISO-tekst, of None): een heropend argument krijgt
+    een nieuwe wachttijd vanaf het heropenen."""
+    gezet = [str(t) for t in tijden if t]
+    return max(gezet) if gezet else None
+
+
 def leeftijd_dagen(tijd: str | None, nu: datetime.datetime) -> float:
     if not tijd:
         return 0.0
@@ -98,32 +130,56 @@ def leeftijd_dagen(tijd: str | None, nu: datetime.datetime) -> float:
     return (nu - t).total_seconds() / 86400
 
 
+def _zelfde(claim: str, ander: str) -> bool:
+    """Spiegelt server._zelfde_bewering (difflib; de dedup-module laten we hier weg)."""
+    return difflib.SequenceMatcher(None, claim or "", ander or "").ratio() >= 0.85
+
+
 def a2_wachtrij(conn) -> list[dict]:
-    """Voorgestelde invloedsclaims die de bronchecker op 'klopt' zette en die nog geen
-    tegenspraak-certificaat hebben (en geen persoon raken: die merget A7 nooit)."""
-    rijen = conn.execute(f"""
-        SELECT a.id, a.claim, a.relation_id, a.entity_id, a.contributed_by, a.created_at,
+    """Voorgestelde argumenten die de bronchecker op 'klopt' zette en die nog op een
+    tegenspraak-certificaat wachten: invloedsclaims, duiding, aspecten, theorie-argumenten en
+    steunende reacties (agents doen alles, 2026-10-06). Niet: ondergravingen, neutrale
+    structuurfeiten en bronrevisies (die hebben geen A2 nodig), en persoonsclaims zolang de
+    smaadtoets ze niet 'feitelijk' bevond."""
+    rijen = conn.execute("""
+        SELECT a.*,
                (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
                   AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS a1,
                (SELECT created_at FROM immuun_oordelen o WHERE o.argument_id = a.id
                   AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS a1_op
         FROM arguments a
-        WHERE a.status = 'voorgesteld' AND NOT a.vervangen AND a.parent_argument_id IS NULL
-          AND a.stance IN ('supporting', 'contradicting')
-          AND COALESCE(a.property, 'existence') IN ('existence', 'influence')
-          AND (a.relation_id IS NOT NULL OR a.entity_id IS NOT NULL)
+        WHERE a.status = 'voorgesteld' AND NOT a.vervangen AND COALESCE(a.smaad_hold, 0) = 0
           AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
                           AND o.fase = 'tegenspraak')
-          AND NOT (a.stance = 'supporting' AND a.relation_id IN (
-                SELECT id FROM relations WHERE relation_type IN
-                ({",".join("?" * len(STRUCTUURTYPES))})))
-          AND NOT EXISTS (SELECT 1 FROM relations r JOIN entities e
-                          ON e.id IN (r.source_id, r.target_id)
-                          WHERE r.id = a.relation_id AND e.type = 'persoon')
-          AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.id = a.entity_id
-                          AND e.type = 'persoon')
-        ORDER BY a.id DESC""", STRUCTUURTYPES).fetchall()  # noqa: S608 - placeholders
-    return [dict(r) for r in rijen if r["a1"] == "klopt"]
+        ORDER BY a.id DESC""").fetchall()
+    uit = []
+    for a in rijen:
+        if a["a1"] != "klopt":
+            continue
+        if (a["parent_argument_id"] is not None and a["stance"] == "contradicting"
+                and (a["reasoning"] or "").strip()):
+            continue  # ondergraving: eigen route
+        personen, rtype = smaadtoets.personen_van(conn, a)
+        if (a["parent_argument_id"] is None and a["stance"] == "supporting"
+                and rtype in STRUCTUURTYPES
+                and (a["property"] or "existence") in ("existence", "influence")):
+            continue  # neutraal structuurfeit
+        if a["reviseert_id"]:
+            oud = conn.execute("SELECT claim, status, vervangen FROM arguments WHERE id = ?",
+                               (a["reviseert_id"],)).fetchone()
+            if (oud and not oud["vervangen"] and oud["status"] not in ("voorgesteld", "verworpen")
+                    and _zelfde(a["claim"], oud["claim"])):
+                continue  # bronrevisie
+        if personen:
+            toets = conn.execute("""SELECT verdict FROM smaad_toetsen WHERE argument_id = ?
+                                    AND COALESCE(door, '') <> COALESCE(?, '')
+                                    ORDER BY created_at DESC, id DESC LIMIT 1""",
+                                 (a["id"], a["contributed_by"])).fetchone()
+            if not toets or toets["verdict"] != "feitelijk":
+                continue  # eerst de smaadtoets
+        uit.append({k: a[k] for k in ("id", "claim", "relation_id", "entity_id",
+                                       "contributed_by", "created_at", "a1", "a1_op")})
+    return uit
 
 
 def rondes_vandaag(label: str) -> int:
@@ -145,7 +201,7 @@ def rondes_vandaag(label: str) -> int:
 
 # ------------------------------------------------------------------ stappen
 def stap_a2(wachtrij, args, meld) -> dict:
-    """Eén aanklager-ronde (Opus) als er invloedsclaims op tegenspraak wachten."""
+    """Eén aanklager-ronde (Opus) als er argumenten op tegenspraak wachten."""
     if not wachtrij:
         return {"gestart": False, "reden": "niets wacht op tegenspraak"}
     if args.zonder_a2:
@@ -166,7 +222,7 @@ def stap_a2(wachtrij, args, meld) -> dict:
            "--model", "opus", "--effort", "high"]
     if CAFFEINATE:
         cmd = [CAFFEINATE, "-i", *cmd]
-    meld(f"A2: aanklager-ronde voor {len(wachtrij)} invloedsclaim(s)…")
+    meld(f"A2: aanklager-ronde voor {len(wachtrij)} argument(en)…")
     t0 = time.monotonic()
     r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
                        timeout=args.a2_timeout + 300)
@@ -198,6 +254,223 @@ def stap_mergen(token, args, meld) -> dict:
             bucket = antwoord.get("bucket") or f"http-{status}"
             tel["buckets"][bucket] = tel["buckets"].get(bucket, 0) + 1
     meld(f"A7: {tel['gemerged']} argument(en) gemerged")
+    return tel
+
+
+def stap_bronzoeken(args, meld) -> dict:
+    """Bronnen zoeken voor argumenten zonder (goede) bron; wat standhoudt wordt een revisie."""
+    if args.zonder_bronzoeker or args.max_zoek <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    if not args.droog and not bronzoeker.DEFAULT_TOKEN.exists():
+        return {"gestart": False, "reden": "geen token voor het account 'bronzoeker'"}
+    return bronzoeker.draai(max_n=args.max_zoek, droog=args.droog, meld=meld)
+
+
+def stap_heropenen(token, args, meld) -> dict:
+    """Eigen afwijzingen terug naar 'voorgesteld' als een onafhankelijk oordeel de bron daarna
+    toch bevestigt (de server checkt het predikaat zelf, ook de volgorde in de tijd)."""
+    conn = db()
+    try:
+        ids = [r["id"] for r in conn.execute("""
+            SELECT a.id FROM arguments a WHERE a.status = 'verworpen' AND NOT a.vervangen
+              AND (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
+                     AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
+                     LIMIT 1) = 'klopt'
+              AND (SELECT l.reason FROM edit_log l WHERE l.table_name = 'arguments'
+                     AND l.record_id = a.id AND l.action = 'disputed'
+                     AND l.new_value LIKE '%verworpen%' ORDER BY l.id DESC LIMIT 1)
+                  LIKE 'automatische beoordeling%'""")]
+    finally:
+        conn.close()
+    tel = {"heropend": 0}
+    for arg_id in ids:
+        if args.droog:
+            tel["heropend"] += 1
+            continue
+        status, antwoord = req("POST", f"/api/beoordeling/heropenen/{arg_id}", token)
+        if status == 503:
+            meld("Heropenen gestopt: automatische beoordeling staat uit")
+            break
+        if status == 200 and antwoord.get("heropend"):
+            tel["heropend"] += 1
+    meld(f"Heropend: {tel['heropend']} eigen afwijzing(en) met een bevestigde bron")
+    return tel
+
+
+def stap_verifieren(token, args, meld) -> dict:
+    """Gemergede argumenten krijgen hun status van het onafhankelijke A1-oordeel."""
+    conn = db()
+    try:
+        rijen = conn.execute("""
+            SELECT a.id, a.status,
+                   (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
+                      AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
+                      LIMIT 1) AS a1
+            FROM arguments a
+            WHERE a.status IN ('ongecontroleerd', 'bronvermelding_nodig') AND NOT a.vervangen
+            ORDER BY a.id""").fetchall()
+    finally:
+        conn.close()
+    ids = [r["id"] for r in rijen
+           if r["a1"] == "klopt" or (r["a1"] == "klopt-niet" and r["status"] == "ongecontroleerd")]
+    tel = {"geverifieerd": 0, "bron_nodig": 0, "blijft": 0}
+    for arg_id in ids:
+        status, antwoord = req("GET" if args.droog else "POST",
+                               f"/api/beoordeling/verificatie/{arg_id}", token)
+        if status in (429, 503):
+            meld(f"Verifiëren gestopt: {antwoord.get('error')}")
+            break
+        nieuw = (antwoord.get("nieuwe_status") if args.droog
+                 else antwoord.get("status") if antwoord.get("gewijzigd") else None)
+        tel[{"geverifieerd": "geverifieerd",
+             "bronvermelding_nodig": "bron_nodig"}.get(nieuw, "blijft")] += 1
+    meld(f"Verificatie: {tel['geverifieerd']} geverifieerd, {tel['bron_nodig']} naar "
+         f"'bronvermelding_nodig' (bron draagt het niet)")
+    return tel
+
+
+def stap_smaadtoets(args, meld) -> dict:
+    """De smaad-firewall door een agent: persoonsclaims met een bevestigde bron toetsen."""
+    if args.max_smaad <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    if not args.droog and not smaadtoets.DEFAULT_TOKEN.exists():
+        return {"gestart": False, "reden": "geen token voor het account 'smaadtoets'"}
+    return smaadtoets.draai(max_n=args.max_smaad, droog=args.droog, meld=meld)
+
+
+def stap_smaad_vrijgeven(token, args, meld) -> dict:
+    """smaad_hold eraf waar de smaadtoets 'feitelijk' zei en de bron de claim draagt."""
+    conn = db()
+    try:
+        ids = [r["id"] for r in conn.execute("""
+            SELECT a.id FROM arguments a WHERE COALESCE(a.smaad_hold, 0) = 1
+              AND NOT a.vervangen AND a.status <> 'verworpen'
+              AND (SELECT verdict FROM smaad_toetsen t WHERE t.argument_id = a.id
+                     AND COALESCE(t.door, '') <> COALESCE(a.contributed_by, '')
+                     ORDER BY t.created_at DESC, t.id DESC LIMIT 1) = 'feitelijk'""")]
+    finally:
+        conn.close()
+    tel = {"vrijgegeven": 0}
+    for arg_id in ids:
+        if args.droog:
+            tel["vrijgegeven"] += 1
+            continue
+        status, antwoord = req("POST", f"/api/beoordeling/smaad_vrijgeven/{arg_id}", token)
+        if status == 503:
+            break
+        if status == 200 and antwoord.get("vrijgegeven"):
+            tel["vrijgegeven"] += 1
+    meld(f"Smaadtoets: {tel['vrijgegeven']} argument(en) van smaad_hold af (feitelijk)")
+    return tel
+
+
+def stap_mechanismen(args, meld) -> dict:
+    """Kandidaat-verbanden krijgen een mechanisme van de mechanisme-toewijzer."""
+    if args.max_mechanismen <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    return mechanisme_toewijzer.draai(max_n=args.max_mechanismen, droog=args.droog, meld=meld)
+
+
+def stap_rfc(token, args, meld) -> dict:
+    """Open RfC's: reviews van twee agents, dan het besluit (aannemen/afwijzen)."""
+    if args.max_rfc <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    reviews = rfc_beoordeling.draai(droog=args.droog, max_n=args.max_rfc, meld=meld)
+    conn = db()
+    try:
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM voorstellen WHERE status = 'open' ORDER BY id")]
+    finally:
+        conn.close()
+    tel = {"reviews": reviews, "aangenomen": 0, "afgewezen": 0, "open": 0, "blokkade": 0}
+    for vid in ids:
+        if args.droog:
+            tel["open"] += 1
+            continue
+        status, antwoord = req("POST", f"/api/beoordeling/rfc/{vid}", token)
+        if status == 503:
+            break
+        besluit = antwoord.get("besluit")
+        if status == 200 and besluit == "geaccepteerd":
+            tel["aangenomen"] += 1
+        elif status == 200 and besluit == "afgewezen":
+            tel["afgewezen"] += 1
+        elif antwoord.get("blokkade"):
+            tel["blokkade"] += 1
+            meld(f"  ✗ RfC #{vid} niet uitvoerbaar: {antwoord['blokkade'][:160]}")
+        else:
+            tel["open"] += 1
+    meld(f"RfC's: {tel['aangenomen']} aangenomen, {tel['afgewezen']} afgewezen, "
+         f"{tel['open']} wachten nog")
+    return tel
+
+
+FEITELIJKE_VERSIE = "Feitelijke versie van #{id} na de smaadtoets"
+
+
+def feitelijke_versie(orig: dict, citaties: list[dict], herformulering: str, reden: str) -> dict:
+    """De body van een nieuw argument met de feitelijke formulering die de smaadtoets gaf:
+    hetzelfde doel, dezelfde stance en dezelfde bronnen (de controles beginnen opnieuw)."""
+    body = {"stance": orig["stance"], "claim": herformulering.strip(),
+            "reasoning": f"{FEITELIJKE_VERSIE.format(id=orig['id'])}: {reden}"[:1500],
+            "negeer_duplicaten": True,
+            "citations": [{k: c[k] for k in ("source_id", "quote", "methode") if c.get(k)}
+                          for c in citaties]}
+    if orig.get("parent_argument_id"):
+        body["parent_argument_id"] = orig["parent_argument_id"]
+    else:
+        for kolom in ("relation_id", "entity_id", "role_id", "mechanism_id",
+                      "emergent_effect_id"):
+            if orig.get(kolom):
+                body[kolom] = orig[kolom]
+        if orig.get("property"):
+            body["property"] = orig["property"]
+        if orig.get("property_value") is not None:
+            body["property_value"] = orig["property_value"]
+    return body
+
+
+def stap_feitelijke_versies(args, meld) -> dict:
+    """Terugkoppelen tot het eind: wat de smaadtoets 'niet feitelijk' bevond en verworpen is,
+    komt met de feitelijke formulering die de bron wél draagt opnieuw binnen (account
+    'bronzoeker', dezelfde bronnen), en gaat weer langs bron-check, smaadtoets en aanklager."""
+    if args.droog or not bronzoeker.DEFAULT_TOKEN.exists():
+        return {"ingediend": 0, "reden": "droog of geen token"}
+    token = bronzoeker.DEFAULT_TOKEN.read_text().strip()
+    conn = db()
+    try:
+        rijen = conn.execute("""
+            SELECT a.*, t.herformulering, t.reden AS smaad_reden FROM arguments a
+            JOIN smaad_toetsen t ON t.id = (
+                SELECT t2.id FROM smaad_toetsen t2 WHERE t2.argument_id = a.id
+                  AND COALESCE(t2.door, '') <> COALESCE(a.contributed_by, '')
+                ORDER BY t2.created_at DESC, t2.id DESC LIMIT 1)
+            WHERE a.status = 'verworpen' AND NOT a.vervangen
+              AND t.verdict = 'niet_feitelijk' AND TRIM(COALESCE(t.herformulering, '')) <> ''
+            ORDER BY a.id""").fetchall()
+        werk = []
+        for r in rijen:
+            merk = FEITELIJKE_VERSIE.format(id=r["id"]) + "%"
+            if conn.execute("SELECT 1 FROM arguments WHERE reasoning LIKE ? LIMIT 1",
+                            (merk,)).fetchone():
+                continue  # al opnieuw ingediend
+            citaties = [dict(c) for c in conn.execute(
+                "SELECT source_id, quote, methode FROM citations WHERE argument_id = ?",
+                (r["id"],))]
+            if citaties:
+                werk.append(feitelijke_versie(dict(r), citaties, r["herformulering"],
+                                              r["smaad_reden"] or ""))
+    finally:
+        conn.close()
+    tel = {"ingediend": 0, "fouten": 0}
+    for body in werk:
+        status, antwoord = req("POST", "/api/arguments", token, body)
+        if status == 201:
+            tel["ingediend"] += 1
+        else:
+            tel["fouten"] += 1
+            meld(f"  ✗ feitelijke versie niet ingediend ({status}): {antwoord.get('error')}")
+    meld(f"Smaadtoets: {tel['ingediend']} feitelijke versie(s) opnieuw ingediend")
     return tel
 
 
@@ -237,7 +510,21 @@ def stap_opruimen(token, args, meld) -> dict:
                    (SELECT detail FROM immuun_oordelen o WHERE o.argument_id = a.id
                       AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS a1_detail,
                    (SELECT created_at FROM immuun_oordelen o WHERE o.argument_id = a.id
-                      AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS a1_op
+                      AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS a1_op,
+                   (SELECT verdict FROM smaad_toetsen t WHERE t.argument_id = a.id
+                      AND COALESCE(t.door, '') <> COALESCE(a.contributed_by, '')
+                      ORDER BY t.created_at DESC, t.id DESC LIMIT 1) AS smaad,
+                   (SELECT reden FROM smaad_toetsen t WHERE t.argument_id = a.id
+                      AND COALESCE(t.door, '') <> COALESCE(a.contributed_by, '')
+                      ORDER BY t.created_at DESC, t.id DESC LIMIT 1) AS smaad_reden,
+                   (SELECT herformulering FROM smaad_toetsen t WHERE t.argument_id = a.id
+                      AND COALESCE(t.door, '') <> COALESCE(a.contributed_by, '')
+                      ORDER BY t.created_at DESC, t.id DESC LIMIT 1) AS smaad_herformulering,
+                   (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
+                      AND o.fase = 'tegenspraak' ORDER BY o.id DESC LIMIT 1) AS a2,
+                   (SELECT MAX(l.created_at) FROM edit_log l WHERE l.table_name = 'arguments'
+                      AND l.record_id = a.id
+                      AND l.reason LIKE 'automatische beoordeling: heropend%') AS heropend_op
             FROM arguments a WHERE a.status = 'voorgesteld' AND NOT a.vervangen""")]
         wacht_a2 = {r["id"]: r for r in a2_wachtrij(conn)}
         # Nog niet door de bronchecker bekeken (boven --max-bron): eerst controleren
@@ -251,22 +538,30 @@ def stap_opruimen(token, args, meld) -> dict:
         conn.close()
     for a in args_rijen:
         motivatie = None
-        if a["id"] in ongecontroleerd:
+        if a["id"] in ongecontroleerd and a["smaad"] != "niet_feitelijk":
             continue
         detail = (a["a1_detail"] or "").replace("[bronchecker] ", "").strip()
-        if a["a1"] == "klopt-niet":
+        if a["smaad"] == "niet_feitelijk":
+            motivatie = (f"{REDEN}: teruggekoppeld door de smaadtoets — {a['smaad_reden']}"
+                         + (f" Feitelijk zou zijn: {a['smaad_herformulering']}"
+                            if a["smaad_herformulering"] else ""))
+        elif a["a1"] == "klopt-niet":
             motivatie = (f"{REDEN}: het bezwaar houdt geen stand — {detail}"
                          if a["parent_argument_id"] else
                          f"{REDEN}: de bron draagt de bewering niet — {detail}")
         elif a["id"] in wacht_a2:
-            if leeftijd_dagen(a["a1_op"], nu) >= args.wachttijd_dagen:
+            if leeftijd_dagen(startmoment(a["a1_op"], a["heropend_op"]),
+                              nu) >= args.wachttijd_dagen:
                 motivatie = (f"{REDEN}: kreeg binnen {args.wachttijd_dagen} dagen geen "
                              "tegenspraak-certificaat — opgeschoond")
             else:
                 tel["wacht_op_a2"] += 1
-        elif leeftijd_dagen(a["created_at"], nu) >= args.wachttijd_dagen:
+        elif leeftijd_dagen(startmoment(a["created_at"], a["heropend_op"]),
+                            nu) >= args.wachttijd_dagen:
             waarom = {"twijfel": f"de bron bevestigt het niet volledig ({detail})",
-                      "klopt": "het komt (nog) niet door de immuunpoort"}.get(
+                      "klopt": ("de aanklager viel het aan (tegenbewijs of een ondergraving)"
+                                if a["a2"] == "aangevallen"
+                                else "het komt (nog) niet door de immuunpoort")}.get(
                 a["a1"], "het valt buiten wat automatisch te controleren is")
             motivatie = (f"{REDEN}: na {args.wachttijd_dagen} dagen niet te bevestigen — "
                          f"{waarom}; opgeschoond")
@@ -284,11 +579,15 @@ def stap_opruimen(token, args, meld) -> dict:
         conn = db()
         try:
             rijen = [dict(r) for r in conn.execute(f"""
-                SELECT t.id, (SELECT MIN(created_at) FROM edit_log l WHERE l.table_name = ?
-                                AND l.record_id = t.id AND l.action = 'created') AS aangemaakt
+                SELECT t.id, COALESCE(
+                    (SELECT MAX(created_at) FROM edit_log l WHERE l.table_name = ?
+                       AND l.record_id = t.id
+                       AND l.reason LIKE 'automatische beoordeling: mechanisme%'),
+                    (SELECT MIN(created_at) FROM edit_log l WHERE l.table_name = ?
+                       AND l.record_id = t.id AND l.action = 'created')) AS aangemaakt
                 FROM {tabel} t WHERE t.status = 'voorgesteld' AND NOT t.vervangen
                 {"AND t.mechanism_id IS NOT NULL" if tabel == "relations" else ""}""",
-                (tabel,))]  # noqa: S608 - vaste tabelnaam
+                (tabel, tabel))]  # noqa: S608 - vaste tabelnaam
         finally:
             conn.close()
         for rij in rijen:
@@ -339,11 +638,31 @@ def ronde(args, meld=print) -> dict:
     t0 = time.monotonic()
     uitkomst = {"start": datetime.datetime.now().isoformat(timespec="seconds"),
                 "droog": bool(args.droog)}
+    # Argumenten zonder (goede) bron: wat de bronzoeker vindt, komt als revisie mee in A1/A7
+    uitkomst["bronzoeker"] = stap_bronzoeken(args, meld)
     uitkomst["a1"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
                                        parallel=args.parallel, meld=meld)
     # Twijfelgevallen van bronchecker v1 nog één keer met v2 (eigen oordeel herzien)
     uitkomst["a1_herzien"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
                                                parallel=args.parallel, herzien=True, meld=meld)
+    # Wat op een v1-oordeel verworpen werd, of na 14 dagen zonder dat een poort besliste:
+    # opnieuw (heropend wordt hieronder, na de smaadtoets)
+    uitkomst["a1_heropenen"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
+                                                 parallel=args.parallel, modus="heropenen",
+                                                 meld=meld)
+    uitkomst["a1_buiten"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
+                                              parallel=args.parallel, modus="buiten", meld=meld)
+    # Wat al gemerged is maar nooit gecontroleerd (wat het nieuws toont eerst)
+    uitkomst["a1_controle"] = bronchecker.draai(max_n=args.max_controle, droog=args.droog,
+                                                parallel=args.parallel, modus="controle",
+                                                meld=meld)
+    # Wat eerder strandde op een onleesbare pdf (nu leesbaar via PDFKit)
+    uitkomst["a1_pdf"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
+                                           parallel=args.parallel, modus="pdf", meld=meld)
+    # Smaad-firewall door een agent: persoonsclaims met een bevestigde bron toetsen
+    uitkomst["smaadtoets"] = stap_smaadtoets(args, meld)
+    uitkomst["smaad_vrijgegeven"] = stap_smaad_vrijgeven(token, args, meld)
+    uitkomst["heropend"] = stap_heropenen(token, args, meld)
     conn = db()
     try:
         wachtrij = a2_wachtrij(conn)
@@ -355,9 +674,15 @@ def ronde(args, meld=print) -> dict:
         uitkomst["a1_na_a2"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
                                                  parallel=args.parallel, meld=meld)
     uitkomst["a7"] = stap_mergen(token, args, meld)
+    uitkomst["verificatie"] = stap_verifieren(token, args, meld)
+    # Kandidaat-verbanden en RfC's: ook door agents beslist
+    uitkomst["mechanismen"] = stap_mechanismen(args, meld)
+    uitkomst["rfc"] = stap_rfc(token, args, meld)
     uitkomst["goedgekeurd"] = stap_goedkeuren(token, args, meld)
     if not args.zonder_opruimen:
         uitkomst["opgeruimd"] = stap_opruimen(token, args, meld)
+    # Wat de smaadtoets terugkoppelde, komt in zijn feitelijke vorm opnieuw binnen
+    uitkomst["feitelijke_versies"] = stap_feitelijke_versies(args, meld)
     uitkomst["gemerged"] = uitkomst["a7"]["gemerged"]
     uitkomst["duur_s"] = round(time.monotonic() - t0)
     if not args.droog:
@@ -379,9 +704,20 @@ def main():
     ap.add_argument("--open-a2", action="store_true",
                     help="print de argumenten die op een tegenspraak-certificaat wachten")
     ap.add_argument("--max-bron", type=int, default=80, help="hooguit zoveel A1-checks per ronde")
+    ap.add_argument("--max-controle", type=int, default=60,
+                    help="hooguit zoveel gemergede, nooit gecontroleerde argumenten per ronde")
+    ap.add_argument("--max-zoek", type=int, default=8,
+                    help="hooguit zoveel argumenten zonder (goede) bron per ronde (bronzoeker)")
+    ap.add_argument("--zonder-bronzoeker", action="store_true", help="geen bronnen zoeken")
+    ap.add_argument("--max-smaad", type=int, default=20,
+                    help="hooguit zoveel smaadtoetsen per ronde (0 = uit)")
+    ap.add_argument("--max-mechanismen", type=int, default=12,
+                    help="hooguit zoveel kandidaat-verbanden per ronde (0 = uit)")
+    ap.add_argument("--max-rfc", type=int, default=3,
+                    help="hooguit zoveel open RfC's per ronde laten reviewen (0 = uit)")
     ap.add_argument("--parallel", type=int, default=3)
     ap.add_argument("--zonder-a2", action="store_true", help="geen aanklager-ronde starten")
-    ap.add_argument("--a2-rondes-per-dag", type=int, default=2)
+    ap.add_argument("--a2-rondes-per-dag", type=int, default=4)
     ap.add_argument("--a2-timeout", type=int, default=2700)
     ap.add_argument("--actieve-uren", type=parse_uren, default=(8, 22))
     ap.add_argument("--wachttijd-dagen", type=int, default=14)

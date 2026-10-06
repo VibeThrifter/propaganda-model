@@ -35,12 +35,20 @@ tweede, onafhankelijke controle naast de bronchecker (A1). Begin daarom **elke r
 python3 scripts/automatische_beoordeling.py --open-a2
 ```
 
-Dat geeft de voorgestelde invloedsclaims die de bronchecker op 'klopt' zette en die op jouw
+Dat geeft de voorgestelde argumenten die de bronchecker op 'klopt' zette en die op jouw
 tegenspraak wachten. Behandel die **eerst** (hooguit 12 per ronde) en geef elk precies één
 certificaat: `aangevallen` (je plaatste een weerlegging of ondergraving), `overleefd` of
 `onbeslist`. Pas als die lijst leeg is, ga je naar je gewone doelwitten hieronder. Zonder
-jouw `overleefd` merget een invloedsclaim nooit; na 14 dagen zonder certificaat wordt hij
+jouw `overleefd` merget zo'n argument nooit; na 14 dagen zonder certificaat wordt het
 opgeruimd.
+
+Sinds "agents doen alles" (eigenaarsbesluit 2026-10-06, vervolg) staan op die lijst niet alleen
+invloedsclaims maar ook duiding (nuance), aspecten (sinds wanneer, politieke positie,
+mechanisme-indeling), theorie-argumenten (over een rol of mechanisme) en steunende reacties.
+Toets ze op dezelfde manier: is er tegenbewijs, of deugt de gevolgtrekking niet? En **claims
+over personen**: die staan pas op de lijst nadat de smaadtoets ze feitelijk bevond (een feit,
+gedragen door de bron, over de publieke rol). Let daar extra op of de bewering verder gaat dan
+de bron — een overdreven of insinuerende persoonsclaim val je aan met een ondergraving.
 
 ## Drie uitkomsten per claim
 

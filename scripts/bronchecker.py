@@ -31,10 +31,23 @@ Versie 2 (2026-10-06, na de eerste ronde):
 - ``--herzien`` bekijkt voorgestelde argumenten met een eerder twijfel-oordeel van versie 1
   opnieuw en werkt dat eigen oordeel bij (``"herzien": true``, nooit een tweede stem).
 
+Agents doen alles (eigenaarsbesluit 2026-10-06, vervolg): ook wat al gemerged is maar nooit
+gecontroleerd werd, krijgt een oordeel.
+- ``--controle`` bekijkt gemergede argumenten zonder oordeel ('ongecontroleerd', of
+  'bronvermelding_nodig' met een bron); scripts/automatische_beoordeling.py zet op dat
+  oordeel hun status ('geverifieerd', of 'bronvermelding_nodig' als de bron de bewering niet
+  draagt — dan zoekt scripts/bronzoeker.py een betere bron);
+- ``--heropenen`` bekijkt wat de beoordeling verwierp op een oordeel van versie 1 opnieuw;
+  bevestigt versie 2 de bron, dan heropent de beoordeling haar eigen afwijzing;
+- pdf-bronnen worden gelezen via macOS PDFKit (JavaScript for Automation, geen installatie);
+  ``--pdf`` bekijkt wat eerder 'twijfel' kreeg omdat de pdf niet te lezen was.
+Wat lezers van de nieuws-aggregator zien (nieuws_voorrang, nieuws_doelen) gaat steeds voor.
+
 Gebruik:
     python3 scripts/bronchecker.py --droog            # toon oordelen, schrijf niets
     python3 scripts/bronchecker.py --max 40 --json    # echt, hooguit 40 argumenten
     python3 scripts/bronchecker.py --ids 3912,3913    # alleen deze argumenten
+    python3 scripts/bronchecker.py --controle --max 60  # gemerged, nooit gecontroleerd
 """
 from __future__ import annotations
 
@@ -227,6 +240,31 @@ def haal_linkedin(url: str) -> tuple[str | None, str]:
     return None, "linkedin: geen scrape gevonden"
 
 
+OSASCRIPT = shutil.which("osascript")
+PDF_TIMEOUT_S = 90
+# macOS PDFKit via JavaScript for Automation: leest de tekstlaag van een pdf, zonder installatie
+PDF_JXA = ('ObjC.import("PDFKit"); function run(argv) { var d = $.PDFDocument.alloc'
+           '.initWithURL($.NSURL.fileURLWithPath(argv[0])); return d.isNil() ? "" : '
+           'ObjC.unwrap(d.string) || ""; }')
+
+
+def pdf_naar_tekst(ruw: bytes) -> str | None:
+    """De tekst van een pdf (macOS PDFKit); None als dat niet kan (geen macOS, scan zonder
+    tekstlaag, beschadigd bestand)."""
+    if not OSASCRIPT or not ruw:
+        return None
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as bestand:
+        bestand.write(ruw)
+        bestand.flush()
+        try:
+            r = subprocess.run([OSASCRIPT, "-l", "JavaScript", "-e", PDF_JXA, bestand.name],
+                               capture_output=True, text=True, timeout=PDF_TIMEOUT_S)
+        except (subprocess.TimeoutExpired, OSError):
+            return None
+    tekst = " ".join((r.stdout or "").split())
+    return tekst if r.returncode == 0 and tekst else None
+
+
 def haal_url(url: str) -> tuple[str | None, str]:
     """(leesbare tekst, toelichting). None bij een fout of een niet-leesbaar formaat."""
     if "linkedin.com" in host_van(url):
@@ -247,7 +285,10 @@ def haal_url(url: str) -> tuple[str | None, str]:
         finally:
             time.sleep(HOST_PAUZE_S)
     if "pdf" in soort or ruw[:5] == b"%PDF-":
-        return None, "pdf: niet automatisch leesbaar"
+        tekst = pdf_naar_tekst(ruw)
+        if not tekst:
+            return None, "pdf: niet automatisch leesbaar"
+        return tekst, f"pdf opgehaald ({len(tekst)} tekens)"
     tekst = ruw.decode(charset, errors="replace")
     if "html" in soort or "<html" in tekst[:2000].lower():
         tekst = html_naar_tekst(tekst)
@@ -301,12 +342,13 @@ def haal_bron(bron: dict, citaat: str | None = None) -> tuple[str | None, str, s
 
 
 # ------------------------------------------------------------------ model
-def vraag_model(prompt: str, schema: dict) -> dict | None:
+def vraag_model(prompt: str, schema: dict, systeem: str | None = None,
+                model: str | None = None) -> dict | None:
     """Eén `claude -p`-aanroep zonder tools/context; het abonnement van de eigenaar."""
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cmd = [CLAUDE, "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config",
-           "--setting-sources", "", "--no-session-persistence", "--model", MODEL,
-           "--system-prompt", SYSTEM_PROMPT, "--json-schema", json.dumps(schema)]
+           "--setting-sources", "", "--no-session-persistence", "--model", model or MODEL,
+           "--system-prompt", systeem or SYSTEM_PROMPT, "--json-schema", json.dumps(schema)]
     with tempfile.TemporaryDirectory(prefix="bronchecker-") as leeg:
         try:
             r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=leeg,
@@ -340,6 +382,21 @@ def db():
 
 
 def doel_tekst(conn, arg) -> str:
+    gezien = set()
+    while arg["parent_argument_id"] is not None and arg["id"] not in gezien:
+        gezien.add(arg["id"])
+        ouder = conn.execute("SELECT * FROM arguments WHERE id = ?",
+                             (arg["parent_argument_id"],)).fetchone()
+        if ouder is None:
+            break
+        arg = ouder
+    for kolom, tabel in (("role_id", "roles"), ("mechanism_id", "mechanisms"),
+                         ("emergent_effect_id", "emergent_effects")):
+        if arg[kolom]:
+            r = conn.execute(f"SELECT name FROM {tabel} WHERE id = ?",  # noqa: S608
+                             (arg[kolom],)).fetchone()
+            if r:
+                return f"het theorie-element '{r['name']}' en zijn plaats in het model"
     if arg["relation_id"]:
         r = conn.execute("""SELECT s.name AS bron, t.name AS doel, r.relation_type,
                                    m.name AS mech, r.description
@@ -370,24 +427,19 @@ def bronnen_van(conn, arg_id) -> list[dict]:
 
 
 def kandidaten(conn, ids=None) -> list[sqlite3.Row]:
-    """Voorgestelde evidentiële roots en ondergravingen zonder oordeel van de bronchecker."""
+    """Voorgestelde argumenten zonder oordeel van de bronchecker: evidentiële roots, duiding,
+    aspecten, theorie-argumenten en reacties (agents doen alles, 2026-10-06). Ook onder
+    smaad_hold: dit oordeel is intern en de smaadtoets bouwt erop."""
     filt, params = "", [ACCOUNT, ACCOUNT]
     if ids:
         filt = f" AND a.id IN ({','.join('?' * len(ids))})"
         params += list(ids)
     return conn.execute(f"""
         SELECT a.* FROM arguments a
-        WHERE a.status = 'voorgesteld' AND NOT a.vervangen AND COALESCE(a.smaad_hold, 0) = 0
-          AND a.contributed_by <> ?
+        WHERE a.status = 'voorgesteld' AND NOT a.vervangen
+          AND COALESCE(a.contributed_by, '') <> ?
           AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
-                          AND o.fase = 'herverificatie' AND o.door = ?)
-          AND (
-            (a.parent_argument_id IS NULL AND a.stance IN ('supporting', 'contradicting')
-             AND COALESCE(a.property, 'existence') IN ('existence', 'influence')
-             AND (a.relation_id IS NOT NULL OR a.entity_id IS NOT NULL))
-            OR (a.parent_argument_id IS NOT NULL AND a.stance = 'contradicting'
-                AND TRIM(COALESCE(a.reasoning, '')) <> '')
-          ){filt}
+                          AND o.fase = 'herverificatie' AND o.door = ?){filt}
         ORDER BY a.id DESC""", params).fetchall()  # noqa: S608 - alleen placeholders
 
 
@@ -403,6 +455,151 @@ def herzien_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
         WHERE a.status = 'voorgesteld' AND NOT a.vervangen AND o.verdict = 'twijfel'
           AND COALESCE(o.detail, '') NOT LIKE ?{filt}
         ORDER BY a.id DESC""", params).fetchall()  # noqa: S608 - alleen placeholders
+
+
+def heeft_tabel(conn, naam: str) -> bool:
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                        (naam,)).fetchone() is not None
+
+
+def nieuws_voorrang(conn) -> tuple[dict[int, str], set[int]]:
+    """Wat lezers van de nieuws-aggregator zien: {relatie-id: laatste melding} (nieuws_voorrang
+    en de bewijsdoelen) en de entiteiten daaromheen (eindpunten, plus de namen uit het nieuws
+    die de nieuws-scout onderzocht)."""
+    relaties: dict[int, str] = {}
+    entiteiten: set[int] = set()
+    if heeft_tabel(conn, "nieuws_voorrang"):
+        for r in conn.execute("SELECT relation_id, gevraagd_op FROM nieuws_voorrang"):
+            relaties[r[0]] = r[1] or ""
+    if heeft_tabel(conn, "nieuws_doelen"):
+        for r in conn.execute("SELECT relation_id, entity_id, bijgewerkt FROM nieuws_doelen"):
+            if r[0]:
+                relaties[r[0]] = max(relaties.get(r[0], ""), r[2] or "")
+            if r[1]:
+                entiteiten.add(r[1])
+    if relaties:
+        ids = list(relaties)
+        for start in range(0, len(ids), 500):
+            deel = ids[start:start + 500]
+            for r in conn.execute(f"SELECT source_id, target_id FROM relations WHERE id IN "  # noqa: S608
+                                  f"({','.join('?' * len(deel))})", deel):
+                entiteiten.update((r[0], r[1]))
+    return relaties, entiteiten
+
+
+def sorteer_op_voorrang(conn, rijen) -> list:
+    """Wat het nieuws toont eerst (laatst gemeld eerst), dan wat er direct omheen ligt, dan
+    de rest; binnen elke groep het nieuwste argument eerst. Rijen hebben rel_bron/rel_doel."""
+    relaties, entiteiten = nieuws_voorrang(conn)
+
+    def groep(a):
+        if a["relation_id"] in relaties:
+            return 0
+        if {a["rel_bron"], a["rel_doel"], a["entity_id"]} & entiteiten:
+            return 1
+        return 2
+
+    rijen = sorted(rijen, key=lambda a: -a["id"])
+    rijen = sorted(rijen, key=lambda a: relaties.get(a["relation_id"], ""), reverse=True)
+    return sorted(rijen, key=groep)
+
+
+def controle_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
+    """Gemergede argumenten die nooit gecontroleerd zijn ('ongecontroleerd', of
+    'bronvermelding_nodig' mét een bron) — evidentieel, duiding, aspect, theorie of reactie;
+    onder een relatie/entiteit alleen als die goedgekeurd is — zonder oordeel van de
+    bronchecker en zonder bevestiging van een ander: wat het nieuws toont eerst."""
+    filt, params = "", [ACCOUNT, ACCOUNT]
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params += list(ids)
+    rijen = conn.execute(f"""
+        SELECT a.*, r.source_id AS rel_bron, r.target_id AS rel_doel FROM arguments a
+        LEFT JOIN relations r ON r.id = a.relation_id
+        LEFT JOIN entities e ON e.id = a.entity_id
+        WHERE a.status IN ('ongecontroleerd', 'bronvermelding_nodig') AND NOT a.vervangen
+          AND COALESCE(a.smaad_hold, 0) = 0
+          AND (a.relation_id IS NULL OR r.status = 'goedgekeurd')
+          AND (a.entity_id IS NULL OR e.status = 'goedgekeurd')
+          AND COALESCE(a.contributed_by, '') <> ?
+          AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
+          AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
+                          AND o.fase = 'herverificatie'
+                          AND (o.door = ? OR o.verdict = 'klopt')){filt}""",
+                         params).fetchall()  # noqa: S608 - alleen placeholders
+    return sorteer_op_voorrang(conn, rijen)
+
+
+def heropen_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
+    """Argumenten die de automatische beoordeling verwierp op een niet-'klopt'-oordeel van
+    bronchecker v1 (die eiste ten onrechte dat een bron ook de duiding van het model noemde):
+    met v2 opnieuw bekijken."""
+    filt, params = "", [ACCOUNT, VERSIE + "%"]
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params += list(ids)
+    return conn.execute(f"""
+        SELECT a.* FROM arguments a JOIN immuun_oordelen o ON o.argument_id = a.id
+          AND o.fase = 'herverificatie' AND o.door = ?
+        WHERE a.status = 'verworpen' AND NOT a.vervangen AND COALESCE(a.smaad_hold, 0) = 0
+          AND o.verdict <> 'klopt' AND COALESCE(o.detail, '') NOT LIKE ?
+          AND (SELECT l.reason FROM edit_log l WHERE l.table_name = 'arguments'
+                 AND l.record_id = a.id AND l.action = 'disputed'
+                 AND l.new_value LIKE '%verworpen%' ORDER BY l.id DESC LIMIT 1)
+              LIKE 'automatische beoordeling%'{filt}
+        ORDER BY a.id DESC""", params).fetchall()  # noqa: S608 - alleen placeholders
+
+
+def buiten_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
+    """Argumenten die de opruimstap na 14 dagen verwierp terwijl de bronchecker ze nooit las
+    (duiding, aspecten, theorie: vóór 2026-10-06 buiten de poort): nu alsnog een oordeel;
+    bevestigt het de bron, dan heropent de beoordeling haar afwijzing."""
+    filt, params = "", [ACCOUNT]
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params += list(ids)
+    rijen = conn.execute(f"""
+        SELECT a.*, r.source_id AS rel_bron, r.target_id AS rel_doel FROM arguments a
+        LEFT JOIN relations r ON r.id = a.relation_id
+        WHERE a.status = 'verworpen' AND NOT a.vervangen
+          AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
+          AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
+                          AND o.fase = 'herverificatie' AND o.door = ?)
+          AND (SELECT l.reason FROM edit_log l WHERE l.table_name = 'arguments'
+                 AND l.record_id = a.id AND l.action = 'disputed'
+                 AND l.new_value LIKE '%verworpen%' ORDER BY l.id DESC LIMIT 1)
+              LIKE 'automatische beoordeling: na % dagen niet te bevestigen%'{filt}""",
+                         params).fetchall()  # noqa: S608 - alleen placeholders
+    return sorteer_op_voorrang(conn, rijen)
+
+
+def pdf_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
+    """Voorgestelde en gemergede argumenten die 'twijfel' kregen omdat hun pdf-bron niet te
+    lezen was (vóór de pdf-ondersteuning via PDFKit): opnieuw, wat het nieuws toont eerst."""
+    filt, params = "", [ACCOUNT, "%pdf: niet automatisch leesbaar%"]
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params += list(ids)
+    rijen = conn.execute(f"""
+        SELECT a.*, r.source_id AS rel_bron, r.target_id AS rel_doel FROM arguments a
+        JOIN immuun_oordelen o ON o.argument_id = a.id AND o.fase = 'herverificatie'
+          AND o.door = ?
+        LEFT JOIN relations r ON r.id = a.relation_id
+        WHERE a.status IN ('voorgesteld', 'ongecontroleerd', 'bronvermelding_nodig')
+          AND NOT a.vervangen AND o.verdict = 'twijfel' AND o.detail LIKE ?{filt}""",
+                         params).fetchall()  # noqa: S608 - alleen placeholders
+    return sorteer_op_voorrang(conn, rijen)
+
+
+# Welke argumenten een ronde bekijkt, en of het eigen eerdere oordeel wordt herzien
+MODI = {
+    "nieuw": (kandidaten, False),
+    "herzien": (herzien_kandidaten, True),
+    "controle": (controle_kandidaten, False),
+    "heropenen": (heropen_kandidaten, True),
+    "pdf": (pdf_kandidaten, True),
+    "buiten": (buiten_kandidaten, False),
+}
 
 
 def _laad_pogingen() -> dict:
@@ -421,7 +618,8 @@ def _bewaar_pogingen(pogingen: dict) -> None:
 def beoordeel_argument(conn, arg) -> dict:
     """→ {verdict, detail, verbatim_span, bron_id}."""
     doel = doel_tekst(conn, arg)
-    rol = "steunt" if arg["stance"] == "supporting" else "spreekt tegen"
+    rol = {"supporting": "steunt", "contradicting": "spreekt tegen"}.get(arg["stance"],
+                                                                       "nuanceert")
     bronnen = bronnen_van(conn, arg["id"])
     if not bronnen:
         return {"verdict": "twijfel", "detail": "geen bron aan dit argument gekoppeld"}
@@ -514,7 +712,8 @@ def beoordeel_bezwaar(conn, reply) -> dict:
 
 
 def beoordeel(conn, arg) -> dict:
-    if arg["parent_argument_id"] is not None:
+    if (arg["parent_argument_id"] is not None and arg["stance"] == "contradicting"
+            and (arg["reasoning"] or "").strip()):
         return beoordeel_bezwaar(conn, arg)
     return beoordeel_argument(conn, arg)
 
@@ -549,9 +748,13 @@ def post_oordeel(api, token, arg_id, uitkomst, herzien=False) -> tuple[int, dict
 
 
 def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, ids=None,
-          parallel=3, herzien=False, meld=print) -> dict:
+          parallel=3, herzien=False, modus=None, meld=print) -> dict:
     """Eén ronde. → samenvatting {bekeken, klopt, twijfel, klopt_niet, technisch,
-    geschreven, fouten}. Met ``herzien`` de v1-twijfelgevallen opnieuw."""
+    geschreven, fouten}. ``modus`` (zie MODI): 'nieuw' (voorgesteld, standaard), 'herzien'
+    (v1-twijfel op voorgesteld; ook via ``herzien=True``), 'controle' (gemerged, nooit
+    gecontroleerd) of 'heropenen' (verworpen op een v1-oordeel)."""
+    modus = modus or ("herzien" if herzien else "nieuw")
+    selectie, herzien = MODI[modus]
     token = None
     if not droog:
         token = Path(token_pad).read_text().strip() if Path(token_pad).exists() else None
@@ -560,8 +763,8 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, id
                              f"{ACCOUNT} --kind agent --new-token --save)")
     conn = db()
     try:
-        rijen = (herzien_kandidaten(conn, ids) if herzien else kandidaten(conn, ids))[:max_n]
-        meld(f"Bronchecker: {len(rijen)} argument(en) te {'herzien' if herzien else 'beoordelen'}"
+        rijen = selectie(conn, ids)[:max_n]
+        meld(f"Bronchecker ({modus}): {len(rijen)} argument(en)"
              f"{' (droog)' if droog else ''}")
         tel = {"bekeken": 0, "klopt": 0, "twijfel": 0, "klopt-niet": 0, "technisch": 0,
                "geschreven": 0, "fouten": 0}
@@ -589,7 +792,8 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, id
                                 "detail": f"{MAX_POGINGEN} keer {uitkomst.get('detail')}"}
                 tel[uitkomst["verdict"]] += 1
                 regel = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
-                         "argument_id": arg["id"], "herzien": herzien, **uitkomst}
+                         "argument_id": arg["id"], "herzien": herzien, "modus": modus,
+                         **uitkomst}
                 if not droog:
                     status, antwoord = post_oordeel(api, token, arg["id"], uitkomst,
                                                     herzien=herzien)
@@ -631,13 +835,25 @@ def main():
     ap.add_argument("--ids", default="", help="alleen deze argument-id's (komma's)")
     ap.add_argument("--parallel", type=int, default=3, help="gelijktijdige modelaanroepen")
     ap.add_argument("--droog", action="store_true", help="beoordeel, maar schrijf niets")
-    ap.add_argument("--herzien", action="store_true",
-                    help="voorgestelde argumenten met een v1-twijfeloordeel opnieuw bekijken")
+    groep = ap.add_mutually_exclusive_group()
+    groep.add_argument("--herzien", action="store_true",
+                       help="voorgestelde argumenten met een v1-twijfeloordeel opnieuw bekijken")
+    groep.add_argument("--controle", action="store_true",
+                       help="gemergede argumenten die nooit gecontroleerd zijn")
+    groep.add_argument("--heropenen", action="store_true",
+                       help="argumenten die op een v1-oordeel verworpen zijn opnieuw bekijken")
+    groep.add_argument("--pdf", action="store_true",
+                       help="argumenten met een onleesbare pdf-bron opnieuw (nu via PDFKit)")
+    groep.add_argument("--buiten", action="store_true",
+                       help="wat na 14 dagen werd opgeruimd zonder dat een poort besliste")
     ap.add_argument("--json", action="store_true", help="eindig met één JSON-regel")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",") if x.strip().isdigit()] or None
+    modus = ("herzien" if args.herzien else "controle" if args.controle
+             else "heropenen" if args.heropenen else "pdf" if args.pdf
+             else "buiten" if args.buiten else "nieuw")
     tel = draai(api=args.api, token_pad=args.token, max_n=args.max, droog=args.droog,
-                ids=ids, parallel=args.parallel, herzien=args.herzien)
+                ids=ids, parallel=args.parallel, modus=modus)
     if args.json:
         print(json.dumps(tel, ensure_ascii=False))
     else:

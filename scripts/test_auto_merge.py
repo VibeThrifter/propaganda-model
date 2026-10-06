@@ -155,21 +155,34 @@ def main():
         merge_reply_ondergraving(a, bezwaar="open")
         check(a, False, "geparkeerd-twijfel", "openstaande ondergraving")
 
-        # e) Contradicting persoons-claim (entity-doel) → geblokkeerd-hoog-inzet
-        #    (ongeacht schone signalen).
+        def smaad(aid, verdict, door="t-verif"):
+            conn.execute("INSERT INTO smaad_toetsen (argument_id, verdict, reden, door) "
+                         "VALUES (?, ?, 'test', ?)", (aid, verdict, door))
+            conn.commit()
+
+        # e) Persoonsclaim (eigenaarsbesluit 2026-10-06: de smaad-firewall door een agent):
+        #    zonder smaadtoets geparkeerd, 'niet_feitelijk' geblokkeerd, 'feitelijk' + A1 + A2
+        #    → auto-gemerged. Ongeacht stance.
         a = mk_arg("contradicting", entity_id=ent_persoon)
         immuun(a, "herverificatie", "klopt", "t-verif")
         immuun(a, "tegenspraak", "overleefd", "t-aanklager")
-        check(a, False, "geblokkeerd-hoog-inzet", "contradicting persoons-claim (entiteit)")
+        check(a, False, "geparkeerd-twijfel", "persoonsclaim (entiteit) zonder smaadtoets")
+        smaad(a, "niet_feitelijk")
+        check(a, False, "geblokkeerd-hoog-inzet", "persoonsclaim die niet feitelijk is")
 
-        # e2) SUPPORTING persoons-claim (entity-doel) → óók geblokkeerd (conservatieve
-        #     smaad-firewall: ongeacht stance).
+        # e2) Een SUPPORTING persoonsclaim die de smaadtoets doorstaat → auto-gemerged.
         a = mk_arg("supporting", entity_id=ent_persoon)
         immuun(a, "herverificatie", "klopt", "t-verif")
         immuun(a, "tegenspraak", "overleefd", "t-aanklager")
-        check(a, False, "geblokkeerd-hoog-inzet", "supporting persoons-claim (entiteit)")
+        smaad(a, "feitelijk")
+        check(a, True, "auto-gemerged", "feitelijke persoonsclaim met A1 + A2")
+        b = mk_arg("supporting", entity_id=ent_persoon, auteur="t-verif")
+        immuun(b, "herverificatie", "klopt", "t-aanklager")
+        immuun(b, "tegenspraak", "overleefd", "t-auteur")
+        smaad(b, "feitelijk", door="t-verif")
+        check(b, False, "geparkeerd-twijfel", "smaadtoets van de auteur zelf telt niet")
 
-        # e3) Claim op een persoon↔org-RELATIE → geblokkeerd (persoon via de relatie).
+        # e3) Claim op een persoon↔org-RELATIE → ook via de smaadtoets.
         rel_persoon = conn.execute("""INSERT INTO relations (source_id, target_id,
                               relation_type, certainty, influence, status)
                               VALUES (?, ?, 'dienstverband', 0.8, 0.4, 'voorgesteld')""",
@@ -178,30 +191,44 @@ def main():
         a = mk_arg("contradicting", relation_id=rel_persoon)
         immuun(a, "herverificatie", "klopt", "t-verif")
         immuun(a, "tegenspraak", "overleefd", "t-aanklager")
-        check(a, False, "geblokkeerd-hoog-inzet", "claim op persoon↔org-relatie")
+        check(a, False, "geparkeerd-twijfel", "claim op persoon↔org-relatie zonder smaadtoets")
+        smaad(a, "feitelijk")
+        check(a, True, "auto-gemerged", "claim op persoon↔org-relatie, feitelijk bevonden")
 
-        # e4) Org↔org-RELATIE (geen persoon betrokken) → NIET op deze grond geblokkeerd.
+        # e4) Org↔org-RELATIE (geen persoon betrokken) → geen smaadtoets nodig.
         #     ent_org → ent_media is org↔org/org↔media; met schone signalen auto-mergebaar.
         a = mk_arg("supporting", relation_id=rel)
         immuun(a, "herverificatie", "klopt", "t-verif")
         immuun(a, "tegenspraak", "overleefd", "t-aanklager")
         check(a, True, "auto-gemerged", "org↔org/org↔media-claim (geen persoon)")
 
-        # f) Theorie-doel (rol) → mensenwerk.
+        # f) Theorie-doel, aspect en reactie (agents doen alles, 2026-10-06): dezelfde eisen
+        #    als een invloedsclaim — zonder signalen geparkeerd, met A1 + A2 gemerged.
         a = mk_arg("supporting", role_id=rol_id)
-        check(a, False, "mensenwerk", "theorie-doel (rol)")
+        check(a, False, "geparkeerd-twijfel", "theorie-doel (rol) zonder A1/A2")
+        immuun(a, "herverificatie", "klopt", "t-verif")
+        immuun(a, "tegenspraak", "overleefd", "t-aanklager")
+        check(a, True, "auto-gemerged", "theorie-doel (rol) met A1 + A2")
 
-        # f2) Aspect-root (property='filter') → mensenwerk.
+        # f2) Aspect-root (property='filter').
         a = mk_arg("supporting", relation_id=rel, prop="filter", prop_value="eigendom")
-        check(a, False, "mensenwerk", "aspect-root (filter)")
+        check(a, False, "geparkeerd-twijfel", "aspect-root (filter) zonder A1/A2")
+        immuun(a, "herverificatie", "klopt", "t-verif")
+        immuun(a, "tegenspraak", "overleefd", "t-aanklager")
+        check(a, True, "auto-gemerged", "aspect-root (filter) met A1 + A2")
 
-        # f3) Reply (parent gezet) → mensenwerk.
+        # f3) Steunende reactie (parent gezet).
         root_voor_reply = mk_arg("supporting", relation_id=rel)
         a = conn.execute("""INSERT INTO arguments (parent_argument_id, stance, claim, status,
                             contributed_by) VALUES (?, 'supporting', 'Steun.', 'voorgesteld',
                             't-auteur')""", (root_voor_reply,)).lastrowid
+        conn.execute("INSERT INTO citations (argument_id, source_id, quote) VALUES (?, ?, ?)",
+                     (a, bron, "Verbatim testcitaat."))
         conn.commit()
-        check(a, False, "mensenwerk", "reply (geen root)")
+        check(a, False, "geparkeerd-twijfel", "steunende reactie zonder A1/A2")
+        immuun(a, "herverificatie", "klopt", "t-verif")
+        immuun(a, "tegenspraak", "overleefd", "t-aanklager")
+        check(a, True, "auto-gemerged", "steunende reactie met A1 + A2")
 
         # g) A1 én A2 door hetzelfde account → faalt op jury-onafhankelijkheid.
         a = mk_arg("supporting", relation_id=rel)

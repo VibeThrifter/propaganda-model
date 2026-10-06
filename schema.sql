@@ -884,6 +884,40 @@ CREATE TABLE nieuws_doelen (
 );
 
 --------------------------------------------------------------
+-- NIEUWS_VOORRANG (eigenaarsbesluit 2026-10-06: agents doen alles): welke verbanden lezers
+-- van de nieuws-aggregator onder "Wie zit erachter?" zien (POST /api/nieuws/voorrang,
+-- account 'nieuws-agent'). Die gaan voor bij de automatische controle (bronchecker) en de
+-- bronzoeker. PROCESMETADATA: telt in niets mee. Aangelegd via schema.sql (verse build) én
+-- scripts/migrate_add_nieuws_voorrang.py (bestaande DB).
+--------------------------------------------------------------
+
+CREATE TABLE nieuws_voorrang (
+    relation_id INTEGER PRIMARY KEY,      -- bewust geen FK (zie nieuws_doelen)
+    gevraagd_op TEXT NOT NULL,            -- laatste melding, lokale ISO-tekst
+    aantal INTEGER NOT NULL DEFAULT 1     -- hoe vaak gemeld
+);
+
+--------------------------------------------------------------
+-- SMAAD_TOETSEN (eigenaarsbesluit 2026-10-06: "laat de smaad-firewall checken of het
+-- feitelijk is"): het oordeel van een agent (nooit de auteur) over een claim die een
+-- natuurlijk persoon raakt — 'feitelijk' (een feit, gedragen door de bron, over de publieke
+-- rol) of 'niet_feitelijk' (met reden en waar mogelijk een feitelijke formulering). De
+-- immuunpoort (A7) en de goedkeuring van persoonsrelaties lezen het; PROCESMETADATA, telt
+-- in niets mee. Aangelegd via schema.sql (verse build) én scripts/migrate_add_smaad_toetsen.py.
+--------------------------------------------------------------
+
+CREATE TABLE smaad_toetsen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    argument_id INTEGER NOT NULL REFERENCES arguments(id),
+    verdict TEXT NOT NULL CHECK(verdict IN ('feitelijk', 'niet_feitelijk')),
+    reden TEXT NOT NULL,
+    herformulering TEXT,                  -- feitelijke formulering die de bron wél draagt
+    door TEXT REFERENCES users(username),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(argument_id, door)
+);
+
+--------------------------------------------------------------
 -- INDEXEN
 --------------------------------------------------------------
 
@@ -928,6 +962,7 @@ CREATE INDEX idx_predictions_status ON predictions(status);
 CREATE INDEX idx_leads_status ON leads(status);
 CREATE INDEX idx_leads_ip ON leads(ingezonden_ip_hash);
 CREATE INDEX idx_nieuws_doelen_status ON nieuws_doelen(status, prioriteit);
+CREATE INDEX idx_smaad_toetsen_argument ON smaad_toetsen(argument_id);
 
 --------------------------------------------------------------
 -- SEED DATA: ROLLEN (theoretisch model)

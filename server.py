@@ -174,9 +174,9 @@ RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur"}
 # (nieuws_doelen) is procesmetadata, geen modelinhoud — de rate limit beschermt tegen
 # score-manipulatie door volume en heeft hier geen functie, terwijl de nieuws-backend per
 # cyclus ~12–30 doelen tegelijk aanbiedt. Wie hier mag schrijven, poorten de endpoints zelf
-# (nieuws-agent/nieuws-scout/maintainer).
+# (nieuws-agent/nieuws-scout/maintainer). Idem de voorrang uit het nieuws (2026-10-06).
 RATE_LIMIT_VRIJE_ENDPOINTS = {"nieuws_doelen_upsert", "nieuws_doelen_claim_volgende",
-                              "nieuws_doelen_claim", "nieuws_doelen_patch"}
+                              "nieuws_doelen_claim", "nieuws_doelen_patch", "nieuws_voorrang"}
 
 
 def _rate_limit_ok(user) -> bool:
@@ -2186,6 +2186,10 @@ def tegenspraak(arg_id):
 #   - een ONDERGRAVING (contradicting reply mét reasoning) merget als een onafhankelijk
 #     A1-oordeel op die reply 'klopt' zegt: het bezwaar houdt stand. Een bezwaar dempt
 #     alleen zijn parent; het kan het model voorzichtiger maken, nooit stelliger.
+#   - een BRONREVISIE (revisie die de bewering van een al gemerged argument houdt en
+#     alleen de bron verbetert, bv. van de bronzoeker) merget op A1 'klopt' alleen: er komt
+#     geen nieuwe bewering in het model, alleen een bron die de oude draagt. Raakt ze een
+#     persoon, dan alleen zonder negatief-feitelijke lading (smaad-lexicon).
 # Al het andere blijft zoals het was: invloedsclaims vergen A1 én A2, negatieve claims
 # over personen nooit automatisch, aspect/duiding/theorie blijven buiten A7.
 BEOORDELING_STRUCTUURTYPES = ("personeel", "dienstverband", "bestuurder", "adviseur",
@@ -2230,20 +2234,52 @@ def _semantisch_duplicaat(conn, arg) -> bool:
     if doelkol is None:
         return False
     claim = arg["claim"] or ""
+    # Een revisie vervangt haar origineel: dat is geen duplicaat maar haar voorganger
     rijen = conn.execute(f"""
         SELECT claim FROM arguments
-        WHERE id <> ? AND parent_argument_id IS NULL AND NOT vervangen
-          AND status NOT IN ('voorgesteld', 'verworpen')
+        WHERE id <> ? AND id <> COALESCE(?, -1) AND parent_argument_id IS NULL
+          AND NOT vervangen AND status NOT IN ('voorgesteld', 'verworpen')
           AND {doelkol} = ?
-    """, (arg["id"], doelid)).fetchall()
-    for r in rijen:
-        ander = r["claim"] or ""
-        difflib_ratio = difflib.SequenceMatcher(None, claim, ander).ratio()
-        dedup_ratio = dedup.gelijkenis(claim, ander) if dedup is not None else 0.0
-        if (difflib_ratio >= AUTO_MERGE_DIFFLIB_DREMPEL
-                or dedup_ratio >= AUTO_MERGE_DEDUP_DREMPEL):
-            return True
-    return False
+    """, (arg["id"], arg["reviseert_id"], doelid)).fetchall()
+    return any(_zelfde_bewering(claim, r["claim"] or "") for r in rijen)
+
+
+def _zelfde_bewering(claim, ander) -> bool:
+    """(Bijna) dezelfde bewering: max(difflib, dedup.gelijkenis) ≥ de A6-drempel."""
+    difflib_ratio = difflib.SequenceMatcher(None, claim, ander).ratio()
+    dedup_ratio = dedup.gelijkenis(claim, ander) if dedup is not None else 0.0
+    return (difflib_ratio >= AUTO_MERGE_DIFFLIB_DREMPEL
+            or dedup_ratio >= AUTO_MERGE_DEDUP_DREMPEL)
+
+
+def _bronrevisie(conn, arg) -> bool:
+    """Automatische beoordeling (2026-10-06, bronzoeker): is dit een revisie die de bewering
+    van een al gemerged root-argument houdt (zelfde doel, stance, aspect en bijna dezelfde
+    claim) en alleen de bron verbetert? Dan brengt ze geen nieuwe bewering in het model."""
+    if not arg["reviseert_id"] or arg["parent_argument_id"] is not None:
+        return False
+    oud = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg["reviseert_id"],)).fetchone()
+    if (oud is None or oud["vervangen"] or oud["parent_argument_id"] is not None
+            or oud["status"] in ("voorgesteld", "verworpen")):
+        return False
+    if ((oud["relation_id"], oud["entity_id"], oud["stance"], oud["property"])
+            != (arg["relation_id"], arg["entity_id"], arg["stance"], arg["property"])):
+        return False
+    return _zelfde_bewering(arg["claim"] or "", oud["claim"] or "")
+
+
+def _wortel(conn, arg):
+    """De root van de boom waarin dit argument staat (het argument zelf als het een root is):
+    die draagt het doel (relatie, entiteit of theorie-element)."""
+    rij, gezien = arg, set()
+    while rij["parent_argument_id"] is not None and rij["id"] not in gezien:
+        gezien.add(rij["id"])
+        ouder = conn.execute("SELECT * FROM arguments WHERE id = ?",
+                             (rij["parent_argument_id"],)).fetchone()
+        if ouder is None:
+            break
+        rij = ouder
+    return rij
 
 
 def _ondergraving_toegestaan(conn, arg):
@@ -2286,65 +2322,66 @@ def auto_merge_toegestaan(conn, arg_id):
     Retourneert (ok, redenen, bucket). ``ok`` is True (bucket 'auto-gemerged')
     ALLEEN als álle condities gelden; anders False met de gefaalde reden(en) en een
     bucket:
-      - 'mensenwerk'            — buiten scope (reply/contextual/aspect/theorie-doel)
-      - 'geblokkeerd-hoog-inzet'— negatieve feitelijke claim over een natuurlijk persoon
+      - 'mensenwerk'            — buiten scope (geen voorstel, of zonder doel)
+      - 'geblokkeerd-hoog-inzet'— smaad_hold, of een persoonsclaim die de smaadtoets
+                                  niet doorstond ('niet_feitelijk')
       - 'geparkeerd-twijfel'    — in scope, maar één of meer signalen ontbreken
     """
     arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
     if not arg:
         return (False, ["Argument niet gevonden"], "mensenwerk")
 
-    # (1) Scope — alleen een 'voorgesteld' evidentiële root op de praktijk-laag
-    # (of een ondergraving, zie _ondergraving_toegestaan).
+    # (1) Scope — een 'voorgesteld' argument. Een ondergraving (contradicting reply mét
+    # reasoning) heeft haar eigen route (_ondergraving_toegestaan). Sinds "agents doen alles"
+    # (eigenaarsbesluit 2026-10-06) beslist deze poort ook over duiding (contextual roots),
+    # aspecten (classificatie, politieke positie, data, …), theorie-argumenten (rol,
+    # mechanisme, emergent veld) en steunende reacties — met dezelfde eisen als een
+    # invloedsclaim: echte bron, onafhankelijke A1 én A2, geen duplicaat.
     if arg["status"] != "voorgesteld":
         return (False, [f"status is '{arg['status']}', niet 'voorgesteld'"], "mensenwerk")
-    if arg["parent_argument_id"] is not None:
+    if (arg["parent_argument_id"] is not None and arg["stance"] == "contradicting"
+            and (arg["reasoning"] or "").strip()):
         return _ondergraving_toegestaan(conn, arg)
-    if arg["stance"] not in ("supporting", "contradicting"):
-        return (False, ["contextual-root (duiding) — mensenwerk"], "mensenwerk")
-    if arg["property"] not in AUTO_MERGE_EVIDENTIEEL:
-        return (False, [f"aspect-root (property='{arg['property']}') — classificatie is mensenwerk"],
-                "mensenwerk")
-    if arg["role_id"] or arg["mechanism_id"] or arg["emergent_effect_id"]:
-        return (False, ["theorie-doel — loopt via RfC (twee menselijke akkoorden)"], "mensenwerk")
-    if not (arg["relation_id"] or arg["entity_id"]):
-        return (False, ["geen praktijk-doel (relatie/entiteit)"], "mensenwerk")
     if arg["smaad_hold"]:
-        return (False, ["smaad_hold op dit argument — mensenwerk"], "geblokkeerd-hoog-inzet")
+        return (False, ["smaad_hold op dit argument — wacht op de smaadtoets"],
+                "geblokkeerd-hoog-inzet")
+    wortel = _wortel(conn, arg)
+    if not any(wortel[k] for k in ("relation_id", "entity_id", "role_id", "mechanism_id",
+                                   "emergent_effect_id")):
+        return (False, ["geen doel (relatie, entiteit of theorie-element)"], "mensenwerk")
 
     # Neutraal structuurfeit (automatische beoordeling, 2026-10-06): een supporting root op
     # een relatie van een structuurtype merget op een onafhankelijke A1 alleen — ook als de
     # relatie een persoon raakt (geen negatieve claim; scope van de nieuws-autokeur).
     structuur = False
-    if arg["stance"] == "supporting" and arg["relation_id"]:
+    if (arg["parent_argument_id"] is None and arg["stance"] == "supporting"
+            and arg["relation_id"] and arg["property"] in AUTO_MERGE_EVIDENTIEEL):
         rtype = conn.execute("SELECT relation_type FROM relations WHERE id = ?",
                              (arg["relation_id"],)).fetchone()
         structuur = bool(rtype) and rtype["relation_type"] in BEOORDELING_STRUCTUURTYPES
+    # Bronrevisie (2026-10-06): dezelfde bewering als een al gemerged argument, betere bron.
+    # Die bewering stond al in het model: alleen de onafhankelijke A1 (de nieuwe bron draagt
+    # haar) telt.
+    bronrevisie = _bronrevisie(conn, arg)
 
-    # (7) Hoog-inzet-blokkade — de conservatieve smaad-firewall (Laag 3, D2.3):
-    # ELKE claim die een natuurlijk persoon raakt merget NOOIT automatisch, ongeacht
-    # stance en ongeacht de bron. "Raken" = het doel is (a) een 'persoon'-entiteit,
-    # óf (b) een relatie waarvan de bron- óf doel-entiteit een 'persoon' is. Bij
-    # "alles publiek" + auto-merge is elke persoon-rakende claim mensenwerk; org↔org /
-    # org↔media / mechanisme-claims blijven wél auto-mergebaar.
-    if arg["entity_id"]:
-        ent = conn.execute("SELECT type FROM entities WHERE id = ?",
-                           (arg["entity_id"],)).fetchone()
-        if ent and ent["type"] == "persoon":
-            return (False, ["claim raakt een genoemd natuurlijk persoon (entiteit-doel; "
-                            "smaad-firewall) — altijd mensbeoordeling"],
-                    "geblokkeerd-hoog-inzet")
-    if arg["relation_id"] and not structuur:
-        n_persoon = conn.execute("""
-            SELECT COUNT(*) FROM relations r
-            JOIN entities e ON e.id IN (r.source_id, r.target_id)
-            WHERE r.id = ? AND e.type = 'persoon'""", (arg["relation_id"],)).fetchone()[0]
-        if n_persoon:
-            return (False, ["claim raakt een genoemd natuurlijk persoon (via de relatie; "
-                            "smaad-firewall) — altijd mensbeoordeling"],
+    # (7) Smaad-firewall (D2.3), sinds 2026-10-06 door agents: een claim die een natuurlijk
+    # persoon raakt ("raken" = het doel van de boom is een 'persoon'-entiteit, of een relatie
+    # met een persoon als bron of doel) en geen neutraal structuurfeit is, merget alleen na
+    # een SMAADTOETS 'feitelijk' van een ander account dan de auteur: een feit, gedragen door
+    # de bron (niet verder dan de bron, geen insinuatie), over de publieke rol. 'niet_feitelijk'
+    # → geblokkeerd; de opruimstap koppelt het met de reden terug.
+    raakt_persoon = _raakt_persoon(conn, entity_id=wortel["entity_id"],
+                                   relation_id=wortel["relation_id"])
+    smaad = None
+    if raakt_persoon and not structuur:
+        smaad = _smaadtoets(conn, arg_id, arg["contributed_by"])
+        if smaad is not None and smaad["verdict"] == "niet_feitelijk":
+            return (False, [f"smaadtoets: niet feitelijk — {smaad['reden']}"],
                     "geblokkeerd-hoog-inzet")
 
     redenen = []
+    if raakt_persoon and not structuur and smaad is None:
+        redenen.append("smaadtoets: nog geen oordeel (de claim raakt een natuurlijk persoon)")
 
     # (2) Citatiepoort — een echte citatie (quote óf vindplaats).
     n_echt = conn.execute("""
@@ -2371,12 +2408,14 @@ def auto_merge_toegestaan(conn, arg_id):
             redenen.append("A1: her-verificatie door de auteur zelf (geen onafhankelijk oordeel)")
 
     # (4) A2 — nieuwste tegenspraak-certificaat = 'overleefd' én geen openstaande ondergraving.
-    # Een neutraal structuurfeit heeft geen tegenspraak nodig (alleen de onafhankelijke A1).
+    # Een neutraal structuurfeit en een bronrevisie hebben geen tegenspraak nodig (alleen de
+    # onafhankelijke A1).
     a2 = conn.execute("""
         SELECT verdict, door, model_familie FROM immuun_oordelen
         WHERE argument_id = ? AND fase = 'tegenspraak'
         ORDER BY id DESC LIMIT 1""", (arg_id,)).fetchone()
-    if structuur:
+    zonder_a2 = structuur or bronrevisie
+    if zonder_a2:
         pass
     elif a2 is None:
         redenen.append("A2: geen tegenspraak-certificaat")
@@ -2389,7 +2428,7 @@ def auto_merge_toegestaan(conn, arg_id):
         redenen.append("A2: openstaande (niet-'opgelost') ondergraving in de boom")
 
     # (6) Jury-onafhankelijkheid — A1 en A2 door verschillende accounts (elk ≠ auteur).
-    if not structuur and a1 is not None and a2 is not None and a1["door"] == a2["door"]:
+    if not zonder_a2 and a1 is not None and a2 is not None and a1["door"] == a2["door"]:
         redenen.append("jury-onafhankelijkheid: A1 en A2 door hetzelfde account")
 
     # (5) A6 — geen semantisch duplicaat t.o.v. bestaande gemergede roots op dit doel.
@@ -7073,7 +7112,17 @@ def _bewijs_relatie_redenen(conn, rid):
         "SELECT COUNT(*) FROM entities WHERE id IN (?, ?) AND type = 'persoon'",
         (rij["source_id"], rij["target_id"])).fetchone()[0]
     if raakt_persoon and rij["relation_type"] not in BEOORDELING_STRUCTUURTYPES:
-        redenen.append("raakt een persoon en is geen neutraal structuurfeit — nooit automatisch")
+        # Smaad-firewall door agents (2026-10-06): alleen met bewijs dat de smaadtoets doorstond
+        feitelijk = [a for a in conn.execute("""
+            SELECT a.id, a.contributed_by FROM arguments a
+            WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
+              AND a.stance = 'supporting' AND a.status IN ('geverifieerd', 'ongecontroleerd')
+              AND COALESCE(a.smaad_hold, 0) = 0""", (rid,))
+            if (_smaadtoets(conn, a["id"], a["contributed_by"]) or {"verdict": None})["verdict"]
+            == "feitelijk"]
+        if not feitelijk:
+            redenen.append("raakt een persoon: nog geen gemerged argument dat de smaadtoets "
+                           "doorstond (feitelijk)")
     n_steun = conn.execute("""
         SELECT COUNT(*) FROM arguments a
         WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
@@ -7207,6 +7256,504 @@ def beoordeling_autokeur(tabel, rid):
     conn.commit()
     conn.close()
     return jsonify({"goedgekeurd": True, "tabel": tabel, "id": rid}), 200
+
+
+# ── Automatische verificatie en heropenen (eigenaarsbesluit 2026-10-06: agents doen alles) ──
+# Wat al gemerged is maar nooit gecontroleerd ('ongecontroleerd', of 'bronvermelding_nodig'
+# met inmiddels een echte bron), krijgt zijn status van het onafhankelijke A1-oordeel
+# (bronchecker of verificatie-agent, nooit de auteur): draagt de bron de bewering, dan
+# 'geverifieerd' — wat een mens-reviewer deed (citaties gecontroleerd en bevestigd); draagt
+# de bron haar aantoonbaar niet ('klopt-niet'), dan 'bronvermelding_nodig' en zoekt de
+# bronzoeker een betere bron. Een statusbesluit van een mens wordt nooit overschreven: wat
+# een maintainer terugzet, blijft staan. En een afwijzing van de automatische beoordeling
+# zelf gaat terug naar 'voorgesteld' zodra de bron daarna alsnog onafhankelijk bevestigd is
+# (de bronchecker herzag zich). Reviewer-tier systeemaccount (merge-service), kill-switch
+# PROPAGANDA_AUTOMATISCHE_BEOORDELING=0, dagplafond PROPAGANDA_VERIFICATIE_PLAFOND
+# (standaard 2000), eerlijk edit_log (reden 'automatische beoordeling: verificatie…' /
+# '…: heropend…').
+VERIFICATIE_REDEN_PREFIX = BEOORDELING_REDEN_PREFIX + ": verificatie"
+HEROPEN_REDEN_PREFIX = BEOORDELING_REDEN_PREFIX + ": heropend"
+VERIFICATIE_PLAFOND_DEFAULT = 2000
+
+
+def _verificatie_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_VERIFICATIE_PLAFOND",
+                                         VERIFICATIE_PLAFOND_DEFAULT)))
+    except ValueError:
+        return VERIFICATIE_PLAFOND_DEFAULT
+
+
+def _verificatie_vandaag(conn):
+    """Statusbesluiten van de automatische verificatie vandaag (lokale kalenderdag)."""
+    return conn.execute("""
+        SELECT COUNT(*) FROM edit_log
+        WHERE table_name = 'arguments' AND reason LIKE ?
+          AND date(created_at, 'localtime') = date('now', 'localtime')
+    """, (VERIFICATIE_REDEN_PREFIX + "%",)).fetchone()[0]
+
+
+def _nieuwste_a1(conn, arg_id):
+    return conn.execute("""
+        SELECT verdict, door, detail, created_at FROM immuun_oordelen
+        WHERE argument_id = ? AND fase = 'herverificatie'
+        ORDER BY created_at DESC, id DESC LIMIT 1""", (arg_id,)).fetchone()
+
+
+def _a1_detail(a1):
+    return (a1["detail"] or "").replace("[bronchecker v2] ", "").strip()[:400]
+
+
+def verificatie_besluit(conn, arg_id):
+    """Welke status geeft de automatische verificatie dit gemergede argument?
+    → (nieuwe_status | None, redenen waarom niet, motivatie)."""
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if arg is None:
+        return None, ["niet gevonden"], None
+    redenen = []
+    if arg["status"] not in ("ongecontroleerd", "bronvermelding_nodig"):
+        redenen.append(f"status is '{arg['status']}' (alleen nooit gecontroleerd werk)")
+    if arg["vervangen"]:
+        redenen.append("vervangen")
+    if arg["smaad_hold"]:
+        redenen.append("smaad_hold op dit argument (smaad-firewall)")
+    # Sinds "agents doen alles" (2026-10-06) elk soort argument: evidentieel, duiding,
+    # aspect, theorie of reactie — de A1 zegt of de bron het draagt
+    mens = conn.execute("""
+        SELECT l.changed_by FROM edit_log l JOIN users u ON u.username = l.changed_by
+        WHERE l.table_name = 'arguments' AND l.record_id = ?
+          AND l.action IN ('verified', 'disputed') AND u.kind = 'mens'
+        ORDER BY l.id DESC LIMIT 1""", (arg_id,)).fetchone()
+    if mens:
+        redenen.append(f"een mens ({mens['changed_by']}) besliste al over de status — blijft staan")
+    a1 = _nieuwste_a1(conn, arg_id)
+    if a1 is None:
+        redenen.append("A1: nog geen bron-herverificatie")
+    elif a1["door"] == arg["contributed_by"]:
+        redenen.append("A1: oordeel van de auteur zelf (niet onafhankelijk)")
+    if redenen:
+        return None, redenen, None
+    if a1["verdict"] == "klopt":
+        n_echt = conn.execute("""
+            SELECT COUNT(*) FROM citations c WHERE c.argument_id = ? AND (
+                (c.quote IS NOT NULL AND TRIM(c.quote) <> '')
+                OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id))
+            """, (arg_id,)).fetchone()[0]
+        if not n_echt:
+            return None, ["citatiepoort: geen echte bron (quote óf vindplaats)"], None
+        return ("geverifieerd", [], f"{VERIFICATIE_REDEN_PREFIX}: de bron draagt de bewering "
+                f"(onafhankelijk A1-oordeel van {a1['door']}: {_a1_detail(a1)})")
+    if a1["verdict"] == "klopt-niet" and arg["status"] == "ongecontroleerd":
+        return ("bronvermelding_nodig", [], f"{VERIFICATIE_REDEN_PREFIX}: de bron draagt de "
+                f"bewering niet (A1-oordeel van {a1['door']}: {_a1_detail(a1)}); de bronzoeker "
+                "zoekt een betere bron")
+    return None, [f"A1: nieuwste oordeel is '{a1['verdict']}' — geen statuswijziging"], None
+
+
+def heropen_besluit(conn, arg_id):
+    """Mag de automatische beoordeling haar EIGEN afwijzing terugdraaien? Alleen als de
+    laatste afwijzing van haar kwam en een onafhankelijk A1-oordeel ná die afwijzing zegt dat
+    de bron de bewering draagt. → (ok, redenen waarom niet, motivatie)."""
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if arg is None:
+        return False, ["niet gevonden"], None
+    redenen = []
+    if arg["status"] != "verworpen":
+        redenen.append(f"status is '{arg['status']}', niet 'verworpen'")
+    if arg["vervangen"]:
+        redenen.append("vervangen")
+    if arg["smaad_hold"]:
+        redenen.append("smaad_hold op dit argument (smaad-firewall)")
+    afwijzing = conn.execute("""
+        SELECT reason, created_at FROM edit_log
+        WHERE table_name = 'arguments' AND record_id = ? AND action = 'disputed'
+          AND new_value LIKE '%verworpen%' ORDER BY id DESC LIMIT 1""", (arg_id,)).fetchone()
+    if afwijzing is None or not (afwijzing["reason"] or "").startswith(BEOORDELING_REDEN_PREFIX):
+        redenen.append("niet verworpen door de automatische beoordeling — blijft staan")
+    a1 = _nieuwste_a1(conn, arg_id)
+    toets = _smaadtoets(conn, arg_id, arg["contributed_by"])
+    na = str(afwijzing["created_at"]) if afwijzing is not None else ""
+    # Nieuw sinds de afwijzing: een bevestiging van de bron, of (bij een persoonsclaim die op
+    # de oude smaad-firewall strandde) een smaadtoets 'feitelijk'
+    toets_nieuw = (toets is not None and toets["verdict"] == "feitelijk"
+                   and str(toets["created_at"]) > na)
+    if a1 is None or a1["verdict"] != "klopt":
+        redenen.append("A1: geen bevestiging dat de bron de bewering draagt")
+    elif a1["door"] == arg["contributed_by"]:
+        redenen.append("A1: oordeel van de auteur zelf (niet onafhankelijk)")
+    elif afwijzing is not None and str(a1["created_at"]) <= na and not toets_nieuw:
+        redenen.append("A1: geen nieuw oordeel sinds de afwijzing")
+    if redenen:
+        return False, redenen, None
+    waarom = (f"na de afwijzing bevond {toets['door']} de claim feitelijk"
+              if toets_nieuw and str(a1["created_at"]) <= na
+              else f"na de afwijzing bevestigt {a1['door']} de bron ({_a1_detail(a1)})")
+    return True, [], f"{HEROPEN_REDEN_PREFIX} (verworpen → voorgesteld): {waarom}"
+
+
+@app.route("/api/beoordeling/verificatie/<int:arg_id>", methods=["GET"])
+@require_user("reviewer")
+def beoordeling_verificatie_check(arg_id):
+    """Alleen-lezen (droogloop): {id, status, nieuwe_status, redenen, motivatie}."""
+    conn = get_db()
+    rij = conn.execute("SELECT status FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    nieuw, redenen, motivatie = verificatie_besluit(conn, arg_id)
+    conn.close()
+    return jsonify({"id": arg_id, "status": rij["status"], "nieuwe_status": nieuw,
+                    "redenen": redenen, "motivatie": motivatie})
+
+
+@app.route("/api/beoordeling/verificatie/<int:arg_id>", methods=["POST"])
+@require_user("reviewer")
+def beoordeling_verificatie(arg_id):
+    """Automatische verificatie van een gemerged argument (merge-service). Het besluit
+    wordt hier ALTIJD zelf genomen. Kill-switch → 503, dagplafond → 429, niets te
+    besluiten → 409 + redenen."""
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        return jsonify({"gewijzigd": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    conn = get_db()
+    oud = conn.execute("SELECT status FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if oud is None:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    plafond, vandaag = _verificatie_plafond(), _verificatie_vandaag(conn)
+    if vandaag >= plafond:
+        conn.close()
+        return jsonify({"gewijzigd": False, "plafond": plafond, "vandaag": vandaag,
+                        "error": f"dagplafond bereikt ({vandaag}/{plafond})"}), 429
+    nieuw, redenen, motivatie = verificatie_besluit(conn, arg_id)
+    if nieuw is None:
+        conn.close()
+        return jsonify({"gewijzigd": False, "redenen": redenen}), 409
+    if nieuw == "geverifieerd":
+        conn.execute("UPDATE arguments SET status = ?, self_merged = 0 WHERE id = ?",
+                     (nieuw, arg_id))
+    else:
+        conn.execute("UPDATE arguments SET status = ? WHERE id = ?", (nieuw, arg_id))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('arguments', ?, ?, ?, ?, ?, ?)
+    """, (arg_id, "verified" if nieuw == "geverifieerd" else "disputed", g.user["username"],
+          json.dumps({"status": oud["status"]}), json.dumps({"status": nieuw}), motivatie))
+    conn.commit()
+    conn.close()
+    return jsonify({"gewijzigd": True, "id": arg_id, "status": nieuw}), 200
+
+
+@app.route("/api/beoordeling/heropenen/<int:arg_id>", methods=["POST"])
+@require_user("reviewer")
+def beoordeling_heropenen(arg_id):
+    """De automatische beoordeling draait een eigen afwijzing terug (verworpen →
+    voorgesteld) als de bron daarna onafhankelijk bevestigd is; de immuunpoort (A7) beslist
+    daarna opnieuw. Kill-switch → 503, niet toegestaan → 409 + redenen."""
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        return jsonify({"heropend": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    conn = get_db()
+    if conn.execute("SELECT 1 FROM arguments WHERE id = ?", (arg_id,)).fetchone() is None:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    ok, redenen, motivatie = heropen_besluit(conn, arg_id)
+    if not ok:
+        conn.close()
+        return jsonify({"heropend": False, "redenen": redenen}), 409
+    conn.execute("UPDATE arguments SET status = 'voorgesteld' WHERE id = ?", (arg_id,))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
+    """, (arg_id, g.user["username"], json.dumps({"status": "verworpen"}),
+          json.dumps({"status": "voorgesteld"}), motivatie))
+    conn.commit()
+    conn.close()
+    return jsonify({"heropend": True, "id": arg_id, "status": "voorgesteld"}), 200
+
+
+# ── Voorrang uit het nieuws (2026-10-06) ──
+# De nieuws-app meldt welke verbanden lezers onder "Wie zit erachter?" te zien krijgen. Die
+# gaan voor bij de automatische controle (bronchecker) en de bronzoeker. Procesdata: telt
+# nergens in de score en verandert niets aan het model.
+NIEUWS_VOORRANG_MAX = 200
+
+
+@app.route("/api/nieuws/voorrang", methods=["POST"])
+@require_user()
+def nieuws_voorrang():
+    """{relation_ids: [...]} (max 200; alleen 'nieuws-agent' of een maintainer). Bestaande,
+    niet-vervangen relaties krijgen voorrang (gevraagd_op = nu, aantal + 1); de rest wordt
+    genegeerd. → {bijgewerkt}."""
+    data = request.get_json(silent=True) or {}
+    ids = data.get("relation_ids")
+    if (not isinstance(ids, list) or len(ids) > NIEUWS_VOORRANG_MAX
+            or any(isinstance(i, bool) or not isinstance(i, int) or i <= 0 for i in ids)):
+        return jsonify({"error": f"'relation_ids' moet een lijst van hooguit "
+                                 f"{NIEUWS_VOORRANG_MAX} positieve gehele getallen zijn"}), 400
+    conn = get_db()
+    if not _mag_nieuws(conn, NIEUWS_AGENT):
+        conn.close()
+        return jsonify({"error": f"Alleen het account '{NIEUWS_AGENT}' of een maintainer "
+                                 "geeft voorrang uit het nieuws door"}), 403
+    nu = _nu_iso()
+    bijgewerkt = 0
+    for rid in sorted(set(ids)):
+        if not conn.execute("SELECT 1 FROM relations WHERE id = ? AND NOT vervangen",
+                            (rid,)).fetchone():
+            continue
+        conn.execute("""
+            INSERT INTO nieuws_voorrang (relation_id, gevraagd_op, aantal) VALUES (?, ?, 1)
+            ON CONFLICT (relation_id) DO UPDATE SET gevraagd_op = excluded.gevraagd_op,
+                                                    aantal = nieuws_voorrang.aantal + 1
+        """, (rid, nu))
+        bijgewerkt += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"bijgewerkt": bijgewerkt})
+
+
+# ── Smaadtoets (eigenaarsbesluit 2026-10-06: "laat de smaad-firewall checken of het feitelijk
+# is; als het niet feitelijk is koppel het terug, anders is het geen smaad") ──
+# Een agent (account 'smaadtoets', nooit de auteur) toetst een claim die een natuurlijk persoon
+# raakt: (1) een feit, geen mening of waardeoordeel als feit; (2) gedragen door de bron, niet
+# verder dan de bron (geen overdrijving, insinuatie of conclusie die de bron niet trekt); (3)
+# over de publieke rol, niet het privéleven. 'feitelijk' → de gewone poorten; 'niet_feitelijk'
+# → teruggekoppeld (de opruimstap verwerpt met de reden en, waar mogelijk, een feitelijke
+# formulering). Procesmetadata in `smaad_toetsen`; telt nergens in de score.
+SMAADTOETS_VERDICTS = ("feitelijk", "niet_feitelijk")
+
+
+def _smaadtoets(conn, arg_id, auteur):
+    """Nieuwste smaadtoets van een ander account dan de auteur, of None."""
+    try:
+        return conn.execute("""
+            SELECT verdict, reden, herformulering, door, created_at FROM smaad_toetsen
+            WHERE argument_id = ? AND COALESCE(door, '') <> COALESCE(?, '')
+            ORDER BY created_at DESC, id DESC LIMIT 1""", (arg_id, auteur)).fetchone()
+    except sqlite3.OperationalError:  # database van vóór de smaadtoets
+        return None
+
+
+@app.route("/api/arguments/<int:arg_id>/smaadtoets", methods=["POST"])
+@require_user()
+def smaadtoets(arg_id):
+    """Smaadtoets door een ander account dan de auteur: {verdict: feitelijk|niet_feitelijk,
+    reden, herformulering?}. Eén oordeel per account; met "herzien": true werkt het account
+    zijn eigen oordeel bij (nooit een tweede stem). 403 voor de auteur."""
+    data = request.get_json(silent=True) or {}
+    verdict = data.get("verdict")
+    if verdict not in SMAADTOETS_VERDICTS:
+        return jsonify({"error": "verdict moet 'feitelijk' of 'niet_feitelijk' zijn"}), 400
+    reden = (data.get("reden") or "").strip()[:1500]
+    if not reden:
+        return jsonify({"error": "een smaadtoets vergt een reden"}), 400
+    herformulering = (data.get("herformulering") or "").strip()[:1000] or None
+    conn = get_db()
+    arg = conn.execute("SELECT id, contributed_by FROM arguments WHERE id = ?",
+                       (arg_id,)).fetchone()
+    if arg is None:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if arg["contributed_by"] == g.user["username"]:
+        conn.close()
+        return jsonify({"error": "De auteur toetst zijn eigen claim niet"}), 403
+    oud = conn.execute("SELECT id, verdict FROM smaad_toetsen WHERE argument_id = ? AND door = ?",
+                       (arg_id, g.user["username"])).fetchone()
+    if oud is not None and data.get("herzien") is not True:
+        conn.close()
+        return jsonify({"error": "Je gaf al een smaadtoets op dit argument (stuur "
+                                 "\"herzien\": true om hem bij te werken)"}), 409
+    if oud is not None:
+        conn.execute("""UPDATE smaad_toetsen SET verdict = ?, reden = ?, herformulering = ?,
+                        created_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                     (verdict, reden, herformulering, oud["id"]))
+        tid = oud["id"]
+    else:
+        tid = conn.execute("""INSERT INTO smaad_toetsen (argument_id, verdict, reden,
+                              herformulering, door) VALUES (?, ?, ?, ?, ?)""",
+                           (arg_id, verdict, reden, herformulering,
+                            g.user["username"])).lastrowid
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+        VALUES ('smaad_toetsen', ?, ?, ?, ?, ?)
+    """, (tid, "updated" if oud else "created", g.user["username"],
+          json.dumps({"argument_id": arg_id, "verdict": verdict}), f"smaadtoets: {verdict}"))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": tid, "argument_id": arg_id, "verdict": verdict,
+                    "herzien": oud is not None}), 200 if oud else 201
+
+
+@app.route("/api/beoordeling/smaad_vrijgeven/<int:arg_id>", methods=["POST"])
+@require_user("reviewer")
+def beoordeling_smaad_vrijgeven(arg_id):
+    """De automatische beoordeling heft een smaad_hold op (merge-service) als een ander
+    account dan de auteur de claim 'feitelijk' bevond én het nieuwste onafhankelijke
+    A1-oordeel zegt dat de bron haar draagt. Kill-switch → 503; niet toegestaan → 409."""
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        return jsonify({"vrijgegeven": False, "error": "automatische beoordeling "
+                        "uitgeschakeld (PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    conn = get_db()
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if arg is None:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    redenen = []
+    if not arg["smaad_hold"]:
+        redenen.append("staat niet op smaad_hold")
+    toets = _smaadtoets(conn, arg_id, arg["contributed_by"])
+    if toets is None or toets["verdict"] != "feitelijk":
+        redenen.append("smaadtoets: niet (of nog niet) 'feitelijk'")
+    a1 = _nieuwste_a1(conn, arg_id)
+    if a1 is None or a1["verdict"] != "klopt" or a1["door"] == arg["contributed_by"]:
+        redenen.append("A1: de bron draagt de bewering niet (of nog geen onafhankelijk oordeel)")
+    if redenen:
+        conn.close()
+        return jsonify({"vrijgegeven": False, "redenen": redenen}), 409
+    conn.execute("UPDATE arguments SET smaad_hold = 0 WHERE id = ?", (arg_id,))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
+    """, (arg_id, g.user["username"], json.dumps({"smaad_hold": 1}),
+          json.dumps({"smaad_hold": 0}),
+          f"{BEOORDELING_REDEN_PREFIX}: smaadtoets feitelijk ({toets['door']}: "
+          f"{(toets['reden'] or '')[:300]}) en de bron draagt het — vrijgegeven"))
+    conn.commit()
+    conn.close()
+    return jsonify({"vrijgegeven": True, "id": arg_id}), 200
+
+
+# ── Mechanisme voor een kandidaat-verband (2026-10-06: agents doen alles) ──
+# Een voorgestelde relatie zonder mechanisme ('kandidaat') wacht niet meer op een mens: de
+# mechanisme-toewijzer (scripts/mechanisme_toewijzer.py) kiest een bestaand mechanisme dat het
+# verband beschrijft, en de automatische beoordeling zet het hier (merge-service). Daarna gaat
+# de relatie langs de gewone bewijspoort. Past er geen, dan blijft ze kandidaat.
+@app.route("/api/beoordeling/mechanisme/<int:rid>", methods=["POST"])
+@require_user("reviewer")
+def beoordeling_mechanisme(rid):
+    """{mechanism_id, motivatie}: zet het mechanisme van een kandidaat-relatie. Kill-switch →
+    503; geen kandidaat of onbekend mechanisme → 409/400."""
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        return jsonify({"gezet": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    data = request.get_json(silent=True) or {}
+    mid = data.get("mechanism_id")
+    motivatie = (data.get("motivatie") or "").strip()[:600]
+    if isinstance(mid, bool) or not isinstance(mid, int) or not motivatie:
+        return jsonify({"error": "mechanism_id (geheel getal) en motivatie zijn verplicht"}), 400
+    conn = get_db()
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+    mech = conn.execute("SELECT id, name, vervangen FROM mechanisms WHERE id = ?",
+                        (mid,)).fetchone()
+    if rel is None:
+        conn.close()
+        return jsonify({"error": "Relatie niet gevonden"}), 404
+    if mech is None or mech["vervangen"]:
+        conn.close()
+        return jsonify({"error": f"Mechanisme {mid} bestaat niet (meer)"}), 400
+    redenen = []
+    if rel["status"] != "voorgesteld" or rel["vervangen"]:
+        redenen.append(f"relatie is '{rel['status']}'{' en vervangen' if rel['vervangen'] else ''}")
+    if rel["mechanism_id"] is not None:
+        redenen.append("relatie heeft al een mechanisme (geen kandidaat)")
+    if conn.execute("SELECT 1 FROM edit_log WHERE table_name = 'relations' AND record_id = ? "
+                    "AND reason LIKE 'intrekken%' LIMIT 1", (rid,)).fetchone():
+        redenen.append("eerder door een maintainer ingetrokken — nooit automatisch")
+    if redenen:
+        conn.close()
+        return jsonify({"gezet": False, "redenen": redenen}), 409
+    conn.execute("UPDATE relations SET mechanism_id = ? WHERE id = ?", (mid, rid))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+    """, (rid, g.user["username"], json.dumps({"mechanism_id": None}),
+          json.dumps({"mechanism_id": mid}),
+          f"{BEOORDELING_REDEN_PREFIX}: mechanisme '{mech['name']}' gekozen door de "
+          f"mechanisme-toewijzer — {motivatie}"))
+    conn.commit()
+    conn.close()
+    return jsonify({"gezet": True, "id": rid, "mechanism_id": mid}), 200
+
+
+# ── RfC's door agents (2026-10-06: agents doen alles) ──
+# Een open voorstel (RfC) wacht niet meer op menselijke akkoorden: twee onafhankelijke agents
+# (scripts/rfc_beoordeling.py, accounts 'rfc-toetser' en 'rfc-criticus') reviewen het via
+# POST /api/voorstellen/<id>/reviews, en de automatische beoordeling beslist hier: twee
+# akkoorden van verschillende agent-accounts (niet de indiener) en geen afwijzing →
+# aangenomen en uitgevoerd; één agent-afwijzing → afgewezen met die motivatie (de indiener kan
+# herzien). Een afwijzing door een mens wint altijd (die beslist het gewone review-endpoint).
+def rfc_besluit(conn, vid):
+    """→ ('geaccepteerd' | 'afgewezen' | None, toelichting, akkoorden)."""
+    rij = conn.execute("SELECT * FROM voorstellen WHERE id = ?", (vid,)).fetchone()
+    if rij is None:
+        return None, "niet gevonden", []
+    if rij["status"] != "open":
+        return None, f"voorstel is al {rij['status']}", []
+    akkoord, afwijzing = [], []
+    for r in conn.execute("""
+            SELECT vr.reviewer, vr.oordeel, vr.motivatie FROM voorstel_reviews vr
+            JOIN users u ON u.username = vr.reviewer
+            WHERE vr.voorstel_id = ? AND u.kind = 'agent' AND vr.reviewer <> ?
+            ORDER BY vr.id""", (vid, rij["ingediend_door"])):
+        (akkoord if r["oordeel"] == "akkoord" else afwijzing).append(r)
+    if afwijzing:
+        return ("afgewezen", "; ".join(f"{r['reviewer']}: {(r['motivatie'] or '')[:400]}"
+                                       for r in afwijzing), [])
+    namen = sorted({r["reviewer"] for r in akkoord})
+    if len(namen) >= 2:
+        return "geaccepteerd", f"akkoord van {', '.join(namen)}", namen
+    return None, "wacht op twee onafhankelijke agent-akkoorden", namen
+
+
+@app.route("/api/beoordeling/rfc/<int:vid>", methods=["POST"])
+@require_user("reviewer")
+def beoordeling_rfc(vid):
+    """Beslis een open RfC op de agent-reviews (merge-service). Kill-switch → 503; nog niets
+    te beslissen → 409; uitvoering faalt (bv. hertriage niet leeg) → 409 en het blijft open."""
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        return jsonify({"besluit": None, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    conn = get_db()
+    rij = conn.execute("SELECT * FROM voorstellen WHERE id = ?", (vid,)).fetchone()
+    if rij is None:
+        conn.close()
+        return jsonify({"error": "Voorstel niet gevonden"}), 404
+    besluit, toelichting, _namen = rfc_besluit(conn, vid)
+    if besluit is None:
+        conn.close()
+        return jsonify({"besluit": None, "reden": toelichting}), 409
+    if besluit == "afgewezen":
+        conn.execute("UPDATE voorstellen SET status = 'afgewezen', besloten_at = "
+                     "CURRENT_TIMESTAMP WHERE id = ?", (vid,))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('voorstellen', ?, 'updated', ?, ?, ?)
+        """, (vid, g.user["username"], json.dumps({"status": "afgewezen"}),
+              f"{BEOORDELING_REDEN_PREFIX}: RfC afgewezen — {toelichting}"[:2000]))
+        conn.commit()
+        conn.close()
+        return jsonify({"besluit": "afgewezen", "id": vid, "reden": toelichting}), 200
+    payload = json.loads(rij["payload"])
+    try:
+        resultaat = voorstellen.voer_uit(conn, rij["soort"], payload, vid,
+                                         ingediend_door=rij["ingediend_door"])
+        resultaat["automatisch"] = True
+        conn.execute("""UPDATE voorstellen SET status = 'geaccepteerd', resultaat = ?,
+                        besloten_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                     (json.dumps(resultaat, ensure_ascii=False), vid))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('voorstellen', ?, 'merged', ?, ?, ?)
+        """, (vid, g.user["username"], json.dumps(resultaat, ensure_ascii=False),
+              f"{BEOORDELING_REDEN_PREFIX}: RfC aangenomen op {toelichting}"))
+        conn.commit()
+    except (ValueError, sqlite3.IntegrityError) as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"besluit": None, "blokkade": str(e)}), 409
+    conn.close()
+    return jsonify({"besluit": "geaccepteerd", "id": vid, "resultaat": resultaat}), 200
 
 
 @app.route("/api/nieuws/autokeur/intrekken", methods=["POST"])
