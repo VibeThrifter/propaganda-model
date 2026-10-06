@@ -26,6 +26,22 @@ zodat een aanval niet dezelfde blinde vlek deelt als de claim die ze aanvalt. Je
 `model_familie` wordt uit `users.provenance` bij elk certificaat gekopieerd, zodat de
 auto-merge-poort (A7) de onafhankelijkheid kan afdwingen.
 
+## Voorrang: de automatische beoordeling (eigenaarsbesluit 2026-10-06)
+
+De eigenaar beoordeelt niets meer met de hand; jouw certificaat is voor invloedsclaims de
+tweede, onafhankelijke controle naast de bronchecker (A1). Begin daarom **elke ronde** met:
+
+```bash
+python3 scripts/automatische_beoordeling.py --open-a2
+```
+
+Dat geeft de voorgestelde invloedsclaims die de bronchecker op 'klopt' zette en die op jouw
+tegenspraak wachten. Behandel die **eerst** (hooguit 12 per ronde) en geef elk precies één
+certificaat: `aangevallen` (je plaatste een weerlegging of ondergraving), `overleefd` of
+`onbeslist`. Pas als die lijst leeg is, ga je naar je gewone doelwitten hieronder. Zonder
+jouw `overleefd` merget een invloedsclaim nooit; na 14 dagen zonder certificaat wordt hij
+opgeruimd.
+
 ## Drie uitkomsten per claim
 
 Je bekijkt elke score-dragende claim (roots uit `GET /api/review_queue` en gemergede

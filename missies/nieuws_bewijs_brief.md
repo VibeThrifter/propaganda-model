@@ -209,11 +209,21 @@ curl -s -X PATCH http://localhost:5000/api/nieuws/doelen/<id> \
 
 ## Wat er daarna gebeurt
 
-Alles wat je indient blijft `voorgesteld` en telt in niets tot een mens het merget. De
-autokeur raakt invloeds- en sourcingclaims nooit. De nieuws-app toont "nieuw bewijs wacht
-op beoordeling" tot de eigenaar het in `/overleg` beoordeelt. Pas daarna ziet de lezer het.
-**Schrijf dus voor die mens:** elk argument moet in één keer controleerbaar zijn, met de
-quote, de url en waarom het telt.
+Alles wat je indient landt `voorgesteld`. Direct na je ronde beslist de **automatische
+beoordeling** (`scripts/automatische_beoordeling.py`, eigenaarsbesluit 2026-10-06: niemand
+beoordeelt met de hand):
+
+1. de **bronchecker** haalt elke bron opnieuw op, zoekt je citaat letterlijk terug en laat een
+   model oordelen of de bron je bewering *zoals jij die formuleerde* draagt;
+2. de **aanklager** probeert elke invloedsclaim te weerleggen;
+3. wat beide doorstaat, merget de immuunpoort. Wat de bron niet draagt, wordt verworpen. Wat
+   na 14 dagen niet te bevestigen is, wordt opgeruimd.
+
+Pas daarna ziet de lezer van de nieuws-app je bewijs. **Schrijf dus voor die controle:**
+- het citaat staat letterlijk op de pagina van de url;
+- de bewering zegt niet meer dan de bron. "De kop noemt PBL", terwijl de kop dat niet doet,
+  wordt "twijfel" en telt niet;
+- één bewering per argument.
 
 ## Harde grenzen
 

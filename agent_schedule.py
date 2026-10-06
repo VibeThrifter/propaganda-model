@@ -120,6 +120,14 @@ AGENTS = [
               "--actieve-uren", "8-22"], "timeout": 2700,
      "omschrijving": "Dun bewijs — bewijs vóór en tegen voor verbanden uit het nieuws",
      "default": {"eenheid": "uur", "elke": 4, "aan": False}},
+    # Automatische beoordeling (eigenaarsbesluit 2026-10-06: de eigenaar beoordeelt niets
+    # meer met de hand). Elke ronde: bronchecker (A1, Sonnet), zo nodig één aanklager-ronde
+    # (A2, Opus, max 2/dag, 08–22), immuunpoort (A7), goedkeuren van relaties/entiteiten met
+    # gecontroleerd bewijs en opruimen na 14 dagen. Eén ronde tegelijk (lock).
+    {"naam": "automatische-beoordeling", "label": "automatische-beoordeling", "soort": "script",
+     "spec": ["scripts/automatische_beoordeling.py", "--once"], "timeout": 4500,
+     "omschrijving": "Automatische beoordeling: bronchecker, aanklager, immuunpoort, opruimen",
+     "default": {"eenheid": "uur", "elke": 2, "aan": True}},
     {"naam": "nieuws-autokeur", "label": "nieuws-autokeur", "soort": "script",
      "spec": ["scripts/nieuws_autokeur_service.py", "--once"], "timeout": 600,
      "omschrijving": "Automatisch goedkeuren van neutrale structuurfeiten (geen claude)",
