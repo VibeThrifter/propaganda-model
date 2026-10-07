@@ -20,6 +20,7 @@ Exit-code 0 = alles groen.
 """
 import datetime
 import importlib.util
+import json
 import os
 import sqlite3
 import sys
@@ -762,6 +763,243 @@ def main():
         st, j = api("post", f"/api/beoordeling/verificatie/{theorie}", "merge-service")
         eis(st == 200 and status("arguments", theorie) == "geverifieerd",
             "een theorie-argument waarvan de bron het draagt → geverifieerd")
+        eis(status("arguments", bezwaar) == "ongecontroleerd", "het bezwaar uit stap 5 is gemerged")
+        st, j = api("post", f"/api/beoordeling/verificatie/{bezwaar}", "merge-service")
+        eis(st == 200 and status("arguments", bezwaar) == "geverifieerd",
+            "een bevestigd bezwaar leunt op de bron van het aangevochten argument → geverifieerd")
+
+        def lees():
+            c = sqlite3.connect(db)
+            c.row_factory = sqlite3.Row
+            return c
+
+        print("18. Bronzoeker: voorstellen met twijfel en verbanden zonder argument")
+        twijfel = argument(invloed, "nieuws-bewijs",
+                           claim="De denktank levert de omroep elke week duiding bij nieuws.")
+        a1(twijfel, "twijfel")
+        eigen_vervanger = argument(invloed, "bronzoeker",
+                                   claim="De denktank levert de omroep duiding bij nieuws.")
+        a1(eigen_vervanger, "twijfel")
+        kaal_verband = relatie(medium, denktank, "bron_van")
+        c = sqlite3.connect(db)
+        c.execute("UPDATE relations SET status = 'goedgekeurd' WHERE id = ?", (kaal_verband,))
+        c.commit()
+        c.close()
+        c = lees()
+        try:
+            alle = bz.kandidaten(c)
+            voorstellen = {a["id"]: a for a in alle if a["soort"] == "voorstel"}
+            verbanden = {a["relation_id"]: a for a in alle if a["soort"] == "verband"}
+            wacht_leeg = bz.wacht_op_zoeker(c, {})
+            wacht_na = bz.wacht_op_zoeker(c, {str(twijfel): {"uitkomst": "niets"}})
+            wacht_fout = bz.wacht_op_zoeker(c, {str(twijfel): {"uitkomst": "fout"}})
+        finally:
+            c.close()
+        eis(twijfel in voorstellen and voorstellen[twijfel]["probleem"] == "twijfel",
+            "een voorstel met 'twijfel' gaat naar de bronzoeker")
+        eis(eigen_vervanger not in voorstellen,
+            "wat de bronzoeker zelf indiende, krijgt geen tweede reparatie")
+        eis(kaal_verband in verbanden and verbanden[kaal_verband]["probleem"] == "geen_argument",
+            "een goedgekeurd verband zonder enig steunend argument gaat naar de bronzoeker")
+        eis(twijfel in wacht_leeg and twijfel not in wacht_na and twijfel in wacht_fout,
+            "de opruimstap wacht op een poging (een technische fout telt niet als poging)")
+        eis([a["soort"] for a in alle].index("voorstel") < [a["soort"] for a in alle].index(
+            "gemerged") if any(a["soort"] == "gemerged" for a in alle) else True,
+            "een voorstel (dat op een besluit wacht) gaat voor gemerged werk")
+        citaties = [{"source_id": bron("bronzoeker"), "quote": "De denktank levert de omroep "
+                     "duiding.", "methode": "verbatim_quote"}]
+        pad, body = bz.indiening(voorstellen[twijfel], {"bewering": "De denktank levert de "
+                                 "omroep duiding bij nieuws.", "toelichting": "NOS 2025"},
+                                 citaties)
+        eis(pad == "/api/arguments" and body["relation_id"] == invloed
+            and body["stance"] == "supporting"
+            and body["reasoning"].startswith(f"Betere bron voor #{twijfel}"),
+            "een vervangend voorstel: zelfde doel en stance, merkteken in de reasoning")
+        st, j = api("post", pad, "bronzoeker", body)
+        eis(st == 201, f"de server neemt het vervangende voorstel aan ({st})")
+        pad, body = bz.indiening(verbanden[kaal_verband], {"bewering": "Omroep Voorbeeld citeert "
+                                 "Denktank Herdoopt.", "toelichting": ""}, citaties)
+        eis(pad == "/api/arguments" and body["relation_id"] == kaal_verband
+            and body["reasoning"].startswith(f"Bron voor verband #{kaal_verband}"),
+            "een nieuw steunend argument voor het verband zonder argument")
+        st, j = api("post", pad, "bronzoeker", body)
+        eis(st == 201, f"de server neemt het nieuwe argument aan ({st})")
+        c = lees()
+        try:
+            verbanden = {a["relation_id"] for a in bz.verbanden_zonder_argument(c)}
+        finally:
+            c.close()
+        eis(kaal_verband not in verbanden, "met een (voorgesteld) argument is het verband in "
+            "behandeling: geen tweede zoektocht")
+        pad, _ = bz.indiening({**voorstellen[twijfel], "soort": "gemerged"},
+                              {"bewering": voorstellen[twijfel]["claim"]}, citaties)
+        eis(pad.endswith("/revisie"), "gemerged werk krijgt een revisie")
+        gevonden = {"bewering": "", "bronnen": [{"url": "https://nos.nl/a", "titel": "x",
+                                                 "uitgever": "NOS", "datum": "2025",
+                                                 "soort": "nieuwsartikel",
+                                                 "citaat": "was het RIVM de belangrijkste bron "
+                                                           "voor de berichtgeving"}],
+                    "gevonden": True, "toelichting": ""}
+        verband = {
+            "id": None, "soort": "verband", "claim": "", "relation_id": 77,
+            "bron_naam": "RIVM", "doel_naam": "De Telegraaf", "entiteit_naam": None,
+            "stance": "supporting", "mechanisme": "x", "relation_type": "bron_van",
+            "probleem": "geen_argument", "bronnen": [], "status": "goedgekeurd"}
+        bz.vraag_zoeker = lambda prompt: gevonden
+        eis(bz.zoek(verband)["uitkomst"] == "niets", "geen bewering geformuleerd → niets")
+        gevonden["bewering"] = "Het RIVM was de belangrijkste bron voor De Telegraaf."
+        eis(bz.zoek(verband)["uitkomst"] == "gevonden",
+            "een bewering met beide partijen en een citaat dat in de bron staat → gevonden")
+        gevonden["bewering"] = "Het RIVM was de belangrijkste bron voor de kranten."
+        eis(bz.zoek(verband)["uitkomst"] == "niets",
+            "een bewering zonder de tweede partij → niets (geen algemene uitspraak)")
+
+        print("19. Opruimen: eerst repareren, dan beslissen")
+        nu = datetime.datetime(2026, 10, 7, 12, 0)
+        basis = {"id": 1, "a1": "twijfel", "a1_detail": "[bronchecker] de bron noemt geen datum",
+                 "smaad": None, "smaad_reden": None, "smaad_herformulering": None,
+                 "parent_argument_id": None, "created_at": "2026-10-07 10:00:00",
+                 "heropend_op": None, "a1_op": "2026-10-07 11:00:00", "a2": None}
+
+        def besluit(a, wacht_zoeker=(), pogingen=None, wacht_a2=()):
+            return ab.motivatie_voor(a, wacht_a2=set(wacht_a2), wacht_zoeker=set(wacht_zoeker),
+                                     pogingen=pogingen or {}, wachttijd=14, nu=nu)
+
+        eis(besluit(basis, wacht_zoeker={1}) == (None, "bronzoeker"),
+            "twijfel: eerst de bronzoeker")
+        m, _ = besluit(basis, pogingen={"1": {"uitkomst": "gevonden", "nieuw_id": 99}})
+        eis(m.startswith("automatische beoordeling: vervangen door #99"),
+            "gevonden: verworpen met de vervanger erbij")
+        m, _ = besluit(basis, pogingen={"1": {"uitkomst": "niets"}})
+        eis("bevestigt het niet volledig" in m and "geen betere bron" in m
+            and "noemt geen datum" in m, "niets gevonden: meteen verworpen, met de reden")
+        m, _ = besluit(basis)
+        eis(m is not None and "bevestigt het niet volledig" in m,
+            "niet te repareren (bv. van de bronzoeker zelf): meteen verworpen, geen 14 dagen")
+        m, _ = besluit({**basis, "a1": "klopt-niet", "parent_argument_id": 5})
+        eis("het bezwaar houdt geen stand" in m, "een bezwaar dat geen stand houdt")
+        eis(besluit({**basis, "a1": "klopt"}, wacht_a2={1}) == (None, "aanklager"),
+            "wacht op de aanklager binnen de wachttijd")
+        m, _ = besluit({**basis, "a1": "klopt", "a1_op": "2026-09-20 10:00:00"}, wacht_a2={1})
+        eis("tegenspraak-certificaat" in m, "na de wachttijd zonder aanklager opgeschoond")
+        m, _ = besluit({**basis, "smaad": "niet_feitelijk", "smaad_reden": "een mening als feit",
+                        "smaad_herformulering": "X zei Y."})
+        eis(m.startswith("automatische beoordeling: teruggekoppeld door de smaadtoets")
+            and "Feitelijk zou zijn: X zei Y." in m, "de smaadtoets koppelt terug")
+        eis(besluit({**basis, "a1": "klopt"}) == (None, None), "jong en 'klopt': niets te doen")
+
+        print("20. Mechanisme-toewijzer: buiten het model wordt afgewezen, anders incuberen")
+        mt = laad_script("mechanisme_toewijzer")
+        mt.DB_PATH = db
+        st, j = api("post", "/api/relations", "nieuws-scout",
+                    {"source_id": partij, "target_id": medium, "relation_type": "alliantie"})
+        assert st == 201, (st, j)
+        buiten = j["id"]
+        mt.bc.vraag_model = lambda *a, **k: {"mechanism_id": 0, "buiten_model": True,
+                                             "reden": "Een partijfusie, geen invloed op media."}
+        eis(mt.kies(buiten)["uitkomst"] == "buiten_model", "het model zegt: buiten het model")
+        mt.bc.vraag_model = lambda *a, **k: {"mechanism_id": 0, "buiten_model": False,
+                                             "reden": "Een patroon zonder mechanisme."}
+        eis(mt.kies(buiten)["uitkomst"] == "geen", "een invloedspatroon zonder huis: incuberen")
+        st, j = api("patch", f"/api/relations/{buiten}/status", "merge-service",
+                    {"status": "afgewezen", "motivatie": "automatische beoordeling: buiten het "
+                     "model — geen mechanisme past (test)"})
+        eis(st == 200 and status("relations", buiten) == "afgewezen",
+            "merge-service wijst een kandidaat zonder mechanisme af (met reden)")
+        nu = datetime.datetime(2026, 10, 7, 12, 0)
+        eis(not mt.mag_weer({"op": "2026-10-01T12:00:00", "uitkomst": "geen", "mech_max": 200},
+                            nu, 200)
+            and mt.mag_weer({"op": "2026-10-01T12:00:00", "uitkomst": "geen", "mech_max": 200},
+                            nu, 201)
+            and mt.mag_weer({"op": "2026-09-01T12:00:00", "uitkomst": "geen"}, nu, 200),
+            "een incuberende kandidaat komt terug na 30 dagen, of zodra er een mechanisme bij kwam")
+
+        print("21. Bronklassen: twee oordelen, bij verschil de voorzichtigste")
+        bk = laad_script("bronklasse")
+
+        def o(rel, ond="nl_systeem", wie="x"):
+            return {"wie": wie, "reliability": rel, "onderwerp": ond, "reden": ""}
+
+        nieuws = {"source_type": "nieuwsartikel", "heeft_loc": 1}
+        eis(bk.beslis(nieuws, [o("regulier"), o("regulier")])[:3]
+            == ("regulier", "nl_systeem", "eens"), "eens: dat geldt")
+        eis(bk.beslis(nieuws, [o("kwaliteitsjournalistiek"), o("regulier", "algemeen")])[:3]
+            == ("regulier", "algemeen", "oneens"),
+            "oneens: de laagste klasse en het minst stellige onderwerp")
+        eis(bk.beslis(nieuws, [o("primair"), o("primair")])[:3]
+            == ("kwaliteitsjournalistiek", "nl_systeem", "lager"),
+            "'primair' past niet bij een nieuwsartikel: de eerstvolgende lagere klasse")
+        eis(bk.beslis({"source_type": "boek", "heeft_loc": 0},
+                      [o("academisch"), o("academisch")])[0] == "kwaliteitsjournalistiek",
+            "een hoge klasse zonder vindplaats haalt de poort niet")
+        eis(bk.beslis({"source_type": "overig", "heeft_loc": 1},
+                      [o("eigen_synthese"), o("grijs")])[0] == "eigen_synthese",
+            "projectmateriaal blijft projectmateriaal")
+        eis(bk.beslis(nieuws, [o("grijs"), o("opinie")])[0] == "grijs"
+            and "eigen_synthese" not in [bk.beslis(nieuws, [o("grijs"), o("grijs")])[0]],
+            "nooit vanzelf naar projectmateriaal")
+        st, j = api("post", "/api/sources", "nieuws-scout",
+                    {"title": "Nieuwsbericht over de omroep", "source_type": "nieuwsartikel",
+                     "location": {"type": "url", "value": "https://bron.test/klasse"},
+                     "reliability_voorgesteld": "kwaliteitsjournalistiek",
+                     "onderwerp_voorgesteld": "nl_systeem"})
+        assert st == 201, (st, j)
+        klasse_bron = j["id"]
+        c = lees()
+        try:
+            rijen = {r["id"]: r for r in bk.kandidaten(c)}
+        finally:
+            c.close()
+        eis(klasse_bron in rijen and bk.voorstel_van(rijen[klasse_bron])["wie"] == "nieuws-scout",
+            "een bron met een voorstel wacht op een besluit (het voorstel is het eerste oordeel)")
+        rel_k, ond_k, uitkomst, uitleg = bk.beslis(
+            rijen[klasse_bron], [bk.voorstel_van(rijen[klasse_bron]), o("regulier", wie="sonnet")])
+        st, j = api("patch", f"/api/sources/{klasse_bron}/classificatie", "merge-service",
+                    {"reliability": rel_k, "onderwerp": ond_k,
+                     "motivatie": bk.motivatie(rijen[klasse_bron], [], rel_k, ond_k, uitleg)})
+        c = lees()
+        try:
+            na = c.execute("SELECT reliability, reliability_voorgesteld FROM sources WHERE id = ?",
+                           (klasse_bron,)).fetchone()
+            nog = {r["id"] for r in bk.kandidaten(c)}
+        finally:
+            c.close()
+        eis(st == 200 and tuple(na) == ("regulier", None) and klasse_bron not in nog,
+            "het besluit (de voorzichtigste) staat, het voorstel is verwerkt")
+        bk.LOG_PATH = Path(tmp) / "bronklasse_log.jsonl"
+        bk.LOG_PATH.write_text(json.dumps({
+            "source_id": klasse_bron, "http": 200,
+            "oordelen": [bk.voorstel_van(rijen[klasse_bron]), o("regulier", wie="sonnet")]}),
+            encoding="utf-8")
+        c = lees()
+        try:
+            herzien = {r["id"]: r for r in bk.herzien_kandidaten(c)}
+        finally:
+            c.close()
+        eis(klasse_bron in herzien
+            and bk.voorstel_van(herzien[klasse_bron])["reliability"] == "kwaliteitsjournalistiek",
+            "--herzien: een eigen besluit opnieuw, met het voorstel van toen uit het logboek")
+        api("patch", f"/api/sources/{klasse_bron}/classificatie", "t-admin",
+            {"reliability": "regulier", "onderwerp": "nl_systeem", "motivatie": "mens"})
+        c = lees()
+        try:
+            herzien = {r["id"] for r in bk.herzien_kandidaten(c)}
+        finally:
+            c.close()
+        eis(klasse_bron not in herzien, "wat een mens daarna zette, herziet de agent niet")
+
+        print("22. Archiveren: wat een run al behandelde, houdt de rest niet tegen")
+        ar = laad_script("archiveer_bronnen")
+        log = Path(tmp) / "archiveer_log.jsonl"
+        log.write_text("\n".join([
+            '{"datum": "2026-10-06T12:00:00", "source_ids": [1, 2]}',
+            '{"datum": "2026-09-01T12:00:00", "source_ids": [3]}', "kapot"]), encoding="utf-8")
+        eis(ar.recent_behandeld(7, datetime.datetime(2026, 10, 7, 12, 0), pad=log) == {1, 2},
+            "alleen de laatste 7 dagen tellen (kapotte regels worden overgeslagen)")
+        eis(ab.ARCHIEF_KLAAR.search("Klaar: 3 bestaande snapshot(s) geregistreerd, 2 vers "
+                                    "aangevraagd, 0 zonder snapshot, 1 door fout/rate-limit "
+                                    "open.").groups() == ("3", "2", "0", "1"),
+            "de ronde leest de uitkomst van het archiefscript")
 
         print("\nALLE TESTS VAN DE AUTOMATISCHE BEOORDELING GESLAAGD")
 

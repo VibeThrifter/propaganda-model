@@ -40,101 +40,79 @@ MIN_ELKE_MINUUT = 5   # onder de 5 min: een ronde (≈10 min claude) is niet een
 
 # Canonieke agent-lijst. `label` = de naam in data/agent_runs.jsonl én de config-key.
 # `soort`: runner (token-agent) | leesagent (--geen-token) | script (kaal, geen claude).
+#
+# Opgeschoond 2026-10-07 ("geen humans in de loop, gestroomlijnd, duidelijk, geen gaten"): wat
+# hier 'aan' staat, draait; de rest staat bewust uit. Eén ronde beslist alles wat binnenkomt
+# (automatische-beoordeling, elk uur: bronzoeker, bronchecker, smaadtoets, aanklager,
+# immuunpoort, verificatie, mechanismen, RfC's, bronklassen, goedkeuren, opruimen,
+# archiveren); twee onderzoeksagents leveren werk aan voor het nieuws. Vervangen en daarom uit
+# de lijst: verificatie-agent (→ bronchecker in de ronde), de losse dagelijkse aanklager (→ de
+# ronde start hem zelf, alleen als er werk is), documentalist (→ bronzoeker), reviewbeoordelaar
+# (→ de ronde beslist zelf), archiveer (→ stap 13 van de ronde) en nieuws-autokeur (→ de ronde
+# keurt goed, na een onafhankelijke broncheck). De nieuws-aggregator start geen rondes meer:
+# zij zet alleen doelen klaar (nieuws_doelen, nieuws_voorrang), dit model plant het werk.
 AGENTS = [
-    {"naam": "verificatie", "label": "verificatie-agent", "soort": "runner",
-     "spec": ["--agent", "verificatie-agent", "--label", "verificatie-agent",
-              "--brief", "missies/verificatie_agent_brief.md"], "timeout": 1800,
-     "omschrijving": "A1 herverificatie — quote verbatim tegen de bron + Wayback",
-     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
-    {"naam": "aanklager", "label": "aanklager-agent", "soort": "runner",
-     "spec": ["--agent", "aanklager-agent", "--label", "aanklager-agent",
-              "--brief", "missies/aanklager_brief.md"], "timeout": 1800,
-     "omschrijving": "A2 tegenspraak — verplichte tegenstander",
-     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
-    {"naam": "monitor", "label": "monitor-agent", "soort": "runner",
-     "spec": ["--agent", "monitor-agent", "--label", "monitor-agent",
-              "--brief", "missies/monitor_brief.md"], "timeout": 1800,
-     "omschrijving": "Drogreden-/logica-controle",
-     "default": {"eenheid": "dag", "elke": 7, "aan": True}},
-    {"naam": "documentalist", "label": "documentalist-agent", "soort": "runner",
-     "spec": ["--agent", "documentalist-agent", "--label", "documentalist-agent",
-              "--brief", "missies/documentalist_brief.md"], "timeout": 2400,
-     "omschrijving": "Bron-suggesties voor probleemargumenten",
-     "default": {"eenheid": "dag", "elke": 7, "aan": True}},
-    {"naam": "scout", "label": "scout-agent", "soort": "runner",
-     "spec": ["--agent", "scout-agent", "--label", "scout-agent",
-              "--brief", "missies/scout_brief.md"], "timeout": 2400,
-     "omschrijving": "Nieuwe entiteiten/relaties uit de onderzoeksagenda",
-     "default": {"eenheid": "dag", "elke": 90, "aan": True}},
-    {"naam": "criticus", "label": "criticus-agent", "soort": "runner",
-     "spec": ["--agent", "criticus-agent", "--label", "criticus-agent",
-              "--brief", "missies/criticus_brief.md"], "timeout": 2400,
-     "omschrijving": "Red team — valt de zwakste claims aan",
-     "default": {"eenheid": "dag", "elke": 90, "aan": True}},
-    {"naam": "ideoloog", "label": "ideoloog", "soort": "runner",
-     "spec": ["--agent", "assistent", "--label", "ideoloog",
-              "--brief", "missies/ideoloog_brief.md"], "timeout": 1800,
-     "omschrijving": "Politieke kleurmeter — richting-signalen",
-     "default": {"eenheid": "dag", "elke": 30, "aan": True}},
-    {"naam": "doelgroep", "label": "doelgroep", "soort": "runner",
-     "spec": ["--agent", "assistent", "--label", "doelgroep",
-              "--brief", "missies/doelgroep_brief.md"], "timeout": 1800,
-     "omschrijving": "Welstandsmeter + bereikmeter",
-     "default": {"eenheid": "dag", "elke": 30, "aan": True}},
-    {"naam": "reviewbeoordelaar", "label": "reviewbeoordelaar", "soort": "leesagent",
-     "spec": ["--geen-token", "--label", "reviewbeoordelaar",
-              "--brief", "missies/reviewbeoordelaar_brief.md"], "timeout": 1800,
-     "omschrijving": "Review-advies (alleen-lezen, adviesbestand)",
-     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
-    {"naam": "resolutie", "label": "voorspelling-resolutie", "soort": "leesagent",
-     "spec": ["--geen-token", "--label", "voorspelling-resolutie",
-              "--brief", "missies/voorspelling_resolutie_brief.md"], "timeout": 1800,
-     "omschrijving": "Voorspelling-resolutie-voorstellen (alleen-lezen)",
-     "default": {"eenheid": "dag", "elke": 30, "aan": True}},
-    {"naam": "archiveer", "label": "archiveer", "soort": "script",
-     "spec": ["scripts/archiveer_bronnen.py"], "timeout": 3600,
-     "omschrijving": "Wayback-archivering (C3, geen claude)",
-     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
-    {"naam": "voorspellingen-regen", "label": "voorspellingen-regen", "soort": "script",
-     "spec": ["scripts/voorspellingen.py"], "timeout": 600,
-     "omschrijving": "Brier-kalibratie herrekenen (geen claude)",
-     "default": {"eenheid": "dag", "elke": 7, "aan": True}},
-    # Epic 12 "Wie is dit?" (eigenaarsbesluit 2026-09-30): de nieuws-pijplijn.
-    # nieuws-scout draait alleen als er open nieuws_doelen zijn (anders exit 0 zonder
-    # claude), hooguit 4 rondes per dag en alleen 08–22 uur; één ronde tegelijk (lock).
+    {"naam": "automatische-beoordeling", "label": "automatische-beoordeling", "soort": "script",
+     "spec": ["scripts/automatische_beoordeling.py", "--once"], "timeout": 4500,
+     "omschrijving": "De ronde die alles beslist: bronzoeker, bronchecker, smaadtoets, "
+                     "aanklager, immuunpoort, verificatie, mechanismen, RfC's, bronklassen, "
+                     "goedkeuren, opruimen, archiveren",
+     "default": {"eenheid": "uur", "elke": 1, "aan": True}},
+    # Epic 12 "Wie is dit?": namen uit het nieuws uitzoeken (wachtrij nieuws_doelen). Draait
+    # alleen als er open doelen zijn (anders exit 0 zonder claude), hooguit 6 rondes per dag
+    # (max 3 doelen per ronde: de instroom is ~12 per dag) en alleen 08–22 uur; één tegelijk.
     {"naam": "nieuws-scout", "label": "nieuws-scout", "soort": "runner",
      "spec": ["--agent", "nieuws-scout", "--label", "nieuws-scout",
               "--brief", "missies/nieuws_scout_brief.md", "--alleen-bij-open-doelen",
-              "--max-rondes-per-dag", "4", "--actieve-uren", "8-22"], "timeout": 2400,
+              "--max-rondes-per-dag", "6", "--actieve-uren", "8-22"], "timeout": 2400,
      "omschrijving": "Wie is dit? — namen uit het nieuws uitzoeken (wachtrij nieuws_doelen)",
      "default": {"eenheid": "uur", "elke": 2, "aan": True}},
-    # Nieuws-aggregator Story 14.13 ("dun bewijs"): bewijs vóór én tegen zoeken voor dun
-    # onderbouwde verbanden die lezers in het nieuws zien (wachtrij nieuws_doelen, soort
-    # 'relatie'). Alles landt 'voorgesteld'; de autokeur raakt het nooit. Standaard UIT:
-    # de nieuws-backend start de rondes zelf binnen haar budget (NIEUWS_BEWIJS_*); zet
-    # deze launchd-taak alleen aan als je rondes ook zonder de nieuws-backend wilt.
+    # Nieuws-aggregator Story 14.13 ("dun bewijs"): bewijs vóór én tegen voor dun onderbouwde
+    # verbanden die lezers in het nieuws zien (wachtrij nieuws_doelen, soort 'relatie'; de
+    # nieuws-app zet er hooguit 6 per dag klaar, 2 per ronde → 3 rondes per dag).
     {"naam": "nieuws-bewijs", "label": "nieuws-bewijs", "soort": "runner",
      "spec": ["--agent", "nieuws-bewijs", "--label", "nieuws-bewijs",
               "--brief", "missies/nieuws_bewijs_brief.md", "--alleen-bij-open-doelen",
-              "--doel-soort", "relatie", "--max-rondes-per-dag", "2",
+              "--doel-soort", "relatie", "--max-rondes-per-dag", "3",
               "--actieve-uren", "8-22"], "timeout": 2700,
      "omschrijving": "Dun bewijs — bewijs vóór en tegen voor verbanden uit het nieuws",
-     "default": {"eenheid": "uur", "elke": 4, "aan": False}},
-    # Automatische beoordeling (eigenaarsbesluit 2026-10-06: de eigenaar beoordeelt niets
-    # meer met de hand; agents doen alles). Elke ronde: bronzoeker (bronnen voor argumenten
-    # zonder goede bron, Sonnet met web), bronchecker (A1, Sonnet; ook gemergede argumenten
-    # die nooit gecontroleerd zijn), zo nodig één aanklager-ronde (A2, Opus, max 2/dag,
-    # 08–22), immuunpoort (A7), verificatie op het A1-oordeel, goedkeuren van relaties/
-    # entiteiten met gecontroleerd bewijs en opruimen na 14 dagen. Eén ronde tegelijk (lock).
-    {"naam": "automatische-beoordeling", "label": "automatische-beoordeling", "soort": "script",
-     "spec": ["scripts/automatische_beoordeling.py", "--once"], "timeout": 4500,
-     "omschrijving": "Automatische beoordeling: bronzoeker, bronchecker, smaadtoets, aanklager, "
-                     "immuunpoort, verificatie, mechanismen, RfC's, opruimen",
-     "default": {"eenheid": "uur", "elke": 1, "aan": True}},
-    {"naam": "nieuws-autokeur", "label": "nieuws-autokeur", "soort": "script",
-     "spec": ["scripts/nieuws_autokeur_service.py", "--once"], "timeout": 600,
-     "omschrijving": "Automatisch goedkeuren van neutrale structuurfeiten (geen claude)",
-     "default": {"eenheid": "minuut", "elke": 30, "aan": True}},
+     "default": {"eenheid": "uur", "elke": 2, "aan": True}},
+    # Uit: geen onderdeel van de beoordeling (inhoud en meters). Aan te zetten op /beheer.
+    {"naam": "monitor", "label": "monitor-agent", "soort": "runner",
+     "spec": ["--agent", "monitor-agent", "--label", "monitor-agent",
+              "--brief", "missies/monitor_brief.md"], "timeout": 1800,
+     "omschrijving": "Drogreden-/logica-controle van het hele model (uit)",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    {"naam": "scout", "label": "scout-agent", "soort": "runner",
+     "spec": ["--agent", "scout-agent", "--label", "scout-agent",
+              "--brief", "missies/scout_brief.md"], "timeout": 2400,
+     "omschrijving": "Nieuwe entiteiten/relaties uit de onderzoeksagenda (uit)",
+     "default": {"eenheid": "dag", "elke": 90, "aan": False}},
+    {"naam": "criticus", "label": "criticus-agent", "soort": "runner",
+     "spec": ["--agent", "criticus-agent", "--label", "criticus-agent",
+              "--brief", "missies/criticus_brief.md"], "timeout": 2400,
+     "omschrijving": "Red team — valt de zwakste claims aan (uit)",
+     "default": {"eenheid": "dag", "elke": 90, "aan": False}},
+    {"naam": "ideoloog", "label": "ideoloog", "soort": "runner",
+     "spec": ["--agent", "assistent", "--label", "ideoloog",
+              "--brief", "missies/ideoloog_brief.md"], "timeout": 1800,
+     "omschrijving": "Politieke kleurmeter — richting-signalen (uit)",
+     "default": {"eenheid": "dag", "elke": 30, "aan": False}},
+    {"naam": "doelgroep", "label": "doelgroep", "soort": "runner",
+     "spec": ["--agent", "assistent", "--label", "doelgroep",
+              "--brief", "missies/doelgroep_brief.md"], "timeout": 1800,
+     "omschrijving": "Welstandsmeter + bereikmeter (uit)",
+     "default": {"eenheid": "dag", "elke": 30, "aan": False}},
+    # Voorspellingen: de eerste deadline is 2027-03-01; tot dan is er niets te resolven
+    {"naam": "resolutie", "label": "voorspelling-resolutie", "soort": "leesagent",
+     "spec": ["--geen-token", "--label", "voorspelling-resolutie",
+              "--brief", "missies/voorspelling_resolutie_brief.md"], "timeout": 1800,
+     "omschrijving": "Voorspelling-resolutie-voorstellen (uit tot de eerste deadline)",
+     "default": {"eenheid": "dag", "elke": 30, "aan": False}},
+    {"naam": "voorspellingen-regen", "label": "voorspellingen-regen", "soort": "script",
+     "spec": ["scripts/voorspellingen.py"], "timeout": 600,
+     "omschrijving": "Brier-kalibratie herrekenen (geen claude; uit tot de eerste deadline)",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
 ]
 
 AGENT_BY_LABEL = {a["label"]: a for a in AGENTS}

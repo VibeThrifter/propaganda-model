@@ -1,48 +1,44 @@
 #!/usr/bin/env python3
-"""Automatische beoordeling — één beoordelingsronde zonder mens (eigenaarsbesluit
-2026-10-06: "ik ga niks handmatig beoordelen"; vervolg dezelfde dag: "haal de mens uit de
-loop en laat agents alles doen in het propagandamodel").
+"""Automatische beoordeling — de ene ronde (elk uur) waarin agents alles beslissen wat in het
+propagandamodel binnenkomt of al staat (eigenaarsbesluit 2026-10-06: "ik ga niks handmatig
+beoordelen"; "niks door mensen, alles door agents"; opgeschoond 2026-10-07: "gestroomlijnd,
+duidelijk, en er mogen geen gaten vallen").
 
-Wat agents voorstellen ('voorgesteld') wordt hier beslist, via de bestaande poorten, en wat
-al in het model staat wordt gecontroleerd en zo nodig van een bron voorzien:
+Elk stuk werk eindigt in een eindtoestand, met de reden in edit_log; een mens kan alles
+terugdraaien (heropenen, intrekken), maar niemand hoeft iets te doen. Per ronde, in deze
+volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
 
-0. **Bronzoeker** (scripts/bronzoeker.py): argumenten zonder (goede) bron krijgen er een
-   via een revisie, als de zoeker een bron vindt waarin het script het citaat letterlijk
-   terugvindt. De revisie gaat hierna door A1 en A7 als elk ander voorstel.
-1. **A1 — bronchecker** (scripts/bronchecker.py): elke voorgestelde evidentiële root en
-   elke ondergraving wordt onafhankelijk tegen de echte bron gecontroleerd. Daarna:
-   wat de beoordeling verwierp op een te streng oordeel van bronchecker v1 opnieuw (en
-   heropend als de bron nu wel bevestigd is), en gemergede argumenten die nooit
-   gecontroleerd zijn (``--max-controle`` per ronde, wat het nieuws toont eerst).
-2. **A2 — aanklager**: staan er invloedsclaims klaar die de bronchecker op 'klopt' zette
-   maar die nog geen tegenspraak hadden, dan één ronde van de aanklager-agent (Opus) —
-   hooguit ``--a2-rondes-per-dag`` per dag en alleen binnen de actieve uren. Neutrale
-   structuurfeiten hebben geen A2 nodig.
-3. **A7 — mergen** via ``POST /api/arguments/<id>/auto_merge`` (merge-service): de server
-   checkt het predikaat zelf (A1 ∧ A2 ∧ dedup ∧ citatiepoort ∧ smaad-firewall, met de twee
-   routes van 2026-10-06 voor structuurfeiten en ondergravingen).
-   **Verificatie**: gemergede argumenten krijgen hun status van het onafhankelijke
-   A1-oordeel via ``POST /api/beoordeling/verificatie/<id>``: 'geverifieerd' als de bron de
-   bewering draagt, 'bronvermelding_nodig' als ze dat aantoonbaar niet doet (dan zoekt de
-   bronzoeker een betere). Een statusbesluit van een mens blijft staan.
-4. **Relaties en entiteiten** met gecontroleerd bewijs gaan de graaf in via
-   ``POST /api/beoordeling/autokeur/<tabel>/<id>`` (entiteiten eerst).
-5. **Opruimen** (status-PATCH door merge-service, altijd met reden, terug te draaien met
-   heropenen/intrekken):
-   - wat de bronchecker 'klopt-niet' gaf: de bron draagt de bewering niet, of het bezwaar
-     houdt geen stand → verworpen;
-   - wat na de wachttijd (``--wachttijd-dagen``, standaard 14) nog niet door de poort komt
-     → verworpen (argumenten) of afgewezen (relaties, entiteiten). Een argument dat alleen
-     nog op een A2-ronde wacht, krijgt die wachttijd vanaf zijn A1-oordeel.
-   Nooit opgeruimd: kandidaat-relaties zonder mechanisme en RfC's (die beslissen agents nu
-   zelf, zie hieronder).
-6. **Agents doen alles** (eigenaarsbesluit 2026-10-06, vervolg): de **smaadtoets**
-   (scripts/smaadtoets.py, Opus) toetst persoonsclaims — feitelijk, gedragen door de bron,
-   over de publieke rol → smaad_hold eraf en de gewone poorten; anders teruggekoppeld (verworpen
-   met de reden); de **mechanisme-toewijzer** geeft kandidaat-verbanden een mechanisme; twee
-   **RfC-beoordelaars** (rfc-toetser, rfc-criticus) reviewen open voorstellen, waarna
-   ``POST /api/beoordeling/rfc/<id>`` aanneemt of afwijst. A7 beslist ook over duiding,
-   aspecten, theorie-argumenten en steunende reacties (A1 én A2).
+1. **Bronzoeker** (scripts/bronzoeker.py): een bron waar die ontbreekt of niet volstaat — een
+   vervangend voorstel voor een voorgesteld argument met 'twijfel'/'klopt-niet', een steunend
+   argument voor een verband zonder argument, een revisie van gemerged werk.
+2. **A1 — bronchecker** (scripts/bronchecker.py): elk nieuw voorstel (ook wat stap 1 net
+   indiende) en ``--max-controle`` gemergede argumenten die nooit gecontroleerd zijn, wat het
+   nieuws toont eerst: haalt de bron op, zoekt het citaat letterlijk terug, en een model zegt
+   of de bron de bewering draagt.
+3. **Smaadtoets** (scripts/smaadtoets.py, Opus): claims over personen — feitelijk, gedragen
+   door de bron, over de publieke rol? Dan smaad_hold eraf en de gewone poorten; zo niet,
+   dan teruggekoppeld (stap 11 en 12). Eigen afwijzingen die een nieuw 'klopt'/'feitelijk'
+   kregen, gaan terug naar 'voorgesteld' (heropenen).
+4. **A2 — aanklager** (Opus, ``--a2-rondes-per-dag``, binnen de actieve uren) voor wat A1 én
+   zo nodig de smaadtoets doorstond en een tegenstander nodig heeft (geen structuurfeit,
+   ondergraving of bronrevisie).
+5. **A7 — mergen** (``POST /api/arguments/<id>/auto_merge``, merge-service): de server checkt
+   het predikaat zelf.
+6. **Verificatie** (``POST /api/beoordeling/verificatie/<id>``): gemerged werk krijgt zijn
+   status van het onafhankelijke A1-oordeel ('geverifieerd' / 'bronvermelding_nodig').
+7. **Mechanismen** (scripts/mechanisme_toewijzer.py): een kandidaat-verband krijgt een
+   mechanisme, of wordt afgewezen als het buiten het model valt.
+8. **RfC's** (scripts/rfc_beoordeling.py): twee agents reviewen, de beoordeling beslist.
+9. **Bronklassen** (scripts/bronklasse.py): twee onafhankelijke oordelen over de
+   betrouwbaarheid en het onderwerp van een bron; bij verschil de voorzichtigste.
+10. **Goedkeuren**: relaties en entiteiten met gecontroleerd bewijs gaan de graaf in.
+11. **Opruimen** (status-PATCH door merge-service, altijd met reden): wat de bron niet draagt
+    en niet te repareren is (na de poging van de bronzoeker), wat de smaadtoets terugkoppelde,
+    en wat na ``--wachttijd-dagen`` (14) nog niet door de poort komt.
+12. **Feitelijke versies**: wat de smaadtoets terugkoppelde, komt in zijn feitelijke vorm
+    opnieuw binnen (en gaat weer langs alle controles).
+13. **Archiveren** (scripts/archiveer_bronnen.py): ``--max-archief`` nieuwe bronnen naar de
+    Wayback Machine, zodat de bronchecker ze ook later nog kan lezen.
 
 Eén ronde tegelijk (lock). Logboek: data/automatische_beoordeling_log.jsonl.
 
@@ -59,6 +55,7 @@ import difflib
 import fcntl
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -71,6 +68,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import bronchecker  # noqa: E402
+import bronklasse  # noqa: E402
 import bronzoeker  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
 import rfc_beoordeling  # noqa: E402
@@ -80,6 +78,7 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 API = "http://127.0.0.1:5000"
 MERGE_TOKEN = ROOT / "data" / "tokens" / "merge-service.token"
 LOG_PATH = ROOT / "data" / "automatische_beoordeling_log.jsonl"
+AUTO_MERGE_LOG = ROOT / "data" / "auto_merge_log.json"
 LOCK_PATH = ROOT / "data" / "locks" / "automatische-beoordeling.lock"
 RUNS_JSONL = ROOT / "data" / "agent_runs.jsonl"
 CLAUDE = shutil.which("claude") or "/usr/local/bin/claude"
@@ -231,7 +230,9 @@ def stap_a2(wachtrij, args, meld) -> dict:
 
 
 def stap_mergen(token, args, meld) -> dict:
-    """A7 over alle voorgestelde argumenten: roots eerst, dan reacties."""
+    """A7 over alle voorgestelde argumenten: roots eerst, dan reacties. Schrijft de stand per
+    argument (bucket + redenen) naar data/auto_merge_log.json, dat het toezicht op /beheer en
+    de wachtrij op /overleg tonen (vroeger schreef scripts/auto_merge_service.py dat)."""
     conn = db()
     try:
         ids = [r["id"] for r in conn.execute("""
@@ -240,6 +241,8 @@ def stap_mergen(token, args, meld) -> dict:
     finally:
         conn.close()
     tel = {"gemerged": 0, "buckets": {}}
+    stand = {}
+    nu = datetime.datetime.now().isoformat(timespec="seconds")
     for arg_id in ids:
         if args.droog:
             continue
@@ -250,15 +253,23 @@ def stap_mergen(token, args, meld) -> dict:
             break
         if status == 200 and antwoord.get("merged"):
             tel["gemerged"] += 1
+            bucket = "auto-gemerged"
         else:
             bucket = antwoord.get("bucket") or f"http-{status}"
             tel["buckets"][bucket] = tel["buckets"].get(bucket, 0) + 1
+        stand[f"arg:{arg_id}"] = {"bucket": bucket, "redenen": antwoord.get("redenen") or [],
+                                  "ts": nu}
+    if not args.droog and not tel.get("uit"):
+        tijdelijk = AUTO_MERGE_LOG.with_suffix(".tmp")
+        tijdelijk.write_text(json.dumps(stand, ensure_ascii=False, indent=1), encoding="utf-8")
+        tijdelijk.replace(AUTO_MERGE_LOG)
     meld(f"A7: {tel['gemerged']} argument(en) gemerged")
     return tel
 
 
 def stap_bronzoeken(args, meld) -> dict:
-    """Bronnen zoeken voor argumenten zonder (goede) bron; wat standhoudt wordt een revisie."""
+    """Een bron waar die ontbreekt of niet volstaat: een vervangend voorstel, een steunend
+    argument voor een verband zonder argument, of een revisie van gemerged werk."""
     if args.zonder_bronzoeker or args.max_zoek <= 0:
         return {"gestart": False, "reden": "uitgezet"}
     if not args.droog and not bronzoeker.DEFAULT_TOKEN.exists():
@@ -405,6 +416,39 @@ def stap_rfc(token, args, meld) -> dict:
     return tel
 
 
+def stap_bronklassen(token, args, meld) -> dict:
+    """Bronklassen door agents: twee onafhankelijke oordelen, bij verschil de voorzichtigste."""
+    if args.max_bronklasse <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    return bronklasse.draai(token=token, max_n=args.max_bronklasse, droog=args.droog,
+                            meld=meld)
+
+
+ARCHIEF_KLAAR = re.compile(r"Klaar: (\d+) bestaande snapshot\(s\) geregistreerd, (\d+) vers "
+                           r"aangevraagd, (\d+) zonder snapshot, (\d+) door fout")
+
+
+def stap_archiveren(args, meld) -> dict:
+    """Nieuwe bronnen naar de Wayback Machine (bestaande snapshot registreren, anders een verse
+    aanvragen), hooguit ``--max-archief`` per ronde: de bronchecker leest een verdwenen pagina
+    uit het archief."""
+    if args.max_archief <= 0 or args.droog:
+        return {"gestart": False, "reden": "uitgezet" if args.max_archief <= 0 else "droog"}
+    cmd = [sys.executable, str(ROOT / "scripts" / "archiveer_bronnen.py"), "--save",
+           "--limit", str(args.max_archief), "--nieuwste-eerst", "--overslaan-dagen", "7"]
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                           timeout=args.archief_timeout)
+    except subprocess.TimeoutExpired:
+        meld("Archief: time-out (de volgende ronde gaat verder)")
+        return {"gestart": True, "timeout": True}
+    m = ARCHIEF_KLAAR.search(r.stdout or "")
+    tel = ({"gevonden": int(m[1]), "aangevraagd": int(m[2]), "zonder": int(m[3]),
+            "fout": int(m[4])} if m else {"exit": r.returncode})
+    meld(f"Archief: {tel}")
+    return tel
+
+
 FEITELIJKE_VERSIE = "Feitelijke versie van #{id} na de smaadtoets"
 
 
@@ -497,10 +541,52 @@ def stap_goedkeuren(token, args, meld) -> dict:
     return tel
 
 
+def motivatie_voor(a: dict, *, wacht_a2, wacht_zoeker, pogingen, wachttijd, nu):
+    """Het opruimbesluit voor één voorgesteld argument → (motivatie of None, waarop het nog
+    wacht of None). Eerst repareren, dan beslissen: wat de bron niet (volledig) draagt, krijgt
+    eerst een poging van de bronzoeker (als die het kan repareren) en wordt daarna meteen
+    verworpen — met de vervanger erbij, of de reden waarom er geen is. Dode wachttijd is er
+    alleen nog voor wat op de aanklager wacht (A2-budget)."""
+    detail = (a["a1_detail"] or "").replace("[bronchecker] ", "").strip()
+    if a["smaad"] == "niet_feitelijk":
+        return (f"{REDEN}: teruggekoppeld door de smaadtoets — {a['smaad_reden']}"
+                + (f" Feitelijk zou zijn: {a['smaad_herformulering']}"
+                   if a["smaad_herformulering"] else "")), None
+    if a["a1"] in ("klopt-niet", "twijfel"):
+        if a["id"] in wacht_zoeker:
+            return None, "bronzoeker"
+        poging = pogingen.get(str(a["id"])) or {}
+        if poging.get("uitkomst") == "gevonden" and poging.get("nieuw_id"):
+            return (f"{REDEN}: vervangen door #{poging['nieuw_id']} — de bronzoeker vond een "
+                    f"bron die het wel draagt (de bronchecker: {detail})"), None
+        if a["parent_argument_id"] and a["a1"] == "klopt-niet":
+            return f"{REDEN}: het bezwaar houdt geen stand — {detail}", None
+        waarom = ("de bron draagt de bewering niet" if a["a1"] == "klopt-niet"
+                  else "de bron bevestigt het niet volledig")
+        zonder = ("; de bronzoeker vond geen betere bron" if poging.get("uitkomst") == "niets"
+                  else "")
+        return f"{REDEN}: {waarom} — {detail}{zonder}", None
+    if a["id"] in wacht_a2:
+        if leeftijd_dagen(startmoment(a["a1_op"], a["heropend_op"]), nu) >= wachttijd:
+            return (f"{REDEN}: kreeg binnen {wachttijd} dagen geen tegenspraak-certificaat "
+                    "— opgeschoond"), None
+        return None, "aanklager"
+    if leeftijd_dagen(startmoment(a["created_at"], a["heropend_op"]), nu) >= wachttijd:
+        waarom = {"klopt": ("de aanklager viel het aan (tegenbewijs of een ondergraving)"
+                            if a["a2"] == "aangevallen"
+                            else "het komt (nog) niet door de immuunpoort")}.get(
+            a["a1"], "het valt buiten wat automatisch te controleren is")
+        return (f"{REDEN}: na {wachttijd} dagen niet te bevestigen — {waarom}; "
+                "opgeschoond"), None
+    return None, None
+
+
 def stap_opruimen(token, args, meld) -> dict:
     """Verwerp wat aantoonbaar niet klopt of na de wachttijd niet door de poort komt."""
     nu = datetime.datetime.now()
-    tel = {"verworpen": 0, "afgewezen": 0, "wacht_op_a2": 0}
+    tel = {"verworpen": 0, "afgewezen": 0, "wacht_op_a2": 0, "wacht_op_bronzoeker": 0}
+    zoeker_aan = not args.zonder_bronzoeker and args.max_zoek > 0
+    pogingen = bronzoeker.laad_pogingen() if zoeker_aan else {}
     conn = db()
     try:
         args_rijen = [dict(r) for r in conn.execute("""
@@ -529,42 +615,29 @@ def stap_opruimen(token, args, meld) -> dict:
         wacht_a2 = {r["id"]: r for r in a2_wachtrij(conn)}
         # Nog niet door de bronchecker bekeken (boven --max-bron): eerst controleren
         ongecontroleerd = {r["id"] for r in bronchecker.kandidaten(conn)}
+        # Wat de bronzoeker nog moet proberen: eerst repareren, dan beslissen
+        wacht_zoeker = bronzoeker.wacht_op_zoeker(conn, pogingen) if zoeker_aan else set()
+        verband_wacht = ({r["relation_id"] for r in bronzoeker.verbanden_zonder_argument(conn)
+                          if (pogingen.get(f"relatie:{r['relation_id']}") or {}).get(
+                              "uitkomst") in (None, "fout")} if zoeker_aan else set())
         # Doelen waarvan het bewijs nog in behandeling is: niet afwijzen
-        bezig = ongecontroleerd | set(wacht_a2)
+        bezig = ongecontroleerd | set(wacht_a2) | wacht_zoeker
         doelen_bezig = {("relations", r["relation_id"]) for r in conn.execute(
             f"SELECT relation_id FROM arguments WHERE id IN ({','.join('?' * len(bezig))})",
             list(bezig)) if r["relation_id"]} if bezig else set()
+        doelen_bezig |= {("relations", rid) for rid in verband_wacht}
     finally:
         conn.close()
     for a in args_rijen:
-        motivatie = None
         if a["id"] in ongecontroleerd and a["smaad"] != "niet_feitelijk":
             continue
-        detail = (a["a1_detail"] or "").replace("[bronchecker] ", "").strip()
-        if a["smaad"] == "niet_feitelijk":
-            motivatie = (f"{REDEN}: teruggekoppeld door de smaadtoets — {a['smaad_reden']}"
-                         + (f" Feitelijk zou zijn: {a['smaad_herformulering']}"
-                            if a["smaad_herformulering"] else ""))
-        elif a["a1"] == "klopt-niet":
-            motivatie = (f"{REDEN}: het bezwaar houdt geen stand — {detail}"
-                         if a["parent_argument_id"] else
-                         f"{REDEN}: de bron draagt de bewering niet — {detail}")
-        elif a["id"] in wacht_a2:
-            if leeftijd_dagen(startmoment(a["a1_op"], a["heropend_op"]),
-                              nu) >= args.wachttijd_dagen:
-                motivatie = (f"{REDEN}: kreeg binnen {args.wachttijd_dagen} dagen geen "
-                             "tegenspraak-certificaat — opgeschoond")
-            else:
-                tel["wacht_op_a2"] += 1
-        elif leeftijd_dagen(startmoment(a["created_at"], a["heropend_op"]),
-                            nu) >= args.wachttijd_dagen:
-            waarom = {"twijfel": f"de bron bevestigt het niet volledig ({detail})",
-                      "klopt": ("de aanklager viel het aan (tegenbewijs of een ondergraving)"
-                                if a["a2"] == "aangevallen"
-                                else "het komt (nog) niet door de immuunpoort")}.get(
-                a["a1"], "het valt buiten wat automatisch te controleren is")
-            motivatie = (f"{REDEN}: na {args.wachttijd_dagen} dagen niet te bevestigen — "
-                         f"{waarom}; opgeschoond")
+        motivatie, wacht = motivatie_voor(a, wacht_a2=wacht_a2, wacht_zoeker=wacht_zoeker,
+                                          pogingen=pogingen, wachttijd=args.wachttijd_dagen,
+                                          nu=nu)
+        if wacht == "aanklager":
+            tel["wacht_op_a2"] += 1
+        elif wacht == "bronzoeker":
+            tel["wacht_op_bronzoeker"] += 1
         if not motivatie:
             continue
         if not args.droog:
@@ -619,7 +692,8 @@ def stap_opruimen(token, args, meld) -> dict:
                     continue
             tel["afgewezen"] += 1
     meld(f"Opgeruimd: {tel['verworpen']} argument(en) verworpen, {tel['afgewezen']} "
-         f"relatie(s)/entiteit(en) afgewezen; {tel['wacht_op_a2']} wachten op de aanklager")
+         f"relatie(s)/entiteit(en) afgewezen; {tel['wacht_op_a2']} wachten op de aanklager, "
+         f"{tel['wacht_op_bronzoeker']} op de bronzoeker")
     return tel
 
 
@@ -638,31 +712,20 @@ def ronde(args, meld=print) -> dict:
     t0 = time.monotonic()
     uitkomst = {"start": datetime.datetime.now().isoformat(timespec="seconds"),
                 "droog": bool(args.droog)}
-    # Argumenten zonder (goede) bron: wat de bronzoeker vindt, komt als revisie mee in A1/A7
+    # 1. Repareren: een bron waar die ontbreekt of niet volstaat (wat de bronzoeker indient,
+    #    controleert stap 2 nog in dezelfde ronde)
     uitkomst["bronzoeker"] = stap_bronzoeken(args, meld)
+    # 2. A1: elk nieuw voorstel, en gemerged werk dat nooit gecontroleerd is (nieuws eerst)
     uitkomst["a1"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
                                        parallel=args.parallel, meld=meld)
-    # Twijfelgevallen van bronchecker v1 nog één keer met v2 (eigen oordeel herzien)
-    uitkomst["a1_herzien"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
-                                               parallel=args.parallel, herzien=True, meld=meld)
-    # Wat op een v1-oordeel verworpen werd, of na 14 dagen zonder dat een poort besliste:
-    # opnieuw (heropend wordt hieronder, na de smaadtoets)
-    uitkomst["a1_heropenen"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
-                                                 parallel=args.parallel, modus="heropenen",
-                                                 meld=meld)
-    uitkomst["a1_buiten"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
-                                              parallel=args.parallel, modus="buiten", meld=meld)
-    # Wat al gemerged is maar nooit gecontroleerd (wat het nieuws toont eerst)
     uitkomst["a1_controle"] = bronchecker.draai(max_n=args.max_controle, droog=args.droog,
                                                 parallel=args.parallel, modus="controle",
                                                 meld=meld)
-    # Wat eerder strandde op een onleesbare pdf (nu leesbaar via PDFKit)
-    uitkomst["a1_pdf"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
-                                           parallel=args.parallel, modus="pdf", meld=meld)
-    # Smaad-firewall door een agent: persoonsclaims met een bevestigde bron toetsen
+    # 3. Smaad-firewall door een agent, en eigen afwijzingen terug na een nieuw 'klopt'
     uitkomst["smaadtoets"] = stap_smaadtoets(args, meld)
     uitkomst["smaad_vrijgegeven"] = stap_smaad_vrijgeven(token, args, meld)
     uitkomst["heropend"] = stap_heropenen(token, args, meld)
+    # 4. A2: de aanklager
     conn = db()
     try:
         wachtrij = a2_wachtrij(conn)
@@ -673,16 +736,19 @@ def ronde(args, meld=print) -> dict:
         # Wat de aanklager aanviel of indiende, kan nu zelf een A1 nodig hebben
         uitkomst["a1_na_a2"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
                                                  parallel=args.parallel, meld=meld)
+    # 5–10. Beslissen
     uitkomst["a7"] = stap_mergen(token, args, meld)
     uitkomst["verificatie"] = stap_verifieren(token, args, meld)
-    # Kandidaat-verbanden en RfC's: ook door agents beslist
     uitkomst["mechanismen"] = stap_mechanismen(args, meld)
     uitkomst["rfc"] = stap_rfc(token, args, meld)
+    uitkomst["bronklassen"] = stap_bronklassen(token, args, meld)
     uitkomst["goedgekeurd"] = stap_goedkeuren(token, args, meld)
+    # 11–12. Opruimen, en wat de smaadtoets terugkoppelde in zijn feitelijke vorm opnieuw
     if not args.zonder_opruimen:
         uitkomst["opgeruimd"] = stap_opruimen(token, args, meld)
-    # Wat de smaadtoets terugkoppelde, komt in zijn feitelijke vorm opnieuw binnen
     uitkomst["feitelijke_versies"] = stap_feitelijke_versies(args, meld)
+    # 13. Nieuwe bronnen archiveren (zodat de bronchecker ze later nog kan lezen)
+    uitkomst["archief"] = stap_archiveren(args, meld)
     uitkomst["gemerged"] = uitkomst["a7"]["gemerged"]
     uitkomst["duur_s"] = round(time.monotonic() - t0)
     if not args.droog:
@@ -715,6 +781,11 @@ def main():
                     help="hooguit zoveel kandidaat-verbanden per ronde (0 = uit)")
     ap.add_argument("--max-rfc", type=int, default=3,
                     help="hooguit zoveel open RfC's per ronde laten reviewen (0 = uit)")
+    ap.add_argument("--max-bronklasse", type=int, default=160,
+                    help="hooguit zoveel bronnen per ronde classificeren (0 = uit)")
+    ap.add_argument("--max-archief", type=int, default=10,
+                    help="hooguit zoveel bronnen per ronde archiveren (0 = uit)")
+    ap.add_argument("--archief-timeout", type=int, default=900)
     ap.add_argument("--parallel", type=int, default=3)
     ap.add_argument("--zonder-a2", action="store_true", help="geen aanklager-ronde starten")
     ap.add_argument("--a2-rondes-per-dag", type=int, default=4)

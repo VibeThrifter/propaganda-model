@@ -7334,11 +7334,14 @@ def verificatie_besluit(conn, arg_id):
     if redenen:
         return None, redenen, None
     if a1["verdict"] == "klopt":
+        # Een ondergraving (bezwaar tegen de bron van haar parent) leunt op die bron: de A1
+        # toetste het bezwaar daartegen, dus telt de citatiepoort ook de citaties van de parent
+        bezwaar = arg["parent_argument_id"] is not None and arg["stance"] == "contradicting"
         n_echt = conn.execute("""
-            SELECT COUNT(*) FROM citations c WHERE c.argument_id = ? AND (
+            SELECT COUNT(*) FROM citations c WHERE c.argument_id IN (?, ?) AND (
                 (c.quote IS NOT NULL AND TRIM(c.quote) <> '')
                 OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id))
-            """, (arg_id,)).fetchone()[0]
+            """, (arg_id, arg["parent_argument_id"] if bezwaar else arg_id)).fetchone()[0]
         if not n_echt:
             return None, ["citatiepoort: geen echte bron (quote óf vindplaats)"], None
         return ("geverifieerd", [], f"{VERIFICATIE_REDEN_PREFIX}: de bron draagt de bewering "

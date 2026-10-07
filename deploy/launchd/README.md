@@ -17,18 +17,14 @@ ernaar, dus die moet draaien).
 | Label | Cadans | Wat |
 |---|---|---|
 | `nl.propaganda.server` | KeepAlive (altijd aan) | `server.py` op `127.0.0.1:5000` |
-| `nl.propaganda.agent-verificatie` | elke 1 dag | A1 herverificatie |
-| `nl.propaganda.agent-aanklager` | elke 1 dag | A2 tegenspraak |
-| `nl.propaganda.agent-monitor` | elke 7 dagen | drogreden-/logica-controle |
-| `nl.propaganda.agent-documentalist` | elke 7 dagen | bron-suggesties |
-| `nl.propaganda.agent-scout` | elke 90 dagen | nieuwe entiteiten/relaties |
-| `nl.propaganda.agent-criticus` | elke 90 dagen | red team |
-| `nl.propaganda.agent-ideoloog` | elke 30 dagen | politieke kleurmeter |
-| `nl.propaganda.agent-doelgroep` | elke 30 dagen | welstand + bereik |
-| `nl.propaganda.agent-reviewbeoordelaar` | elke 1 dag | review-advies (alleen-lezen) |
-| `nl.propaganda.agent-resolutie` | elke 30 dagen | voorspelling-resolutie (alleen-lezen) |
-| `nl.propaganda.agent-archiveer` | elke 1 dag | Wayback-archivering (C3) |
-| `nl.propaganda.agent-voorspellingen-regen` | elke 7 dagen | Brier-kalibratie |
+| `nl.propaganda.agent-automatische-beoordeling` | elk uur | de ronde die alles beslist (bronzoeker, bronchecker, smaadtoets, aanklager, immuunpoort, verificatie, mechanismen, RfC's, bronklassen, goedkeuren, opruimen, archiveren) |
+| `nl.propaganda.agent-nieuws-scout` | elke 2 uur (max 6/dag, 08–22) | namen uit het nieuws uitzoeken |
+| `nl.propaganda.agent-nieuws-bewijs` | elke 2 uur (max 3/dag, 08–22) | bewijs voor dun onderbouwde verbanden uit het nieuws |
+
+Opgeschoond 2026-10-07: de losse verificatie-agent, de dagelijkse aanklager, documentalist,
+reviewbeoordelaar, archiveer en nieuws-autokeur zijn vervangen door stappen van de
+automatische beoordeling; monitor, scout, criticus, ideoloog, doelgroep en de voorspellingen
+staan uit (aan te zetten op `/beheer`). `agent_schedule.py` is de enige lijst.
 
 Het schema is een **interval** (launchd `StartInterval`): elke X minuten/uur/dagen. Dit
 zijn de defaults — bewerk ze per agent op `/beheer` (zie hieronder). launchd vuurt elke
@@ -92,11 +88,8 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/nl.propaganda.agent-scou
 python3 deploy/launchd/genereer_launchd.py --verwijderen
 ```
 
-De **auto-merge** is een aparte schakelaar (niet in deze set): de env-noodrem
-`PROPAGANDA_AUTO_MERGE=0` op de server-plist, en de C2-loop
-(`scripts/auto_merge_service.py`) draai je apart. Zet die pas aan met een
-eigenaars-sign-off — draai eerst een tijd met de agents en beoordeel de wachtrij met
-de hand op `/overleg`.
+Het **mergen** gebeurt in de automatische beoordeling (stap 5, account `merge-service`);
+de env-noodrem `PROPAGANDA_AUTO_MERGE=0` op de server-plist zet het uit.
 
 ## Waarom `--skip-permissions`
 

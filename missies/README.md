@@ -16,9 +16,10 @@ laadt het agent-token, bouwt de missie-prompt (verwijzing naar de brief + het ac
 die naar `missies/logs/` tee't. De agent *is* een Claude Code-sessie, dus "schedulen"
 = per ronde één headless invocatie plannen — geen aparte daemon.
 
-- **Cadans & installatie:** `deploy/systemd/` (per agent een `.service` + `.timer`,
-  met de cadans-tabel in `deploy/systemd/README.md`) of de frictieloze fallback
-  `deploy/crontab`. LinkedIn-scrapen heeft geen eigen timer; onbewaakt gebruik (alleen
+- **Cadans & installatie:** `agent_schedule.py` is de enige lijst van wat er draait (op
+  deze Mac via launchd: `deploy/launchd/genereer_launchd.py --geen-server --laden`; op een
+  VPS `deploy/systemd/`). Sinds 2026-10-07 draaien alleen de automatische beoordeling (elk
+  uur; zij start de aanklager zelf), `nieuws-scout` en `nieuws-bewijs`. LinkedIn-scrapen heeft geen eigen timer; onbewaakt gebruik (alleen
   door de `nieuws-scout`) loopt uitsluitend achter de snelheidsrem
   `tools/linkedin/snelheidsrem.py` (beleid J4, gewijzigd 2026-09-30).
 - **Droogloop (post niets):**
@@ -27,7 +28,8 @@ die naar `missies/logs/` tee't. De agent *is* een Claude Code-sessie, dus "sched
 - **Handmatig één ronde forceren** kan met hetzelfde commando zónder `--dry-run`.
 
 Elke ronde: de agent logt in `missies/logs/` (zie hieronder) en dient alle
-bevindingen in via de API; een mens reviewt/merget daarna. De runner voegt exit-code,
+bevindingen in via de API; de automatische beoordeling beslist daarna, elk uur, met
+onafhankelijke controles (niemand beoordeelt met de hand, eigenaarsbesluit 2026-10-06). De runner voegt exit-code,
 duur en oogst (edit_log-delta) als footer aan het log toe en schrijft een run-record
 naar `data/agent_runs.jsonl` (gitignored, C4-toezicht).
 
@@ -108,10 +110,10 @@ De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 claim de aanval `overleefde` via `POST /api/arguments/<id>/tegenspraak`. Beide oordelen
 leven in de procestabel `immuun_oordelen`, tellen **nergens** in de score, en voeden
 alléén de auto-merge-poort (A7). Vertrouwen komt hier niet uit consensus maar uit
-**onafhankelijkheid**: indiener, verificatie-agent en aanklager draaien elk onder een
-**andere modelfamilie-`provenance`** (decorrelatie). **De accounts `verificatie-agent`
-en `aanklager-agent` moeten nog worden aangemaakt** — de coördinator doet dat na de
-schema-migratie (`migrate_immuunsysteem.py`), om DB-locks te vermijden.
+**onafhankelijkheid**: indiener, A1 en aanklager draaien elk onder een ander account
+(decorrelatie). Sinds 2026-10-06 doet het script `scripts/bronchecker.py` (account
+`bronchecker`) de A1 in de automatische beoordeling, en start die ronde de aanklager zelf
+als er werk voor hem is; de `verificatie-agent`-missie draait niet meer.
 
 **De publieke lead-intake (Deel D2).** De `lead-corroboratie-agent`
 (`lead_corroboratie_brief.md`, D2.2) werkt de publieke lead-quarantaine (`GET /api/leads`,

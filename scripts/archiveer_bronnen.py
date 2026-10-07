@@ -157,17 +157,36 @@ def vraag_snapshot_aan(url):
     return None
 
 
-def bronnen_zonder_archief(conn):
+def bronnen_zonder_archief(conn, nieuwste_eerst=False):
     """Per bron zonder archive_url-rij de eerste url-vindplaats."""
-    return conn.execute("""
+    return conn.execute(f"""
         SELECT s.id AS source_id, s.title, l.location AS url
         FROM sources s
         JOIN source_locations l ON l.source_id = s.id AND l.location_type = 'url'
         WHERE NOT EXISTS (SELECT 1 FROM source_locations a
                           WHERE a.source_id = s.id AND a.location_type = 'archive_url')
         GROUP BY s.id
-        ORDER BY s.id
-    """).fetchall()
+        ORDER BY s.id {'DESC' if nieuwste_eerst else ''}
+    """).fetchall()  # noqa: S608 - vaste volgorde
+
+
+def recent_behandeld(dagen, nu=None, pad=None):
+    """Bron-id's die een run in de laatste ``dagen`` dagen al behandelde (data/archiveer_log.jsonl):
+    een bron die Save Page Now weigert, houdt zo niet elke run de rest tegen."""
+    grens = (nu or datetime.datetime.now()) - datetime.timedelta(days=dagen)
+    ids = set()
+    try:
+        regels = Path(pad or LOG_PATH).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ids
+    for regel in regels:
+        try:
+            rec = json.loads(regel)
+            if datetime.datetime.fromisoformat(rec["datum"]) >= grens:
+                ids.update(rec.get("source_ids") or [])
+        except (ValueError, KeyError, TypeError):
+            continue
+    return ids
 
 
 def registreer(conn, source_id, snapshot, dry_run):
@@ -191,6 +210,10 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="niets schrijven (preview)")
     parser.add_argument("--tel", action="store_true",
                         help="alleen het gearchiveerd-percentage tonen (geen netwerk, geen schrijf)")
+    parser.add_argument("--nieuwste-eerst", action="store_true",
+                        help="nieuwe bronnen eerst (de automatische beoordeling, elk uur)")
+    parser.add_argument("--overslaan-dagen", type=int, default=0,
+                        help="sla bronnen over die een run in de laatste N dagen al behandelde")
     args = parser.parse_args()
 
     conn = sqlite3.connect(args.db)
@@ -207,7 +230,10 @@ def main():
 
     pct_voor = toon_stand(conn, prefix="Voor:  ")
 
-    werk = bronnen_zonder_archief(conn)
+    werk = bronnen_zonder_archief(conn, nieuwste_eerst=args.nieuwste_eerst)
+    if args.overslaan_dagen > 0:
+        recent = recent_behandeld(args.overslaan_dagen)
+        werk = [rij for rij in werk if rij["source_id"] not in recent]
     if args.limit:
         werk = werk[:args.limit]
     print(f"{len(werk)} bron(nen) zonder archive_url in deze run"

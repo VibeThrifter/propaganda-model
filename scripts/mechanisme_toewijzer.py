@@ -8,8 +8,14 @@ mechanisme dat het verband beschrijft — met de precedenten (welke mechanismen 
 relaties van hetzelfde type hebben) bovenaan — of zegt dat er geen past. Een keuze gaat via
 POST /api/beoordeling/mechanisme/<id> (merge-service; de server checkt dat het een kandidaat
 is en het mechanisme bestaat); daarna beslist de gewone bewijspoort over de relatie. Past er
-geen, dan blijft ze kandidaat en komt ze na 30 dagen terug (nieuwe mechanismen komen via
-RfC's, die nu ook door agents beslist worden).
+geen, dan zegt het model ook waarom:
+- het verband valt buiten het model (beschrijvend of organisatorisch, geen invloed op media
+  of nieuws): dan wijst de toewijzer het af (PATCH /api/relations/<id>/status, met de reden;
+  terug te draaien met heraanmelden), zodat het niet eeuwig blijft hangen (opgeschoond
+  2026-10-07);
+- het is wel een invloedspatroon waarvoor het model nog geen mechanisme heeft: dan blijft
+  het een incuberende kandidaat (zoals de orphan-poort bedoelt: een RfC kan het adopteren) en
+  komt het terug na 30 dagen, of eerder zodra er een nieuw mechanisme bij komt.
 
 Gebruik:
     python3 scripts/mechanisme_toewijzer.py --droog --max 5
@@ -47,14 +53,20 @@ SYSTEM_PROMPT = (
     "het mechanisme beschrijft HOE de ene partij de andere beïnvloedt of eraan verbonden is. "
     "Kies alleen een mechanisme waarvan de omschrijving dit verband echt dekt (bron- en "
     "doeltype, richting, soort band); volg bij twijfel de precedenten van hetzelfde relatietype. "
-    "Past er geen, kies dan 0. Antwoord alleen met het gevraagde JSON."
+    "Past er geen, kies dan 0 en zeg met 'buiten_model' of het verband buiten het model valt "
+    "(true: beschrijvend of organisatorisch, zoals een opleiding binnen een universiteit, een "
+    "vakbondsvoorzitter of een fusie van partijen, zonder invloed op media of nieuws) of dat het "
+    "wél een invloedspatroon is waarvoor het model nog geen mechanisme heeft (false). Kies je "
+    "een mechanisme, dan is 'buiten_model' false. Antwoord alleen met het gevraagde JSON."
 )
 SCHEMA = {
     "type": "object",
-    "properties": {"mechanism_id": {"type": "integer"}, "reden": {"type": "string"}},
-    "required": ["mechanism_id", "reden"],
+    "properties": {"mechanism_id": {"type": "integer"}, "buiten_model": {"type": "boolean"},
+                   "reden": {"type": "string"}},
+    "required": ["mechanism_id", "buiten_model", "reden"],
     "additionalProperties": False,
 }
+REDEN = "automatische beoordeling"
 
 
 def db():
@@ -125,8 +137,9 @@ def prompt_voor(conn, rel: dict, alle: list[dict]) -> str:
     for m in alle:
         omschrijving = " ".join((m["description"] or "").split())[:OMSCHRIJVING_TEKENS]
         regels.append(f"#{m['id']} {m['name']} [{m['filter']}]: {omschrijving}")
-    regels.append("\nGeef het id van het mechanisme dat dit verband beschrijft (0 = geen past) en "
-                  "in 'reden' één korte zin waarom.")
+    regels.append("\nGeef het id van het mechanisme dat dit verband beschrijft (0 = geen past), "
+                  "bij 0 of het verband buiten het model valt, en in 'reden' één korte zin "
+                  "waarom.")
     return "\n".join(regels)
 
 
@@ -146,16 +159,31 @@ def kies(rel_id: int) -> dict:
     mid = antwoord["mechanism_id"]
     namen = {m["id"]: m["name"] for m in alle}
     if mid == 0:
-        return {"uitkomst": "geen", "reden": (antwoord.get("reden") or "").strip()}
+        return {"uitkomst": "buiten_model" if antwoord.get("buiten_model") is True else "geen",
+                "reden": (antwoord.get("reden") or "").strip()}
     if mid not in namen:
         return {"uitkomst": "fout", "reden": f"onbekend mechanisme {mid}"}
     return {"uitkomst": "gekozen", "mechanism_id": mid, "mechanisme": namen[mid],
             "reden": (antwoord.get("reden") or "").strip()}
 
 
+def mag_weer(poging: dict | None, nu: datetime.datetime, mech_max: int) -> bool:
+    """Een kandidaat zonder passend mechanisme komt terug na 30 dagen, of eerder zodra er een
+    nieuw mechanisme bij kwam (een RfC die agents aannamen)."""
+    if not poging:
+        return True
+    if mech_max > int(poging.get("mech_max") or mech_max):
+        return True
+    try:
+        op = datetime.datetime.fromisoformat(poging["op"])
+    except (KeyError, ValueError):
+        return True
+    return nu - op >= datetime.timedelta(days=OPNIEUW_NA_DAGEN)
+
+
 def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=12, droog=False, ids=None,
           parallel=2, meld=print) -> dict:
-    """Eén ronde. → {bekeken, gekozen, geen, fout, gezet}."""
+    """Eén ronde. → {bekeken, gekozen, geen, buiten_model, fout, gezet, afgewezen}."""
     token = None
     if not droog:
         token = Path(token_pad).read_text().strip() if Path(token_pad).exists() else None
@@ -166,23 +194,15 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=12, droog=False, id
     conn = db()
     try:
         alle = kandidaten(conn, ids)
+        mech_max = conn.execute("SELECT COALESCE(MAX(id), 0) FROM mechanisms").fetchone()[0]
     finally:
         conn.close()
-
-    def mag(rel):
-        poging = pogingen.get(str(rel["id"]))
-        if ids or not poging:
-            return True
-        try:
-            op = datetime.datetime.fromisoformat(poging["op"])
-        except (KeyError, ValueError):
-            return True
-        return nu - op >= datetime.timedelta(days=OPNIEUW_NA_DAGEN)
-
-    rijen = [r for r in alle if mag(r)][:max_n]
+    rijen = [r for r in alle if ids or mag_weer(pogingen.get(str(r["id"])), nu, mech_max)]
+    rijen = rijen[:max_n]
     meld(f"Mechanisme-toewijzer: {len(rijen)} van {len(alle)} kandidaat-verband(en)"
          f"{' (droog)' if droog else ''}")
-    tel = {"bekeken": 0, "gekozen": 0, "geen": 0, "fout": 0, "gezet": 0}
+    tel = {"bekeken": 0, "gekozen": 0, "geen": 0, "buiten_model": 0, "fout": 0, "gezet": 0,
+           "afgewezen": 0}
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
         toekomst = {pool.submit(kies, r["id"]): r for r in rijen}
         for f in concurrent.futures.as_completed(toekomst):
@@ -204,12 +224,25 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=12, droog=False, id
                     tel["gezet"] += 1
                 else:
                     regel["fout"] = antwoord.get("error") or antwoord.get("redenen")
+            if uitkomst["uitkomst"] == "buiten_model" and not droog:
+                status, antwoord = verzoek(
+                    api, token, f"/api/relations/{rel['id']}/status",
+                    {"status": "afgewezen",
+                     "motivatie": (f"{REDEN}: buiten het model — geen mechanisme past "
+                                   f"({uitkomst['reden'] or 'beschrijvend verband'})")[:900]},
+                    methode="PATCH")
+                regel["http"] = status
+                if status == 200:
+                    tel["afgewezen"] += 1
+                else:
+                    regel["fout"] = antwoord.get("error")
             meld(f"  · relatie #{rel['id']} ({rel['bron']} → {rel['doel']}): {uitkomst['uitkomst']}"
                  f"{' ' + uitkomst['mechanisme'] if uitkomst.get('mechanisme') else ''}"
                  f" — {uitkomst['reden'][:100]}")
             if not droog and uitkomst["uitkomst"] != "fout":
                 pogingen[str(rel["id"])] = {"op": nu.isoformat(timespec="seconds"),
-                                            "uitkomst": uitkomst["uitkomst"]}
+                                            "uitkomst": uitkomst["uitkomst"],
+                                            "mech_max": mech_max}
                 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
                 with open(LOG_PATH, "a", encoding="utf-8") as log:
                     log.write(json.dumps(regel, ensure_ascii=False) + "\n")
@@ -220,7 +253,11 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=12, droog=False, id
 
 def post(api, token, pad, body):
     """POST met het merge-service-token (vrijgesteld van de rate limit)."""
-    req = urllib.request.Request(f"{api}{pad}", data=json.dumps(body).encode(), method="POST",
+    return verzoek(api, token, pad, body)
+
+
+def verzoek(api, token, pad, body, methode="POST"):
+    req = urllib.request.Request(f"{api}{pad}", data=json.dumps(body).encode(), method=methode,
                                  headers={"Authorization": f"Bearer {token}",
                                           "Content-Type": "application/json"})
     try:

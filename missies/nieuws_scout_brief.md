@@ -20,15 +20,15 @@ wachtrij, de afbakening en de snelheidsrem toe.
 > 2. **LinkedIn mag onbewaakt**, maar alleen achter de snelheidsrem
 >    (`tools/linkedin/snelheidsrem.py`: max 2/uur en 10/dag per soort, 08–22 uur,
 >    stroomonderbreker). Zie stap 4.
-> 3. Alles wat je indient landt `voorgesteld`, net als altijd. Daarna mag een **aparte,
->    deterministische service** (`scripts/nieuws_autokeur_service.py`, account
->    `nieuws-autokeur` — **niet jij**) een deel ervan automatisch goedkeuren: alleen
->    neutrale structuurrelaties (`personeel`, `dienstverband`, `bestuurder`, `adviseur`,
->    `woordvoerder_van`, `lidmaatschap`, `eigendom`) mét mechanisme en een bron met URL,
->    en alleen van doelen die jij op `klaar` zet. Argumenten worden nooit automatisch
->    gemerged. Dat verandert niets aan jouw discipline: **schrijf alsof een mens elk
->    voorstel leest** — de automatische poort is geen doel om naartoe te schrijven, en
->    twijfel hoort op `twijfel`, niet op `klaar`.
+> 3. Alles wat je indient landt `voorgesteld`, net als altijd. Daarna beslist de
+>    **automatische beoordeling** (elk uur, andere accounts — **niet jij**): de bronchecker
+>    haalt je bron op en zoekt je citaat letterlijk terug, en draagt de bron je bewering,
+>    dan gaan neutrale structuurfeiten (`personeel`, `dienstverband`, `bestuurder`,
+>    `adviseur`, `woordvoerder_van`, `lidmaatschap`, `eigendom`, `draaideur`) en hun
+>    entiteiten de graaf in; draagt ze die niet volledig, dan zoekt de bronzoeker een betere
+>    bron of wordt je voorstel verworpen. Dat verandert niets aan jouw discipline: **schrijf
+>    alsof een mens elk voorstel leest** — een letterlijk citaat dat je bewering draagt is
+>    het enige dat telt, en twijfel hoort op `twijfel`, niet op `klaar`.
 
 ## Wie wel, wie nooit
 

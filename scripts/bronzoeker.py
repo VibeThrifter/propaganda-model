@@ -1,36 +1,43 @@
 #!/usr/bin/env python3
-"""Bronzoeker — zoekt een bron voor argumenten die er geen (goede) hebben (eigenaarsbesluit
-2026-10-06: "haal de mens uit de loop en laat agents alles doen in het propagandamodel").
+"""Bronzoeker — zoekt een bron waar die ontbreekt of niet volstaat (eigenaarsbesluit
+2026-10-06: "als er geen bronnen zijn moet een agent op zoek gaan"; "haal de mens uit de loop
+en laat agents alles doen in het propagandamodel").
 
-Kandidaten: gemergede praktijk-roots (supporting/contradicting, over het bestaan of de
-invloed van een goedgekeurde relatie of entiteit) zonder echte bron, of waarvan de
-bronchecker zei dat de bron de bewering niet (volledig) draagt. Wat lezers van de
-nieuws-aggregator zien gaat voor (nieuws_voorrang, nieuws_doelen); daarna wat helemaal geen
-bron heeft, dan 'klopt-niet', dan 'twijfel'.
+Drie soorten werk (``soort``), wat lezers van de nieuws-aggregator zien eerst (nieuws_voorrang,
+nieuws_doelen):
+- ``voorstel``: een voorgesteld argument (praktijk-root, supporting/contradicting) waarvan de
+  bronchecker zei dat de bron het niet (volledig) draagt ('twijfel'/'klopt-niet'). Wat de
+  zoeker vindt, wordt een vervangend voorstel (POST /api/arguments, reasoning "Betere bron
+  voor #…"); de automatische beoordeling verwerpt daarna het origineel ("vervangen door #…",
+  of zonder vervanger "geen betere bron gevonden"). Zo blijft niets 14 dagen dood liggen;
+- ``verband``: een goedgekeurd (of voorgesteld, met mechanisme) verband zonder enig levend
+  steunend argument. Wat de zoeker vindt, wordt een nieuw steunend argument (reasoning "Bron
+  voor verband #…") met beide partijen bij naam;
+- ``gemerged``: een gemerged argument zonder echte bron, of waarvan de bronchecker zei dat de
+  bron het niet (volledig) draagt. Wat de zoeker vindt, wordt een REVISIE (POST
+  /api/arguments/<id>/revisie): dezelfde bewering — of een eerlijker, zwakkere als de bron
+  alleen die draagt — met de bron als letterlijk citaat.
 
-Per argument:
+Per stuk:
 1. een taalmodel (Claude Sonnet via de `claude`-CLI, met alleen WebSearch en WebFetch) zoekt
-   een openbare, betrouwbare bron die de FEITELIJKE inhoud van de bewering draagt, met een
-   letterlijk citaat;
+   een openbare, betrouwbare bron die de FEITELIJKE inhoud draagt, met een letterlijk citaat;
 2. het script haalt elke voorgestelde bron zelf op en zoekt het citaat letterlijk terug
    (bronchecker.haal_bron/zoek_citaat): een citaat dat niet in de bron staat, telt niet;
-3. een bron die standhoudt, wordt een REVISIE van het argument (POST
-   /api/arguments/<id>/revisie, account 'bronzoeker'): dezelfde bewering — of een eerlijker,
-   zwakkere als de bron alleen die draagt — met de bron als letterlijk citaat. De revisie
-   landt 'voorgesteld' en gaat langs de gewone poorten: de bronchecker (A1, onafhankelijk)
-   en de immuunpoort (A7: een bronrevisie met dezelfde bewering merget op A1 alleen, een
-   nieuwe formulering heeft ook de aanklager nodig). Mergt ze, dan vervangt ze het oude
-   argument; zo niet, dan ruimt de automatische beoordeling haar na 14 dagen op;
-4. niets gevonden: gelogd, en het argument komt pas na 30 dagen terug.
+3. wat standhoudt landt 'voorgesteld' (account 'bronzoeker') en gaat langs de gewone poorten:
+   de bronchecker (A1, onafhankelijk), zo nodig de smaadtoets en de aanklager, en de
+   immuunpoort (A7: een bronrevisie met dezelfde bewering merget op A1 alleen);
+4. niets gevonden: gelogd (data/bronzoeker_pogingen.json), en het stuk komt pas na 30 dagen
+   terug. Wat de bronzoeker zelf indiende, krijgt geen tweede reparatie.
 
 Nooit: een bron verzinnen of een citaat parafraseren (het script controleert dat), het
 propagandamodel, Wikipedia of sociale media als bron, iets anders schrijven dan bronnen en
-revisies.
+argumenten.
 
 Gebruik:
     python3 scripts/bronzoeker.py --droog --max 3     # zoeken en natrekken, niets schrijven
     python3 scripts/bronzoeker.py --max 8 --json      # echt
     python3 scripts/bronzoeker.py --ids 223           # alleen dit argument
+    python3 scripts/bronzoeker.py --relaties 1714     # alleen dit verband zonder argument
 """
 from __future__ import annotations
 
@@ -150,20 +157,19 @@ def probleem(rij) -> str | None:
     return None
 
 
-PROBLEEM_VOLGORDE = {"geen_bron": 0, "draagt_niet": 1, "twijfel": 2}
+PROBLEEM_VOLGORDE = {"geen_argument": 0, "geen_bron": 0, "draagt_niet": 1, "twijfel": 2}
+# Een voorstel wacht op dit besluit (het blokkeert nieuw werk), dan een verband zonder enig
+# argument, dan wat al gemerged is
+SOORT_VOLGORDE = {"voorstel": 0, "verband": 1, "gemerged": 2}
+# Merktekens in de reasoning van wat de bronzoeker indient (de beoordeling herkent ze)
+VERVANGING = "Betere bron voor #{id}"
+VERBAND = "Bron voor verband #{id}"
 
-
-def kandidaten(conn, ids=None) -> list[dict]:
-    """Argumenten die een (betere) bron nodig hebben, zonder openstaande revisie: wat het
-    nieuws toont eerst, dan zonder bron, dan 'klopt-niet', dan 'twijfel'."""
-    filt, params = "", []
-    if ids:
-        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
-        params = list(ids)
-    rijen = conn.execute(f"""
-        SELECT a.id, a.claim, a.reasoning, a.stance, a.property, a.status, a.relation_id,
-               a.entity_id, r.source_id AS rel_bron, r.target_id AS rel_doel,
-               r.relation_type, s.name AS bron_naam, t.name AS doel_naam,
+_ARGUMENT_KOLOMMEN = """
+        SELECT a.id, a.claim, a.reasoning, a.stance, a.property, a.property_value, a.status,
+               a.relation_id, a.entity_id, a.contributed_by, r.source_id AS rel_bron,
+               r.target_id AS rel_doel, r.relation_type, r.description AS rel_omschrijving,
+               s.name AS bron_naam, t.name AS doel_naam,
                m.name AS mechanisme, e.name AS entiteit_naam,
                (SELECT COUNT(*) FROM citations c WHERE c.argument_id = a.id AND (
                     TRIM(COALESCE(c.quote, '')) <> ''
@@ -188,31 +194,97 @@ def kandidaten(conn, ids=None) -> list[dict]:
           AND COALESCE(a.smaad_hold, 0) = 0
           AND a.stance IN ('supporting', 'contradicting')
           AND COALESCE(a.property, 'existence') IN ('existence', 'influence')
+          AND (a.relation_id IS NOT NULL OR a.entity_id IS NOT NULL)"""
+
+
+def sleutel(item: dict) -> str:
+    """De sleutel in data/bronzoeker_pogingen.json: het argument-id, of 'relatie:<id>'."""
+    return f"relatie:{item['relation_id']}" if item["soort"] == "verband" else str(item["id"])
+
+
+def kandidaten(conn, ids=None, relaties_ids=None) -> list[dict]:
+    """Alles wat een (betere) bron nodig heeft (zie de docstring bovenaan), zonder openstaande
+    revisie of vervanger: wat het nieuws toont eerst, dan voorstellen, verbanden zonder
+    argument en gemerged werk; binnen elk eerst zonder bron, dan 'klopt-niet', dan 'twijfel'.
+    ``ids`` beperkt tot deze argumenten, ``relaties_ids`` tot deze verbanden."""
+    filt, params = "", []
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params = list(ids)
+    zonder_verbanden = bool(ids) and not relaties_ids
+    zonder_argumenten = bool(relaties_ids) and not ids
+    rijen = [] if zonder_argumenten else conn.execute(f"""{_ARGUMENT_KOLOMMEN}
           AND a.status IN ('ongecontroleerd', 'bronvermelding_nodig', 'betwist')
-          AND (a.relation_id IS NOT NULL OR a.entity_id IS NOT NULL)
           AND (a.relation_id IS NULL OR r.status = 'goedgekeurd')
           AND (a.entity_id IS NULL OR e.status = 'goedgekeurd')
           AND NOT EXISTS (SELECT 1 FROM arguments v WHERE v.reviseert_id = a.id
                           AND v.status = 'voorgesteld' AND NOT v.vervangen){filt}""",
-                         params).fetchall()  # noqa: S608 - alleen placeholders
+                                                  params).fetchall()  # noqa: S608
+    voorstellen = [] if zonder_argumenten else conn.execute(f"""{_ARGUMENT_KOLOMMEN}
+          AND a.status = 'voorgesteld' AND COALESCE(a.contributed_by, '') <> ?
+          AND (a.relation_id IS NULL OR r.status IN ('goedgekeurd', 'voorgesteld'))
+          AND (a.entity_id IS NULL OR e.status IN ('goedgekeurd', 'voorgesteld')){filt}""",
+                                                       [ACCOUNT, *params]).fetchall()  # noqa: S608
     relaties, entiteiten = bc.nieuws_voorrang(conn)
+
+    def voorrang(item):
+        return (0 if item["relation_id"] in relaties else
+                1 if {item["rel_bron"], item["rel_doel"], item.get("entity_id")} & entiteiten
+                else 2)
+
     uit = []
     for rij in rijen:
         waarom = probleem(rij)
         if waarom is None:
             continue
-        item = dict(rij)
-        item["probleem"] = waarom
-        item["bronnen"] = bc.bronnen_van(conn, rij["id"])
-        item["voorrang"] = (0 if rij["relation_id"] in relaties else
-                            1 if {rij["rel_bron"], rij["rel_doel"], rij["entity_id"]} & entiteiten
-                            else 2)
-        item["gemeld"] = relaties.get(rij["relation_id"], "")
-        uit.append(item)
-    uit.sort(key=lambda a: -a["id"])
+        uit.append({**dict(rij), "soort": "gemerged", "probleem": waarom})
+    for rij in voorstellen:
+        # Alleen wat de bronchecker al las en niet (volledig) gedragen vond
+        waarom = {"klopt-niet": "draagt_niet", "twijfel": "twijfel"}.get(rij["a1"])
+        if waarom:
+            uit.append({**dict(rij), "soort": "voorstel", "probleem": waarom})
+    if not zonder_verbanden:
+        uit += verbanden_zonder_argument(conn, relaties_ids)
+    for item in uit:
+        item["bronnen"] = bc.bronnen_van(conn, item["id"]) if item["id"] else []
+        item["voorrang"] = voorrang(item)
+        item["gemeld"] = relaties.get(item["relation_id"], "")
+    uit.sort(key=lambda a: -(a["id"] or a["relation_id"]))
     uit.sort(key=lambda a: a["gemeld"], reverse=True)
-    uit.sort(key=lambda a: (a["voorrang"], PROBLEEM_VOLGORDE[a["probleem"]]))
+    uit.sort(key=lambda a: (a["voorrang"], SOORT_VOLGORDE[a["soort"]],
+                            PROBLEEM_VOLGORDE[a["probleem"]]))
     return uit
+
+
+def verbanden_zonder_argument(conn, relaties_ids=None) -> list[dict]:
+    """Verbanden zonder enig levend steunend argument (gemerged of nog in behandeling):
+    goedgekeurd, of voorgesteld mét mechanisme (een kandidaat zonder mechanisme gaat eerst
+    langs de mechanisme-toewijzer). Nooit wat een maintainer introk."""
+    filt, params = "", []
+    if relaties_ids:
+        filt = f" AND r.id IN ({','.join('?' * len(relaties_ids))})"
+        params = list(relaties_ids)
+    return [{**dict(r), "id": None, "soort": "verband", "probleem": "geen_argument",
+             "claim": "", "reasoning": None, "stance": "supporting", "property": None,
+             "property_value": None, "entity_id": None, "entiteit_naam": None,
+             "status": r["rel_status"], "a1": None, "a1_detail": None, "betwist_reden": None,
+             "n_echt": 0}
+            for r in conn.execute(f"""
+        SELECT r.id AS relation_id, r.status AS rel_status, r.relation_type,
+               r.description AS rel_omschrijving, r.source_id AS rel_bron,
+               r.target_id AS rel_doel, s.name AS bron_naam, t.name AS doel_naam,
+               m.name AS mechanisme
+        FROM relations r
+        JOIN entities s ON s.id = r.source_id
+        JOIN entities t ON t.id = r.target_id
+        JOIN mechanisms m ON m.id = r.mechanism_id
+        WHERE NOT r.vervangen AND r.status IN ('goedgekeurd', 'voorgesteld')
+          AND NOT EXISTS (SELECT 1 FROM arguments a WHERE a.relation_id = r.id
+                          AND a.parent_argument_id IS NULL AND a.stance = 'supporting'
+                          AND NOT a.vervangen AND a.status NOT IN ('verworpen', 'verouderd'))
+          AND NOT EXISTS (SELECT 1 FROM edit_log l WHERE l.table_name = 'relations'
+                          AND l.record_id = r.id AND l.reason LIKE 'intrekken%'){filt}""",
+                                  params)]  # noqa: S608 - alleen placeholders
 
 
 # ------------------------------------------------------------------ pogingen
@@ -249,6 +321,16 @@ def prompt_voor(arg: dict) -> str:
         doel = f"het verband '{arg['bron_naam']} → {arg['doel_naam']}' ({hoe})"
     else:
         doel = f"de entiteit '{arg['entiteit_naam']}'"
+    if arg.get("soort") == "verband":
+        regels = [f"Verband in de database: {arg['bron_naam']} → {arg['doel_naam']}, "
+                  f"relatietype '{arg['relation_type']}', mechanisme '{hoe}'."]
+        if (arg.get("rel_omschrijving") or "").strip():
+            regels.append(f"Omschrijving in de database: {arg['rel_omschrijving'].strip()[:800]}")
+        regels.append("Er is nog geen argument met een bron voor dit verband. Formuleer in "
+                      "'bewering' de feitelijke bewering die het verband draagt (wie, wat, "
+                      f"wanneer), met {arg['bron_naam']} en {arg['doel_naam']} allebei bij "
+                      "naam, en zoek een bron die haar draagt.")
+        return "\n".join(regels + [OPDRACHT])
     regels = [f"Bewering: {arg['claim']}",
               f"Context: dit argument {rol} {doel} in de database."]
     if (arg.get("reasoning") or "").strip():
@@ -264,30 +346,35 @@ def prompt_voor(arg: dict) -> str:
         waarom = (arg.get("a1_detail") or "").replace(bc.VERSIE, "").strip()
         regels.append(f"De huidige bron ({oud}) volstaat niet volgens de bronchecker: "
                       f"{waarom[:400] or 'de bron draagt de bewering niet'}. Zoek een betere.")
-    regels.append(
-        "\nOpdracht:\n"
-        "1. Zoek (WebSearch) en lees (WebFetch) bronnen die de feiten van deze bewering dragen. "
-        "Voorkeur: onafhankelijke Nederlandse kwaliteitsmedia, officiële documenten en "
-        "registers, onderzoeksrapporten, wetenschappelijke publicaties. Een bron van de partij "
-        "zelf (eigen site, persbericht) mag, maar zoek dan ook een onafhankelijke.\n"
-        "2. Niet als bron: deze database zelf, Wikipedia (wel om naar de echte bron te zoeken), "
-        "sociale media, fora, LinkedIn.\n"
-        "3. Per bron: de url die je opende, de titel, de uitgever, de publicatiedatum "
-        "(JJJJ-MM-DD, of JJJJ als alleen het jaar bekend is; leeg als onbekend), de soort, en een "
-        "LETTERLIJK citaat van één of twee zinnen (hooguit 300 tekens) dat de feiten draagt — "
-        "precies zoals het op de pagina staat.\n"
-        "4. Draagt geen bron de bewering zoals ze er staat, maar wel een duidelijk zwakkere of "
-        "preciezere versie OVER DEZELFDE PARTIJEN, die bij naam genoemd blijven, en met dezelfde "
-        "strekking (het verband bestaat of bestond), geef die dan als 'bewering' en de bronnen die "
-        "haar dragen. Anders is 'bewering' de oorspronkelijke tekst, ongewijzigd.\n"
-        "5. Niet goed genoeg, dus gevonden = false: een algemene bewering over een sector of groep "
-        "('Nederlandse nieuwssites', 'de media') in plaats van deze partijen; een bron die laat zien "
-        "dat het verband niet klopt of voorbij is (noem dat dan in 'toelichting' — tegenbewijs gaat "
-        "langs een andere weg het model in).\n"
-        "6. Niets betrouwbaars gevonden: gevonden = false, bronnen = [], en zeg in 'toelichting' "
-        "kort wat je zocht.\n"
-        f"Hooguit {MAX_BRONNEN} bronnen; liever één goede dan twee matige.")
-    return "\n".join(regels)
+    return "\n".join(regels + [OPDRACHT])
+
+
+OPDRACHT = (
+    "\nOpdracht:\n"
+    "1. Zoek (WebSearch) en lees (WebFetch) bronnen die de feiten van deze bewering dragen. "
+    "Voorkeur: onafhankelijke Nederlandse kwaliteitsmedia, officiële documenten en "
+    "registers, onderzoeksrapporten, wetenschappelijke publicaties. Een bron van de partij "
+    "zelf (eigen site, persbericht) mag, maar zoek dan ook een onafhankelijke.\n"
+    "2. Niet als bron: deze database zelf, Wikipedia (wel om naar de echte bron te zoeken), "
+    "sociale media, fora, LinkedIn.\n"
+    "3. Per bron: de url die je opende, de titel, de uitgever, de publicatiedatum "
+    "(JJJJ-MM-DD, of JJJJ als alleen het jaar bekend is; leeg als onbekend), de soort, en een "
+    "LETTERLIJK citaat van één of twee zinnen (hooguit 300 tekens) dat de feiten draagt — "
+    "precies zoals het op de pagina staat.\n"
+    "4. Een onafhankelijke controle leest daarna je bron en keurt elke bewering af die verder "
+    "gaat dan de bron. Zorg dus dat ELK feit in 'bewering' (wie, wat, welke rol, wanneer, "
+    "hoeveel, hoe vaak) in je citaat of elders op de pagina staat; laat weg wat de bron niet "
+    "zegt. Draagt geen bron de bewering zoals ze er staat, maar wel een duidelijk zwakkere of "
+    "preciezere versie OVER DEZELFDE PARTIJEN, die bij naam genoemd blijven, en met dezelfde "
+    "strekking (het verband bestaat of bestond), geef die dan als 'bewering' en de bronnen die "
+    "haar dragen. Anders is 'bewering' de oorspronkelijke tekst, ongewijzigd.\n"
+    "5. Niet goed genoeg, dus gevonden = false: een algemene bewering over een sector of groep "
+    "('Nederlandse nieuwssites', 'de media') in plaats van deze partijen; een bron die laat zien "
+    "dat het verband niet klopt of voorbij is (noem dat dan in 'toelichting' — tegenbewijs gaat "
+    "langs een andere weg het model in).\n"
+    "6. Niets betrouwbaars gevonden: gevonden = false, bronnen = [], en zeg in 'toelichting' "
+    "kort wat je zocht.\n"
+    f"Hooguit {MAX_BRONNEN} bronnen; liever één goede dan twee matige.")
 
 
 def vraag_zoeker(prompt: str) -> dict | None:
@@ -397,11 +484,17 @@ def zoek(arg: dict) -> dict:
         else:
             afgevallen.append({"url": bron.get("url"), "reden": reden})
     bewering = (antwoord.get("bewering") or "").strip() or arg["claim"]
-    # Een herformulering blijft over dezelfde partijen (geen algemene uitspraak over een sector)
+    if gehouden and not bewering:
+        afgevallen.append({"url": None, "reden": "geen bewering geformuleerd"})
+        gehouden = []
+    # Een herformulering (en de bewering bij een verband zonder argument) blijft over dezelfde
+    # partijen, bij naam (geen algemene uitspraak over een sector)
     partijen = ([arg["bron_naam"], arg["doel_naam"]] if arg["relation_id"]
                 else [arg["entiteit_naam"]])
     ontbreekt = [naam for naam in partijen if naam and not noemt(bewering, naam)]
-    if gehouden and ontbreekt and bc.normaliseer(bewering) != bc.normaliseer(arg["claim"]):
+    nieuw = (arg.get("soort") == "verband"
+             or bc.normaliseer(bewering) != bc.normaliseer(arg["claim"]))
+    if gehouden and ontbreekt and nieuw:
         afgevallen.append({"url": None, "reden": f"bewering noemt {', '.join(ontbreekt)} niet"})
         gehouden = []
     return {"uitkomst": "gevonden" if gehouden else "niets", "bronnen": gehouden,
@@ -447,7 +540,35 @@ def registreer_bron(api, token, bron: dict) -> int | None:
     return int(antwoord["id"])
 
 
-def dien_revisie_in(api, token, arg: dict, gevonden: dict) -> tuple[int | None, str | None]:
+def indiening(arg: dict, gevonden: dict, citaties: list[dict]) -> tuple[str, dict]:
+    """Wat de bronzoeker indient, per soort → (pad, body): een revisie van gemerged werk, een
+    vervangend voorstel, of een nieuw steunend argument voor een verband zonder argument."""
+    bewering = gevonden["bewering"].strip()
+    toelichting = (gevonden.get("toelichting") or "").strip()
+    if arg["soort"] == "gemerged":
+        body = {"citations": citaties}
+        if bc.normaliseer(bewering) != bc.normaliseer(arg["claim"]):
+            body["claim"] = bewering
+        return f"/api/arguments/{arg['id']}/revisie", body
+    if arg["soort"] == "verband":
+        merk = VERBAND.format(id=arg["relation_id"])
+        return "/api/arguments", {
+            "relation_id": arg["relation_id"], "stance": "supporting", "claim": bewering,
+            "reasoning": f"{merk} zonder argument (bronzoeker): {toelichting}"[:1500],
+            "citations": citaties, "negeer_duplicaten": True}
+    waarom = (arg.get("a1_detail") or "").replace(bc.VERSIE, "").strip()
+    merk = VERVANGING.format(id=arg["id"])
+    body = {"stance": arg["stance"], "claim": bewering, "citations": citaties,
+            "reasoning": (f"{merk} (de bronchecker: {waarom[:300] or 'bron draagt het niet'}). "
+                          f"{toelichting}")[:1500],
+            "negeer_duplicaten": True}
+    for kolom in ("relation_id", "entity_id", "property", "property_value"):
+        if arg.get(kolom) is not None:
+            body[kolom] = arg[kolom]
+    return "/api/arguments", body
+
+
+def dien_in(api, token, arg: dict, gevonden: dict) -> tuple[int | None, str | None]:
     citaties = []
     for bron in gevonden["bronnen"]:
         sid = registreer_bron(api, token, bron)
@@ -456,19 +577,25 @@ def dien_revisie_in(api, token, arg: dict, gevonden: dict) -> tuple[int | None, 
                              "methode": "verbatim_quote"})
     if not citaties:
         return None, "bron niet te registreren"
-    body = {"citations": citaties}
-    if bc.normaliseer(gevonden["bewering"]) != bc.normaliseer(arg["claim"]):
-        body["claim"] = gevonden["bewering"]
-    status, antwoord = api_post(api, token, f"/api/arguments/{arg['id']}/revisie", body)
+    pad, body = indiening(arg, gevonden, citaties)
+    status, antwoord = api_post(api, token, pad, body)
     if status != 201:
-        return None, f"revisie geweigerd ({status}): {antwoord.get('error')}"
+        return None, f"geweigerd ({status}): {antwoord.get('error')}"
     return antwoord.get("id"), None
 
 
 # ------------------------------------------------------------------ ronde
+def wacht_op_zoeker(conn, pogingen: dict | None = None) -> set[int]:
+    """Voorgestelde argumenten die op een poging van de bronzoeker wachten (nog geen poging,
+    of alleen een technische fout): de opruimstap verwerpt ze pas daarna."""
+    pogingen = laad_pogingen() if pogingen is None else pogingen
+    return {a["id"] for a in kandidaten(conn) if a["soort"] == "voorstel"
+            and (pogingen.get(str(a["id"])) or {}).get("uitkomst") in (None, "fout")}
+
+
 def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=8, droog=False, ids=None,
-          parallel=2, meld=print) -> dict:
-    """Eén ronde. → {bekeken, gevonden, niets, fout, revisies}."""
+          relaties_ids=None, parallel=2, meld=print) -> dict:
+    """Eén ronde. → {bekeken, gevonden, niets, fout, ingediend, per_soort}."""
     token = None
     if not droog:
         token = Path(token_pad).read_text().strip() if Path(token_pad).exists() else None
@@ -479,13 +606,17 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=8, droog=False, ids
     pogingen = laad_pogingen()
     conn = db()
     try:
-        alle = kandidaten(conn, ids)
+        alle = kandidaten(conn, ids, relaties_ids)
     finally:
         conn.close()
-    rijen = [a for a in alle if ids or mag_weer(pogingen.get(str(a["id"])), nu)][:max_n]
-    meld(f"Bronzoeker: {len(rijen)} van {len(alle)} argument(en) zonder (goede) bron"
-         f"{' (droog)' if droog else ''}")
-    tel = {"bekeken": 0, "gevonden": 0, "niets": 0, "fout": 0, "revisies": 0}
+    gericht = bool(ids or relaties_ids)
+    rijen = [a for a in alle if gericht or mag_weer(pogingen.get(sleutel(a)), nu)][:max_n]
+    per_soort = {s: sum(1 for a in alle if a["soort"] == s) for s in SOORT_VOLGORDE}
+    meld(f"Bronzoeker: {len(rijen)} van {len(alle)} zonder (goede) bron ("
+         f"{per_soort['voorstel']} voorstel(len), {per_soort['verband']} verband(en) zonder "
+         f"argument, {per_soort['gemerged']} gemerged){' (droog)' if droog else ''}")
+    tel = {"bekeken": 0, "gevonden": 0, "niets": 0, "fout": 0, "ingediend": 0,
+           "per_soort": {s: 0 for s in SOORT_VOLGORDE}}
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
         toekomst = {pool.submit(zoek, a): a for a in rijen}
         for f in concurrent.futures.as_completed(toekomst):
@@ -495,21 +626,28 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=8, droog=False, ids
             except Exception as exc:  # noqa: BLE001 - één fout stopt de ronde niet
                 uitkomst = {"uitkomst": "fout", "toelichting": str(exc)[:300]}
             tel["bekeken"] += 1
-            tel[uitkomst["uitkomst"]] += 1
+            tel["per_soort"][arg["soort"]] += 1
             regel = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
-                     "argument_id": arg["id"], "probleem": arg["probleem"], **uitkomst}
+                     "soort": arg["soort"], "argument_id": arg["id"],
+                     "relation_id": arg["relation_id"], "probleem": arg["probleem"], **uitkomst}
             if uitkomst["uitkomst"] == "gevonden" and not droog:
-                revisie, fout = dien_revisie_in(api, token, arg, uitkomst)
-                regel["revisie_id"], regel["fout"] = revisie, fout
-                if revisie:
-                    tel["revisies"] += 1
+                nieuw_id, fout = dien_in(api, token, arg, uitkomst)
+                regel["nieuw_id"], regel["fout"] = nieuw_id, fout
+                if nieuw_id:
+                    tel["ingediend"] += 1
+                else:
+                    uitkomst["uitkomst"] = "fout"  # niets ingediend: later opnieuw
+            tel[uitkomst["uitkomst"]] += 1
             bronnen = ", ".join(bc.host_van(b["url"]) for b in uitkomst.get("bronnen") or [])
-            meld(f"  · #{arg['id']} ({arg['probleem']}): {uitkomst['uitkomst']}"
+            wat = (f"verband #{arg['relation_id']}" if arg["soort"] == "verband"
+                   else f"#{arg['id']}")
+            meld(f"  · {wat} ({arg['soort']}, {arg['probleem']}): {uitkomst['uitkomst']}"
                  f"{' — ' + bronnen if bronnen else ''}"
-                 f"{' → revisie #' + str(regel['revisie_id']) if regel.get('revisie_id') else ''}")
+                 f"{' → #' + str(regel['nieuw_id']) if regel.get('nieuw_id') else ''}")
             if not droog:
-                pogingen[str(arg["id"])] = {"op": nu.isoformat(timespec="seconds"),
-                                            "uitkomst": uitkomst["uitkomst"]}
+                pogingen[sleutel(arg)] = {"op": nu.isoformat(timespec="seconds"),
+                                          "uitkomst": uitkomst["uitkomst"],
+                                          "nieuw_id": regel.get("nieuw_id")}
                 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
                 with open(LOG_PATH, "a", encoding="utf-8") as log:
                     log.write(json.dumps(regel, ensure_ascii=False) + "\n")
@@ -524,13 +662,15 @@ def main():
     ap.add_argument("--token", default=str(DEFAULT_TOKEN))
     ap.add_argument("--max", type=int, default=8, help="hooguit zoveel argumenten per ronde")
     ap.add_argument("--ids", default="", help="alleen deze argument-id's (komma's)")
+    ap.add_argument("--relaties", default="", help="alleen deze verbanden zonder argument")
     ap.add_argument("--parallel", type=int, default=2, help="gelijktijdige zoeksessies")
     ap.add_argument("--droog", action="store_true", help="zoek en trek na, maar schrijf niets")
     ap.add_argument("--json", action="store_true", help="eindig met één JSON-regel")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",") if x.strip().isdigit()] or None
+    relaties = [int(x) for x in args.relaties.split(",") if x.strip().isdigit()] or None
     tel = draai(api=args.api, token_pad=args.token, max_n=args.max, droog=args.droog, ids=ids,
-                parallel=args.parallel)
+                relaties_ids=relaties, parallel=args.parallel)
     print(json.dumps(tel, ensure_ascii=False) if args.json else f"Klaar: {tel}")
 
 

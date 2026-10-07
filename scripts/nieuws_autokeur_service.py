@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Nieuws-autokeur-service (Epic 12 "Wie is dit?", eigenaarsbesluit 2026-09-30) — de
 deterministische loop die het werk van de `nieuws-scout` aanbiedt aan de
-autokeur-poort. Spiegel van `scripts/auto_merge_service.py`.
+autokeur-poort.
+
+**Niet meer gepland sinds 2026-10-07.** De automatische beoordeling (stap 10, elk uur) keurt
+het werk van de nieuws-scout goed ná een onafhankelijke broncheck (A1); deze service keurde
+goed zonder die check en was daarmee een tweede, zwakkere poort voor hetzelfde werk. Het
+endpoint blijft (ook voor `intrekken`); de service draai je alleen nog met de hand.
 
 Deze service *beslist niets zelf*: ze haalt de nieuws-doelen met status `klaar` op,
 verzamelt de entiteit- en relatie-id's uit hun `resultaat`, en biedt ze één voor één
