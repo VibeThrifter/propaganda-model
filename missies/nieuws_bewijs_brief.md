@@ -122,6 +122,13 @@ Lees de definitie van het mechanisme in het model. Twee voorbeelden waarbij een 
   planbureau van de overheid is iets anders.
 - `bron_afhankelijkheid` gaat over structureel leunen op één bron, niet over één keer
   citeren.
+- Sinds 2026-10-07 hoort ook de besluitvorming in het model (categorieën `formele_macht`,
+  `belangen`, `kennis_advies`, `polder`, `werving`, naast de vijf filters): een ambt, een
+  nevenfunctie, een adviesrol of een benoeming heeft een eigen mechanisme
+  (`lokaal_bestuursmandaat`, `nevenfunctie_verstrengeling`, `institutioneel_advies`,
+  `kroonbenoeming`, …) en is geen reden om een verband "buiten het model" te noemen.
+  Een registerfeit (citaat = recordregel, methode `officieel_register_scrape`) is al
+  deterministisch gecontroleerd; daar hoef je geen tweede bron voor te zoeken.
 
 Past een ander mechanisme beter, dien dan een **aspect-argument** in op de relatie:
 `property: "mechanism"`, `property_value` = het id van dat mechanisme, en een `reasoning`

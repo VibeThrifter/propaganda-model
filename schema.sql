@@ -17,8 +17,14 @@ CREATE TABLE roles (
         'flak',              -- 4e filter: disciplineringsmechanisme
         'ideologie',         -- 5e filter: ideologisch kader
         'systeemactor',      -- actoren die meerdere filters bedienen
-        'tegenmacht',        -- rollen die de filters weerstaan/corrigeren
-        'overig'
+        'tegenmacht',        -- rollen die de filters (en de bestuursmacht) weerstaan/corrigeren
+        'overig',
+        -- Besluitvorming (Uitbreiding C, eigenaarsbesluit 2026-10-07; naar Domhoff), zelfde netwerk:
+        'formele_macht',     -- wie bevoegd is: ministerie, ambtelijke top, zbo, decentrale overheid, EU
+        'belangen',          -- special-interest: lobbytoegang, geschenken/reizen, subsidies, nevenfuncties
+        'kennis_advies',     -- policy-planning: adviescolleges, planbureaus, denktanks, consultants
+        'polder',            -- corporatisme: SER, sociale partners, akkoorden, overlegtafels
+        'werving'            -- candidate-selection: kandidaatstelling, benoeming, draaideur
     )),
     description TEXT NOT NULL,
     examples TEXT,                        -- generieke voorbeelden ter illustratie
@@ -42,8 +48,14 @@ CREATE TABLE mechanisms (
         'flak',
         'ideologie',
         'cross_filter',      -- mechanismen die meerdere filters verbinden
-        'tegenmacht',        -- mechanismen die de filters weerstaan/corrigeren
-        'overig'
+        'tegenmacht',        -- mechanismen die de filters (en de bestuursmacht) weerstaan/corrigeren
+        'overig',
+        -- Besluitvorming (Uitbreiding C, eigenaarsbesluit 2026-10-07; naar Domhoff), zelfde netwerk:
+        'formele_macht',     -- wie bevoegd is: ministerie, ambtelijke top, zbo, decentrale overheid, EU
+        'belangen',          -- special-interest: lobbytoegang, geschenken/reizen, subsidies, nevenfuncties
+        'kennis_advies',     -- policy-planning: adviescolleges, planbureaus, denktanks, consultants
+        'polder',            -- corporatisme: SER, sociale partners, akkoorden, overlegtafels
+        'werving'            -- candidate-selection: kandidaatstelling, benoeming, draaideur
     )),
     mechanism_type TEXT CHECK(mechanism_type IN (
         'structureel',       -- ingebouwd in het systeem (eigendomsconcentratie)
@@ -55,7 +67,7 @@ CREATE TABLE mechanisms (
         'discursief'         -- via taal en framing (etikettering)
     )),
     description TEXT NOT NULL,            -- hoe werkt dit mechanisme
-    effect TEXT NOT NULL,                 -- wat is het effect op de berichtgeving
+    effect TEXT NOT NULL,                 -- wat is het effect op de berichtgeving of de besluitvorming
     source_role_id INTEGER REFERENCES roles(id),  -- welke rol oefent dit uit
     target_role_id INTEGER REFERENCES roles(id),  -- welke rol ondergaat dit
     -- Aard van het mechanisme: is een instantie ervan een echt dyadisch invloedskanaal
@@ -82,7 +94,9 @@ CREATE TABLE mechanisms (
 CREATE TABLE mechanism_filters (
     mechanism_id INTEGER NOT NULL REFERENCES mechanisms(id) ON DELETE CASCADE,
     filter TEXT NOT NULL CHECK(filter IN (
-        'eigendom', 'advertentie', 'sourcing', 'flak', 'ideologie', 'tegenmacht', 'overig'
+        'eigendom', 'advertentie', 'sourcing', 'flak', 'ideologie', 'tegenmacht', 'overig',
+        -- Besluitvorming (Uitbreiding C, 2026-10-07): overlap met de filters is de bedoeling
+        'formele_macht', 'belangen', 'kennis_advies', 'polder', 'werving'
     )),
     PRIMARY KEY (mechanism_id, filter)
 );
@@ -110,7 +124,8 @@ CREATE TABLE emergent_effects (
     name TEXT NOT NULL UNIQUE,            -- machine-naam, bv. 'fabricage_van_instemming'
     label TEXT NOT NULL,                  -- weergavenaam, bv. 'Fabricage van instemming'
     category TEXT NOT NULL DEFAULT 'systeemactor' CHECK(category IN (
-        'eigendom','advertentie','sourcing','flak','ideologie','systeemactor','overig'
+        'eigendom','advertentie','sourcing','flak','ideologie','systeemactor','overig',
+        'formele_macht','belangen','kennis_advies','polder','werving'  -- Uitbreiding C (2026-10-07)
     )),
     description TEXT NOT NULL,            -- wat is het emergente effect (uit welk samenspel)
     effect TEXT NOT NULL,                -- gevolg voor de berichtgeving
@@ -189,7 +204,11 @@ CREATE TABLE entities (
     )),
     primary_role_id INTEGER REFERENCES roles(id),
     description TEXT,
-    metadata JSON,
+    metadata JSON,                       -- vrij; bv. {"oo_type": "Zelfstandig bestuursorgaan"} (registersoort)
+    -- Uitbreiding C (2026-10-07): meerlagig bestuur. Alleen organisaties; NULL = n.v.t./onbekend.
+    bestuurslaag TEXT CHECK(bestuurslaag IN (
+        'eu', 'rijk', 'provincie', 'gemeente', 'waterschap', 'caribisch', 'regio'
+    )),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
@@ -212,6 +231,25 @@ CREATE TABLE entity_roles (
     notes TEXT,
     PRIMARY KEY (entity_id, role_id)
 );
+
+-- Uitbreiding C (2026-10-07): externe identificatie per entiteit, uniek per stelsel.
+-- Voorkomt dubbele knopen bij registerimport en elke latere sync (tools/registers/),
+-- en vervangt naam-matching: personen worden NOOIT op naam alleen gekoppeld.
+CREATE TABLE externe_ids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    stelsel TEXT NOT NULL CHECK(stelsel IN (
+        'tooi',          -- identifier.overheid.nl (TOOI), bv. 'oorg10212'
+        'oo',            -- systeemId in het register van overheidsorganisaties
+        'tk_persoon',    -- Persoon.Id in de open data van de Tweede Kamer
+        'wikidata',      -- QID, bv. 'Q12345'
+        'ep_mep'         -- MEP-id in de open data van het Europees Parlement
+    )),
+    waarde TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (stelsel, waarde)
+);
+CREATE INDEX idx_externe_ids_entity ON externe_ids(entity_id);
 
 CREATE TABLE relations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -256,10 +294,17 @@ CREATE TABLE relations (
         'etikettering',          -- labelen/diskwalificeren (wappie, complotdenker)
 
         -- Algoritmisch
-        'algoritmische_filtering' -- platformalgoritme bepaalt zichtbaarheid
+        'algoritmische_filtering', -- platformalgoritme bepaalt zichtbaarheid
+
+        -- Bestuur (Uitbreiding C, eigenaarsbesluit 2026-10-07)
+        'ambt',                  -- persoon bekleedt een openbaar ambt bij deze organisatie (titel in `functie`)
+        'zeggenschap',           -- org -> org: hiërarchie, verantwoordelijkheid op afstand, deelname
+        'controle',              -- controleorgaan/rechter/volksvertegenwoordiging -> bestuur (verantwoording)
+        'geschenk'               -- geregistreerd geschenk of betaalde reis (openbaar register)
     )),
     mechanism_id INTEGER REFERENCES mechanisms(id),
     description TEXT,
+    functie TEXT,                -- Uitbreiding C: ambtstitel zoals het register hem geeft (bv. 'Secretaris-generaal')
     certainty REAL CHECK(certainty BETWEEN 0.0 AND 1.0),
     influence REAL CHECK(influence BETWEEN 0.0 AND 1.0),
     bidirectional BOOLEAN DEFAULT FALSE,
@@ -340,11 +385,11 @@ CREATE TABLE sources (
         'onbeoordeeld'       -- nog niet geclassificeerd
     )),
     -- Relevantie-as (los van reliability/rigueur): hoe specifiek gaat de bron over het
-    -- ONDERWERP van dit model — het Nederlandse mediasysteem? Stuurt de relevantiefactor
+    -- ONDERWERP van dit model — het Nederlandse media- en bestuurssysteem? Stuurt de relevantiefactor
     -- in scoring.py (nl_systeem weegt iets zwaarder, buitenlands iets lichter; algemeen/
     -- onbepaald neutraal). Classificatie is reviewer-werk (PATCH /api/sources/<id>/classificatie).
     onderwerp TEXT NOT NULL DEFAULT 'onbepaald' CHECK(onderwerp IN (
-        'nl_systeem',        -- over het Nederlandse mediasysteem
+        'nl_systeem',        -- over het Nederlandse media- en bestuurssysteem (media, politiek, overheid)
         'algemeen',          -- landneutraal raamwerk/theorie (bv. Manufacturing Consent)
         'buitenlands',       -- over een buitenlands mediasysteem (VS, VK, …)
         'onbepaald'          -- nog niet bepaald
@@ -636,7 +681,8 @@ CREATE TABLE user_filter_rollen (
     user_id INTEGER NOT NULL REFERENCES users(id),
     filter TEXT NOT NULL CHECK(filter IN (
         'eigendom', 'advertentie', 'sourcing', 'flak', 'ideologie',
-        'cross_filter', 'systeemactor', 'tegenmacht', 'overig'
+        'cross_filter', 'systeemactor', 'tegenmacht', 'overig',
+        'formele_macht', 'belangen', 'kennis_advies', 'polder', 'werving'  -- Uitbreiding C
     )),
     rol TEXT NOT NULL CHECK(rol IN ('reviewer', 'maintainer')),
     PRIMARY KEY (user_id, filter)

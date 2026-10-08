@@ -67,12 +67,12 @@ def _entities(conn):
     # slice is de STRUCTUUR (types, rollen, scores, bronnen); de prose blijft op de
     # live site. Zie DATA_DICTIONARY.md.
     kol = ["id", "name", "type", "primary_role_id", "primary_role",
-           "active_from", "active_until", "active"]
+           "active_from", "active_until", "active", "bestuurslaag"]
     rijen = [[r["id"], r["name"], r["type"], r["primary_role_id"], r["role_name"],
-              r["active_from"], r["active_until"], int(bool(r["active"]))]
+              r["active_from"], r["active_until"], int(bool(r["active"])), r["bestuurslaag"]]
              for r in conn.execute("""
         SELECT e.id, e.name, e.type, e.primary_role_id,
-               e.active_from, e.active_until, e.active, ro.name AS role_name
+               e.active_from, e.active_until, e.active, ro.name AS role_name, e.bestuurslaag
         FROM entities e
         LEFT JOIN roles ro ON ro.id = e.primary_role_id
         WHERE e.status = 'goedgekeurd' AND NOT e.vervangen
@@ -87,14 +87,14 @@ def _relations(conn):
     (type, mechanisme, filter, twee-assen-score) is het product."""
     kol = ["id", "source_id", "source_name", "target_id", "target_name",
            "relation_type", "mechanism_id", "mechanism_name", "filter",
-           "certainty", "influence", "active_from", "active_until"]
+           "certainty", "influence", "active_from", "active_until", "functie"]
     rijen = [[r["id"], r["source_id"], r["source_name"], r["target_id"],
               r["target_name"], r["relation_type"], r["mechanism_id"],
               r["mechanism_name"], r["mechanism_filter"], r["certainty"],
-              r["influence"], r["active_from"], r["active_until"]]
+              r["influence"], r["active_from"], r["active_until"], r["functie"]]
              for r in conn.execute("""
         SELECT r.id, r.source_id, r.target_id, r.relation_type, r.mechanism_id,
-               r.certainty, r.influence, r.active_from, r.active_until,
+               r.certainty, r.influence, r.active_from, r.active_until, r.functie,
                e1.name AS source_name, e2.name AS target_name,
                m.name AS mechanism_name, m.filter AS mechanism_filter
         FROM relations r

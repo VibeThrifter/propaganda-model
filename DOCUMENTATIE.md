@@ -2,7 +2,7 @@
 
 ## Doel
 
-Dit project modelleert de structurele mechanismen waarmee nieuws in Nederland wordt gefilterd en gevormd voordat het het publiek bereikt. Het is gebaseerd op het propagandamodel van Herman & Chomsky (*Manufacturing Consent*, 1988), toegepast op de Nederlandse context met behulp van het werk van Tabe Bergman, Joris Luyendijk, Kees van der Pijl en anderen.
+Dit project modelleert de structurele mechanismen waarmee nieuws in Nederland wordt gefilterd en gevormd voordat het het publiek bereikt, én — in hetzelfde netwerk — hoe besluiten tot stand komen en wie ze vormt (zie [Uitbreiding C: Besluitvorming](#uitbreiding-c-besluitvorming), eigenaarsbesluit 2026-10-07). Het is gebaseerd op het propagandamodel van Herman & Chomsky (*Manufacturing Consent*, 1988), toegepast op de Nederlandse context met behulp van het werk van Tabe Bergman, Joris Luyendijk, Kees van der Pijl en anderen.
 
 Het model is geen complottheorie. Het beschrijft hoe structurele krachten — eigendom, economische druk, bronafhankelijkheid, disciplinering en ideologie — leiden tot een systematische pro-elite bias als *emergente eigenschap* van het systeem, zonder dat er sprake hoeft te zijn van centrale sturing.
 
@@ -16,7 +16,7 @@ Het systeem onderscheidt twee lagen:
 
 ### Laag 1: Theoretisch model (abstract, zonder namen)
 
-Beschrijft de structuur: welke **rollen** bestaan er in het medialandschap en via welke **mechanismen** oefenen ze invloed uit?
+Beschrijft de structuur: welke **rollen** bestaan er in het medialandschap en het openbaar bestuur, en via welke **mechanismen** oefenen ze invloed uit?
 
 - **Rollen** — abstracte functies die actoren kunnen vervullen (bijv. `mediaeigenaar`, `adverteerder`, `hoofdredacteur`)
 - **Mechanismen** — processen waarmee de ene rol de andere beïnvloedt (bijv. `pakketjournalistiek`, `etikettering`, `zelfcensuur`)
@@ -42,7 +42,7 @@ De kolom `entities.primary_role_id` is daarmee nog slechts **fallback/override**
 
 ## De vijf filters + uitbreidingen
 
-Elk mechanisme draagt **één of meer** filters (multi-filter, in `mechanism_filters`; het primaire filter staat in `mechanisms.filter` en bepaalt de kleur); elke rol hoort bij één categorie. Naast de vijf klassieke filters van Herman & Chomsky kent het model twee uitbreidingen die het hedendaagse Nederlandse landschap vangen: **tegenmacht** (krachten die het filtersysteem begrenzen of doorbreken) en **systeemactoren** (structurele spelers die in alle filters tegelijk opereren). De oude noodcategorie `cross_filter` is vervangen: wat "meerdere filters tegelijk" was, draagt nu gewoon die meerdere filters, en de herkenbare families (draaideur, elite-netwerk, geldstromen, …) zijn ondergebracht in een aparte **thema-as** (zie hieronder).
+Elk mechanisme draagt **één of meer** filters (multi-filter, in `mechanism_filters`; het primaire filter staat in `mechanisms.filter` en bepaalt de kleur); elke rol hoort bij één categorie. Naast de vijf klassieke filters van Herman & Chomsky kent het model drie uitbreidingen die het hedendaagse Nederlandse landschap vangen: **tegenmacht** (krachten die het filtersysteem en de bestuursmacht begrenzen of doorbreken), **systeemactoren** (structurele spelers die in alle filters tegelijk opereren) en **besluitvorming** (vijf categorieën voor hoe besluiten tot stand komen, in hetzelfde netwerk; zie Uitbreiding C). De oude noodcategorie `cross_filter` is vervangen: wat "meerdere filters tegelijk" was, draagt nu gewoon die meerdere filters, en de herkenbare families (draaideur, elite-netwerk, geldstromen, …) zijn ondergebracht in een aparte **thema-as** (zie hieronder).
 
 ### Filter 1: Eigendom
 De eigendomsstructuur bepaalt de institutionele context van nieuwsproductie. In Nederland bestaat een duopolie: DPG Media en Mediahuis bezitten samen >90% van de online commerciële nieuwsmarkt. De eigenaren (families Van Thillo, Leysen, Baert, Van Puijenbroek) behoren tot de transnationale kapitaalklasse.
@@ -166,6 +166,42 @@ Zo vangt de `belanghebbende` de elite-/kapitaalkant die voorheen versplinterd ov
 
 **Rollen:** `politicus`, `publiek`, `redactie`, `techplatform`, `belanghebbende`, `partij`
 
+<a id="uitbreiding-c-besluitvorming"></a>
+### Uitbreiding C: Besluitvorming — vijf categorieën in hetzelfde netwerk
+*Eigenaarsbesluit 2026-10-07 (`VOORSTEL_besluitvorming-als-categorieen.md`).* Het model toont niet alleen hoe nieuws gefilterd wordt, maar ook **hoe besluiten tot stand komen en wie ze vormt**. Dat is geen tweede model: in de echte wereld is het één netwerk. Een minister is bron voor de NOS (Sourcing) én hoofd van een departement; een draaideur van Kamerlid naar lobbykantoor raakt de berichtgeving én het beleid. Daarom komen er vijf **categorieën** bij in hetzelfde veld als de filters (`mechanisms.filter`, `mechanism_filters`, `roles.category`), en mag een mechanisme in meerdere tegelijk vallen.
+
+**Theoretische grond.** G. William Domhoff (*Who Rules America?*) beschrijft vier netwerken waarlangs een machtselite beleid vormt. Het vierde, het *opinion-shaping process*, is het terrein van Herman & Chomsky — de vijf filters hierboven. De andere drie worden categorieën, aangevuld met twee Nederlandse lagen die Domhoff voor de VS niet nodig had:
+
+| Categorie | Vraag | Domhoff / NL-bron | Voorbeelden |
+|---|---|---|---|
+| `formele_macht` | Wie mag hierover besluiten? | NL: ministeriële verantwoordelijkheid, ambtelijke top (ABD, onderzoek 1.4), verzelfstandiging, meerlagig bestuur | minister → departement, SG/DG, ministerie → zbo op afstand, burgemeester/wethouder → gemeente, EU-regels |
+| `belangen` | Wie heeft er belang bij, en hoe komt het binnen? | special-interest process | lobbytoegang, geschenken en betaalde reizen, subsidies, nevenfuncties |
+| `kennis_advies` | Wie levert de kennis en het advies? | policy-planning process | Raad van State, WRR, planbureaus, adviescolleges, denktanks, consultants, elite-fora |
+| `polder` | Wie zit er aan tafel? | NL: corporatisme (onderzoek 3.4) | SER, Stichting van de Arbeid, vakbonden en werkgevers, akkoorden en overlegtafels |
+| `werving` | Wie komt waar terecht, en via wie? | candidate-selection process | kandidaatstelling, (Kroon)benoemingen, draaideur, kadervorming |
+
+**Controle valt onder `tegenmacht`.** Tegenmacht betekent al *soort 1: verantwoording* (zie Uitbreiding B), en `parlementaire_controle` staat er al onder. De Rekenkamer, de ombudsman, inspecties en de bestuursrechter zijn verantwoording van **bestuursmacht** in dezelfde zin; `tegenmacht.FILTER_DOELEN` telt daarom de bestuurscategorieën mee als doel (`filter:formele_macht` = deze edge checkt formele macht). De gevolgen zijn bewust: een controle-edge telt, zoals elke tegenmacht-edge, negatief in de directe invloed (`influence.edge_sign`) en kleurt geen knoop (`scoring.py`).
+
+**Meerlagig bestuur** is geen categorie maar een eigenschap van een organisatie: `entities.bestuurslaag` (`eu`, `rijk`, `provincie`, `gemeente`, `waterschap`, `caribisch`, `regio`). Het type blijft de structuurvorm (`overheidsinstelling`, `toezichthouder`, `rechterlijke_macht`); de registersoort (ministerie, zbo, agentschap, adviescollege, inspectie, …) staat in `metadata.oo_type`.
+
+**Besluiten zelf zijn geen knoop.** Het model toont wie bevoegd is en langs welke kanalen besluiten gevormd worden — niet elk wetsvoorstel of elke motie (eigenaarsbesluit: "alleen wie besluit").
+
+**Rollen:** `bewindspersoon`, `topambtenaar`, `departement`, `uitvoeringsorganisatie`, `decentrale_overheid`, `lokale_bestuurder`, `eu_instelling` (formele macht); `adviesorgaan`, `consultant` (kennis & advies); `sociale_partner` (polder); `controleorgaan`, `bestuursrechter` (tegenmacht/controle). Bestaande rollen doen mee waar ze passen: `politicus`, `partij`, `parlementair_controleur` (de Kamers), `toezichthouder`, `lobbyist`, `belanghebbende`, `denktank`, `gezagsinstituut`, `elite_forum`.
+
+**Mechanismen:**
+- *Formele macht:* `ministeriele_verantwoordelijkheid` (bewindspersoon → departement), `ambtelijke_leiding` (de benoemde leiding van een departement, agentschap, zbo of adviesorgaan), `hierarchische_aansturing` (departement → directoraat-generaal of agentschap), `verzelfstandigd_bestuur` (departement → zbo, op afstand), `lokaal_bestuursmandaat` (burgemeester, wethouder, CdK, dijkgraaf → hun overheid), `kamerzetel` (volksvertegenwoordiger → Kamer of raad; ook tegenmacht), `europese_doorwerking` (EU-regels binden nationaal en decentraal beleid), `markttoezicht` (toezichthouder neemt bindende besluiten over een markt; ook tegenmacht).
+- *Belangen:* `lobbytoegang` (vaste toegangspas tot de Kamer), `geschenk_en_gastvrijheid` (geregistreerde geschenken en betaalde reizen), `nevenfunctie_verstrengeling` (lopende nevenfuncties van ambtsdragers; ook werving).
+- *Kennis & advies:* `institutioneel_advies` (adviescollege → departement), `inhuur_consultancy` (adviesbureau → departement; ook belangen).
+- *Polder:* `polderoverleg` (sociale partner → SER/Stichting van de Arbeid), `akkoord_preemptie` (een vooraf gesloten akkoord legt de uitkomst vast vóór het parlement spreekt; ook formele macht).
+- *Werving:* `kroonbenoeming` (benoeming van burgemeesters, zbo-bestuurders en topambtenaren door Kroon en ministerraad).
+- *Tegenmacht (controle):* `onafhankelijke_controle` (Rekenkamer, ombudsman, inspectie → bestuur), `beleid_via_rechter` (de bestuursrechter toetst en dwingt beleid af — de juridificering uit onderzoek 3.8).
+
+**Overlap met bestaande mechanismen** (extra categorieën via `mechanism_filters`): de draaideur-familie (`draaideurconstructie`, `draaideur_politiek_*`, `draaideur_journalistiek_politiek`), `partijlijn`, `politieke_kadervorming` en `staatspartijfinanciering` → `werving`; `lobbyist_naar_politicus`, `belangenbehartiging`, `partijfinanciering`, `kapitaalvluchtdreiging`, `overheidssubsidie_ngo`/`_denktank` → `belangen`; `denktank_naar_politiek`, `belanghebbende_als_adviseur`, `begrotingsorthodoxie`, `politieke_synchronisatie`, `institutionele_gezagsketen` → `kennis_advies`.
+
+**Relatietypes.** Vier nieuwe vormen: `ambt` (persoon → overheidsorganisatie: bekleedt een openbaar ambt; de titel staat in `relations.functie`, bv. "Secretaris-generaal"), `zeggenschap` (organisatie → organisatie: hiërarchie, verantwoordelijkheid op afstand, deelname), `controle` (controleorgaan of rechter → bestuur) en `geschenk` (gever → ambtsdrager, uit het openbare register). De rest wordt hergebruikt: `lobbyt`, `financiering`, `adviseur`, `lidmaatschap`, `bestuurder`, `personeel`.
+
+**Waar de praktijklaag vandaan komt.** Open registers, zonder AI, via `tools/registers/` en het gewone REST-pad (account `register-import`): het register van overheidsorganisaties (organisaties.overheid.nl), de Tweede Kamer (Kamerleden, fracties, nevenfuncties, loopbaan, geschenken, reizen), Wikidata (volledige namen en id's), het Europees Parlement en het lobbyistenregister. Externe id's (`externe_ids`: tooi, oo, tk_persoon, wikidata, ep_mep) voorkomen dubbele knopen; personen worden **nooit op naam alleen** gekoppeld. Een deterministische **registercheck** (account `registercheck`, geen LLM) toetst elk registerfeit aan de bewaarde registeruitgave en geeft het onafhankelijke A1-oordeel; zie CLAUDE.md § "Besluitvorming".
+
 ---
 
 ## Databaseschema
@@ -197,8 +233,8 @@ Zie "Scores: van discussieboom naar theorie".
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `roles` | Abstracte rollen in het medialandschap | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`), description, examples, active_from/active_until (temporeel) |
-| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primair filter; vijf filters + `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id, active_from/active_until (temporeel) |
+| `roles` | Abstracte rollen in het medialandschap en het openbaar bestuur | name, category (`eigendom`/`advertentie`/`sourcing`/`flak`/`ideologie`/`systeemactor`/`tegenmacht`/`overig`, plus de besluitvormingscategorieën `formele_macht`/`belangen`/`kennis_advies`/`polder`/`werving`), description, examples, active_from/active_until (temporeel) |
+| `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primaire categorie; vijf filters, vijf besluitvormingscategorieën, `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id, active_from/active_until (temporeel) |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
 | `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`; `systemisch` deprecated/leeg — aard-laag codeert dat) |
 | `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl). Eersteklas theorie-element: eigen discussieboom (`arguments.emergent_effect_id`), eigen tijdvenster en eigen score (lit-only) | name, label, category, description, effect, active_from/active_until (temporeel) |
@@ -211,9 +247,10 @@ Zie "Scores: van discussieboom naar theorie".
 
 | Tabel | Beschrijving | Velden |
 |---|---|---|
-| `entities` | Concrete actoren (personen, organisaties, partijen) | name, type, primary_role_id, description, metadata (JSON), active_from/active_until/active (temporeel) |
+| `entities` | Concrete actoren (personen, organisaties, partijen) | name, type, primary_role_id, description, metadata (JSON; bv. `oo_type` = de registersoort), **bestuurslaag** (`eu`/`rijk`/`provincie`/`gemeente`/`waterschap`/`caribisch`/`regio`, alleen organisaties), active_from/active_until/active (temporeel) |
+| `externe_ids` | Externe identificatie per entiteit (uniek per stelsel): voorkomt dubbele knopen bij registerimport en sync | entity_id, stelsel (`tooi`/`oo`/`tk_persoon`/`wikidata`/`ep_mep`), waarde |
 | `entity_roles` | Koppeltabel: entiteit kan meerdere rollen vervullen | entity_id, role_id, notes |
-| `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, description, certainty, influence, bidirectional, active_from/active_until/active (temporeel) |
+| `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, description, **functie** (ambtstitel uit het register, bij `ambt`), certainty, influence, bidirectional, active_from/active_until/active (temporeel) |
 | `instantiations` | Expliciete klasse↔instantie-koppeling: rol↔entiteit of mechanisme↔relatie, met **exemplariteit** (hoe prototypisch is dit voorbeeld). Basis voor de bottom-up aggregatie. | role_id/mechanism_id (de klasse), entity_id/relation_id (de instantie), exemplarity (0–1), notes |
 | `source_mentions` | Welke entiteiten worden in welke bronnen genoemd | source_id, entity_id, context |
 
@@ -420,7 +457,7 @@ Elke relatie heeft twee onafhankelijke scores:
 | 0.3 - 0.49 | Mogelijk | Specifieke SLAPP-dreiging door GBL |
 | < 0.3 | Speculatief | — |
 
-### Influence (invloed): "Hoe sterk werkt het door in de berichtgeving?"
+### Influence (invloed): "Hoe sterk werkt het door in de berichtgeving of de besluitvorming?"
 
 | Score | Betekenis | Voorbeeld |
 |---|---|---|
@@ -821,7 +858,8 @@ De volledige lijst staat in de `CHECK`-constraint van `relations` in `schema.sql
 | Groep | Types |
 |---|---|
 | **Eigendom & financiën** | `eigendom`, `financiering`, `adverteerder`, `donor`, `investering` |
-| **Organisatorisch** | `lidmaatschap`, `personeel`, `bestuurder`, `adviseur`, `woordvoerder_van`, `draaideur` |
+| **Organisatorisch** | `lidmaatschap`, `personeel`, `dienstverband`, `bestuurder`, `adviseur`, `woordvoerder_van`, `draaideur` |
+| **Bestuur** (Uitbreiding C) | `ambt` (persoon bekleedt een openbaar ambt; titel in `functie`), `zeggenschap` (hiërarchie / verantwoordelijkheid op afstand / deelname), `controle` (controleorgaan of rechter → bestuur), `geschenk` (geregistreerd geschenk of betaalde reis) |
 | **Informatiestromen** | `bron_van`, `mediaplatform`, `framing`, `citeert` |
 | **Macht & druk** | `lobbyt`, `censuur`, `flak`, `intimidatie`, `regulering`, `zelfcensuur` |
 | **Politiek & ideologisch** | `alliantie`, `oppositie`, `beinvloeding`, `cooptatie`, `etikettering` |

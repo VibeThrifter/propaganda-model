@@ -153,6 +153,7 @@ body {
 .model-intro .mi-acties { display: flex; justify-content: flex-end; margin-top: 10px; }
 
 .filter-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-groep { flex-basis: 100%; font-size: 10px; color: var(--text-muted); margin: 4px 0 -2px; }
 
 .filter-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -810,8 +811,13 @@ footer.hs-voet .hs-voet-merk { display: none; }
     </div>
   </div>
   <div class="panel-section collapsible" id="filterSection">
-    <h3>Filters (Chomsky/Herman)</h3>
+    <h3>Filters &amp; categorieën</h3>
     <div class="filter-group" id="filterChips"></div>
+  </div>
+  <div class="panel-section collapsible" id="laagSection" style="display:none">
+    <h3>Bestuurslaag</h3>
+    <div style="font-size:10px;color:var(--text-muted);margin:-2px 0 7px">Gemeenten, waterschappen en regio's staan standaard uit, zodat de graaf leesbaar blijft. Een ambtsdrager volgt de laag van zijn ambt.</div>
+    <div class="filter-group" id="laagChips"></div>
   </div>
   <div class="panel-section collapsible geavanceerd" id="themeSection">
     <h3>Thema's (dwarsverbanden)</h3>
@@ -1103,8 +1109,11 @@ const RELATION_LABELS = {
   eigendom: 'Eigendom', financiering: 'Financiering', adverteerder: 'Adverteerder',
   donor: 'Donor', investering: 'Investering',
   // Organisatorisch
-  lidmaatschap: 'Lidmaatschap', personeel: 'Personeel', bestuurder: 'Bestuurder',
-  adviseur: 'Adviseur', woordvoerder_van: 'Woordvoerder', draaideur: 'Draaideur',
+  lidmaatschap: 'Lidmaatschap', personeel: 'Personeel', dienstverband: 'Dienstverband',
+  bestuurder: 'Bestuurder', adviseur: 'Adviseur', woordvoerder_van: 'Woordvoerder',
+  draaideur: 'Draaideur',
+  // Bestuur (Uitbreiding C, 2026-10-07)
+  ambt: 'Ambt', zeggenschap: 'Zeggenschap', controle: 'Controle', geschenk: 'Geschenk',
   // Informatiestromen
   bron_van: 'Bron van', mediaplatform: 'Mediaplatform', framing: 'Framing', citeert: 'Citeert',
   // Macht & druk
@@ -2165,6 +2174,9 @@ let state = {
   ideoAxis: 'economisch', // kleurmodus 'ideologie': welke as kleurt (economisch|cultureel|establishment)
   activeFilters: new Set(Object.keys(FILTER_LABELS)),  // filter-as: categorieën van de EDGES
   activeThemes: new Set(Object.keys(THEME_LABELS)),    // thema-as: dwarsverbanden van de EDGES
+  // Uitbreiding C: bestuurslaag (alleen praktijkmodel). Lokale lagen standaard uit.
+  activeLagen: new Set(['eu', 'rijk', 'provincie', 'caribisch']),
+  laagVanNode: new Map(),   // entity-id -> Set(lagen): organisatie = eigen laag, persoon = laag van zijn ambt(en)
   certMin: 0, inflMin: 0,
   selectedNode: null,
   selectedRelation: null,
@@ -2492,6 +2504,8 @@ function buildGraph() {
 
   currentNodes = nodes;
   currentLinks = links;
+  state.laagVanNode = isTheory ? new Map() : computeLaagMap(nodes, links);
+  rebuildLaagChips();
   _ringMaps = { instance: null, theory: null };    // multi-filter-ring lui herberekenen op de nieuwe data
   state.receivedMap = computeReceivedMap();        // voor de 'ontvangen invloed'-maat
   state.fieldPropertyMap = computeFieldPropertyMap(); // voor de veld-eigenschap-halo's
@@ -5491,6 +5505,53 @@ function linkTijdloos(l) {
   return false;
 }
 
+// ── Bestuurslaag (Uitbreiding C, 2026-10-07) ──────────────────────────────
+// Een organisatie draagt haar eigen laag (entities.bestuurslaag); een persoon volgt de
+// laag van de organisatie(s) waar hij een ambt bekleedt. Wie geen laag heeft (media,
+// bedrijven, mensen zonder ambt) valt nooit weg door dit filter.
+function computeLaagMap(nodes, links) {
+  const m = new Map();
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  nodes.forEach(n => { if (n.bestuurslaag) m.set(n.id, new Set([n.bestuurslaag])); });
+  links.forEach(l => {
+    if (l.relation_type !== 'ambt') return;
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    const org = byId.get(tid), pers = byId.get(sid);
+    if (!org || !pers || pers.type !== 'persoon' || !org.bestuurslaag) return;
+    if (!m.has(sid)) m.set(sid, new Set());
+    m.get(sid).add(org.bestuurslaag);
+  });
+  return m;
+}
+function laagZichtbaar(id) {
+  const lagen = state.laagVanNode.get(id);
+  if (!lagen || !lagen.size) return true;
+  for (const l of lagen) if (state.activeLagen.has(l)) return true;
+  return false;
+}
+function rebuildLaagChips() {
+  const sectie = document.getElementById('laagSection');
+  const box = document.getElementById('laagChips');
+  if (!sectie || !box) return;
+  const aanwezig = new Set();
+  if (state.model !== 'theory') state.laagVanNode.forEach(s => s.forEach(l => aanwezig.add(l)));
+  sectie.style.display = aanwezig.size ? '' : 'none';
+  box.innerHTML = '';
+  Object.keys(BESTUURSLAAG_LABELS).filter(k => aanwezig.has(k)).forEach(k => {
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip' + (state.activeLagen.has(k) ? ' active' : '');
+    chip.style.setProperty('--chip-color', '#94a3b8');
+    chip.innerHTML = `<span class="dot"></span>${BESTUURSLAAG_LABELS[k]}`;
+    chip.addEventListener('click', () => {
+      if (state.activeLagen.has(k)) state.activeLagen.delete(k); else state.activeLagen.add(k);
+      chip.classList.toggle('active', state.activeLagen.has(k));
+      applyFilters();
+    });
+    box.appendChild(chip);
+  });
+}
+
 function computeVisibleLinks(negeerValentie) {
   const isTheory = state.model === 'theory';
   const cf = state.certMin;
@@ -5510,7 +5571,8 @@ function computeVisibleLinks(negeerValentie) {
     const matchTime = isActiveAt(n, year);
     // Voorgestelde nodes (in review) alleen tonen als de toggle aanstaat.
     const matchStatus = state.showVoorgesteld || !isVoorgesteld(n);
-    nodePassesFilter.set(n.id, matchLegend && matchSearch && matchTime && matchStatus);
+    const matchLaag = isTheory || laagZichtbaar(n.id);
+    nodePassesFilter.set(n.id, matchLegend && matchSearch && matchTime && matchStatus && matchLaag);
   });
 
   const visibleLinkSet = new Set();
@@ -6220,7 +6282,24 @@ function rebuildAxis(axisKey) {
   a.set(new Set(a.defaultActive));
   a.container.innerHTML = '';
   a.els.clear();
+  // Uitbreiding C: op de filter-as een kopje per groep (Media / Besluitvorming), maar
+  // alleen als er besluitvormings-edges zijn — anders blijft de as zoals hij was.
+  const metGroepen = axisKey === 'filter' && a.cats.some(k => BESLUITVORMING_CATEGORIEEN.has(k));
+  if (metGroepen) {
+    a.cats.sort((x, y) => (BESLUITVORMING_CATEGORIEEN.has(x) - BESLUITVORMING_CATEGORIEEN.has(y)));
+  }
+  let vorigeGroep = null;
   a.cats.forEach(key => {
+    if (metGroepen) {
+      const groep = BESLUITVORMING_CATEGORIEEN.has(key) ? 'Besluitvorming' : 'Media';
+      if (groep !== vorigeGroep) {
+        const kop = document.createElement('div');
+        kop.className = 'chip-groep';
+        kop.textContent = groep;
+        a.container.appendChild(kop);
+        vorigeGroep = groep;
+      }
+    }
     const chip = document.createElement('div');
     chip.className = 'filter-chip' + (a.defaultActive.has(key) ? ' active' : '');
     chip.style.setProperty('--chip-color', a.colors[key]);
@@ -6454,7 +6533,8 @@ const ENTITY_TYPE_GROUPS = {
 };
 // Volgorde waarin rollen per filter in de dropdown gegroepeerd worden.
 const ROLE_CAT_ORDER = ['eigendom','advertentie','sourcing','flak','ideologie',
-  'systeemactor','tegenmacht','cross_filter','overig'];
+  'systeemactor','tegenmacht','formele_macht','belangen','kennis_advies','polder','werving',
+  'cross_filter','overig'];
 
 function entityTypeOptions() {
   return Object.entries(ENTITY_TYPE_GROUPS).map(([grp, types]) =>
@@ -6489,8 +6569,10 @@ function mechanismOptions() {
       .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
 }
 // Theorie-dropdowns
-const ROLE_CATEGORIES = ['eigendom','advertentie','sourcing','flak','ideologie','systeemactor','tegenmacht','overig'];
-const MECH_FILTERS = ['eigendom','advertentie','sourcing','flak','ideologie','cross_filter','tegenmacht','overig'];
+const ROLE_CATEGORIES = ['eigendom','advertentie','sourcing','flak','ideologie','systeemactor','tegenmacht',
+  'formele_macht','belangen','kennis_advies','polder','werving','overig'];
+const MECH_FILTERS = ['eigendom','advertentie','sourcing','flak','ideologie','cross_filter','tegenmacht',
+  'formele_macht','belangen','kennis_advies','polder','werving','overig'];
 const MECH_TYPES = ['structureel','procedureel','psychologisch','economisch','juridisch','technologisch','discursief'];
 function catOptions(list, selected) {
   return list.map(c => `<option value="${c}"${c === selected ? ' selected' : ''}>${FILTER_LABELS[c] || c}</option>`).join('');

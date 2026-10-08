@@ -53,6 +53,7 @@ import argparse
 import datetime
 import difflib
 import fcntl
+import http.client
 import json
 import os
 import re
@@ -71,6 +72,7 @@ import bronchecker  # noqa: E402
 import bronklasse  # noqa: E402
 import bronzoeker  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
+import registercheck  # noqa: E402
 import rfc_beoordeling  # noqa: E402
 import smaadtoets  # noqa: E402
 
@@ -85,7 +87,8 @@ CLAUDE = shutil.which("claude") or "/usr/local/bin/claude"
 CAFFEINATE = shutil.which("caffeinate")
 # Spiegelt server.BEOORDELING_STRUCTUURTYPES (neutrale structuurfeiten: geen A2 nodig)
 STRUCTUURTYPES = ("personeel", "dienstverband", "bestuurder", "adviseur", "woordvoerder_van",
-                  "lidmaatschap", "eigendom", "draaideur")
+                  "lidmaatschap", "eigendom", "draaideur",
+                  "ambt", "zeggenschap", "controle", "geschenk")  # Uitbreiding C (2026-10-07)
 REDEN = "automatische beoordeling"
 
 
@@ -98,18 +101,25 @@ def db():
 
 def req(method, pad, token, body=None):
     data = json.dumps(body).encode() if body is not None else None
-    r = urllib.request.Request(API + pad, data=data, method=method,
-                               headers={"Authorization": f"Bearer {token}",
-                                        "Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(r, timeout=60) as resp:
-            tekst = resp.read().decode()
-            return resp.status, (json.loads(tekst) if tekst else {})
-    except urllib.error.HTTPError as e:
+    for poging in range(4):
+        r = urllib.request.Request(API + pad, data=data, method=method,
+                                   headers={"Authorization": f"Bearer {token}",
+                                            "Content-Type": "application/json"})
         try:
-            return e.code, json.loads(e.read().decode() or "{}")
-        except json.JSONDecodeError:
-            return e.code, {}
+            with urllib.request.urlopen(r, timeout=60) as resp:
+                tekst = resp.read().decode()
+                return resp.status, (json.loads(tekst) if tekst else {})
+        except urllib.error.HTTPError as e:
+            try:
+                return e.code, json.loads(e.read().decode() or "{}")
+            except json.JSONDecodeError:
+                return e.code, {}
+        except (http.client.RemoteDisconnected, ConnectionError, urllib.error.URLError):
+            # de server herstart even (bv. de reloader na een codewijziging): niet de hele
+            # ronde laten vallen, maar kort wachten en opnieuw (2026-10-08: A7 brak zo af)
+            if poging == 3:
+                raise
+            time.sleep(3 * 2 ** poging)
 
 
 def startmoment(*tijden: str | None) -> str | None:
@@ -521,6 +531,7 @@ def stap_feitelijke_versies(args, meld) -> dict:
 def stap_goedkeuren(token, args, meld) -> dict:
     """Relaties en entiteiten met gecontroleerd bewijs: entiteiten eerst, dan relaties."""
     tel = {"entities": 0, "relations": 0}
+    uitgeput: set[str] = set()
     for tabel in ("entities", "relations"):
         conn = db()
         try:
@@ -532,9 +543,19 @@ def stap_goedkeuren(token, args, meld) -> dict:
         for rid in ids:
             methode = "GET" if args.droog else "POST"
             status, antwoord = req(methode, f"/api/beoordeling/autokeur/{tabel}/{rid}", token)
-            if status in (429, 503):
+            if status == 503:
                 meld(f"Goedkeuren gestopt: {antwoord.get('error')}")
                 return tel
+            if status == 429:
+                # Twee plafonds (Uitbreiding C): gewoon en register. Is er één bereikt, dan
+                # gaan elementen van de andere soort gewoon door.
+                soort = antwoord.get("soort") or "gewoon"
+                if soort not in uitgeput:
+                    meld(f"Dagplafond ({soort}) bereikt: {antwoord.get('error')}")
+                uitgeput.add(soort)
+                if {"gewoon", "register"} <= uitgeput:
+                    return tel
+                continue
             if (args.droog and antwoord.get("toegestaan")) or antwoord.get("goedgekeurd"):
                 tel[tabel] += 1
     meld(f"Goedgekeurd: {tel['entities']} entiteit(en), {tel['relations']} relatie(s)")
@@ -721,6 +742,8 @@ def ronde(args, meld=print) -> dict:
     uitkomst["a1_controle"] = bronchecker.draai(max_n=args.max_controle, droog=args.droog,
                                                 parallel=args.parallel, modus="controle",
                                                 meld=meld)
+    # 2b. A1 voor registerfeiten (Uitbreiding C): deterministisch tegen de bewaarde uitgave
+    uitkomst["registercheck"] = registercheck.draai(droog=args.droog, meld=meld)
     # 3. Smaad-firewall door een agent, en eigen afwijzingen terug na een nieuw 'klopt'
     uitkomst["smaadtoets"] = stap_smaadtoets(args, meld)
     uitkomst["smaad_vrijgegeven"] = stap_smaad_vrijgeven(token, args, meld)

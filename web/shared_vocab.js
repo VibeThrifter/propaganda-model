@@ -14,12 +14,25 @@ const FILTER_COLORS = {
   systeemactor: '#e8c547', cross_filter: '#fd79a8',
   tegenmacht: '#1abc9c',
   overig: '#7f8c9a',
+  // Besluitvorming (Uitbreiding C, 2026-10-07): eigen tinten, onderscheidbaar van de filters
+  formele_macht: '#5468ff', belangen: '#c4d630', kennis_advies: '#e15ef2',
+  polder: '#c08552', werving: '#22d3ee',
 };
 const FILTER_LABELS = {
   eigendom: '1. Eigendom', advertentie: '2. Advertentie', sourcing: '3. Sourcing',
   flak: '4. Flak', ideologie: '5. Ideologie',
   systeemactor: 'Systeemactor', tegenmacht: 'Tegenmacht', cross_filter: 'Cross-filter',
   overig: 'Overig',
+  formele_macht: 'Formele macht', belangen: 'Belangen', kennis_advies: 'Kennis & advies',
+  polder: 'Polder', werving: 'Werving',
+};
+// Uitbreiding C: de vijf besluitvormingscategorieën (zelfde netwerk, eigen chipgroep).
+const BESLUITVORMING_CATEGORIEEN = new Set(['formele_macht', 'belangen', 'kennis_advies',
+  'polder', 'werving']);
+// Bestuurslaag van een organisatie (entities.bestuurslaag); volgorde = weergave.
+const BESTUURSLAAG_LABELS = {
+  eu: 'EU', rijk: 'Rijk', provincie: 'Provincie', gemeente: 'Gemeente',
+  waterschap: 'Waterschap', caribisch: 'Caribisch Nederland', regio: 'Regio',
 };
 
 // ── Leesbare namen (W2.3) ─────────────────────────────────────────────────
@@ -35,6 +48,11 @@ const NAAM_WEERGAVE = {
   columnist_opiniemaker: 'Columnist / opiniemaker',
   elite_forum: 'Elite-forum',
   vakbond_media: 'Vakbond (media)',
+  eu_instelling: 'EU-instelling',
+  // Uitbreiding C — mechanismen met trema's/koppeltekens
+  ministeriele_verantwoordelijkheid: 'Ministeriële verantwoordelijkheid',
+  hierarchische_aansturing: 'Hiërarchische aansturing',
+  akkoord_preemptie: 'Akkoord-preëmptie',
   // Mechanismen — spelling (trema's, koppeltekens, afkortingen)
   commerciele_afhankelijkheid: 'Commerciële afhankelijkheid',
   continuiteitsborging: 'Continuïteitsborging',

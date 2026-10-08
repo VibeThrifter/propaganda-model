@@ -48,7 +48,9 @@ ROLLEN = {
         "model": "opus",
         "systeem": (
             "Je bent toetser van voorstellen (RfC's) voor een onderzoeksdatabase over het "
-            "Nederlandse mediasysteem, gebouwd op het propagandamodel van Herman & Chomsky. Je "
+            "Nederlandse media- en bestuurssysteem als één netwerk: het propagandamodel van "
+            "Herman & Chomsky plus de besluitvormingscategorieën (formele macht, belangen, kennis "
+            "& advies, polder, werving; naar Domhoff). Je "
             "toetst of een voorstel klopt en past: (1) feiten kloppen (ga ze na op het web met "
             "WebSearch/WebFetch; verzin niets); (2) het past in de theorie en het model; (3) het "
             "is geen duplicaat of bijna-duplicaat van een bestaand element; (4) een nieuwe "
@@ -59,7 +61,9 @@ ROLLEN = {
         "model": "sonnet",
         "systeem": (
             "Je bent de criticus van voorstellen (RfC's) voor een onderzoeksdatabase over het "
-            "Nederlandse mediasysteem (propagandamodel van Herman & Chomsky). Je zoekt redenen "
+            "Nederlandse media- en bestuurssysteem als één netwerk (propagandamodel van Herman & "
+            "Chomsky plus besluitvorming: formele macht, belangen, kennis & advies, polder, "
+            "werving). Hoe besluiten tot stand komen valt BINNEN het onderwerp. Je zoekt redenen "
             "om een voorstel af te wijzen: een duplicaat van een bestaand element, te vaag of "
             "niet onderscheidend, feitelijk onjuist (ga feiten na op het web met "
             "WebSearch/WebFetch), of buiten het onderwerp van het model. Wijs alleen af met een "

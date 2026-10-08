@@ -151,6 +151,7 @@ zijn `status='goedgekeurd' AND NOT vervangen` (de `voorgesteld`/`afgewezen`/
 | `primary_role` | Naam van die rol (bv. `mediaeigenaar`, `gatekeeper`). |
 | `active_from` / `active_until` | Looptijd (jaar of datum); leeg = onbegrensd voor zover bekend. |
 | `active` | 1/0 — of de entiteit als actueel geldt. |
+| `bestuurslaag` | Alleen bij overheidsorganisaties (Uitbreiding C, 2026-10-07): `eu`, `rijk`, `provincie`, `gemeente`, `waterschap`, `caribisch` of `regio`; leeg voor de rest. |
 
 ### `relations.csv` — de gerichte banden
 
@@ -159,12 +160,13 @@ zijn `status='goedgekeurd' AND NOT vervangen` (de `voorgesteld`/`afgewezen`/
 | `id` | Primaire sleutel. |
 | `source_id` / `source_name` | Uitgaande knoop (de bron van de invloed). |
 | `target_id` / `target_name` | Inkomende knoop. |
-| `relation_type` | Aard van de band (`schema.sql` :220–260): o.a. `eigendom`, `financiering`, `adverteerder`, `lidmaatschap`, `bestuurder`, `draaideur`, `bron_van`, `framing`, `lobbyt`, `flak`, `intimidatie`, `regulering`, `zelfcensuur`, `cooptatie`, `algoritmische_filtering`. |
+| `relation_type` | Aard van de band (`schema.sql`): o.a. `eigendom`, `financiering`, `adverteerder`, `lidmaatschap`, `bestuurder`, `draaideur`, `bron_van`, `framing`, `lobbyt`, `flak`, `intimidatie`, `regulering`, `zelfcensuur`, `cooptatie`, `algoritmische_filtering`, en sinds Uitbreiding C (2026-10-07) `ambt` (persoon → overheidsorganisatie), `zeggenschap` (organisatie → organisatie), `controle` en `geschenk`. |
 | `mechanism_id` / `mechanism_name` | Het theorie-mechanisme waarvan deze relatie een instantie is (leeg = nog geen mechanisme; zo'n relatie is dan geen goedgekeurde instantie). |
-| `filter` | Het primaire propagandamodel-filter van dat mechanisme: `eigendom`, `advertentie`, `sourcing`, `flak`, `ideologie`, `tegenmacht`, `overig`. |
+| `filter` | De primaire categorie van dat mechanisme: een van de vijf filters (`eigendom`, `advertentie`, `sourcing`, `flak`, `ideologie`), `tegenmacht`, `overig`, `cross_filter`, of een van de vijf categorieën van de besluitvorming (Uitbreiding C, 2026-10-07): `formele_macht`, `belangen`, `kennis_advies`, `polder`, `werving`. |
 | `certainty` | As 1 — *bestaat de relatie?* 0,0–1,0. 0,05 = onbewezen prior (zie boven). |
 | `influence` | As 2 — *hoe sterk stuurt ze berichtgeving?* 0,0–1,0. 0,05 = onbewezen prior. |
 | `active_from` / `active_until` | Looptijd; leeg = onbegrensd voor zover bekend. |
+| `functie` | De ambtstitel of functie zoals het register hem geeft (bv. "Secretaris-generaal", "Kamerlid, fractievoorzitter", "Vaste toegangspas (…)"); meestal bij `ambt`, verder leeg. |
 
 ### `sources.csv` — de bronnenlijst (bibliografisch)
 

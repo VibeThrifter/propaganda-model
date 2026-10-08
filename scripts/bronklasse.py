@@ -63,8 +63,8 @@ ONDERWERPEN = ("nl_systeem", "algemeen", "buitenlands", "onbepaald")
 ONDERWERP_VOLGORDE = ("buitenlands", "onbepaald", "algemeen", "nl_systeem")
 
 SYSTEM_PROMPT = (
-    "Je classificeert bronnen voor een onderzoeksdatabase over het Nederlandse mediasysteem "
-    "(het propagandamodel van Herman & Chomsky). Per bron geef je twee dingen.\n"
+    "Je classificeert bronnen voor een onderzoeksdatabase over het Nederlandse media- en "
+    "bestuurssysteem (het propagandamodel van Herman & Chomsky plus besluitvorming). Per bron geef je twee dingen.\n"
     "reliability — de betrouwbaarheid van het soort bron:\n"
     "- primair: het originele document zelf: wet- of regelgeving, officieel register (KvK, "
     "Staatscourant), dataset, transcript, jaarverslag, persbericht of eigen verklaring van de "

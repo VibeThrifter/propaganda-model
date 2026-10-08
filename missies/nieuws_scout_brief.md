@@ -33,7 +33,9 @@ wachtrij, de afbakening en de snelheidsrem toe.
 ## Wie wel, wie nooit
 
 - **Wel, in deze volgorde:** politici en bestuurders van overheden (Kamerleden,
-  ministers, wethouders, burgemeesters, gedeputeerden), journalisten/hoofdredacteuren,
+  ministers, wethouders, burgemeesters, gedeputeerden), topambtenaren (secretarissen-generaal,
+  directeuren-generaal, inspecteurs-generaal) en bestuurders van zbo's, agentschappen en
+  adviescolleges (besluitvorming hoort sinds 2026-10-07 in hetzelfde netwerk), journalisten/hoofdredacteuren,
   woordvoerders/voorlichters, bestuurders/commissarissen/directeuren van organisaties;
   daarna organisaties en experts (hoogleraren, analisten, denktankmedewerkers).
 - **Nooit:** privépersonen — bewoners, ooggetuigen, slachtoffers, verdachten,
@@ -107,6 +109,16 @@ wachtrij, de afbakening en de snelheidsrem toe.
 - Welke organisatie-knopen bestaan al (partij, gemeente, ministerie, medium, bedrijf)?
   Koppel aan de **bestaande** knoop; maak een org alleen aan als ze ontbreekt en je haar
   met een bron kunt staven.
+- **Registers eerst.** Het openbaar bestuur staat er al uit de officiële registers (account
+  `register-import`): ministeries met hun directoraten-generaal, zbo's, agentschappen,
+  adviescolleges, inspecties, gemeenten, provincies en waterschappen; bewindspersonen, SG's,
+  DG's, burgemeesters, wethouders, CdK's, dijkgraven en de 150 Kamerleden met hun fractie,
+  nevenfuncties, loopbaan en geschenken. Zoek een ambtsdrager dus eerst in het model (ook op
+  externe id: `GET /api/externe_ids?stelsel=tk_persoon|oo&waarde=…`). Burgemeesters en
+  wethouders staan er vaak met voorletters en een toevoeging ("B.C.M. Vostermans (burgemeester
+  Peel en Maas)"): kloppen achternaam, voorletter, functie en plaats, dan is het die knoop —
+  hergebruik hem en maak geen tweede (noem in het verslag dat de volledige naam ontbreekt).
+  Een registerfeit (ambt, fractie, nevenfunctie) hoef je niet opnieuw in te dienen.
 - **Volg de precedenten van vergelijkbare actoren** — kijk hoe het model soortgelijke
   personen al modelleert en doe het net zo. Richtinggevend (controleer altijd in het
   model; ids via `GET /api/roles` en de mechanismen in `graph_data`):
@@ -114,6 +126,17 @@ wachtrij, de afbakening en de snelheidsrem toe.
   | Actor | Relatie (richting) | Mechanisme (bestaand) | Rol-suggestie persoon |
   |---|---|---|---|
   | Politicus ↔ partij | `partij → persoon`, `lidmaatschap` | `partijlijn` | `politicus` |
+  | Partijlid zonder politiek mandaat (bestuurder, journalist) ↔ partij | `partij → persoon`, `lidmaatschap` | `partijbinding` (niet `partijlijn`: dat is fractiediscipline van politici) | naar functie |
+  | Bewindspersoon ↔ ministerie | `persoon → ministerie`, `ambt` | `ministeriele_verantwoordelijkheid` | `bewindspersoon` |
+  | Topambtenaar (SG, DG, IG) ↔ ministerie of onderdeel | `persoon → org`, `ambt` | `ambtelijke_leiding` | `topambtenaar` |
+  | Burgemeester, wethouder, CdK, dijkgraaf ↔ gemeente, provincie, waterschap | `persoon → org`, `ambt` | `lokaal_bestuursmandaat` | `lokale_bestuurder` |
+  | Kamerlid, Statenlid, raadslid ↔ Kamer, provincie, gemeente | `persoon → org`, `ambt` | `kamerzetel` | `politicus` |
+  | Zbo of agentschap ↔ ministerie | `ministerie → org`, `zeggenschap` | `verzelfstandigd_bestuur` (zbo) / `hierarchische_aansturing` (agentschap, DG) | org: `uitvoeringsorganisatie` |
+  | Adviescollege, planbureau ↔ ministerie | `adviescollege → ministerie`, `adviseur` | `institutioneel_advies` | org: `adviesorgaan` |
+  | Organisatie met toegang tot de Kamer ↔ Tweede Kamer | `org → Tweede Kamer`, `lobbyt` | `lobbytoegang` | — |
+  | Nevenfunctie van een ambtsdrager ↔ organisatie | `persoon → org`, `bestuurder`/`adviseur`/`lidmaatschap` | `nevenfunctie_verstrengeling` | — |
+  | Geschenk of betaalde reis ↔ ambtsdrager | `gever → persoon`, `geschenk` | `geschenk_en_gastvrijheid` | — |
+  | Benoeming door Kroon of minister (burgemeester, CdK, SG/DG, zbo-voorzitter, staatsraad) | `bewindspersoon → persoon` | `kroonbenoeming` (alleen met een bron voor de benoeming zelf) | naar functie |
   | Journalist ↔ medium | `mediaorganisatie → persoon`, `dienstverband` | `dienstverband` | `journalist` (of `hoofdredacteur`) |
   | Woordvoerder ↔ organisatie | `persoon → org`, `woordvoerder_van` | `woordvoerdersregie` (of `draaideurconstructie` bij een loopbaanstap) | `voorlichter` |
   | Bestuurder/commissaris ↔ organisatie | `persoon → org`, `bestuurder` | `draaideurconstructie` (loopbaan), `directiebenoeming`/`commissarisbenoeming` waar het model dat al zo doet | `directie` / `raad_van_commissarissen` |

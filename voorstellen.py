@@ -56,11 +56,15 @@ ARG_KOLOM = {
 GRANULARITEIT_TYPES = ("rol", "mechanisme", "entiteit")
 
 MECHANISME_FILTERS = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
-                      "cross_filter", "tegenmacht", "overig")
+                      "cross_filter", "tegenmacht", "overig",
+                      # Uitbreiding C (besluitvorming, 2026-10-07)
+                      "formele_macht", "belangen", "kennis_advies", "polder", "werving")
 ROL_CATEGORIEEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
-                   "systeemactor", "tegenmacht", "overig")
+                   "systeemactor", "tegenmacht", "overig",
+                   "formele_macht", "belangen", "kennis_advies", "polder", "werving")
 VELD_CATEGORIEEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
-                    "systeemactor", "overig")
+                    "systeemactor", "overig",
+                    "formele_macht", "belangen", "kennis_advies", "polder", "werving")
 AARD_KEUZES = ("direct", "veld_eigenschap")  # de twee levende waarden (zie CLAUDE.md)
 
 
@@ -412,6 +416,11 @@ def _maak_element(conn, element_type, velden) -> int:
             (velden["naam"].strip(), velden["filter"], velden.get("mechanisme_type"),
              velden["definitie"].strip(), velden["effect"].strip(),
              velden.get("source_role_id"), velden.get("target_role_id"), velden["aard"]))
+        # mechanism_filters bevat ALLE filter-tags incl. de primaire (DOCUMENTATIE.md); zonder
+        # deze rij verdringt de eerste extra categorie de primaire uit de viz (viz_data.py).
+        if velden["filter"] != "cross_filter":
+            conn.execute("INSERT OR IGNORE INTO mechanism_filters (mechanism_id, filter) "
+                         "VALUES (?, ?)", (cur.lastrowid, velden["filter"]))
     elif element_type == "entiteit":
         cur = conn.execute(
             "INSERT INTO entities (name, type, primary_role_id, description) VALUES (?, ?, ?, ?)",

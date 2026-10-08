@@ -77,6 +77,14 @@ AGENTS = [
               "--actieve-uren", "8-22"], "timeout": 2700,
      "omschrijving": "Dun bewijs — bewijs vóór en tegen voor verbanden uit het nieuws",
      "default": {"eenheid": "uur", "elke": 2, "aan": True}},
+    # Uitbreiding C (2026-10-07): de registers bijwerken (overheidsorganisaties, Tweede Kamer,
+    # Europees Parlement, lobbyisten). Nieuwe uitgaven ophalen, nieuwe feiten indienen, afgelopen
+    # ambten afsluiten; deterministisch, geen claude. De uurronde controleert (registercheck) en
+    # keurt goed.
+    {"naam": "registers-sync", "label": "registers-sync", "soort": "script",
+     "spec": ["scripts/registers_sync.py"], "timeout": 5400,
+     "omschrijving": "Registers bijwerken: nieuwe uitgaven, nieuwe ambten en functies, afgelopen ambten",
+     "default": {"eenheid": "dag", "elke": 7, "aan": True}},
     # Uit: geen onderdeel van de beoordeling (inhoud en meters). Aan te zetten op /beheer.
     {"naam": "monitor", "label": "monitor-agent", "soort": "runner",
      "spec": ["--agent", "monitor-agent", "--label", "monitor-agent",

@@ -48,16 +48,20 @@ OPNIEUW_NA_DAGEN = 30
 OMSCHRIJVING_TEKENS = 220
 
 SYSTEM_PROMPT = (
-    "Je classificeert verbanden in een onderzoeksdatabase over het Nederlandse mediasysteem "
-    "(propagandamodel van Herman & Chomsky). Elk verband moet bij precies één mechanisme horen: "
+    "Je classificeert verbanden in een onderzoeksdatabase over het Nederlandse media- en "
+    "bestuurssysteem, één netwerk: hoe nieuws gefilterd wordt (propagandamodel van Herman & "
+    "Chomsky) én hoe besluiten tot stand komen en wie ze vormt (formele macht, belangen, kennis "
+    "& advies, polder, werving, controle). Elk verband moet bij precies één mechanisme horen: "
     "het mechanisme beschrijft HOE de ene partij de andere beïnvloedt of eraan verbonden is. "
     "Kies alleen een mechanisme waarvan de omschrijving dit verband echt dekt (bron- en "
     "doeltype, richting, soort band); volg bij twijfel de precedenten van hetzelfde relatietype. "
     "Past er geen, kies dan 0 en zeg met 'buiten_model' of het verband buiten het model valt "
-    "(true: beschrijvend of organisatorisch, zoals een opleiding binnen een universiteit, een "
-    "vakbondsvoorzitter of een fusie van partijen, zonder invloed op media of nieuws) of dat het "
-    "wél een invloedspatroon is waarvoor het model nog geen mechanisme heeft (false). Kies je "
-    "een mechanisme, dan is 'buiten_model' false. Antwoord alleen met het gevraagde JSON."
+    "(true: puur beschrijvend, zoals een opleiding binnen een universiteit of een interne "
+    "afdeling, zonder invloed op media of nieuws én zonder rol in besluitvorming) of dat het "
+    "wél een invloeds- of besluitvormingspatroon is waarvoor het model nog geen mechanisme "
+    "heeft (false). Een ambt, benoeming, bestuursfunctie, lobby, advies, overleg of controle "
+    "rond overheidsbesluiten valt BINNEN het model. Kies je een mechanisme, dan is "
+    "'buiten_model' false. Antwoord alleen met het gevraagde JSON."
 )
 SCHEMA = {
     "type": "object",

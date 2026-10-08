@@ -52,10 +52,12 @@ LOG_PATH = ROOT / "data" / "smaadtoets_log.jsonl"
 MODEL = "opus"
 # Spiegelt server.BEOORDELING_STRUCTUURTYPES (neutrale structuurfeiten: geen smaadtoets nodig)
 STRUCTUURTYPES = ("personeel", "dienstverband", "bestuurder", "adviseur", "woordvoerder_van",
-                  "lidmaatschap", "eigendom", "draaideur")
+                  "lidmaatschap", "eigendom", "draaideur",
+                  "ambt", "zeggenschap", "controle", "geschenk")  # Uitbreiding C (2026-10-07)
 
 SYSTEM_PROMPT = (
-    "Je bent de smaadtoets van een onderzoeksdatabase over het Nederlandse mediasysteem. Een "
+    "Je bent de smaadtoets van een onderzoeksdatabase over het Nederlandse media- en "
+    "bestuurssysteem. Een "
     "bewering raakt een met naam genoemd natuurlijk persoon. Je toetst of ze publiceerbaar is "
     "zonder smaad: (1) het is een controleerbaar FEIT, geen mening of waardeoordeel dat als feit "
     "wordt gebracht; (2) de BRON draagt het: de bewering gaat niet verder dan wat de brontekst "

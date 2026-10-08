@@ -245,6 +245,8 @@ class Indiener:
             cit = {"source_id": sid}
             if a.get("quote"):
                 cit["quote"] = a["quote"]
+            if a.get("methode"):  # provenance-tier (A5), bv. 'verbatim_quote'
+                cit["methode"] = a["methode"]
             body["citations"] = [cit]
         print(f"    + argument ({body['stance']}{', ' + a['property'] if a.get('property') else ''}) op {context}")
         res = self._post("/api/arguments", body, "argument")

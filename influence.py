@@ -66,6 +66,13 @@ FIELD_MODES = ("full", "collapse", "exclude")
 # ze niet rechtstreeks. In het theoriemodel is er één expliciet doel: de rol 'publiek'.
 PUBLIC_TYPES = frozenset({"mediaorganisatie", "omroep", "platform"})
 
+# Wie besluit (Uitbreiding C, 2026-10-07): de rollen met formele beslissingsmacht — bewindspersonen,
+# topambtenaren, ministeries en uitvoeringsorganisaties, lokale bestuurders en hun overheden, de
+# EU-instellingen en de Kamers. Derde eindpuntset naast het publiek en de politiek: hoeveel invloed
+# komt er uiteindelijk bij de besluitvorming terecht?
+BESLUIT_ROLLEN = ("bewindspersoon", "topambtenaar", "departement", "uitvoeringsorganisatie",
+                  "lokale_bestuurder", "decentrale_overheid", "eu_instelling", "parlementair_controleur")
+
 MAX_HOPS = 6      # hoe ver invloed propageert voordat we stoppen
 PRUNE = 0.01      # paden zwakker dan dit negeren we (demping maakt ze verwaarloosbaar)
 
@@ -291,6 +298,10 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
         "SELECT e.id FROM entities e JOIN roles r ON e.primary_role_id = r.id "
         "WHERE r.name = 'politicus' AND NOT e.vervangen AND e.status = 'goedgekeurd'")}
     politiek_ids |= {r[0] for r in rows if r[1] == "partij"}
+    besluit_ids = {r[0] for r in conn.execute(
+        "SELECT e.id FROM entities e JOIN roles r ON e.primary_role_id = r.id "
+        f"WHERE r.name IN ({','.join('?' * len(BESLUIT_ROLLEN))}) "
+        "AND NOT e.vervangen AND e.status = 'goedgekeurd'", BESLUIT_ROLLEN)}
 
     relations = [
         {"source_id": s, "target_id": t, "influence": inf, "relation_type": rt,
@@ -306,6 +317,7 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
         # uitlaten leveren zelf direct aan het publiek (+1); de politiek zijn doelen ín de graaf.
         "public": {"ids": public_ids, "self": True},
         "politiek": {"ids": politiek_ids, "self": False},
+        "besluitvorming": {"ids": besluit_ids, "self": False},
     }
     return _centrality(entity_ids, adj, max_hops, prune, target_sets=target_sets)
 

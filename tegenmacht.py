@@ -15,6 +15,9 @@ MECHANISME (een edge). Twee vormen (property_value):
   • 'filter:<eigendom|advertentie|sourcing|flak|ideologie>' — SOORT 1, verantwoording:
     deze edge checkt die filter-machtsconcentratie (de klassieke accountability-tegenmacht:
     borgingsstichting → eigendom, toezichthouder → holdingconcentratie, NVJ → flak).
+    Sinds Uitbreiding C (besluitvorming, 2026-10-07) ook de bestuurscategorieën als doel:
+    'filter:<formele_macht|belangen|kennis_advies|polder|werving>' — controle op bestuursmacht
+    (Rekenkamer → formele_macht, lobbyregister/integriteitstoezicht → belangen).
   • 'as:<economisch|cultureel|establishment>:<opent|sluit>' — SOORT 2, contra-hegemonie:
     deze edge duwt een onderwerp van de sfeer van consensus naar legitieme controverse
     ('opent', contra-hegemoniaal) of verstrakt de consensus ('sluit', pro-hegemoniaal)
@@ -42,7 +45,9 @@ from __future__ import annotations
 import scoring
 from politiek import ASSEN  # dezelfde drie assen als de kleurmeter
 
-FILTER_DOELEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie")
+FILTER_DOELEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
+                 # Uitbreiding C (2026-10-07): controle = verantwoording van bestuursmacht
+                 "formele_macht", "belangen", "kennis_advies", "polder", "werving")
 RICHTINGEN = {"opent": 1.0, "sluit": -1.0}  # opent = contra-hegemoniaal (+), sluit = pro-hegemoniaal (−)
 K_VAL = 1.0  # krimp voor de per-as-valentie: pos = Σ(w·teken) / (Σw + K_VAL)
 

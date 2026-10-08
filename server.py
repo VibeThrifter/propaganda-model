@@ -169,7 +169,8 @@ _rate_emmers = {}
 # echte rem. De bijdrager-accounts 'nieuws-agent'/'nieuws-scout' blijven bewust NIET
 # vrijgesteld (hun inhouds-schrijfacties houden de flood-rem); alleen hun wachtrij-
 # endpoints zijn vrij (RATE_LIMIT_VRIJE_ENDPOINTS hieronder).
-RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur"}
+RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur",
+                          "register-import", "registercheck"}  # Uitbreiding C: registerpijplijn
 # Endpoints die voor ELK account buiten de per-account-limiet vallen: de nieuws-wachtrij
 # (nieuws_doelen) is procesmetadata, geen modelinhoud — de rate limit beschermt tegen
 # score-manipulatie door volume en heeft hier geen functie, terwijl de nieuws-backend per
@@ -1113,7 +1114,9 @@ def discussion_index():
 # Filter-enum voor classificatie-aspect 'filter' (unie van de roles- en
 # mechanisms-CHECK in schema.sql); property_value moet hier een van zijn.
 FILTERS = {"eigendom", "advertentie", "sourcing", "flak", "ideologie",
-           "cross_filter", "systeemactor", "tegenmacht", "overig"}
+           "cross_filter", "systeemactor", "tegenmacht", "overig",
+           # Uitbreiding C (besluitvorming, eigenaarsbesluit 2026-10-07): zelfde netwerk
+           "formele_macht", "belangen", "kennis_advies", "polder", "werving"}
 
 # Provenance-methode-tier (A5): de toegestane methode-waarden op een citatie.
 METHODES = tuple(scoring.METHODE_FACTOR)
@@ -1303,7 +1306,7 @@ def create_argument():
                                      "valentie van een edge, geen actor-kleur"}), 400
         if tegenmacht.parse_machtsvalentie(prop_value) is None:
             return jsonify({"error": "property_value voor 'machtsvalentie' is "
-                                     "'filter:<eigendom|advertentie|sourcing|flak|ideologie>' "
+                                     "'filter:<" + "|".join(tegenmacht.FILTER_DOELEN) + ">' "
                                      "(verantwoording) of 'as:<economisch|cultureel|"
                                      "establishment>:<opent|sluit>' (contra-hegemonie)"}), 400
     # Doelgroepklasse (welstandsmeter): welke marketing-/welstandsklasse targt een OUTLET.
@@ -2193,7 +2196,10 @@ def tegenspraak(arg_id):
 # Al het andere blijft zoals het was: invloedsclaims vergen A1 én A2, negatieve claims
 # over personen nooit automatisch, aspect/duiding/theorie blijven buiten A7.
 BEOORDELING_STRUCTUURTYPES = ("personeel", "dienstverband", "bestuurder", "adviseur",
-                              "woordvoerder_van", "lidmaatschap", "eigendom", "draaideur")
+                              "woordvoerder_van", "lidmaatschap", "eigendom", "draaideur",
+                              # Uitbreiding C (2026-10-07): openbaar ambt, hiërarchie,
+                              # controle en geregistreerde geschenken zijn structuurfeiten
+                              "ambt", "zeggenschap", "controle", "geschenk")
 AUTO_MERGE_EVIDENTIEEL = (None, "influence", "existence")
 
 # Duplicaat-drempels (spiegelt create_argument, M0.3/A6).
@@ -2359,6 +2365,10 @@ def auto_merge_toegestaan(conn, arg_id):
         rtype = conn.execute("SELECT relation_type FROM relations WHERE id = ?",
                              (arg["relation_id"],)).fetchone()
         structuur = bool(rtype) and rtype["relation_type"] in BEOORDELING_STRUCTUURTYPES
+        # Uitbreiding C: een letterlijke registerregel (bv. lobbytoegang, subsidie) is ook
+        # een neutraal structuurfeit — geen duiding, alleen wat het register zegt.
+        if bool(rtype) and not structuur:
+            structuur = _alleen_registercitaties(conn, arg_id)
     # Bronrevisie (2026-10-06): dezelfde bewering als een al gemerged argument, betere bron.
     # Die bewering stond al in het model: alleen de onafhankelijke A1 (de nieuwe bron draagt
     # haar) telt.
@@ -2944,6 +2954,175 @@ def delete_citation(cid):
 
 # ── Entiteiten & relaties API ────────────────────────────────
 
+# Uitbreiding C (besluitvorming, eigenaarsbesluit 2026-10-07). Spiegelt de CHECK's in schema.sql.
+BESTUURSLAGEN = ("eu", "rijk", "provincie", "gemeente", "waterschap", "caribisch", "regio")
+EXTERNE_STELSELS = ("tooi", "oo", "tk_persoon", "wikidata", "ep_mep")
+# Wie registergegevens (laag, registersoort, externe id's) aan een BESTAANDE entiteit mag
+# hangen: de registerpijplijn (tools/registers/) en maintainers. Geen inhoud: alleen
+# identificatie en structuur uit een officieel register, gelogd en terug te draaien.
+REGISTER_ACCOUNTS = {"register-import", "registercheck"}
+
+
+def _externe_ids_uit(waarde):
+    """→ ([(stelsel, waarde)], fout). Neemt een lijst {stelsel, waarde} aan."""
+    if waarde in (None, []):
+        return [], None
+    if not isinstance(waarde, list):
+        return [], "externe_ids moet een lijst {stelsel, waarde} zijn"
+    uit = []
+    for item in waarde:
+        if not isinstance(item, dict):
+            return [], "externe_ids moet een lijst {stelsel, waarde} zijn"
+        stelsel = (item.get("stelsel") or "").strip()
+        w = str(item.get("waarde") or "").strip()
+        if stelsel not in EXTERNE_STELSELS:
+            return [], f"stelsel moet een van {list(EXTERNE_STELSELS)} zijn"
+        if not w:
+            return [], "externe id zonder waarde"
+        uit.append((stelsel, w))
+    return uit, None
+
+
+def _externe_ids_bezet(conn, ext, behalve=None):
+    """Externe id's die al aan een (andere) entiteit hangen."""
+    bezet = []
+    for stelsel, w in ext:
+        rij = conn.execute("SELECT entity_id FROM externe_ids WHERE stelsel = ? AND waarde = ?",
+                           (stelsel, w)).fetchone()
+        if rij and rij["entity_id"] != behalve:
+            bezet.append({"stelsel": stelsel, "waarde": w, "entity_id": rij["entity_id"]})
+    return bezet
+
+
+@app.route("/api/externe_ids", methods=["GET"])
+def api_externe_ids():
+    """Opzoeken: ?stelsel=tooi[&waarde=oorg10212] of ?entity_id=123. Open, zoals alle GET's."""
+    stelsel = (request.args.get("stelsel") or "").strip()
+    waarde = (request.args.get("waarde") or "").strip()
+    entity_id = request.args.get("entity_id", type=int)
+    sql, args = "SELECT entity_id, stelsel, waarde FROM externe_ids WHERE 1=1", []
+    if stelsel:
+        sql += " AND stelsel = ?"; args.append(stelsel)
+    if waarde:
+        sql += " AND waarde = ?"; args.append(waarde)
+    if entity_id:
+        sql += " AND entity_id = ?"; args.append(entity_id)
+    if not (stelsel or entity_id):
+        return jsonify({"error": "geef stelsel of entity_id"}), 400
+    conn = get_db()
+    rijen = [dict(r) for r in conn.execute(sql + " ORDER BY entity_id", args)]
+    conn.close()
+    return jsonify(rijen)
+
+
+@app.route("/api/entities/<int:eid>/register", methods=["POST"])
+@require_user()
+def api_entity_register(eid):
+    """Registergegevens aan een BESTAANDE entiteit hangen (Uitbreiding C): externe id's,
+    bestuurslaag en registersoort (metadata). Vult alleen wat leeg is — overschrijft nooit —
+    zodat een registerkoppeling geen inhoud kan wijzigen. Alleen REGISTER_ACCOUNTS of een
+    maintainer; elke wijziging staat in edit_log."""
+    data = request.json or {}
+    conn = get_db()
+    if g.user["username"] not in REGISTER_ACCOUNTS and not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "alleen de registerpijplijn of een maintainer"}), 403
+    rij = conn.execute("SELECT id, bestuurslaag, metadata FROM entities WHERE id = ?",
+                       (eid,)).fetchone()
+    if not rij:
+        conn.close()
+        return jsonify({"error": "entiteit niet gevonden"}), 404
+    ext, fout = _externe_ids_uit(data.get("externe_ids"))
+    laag = (data.get("bestuurslaag") or "").strip() or None
+    meta_in = data.get("metadata") or {}
+    if not fout and laag is not None and laag not in BESTUURSLAGEN:
+        fout = f"bestuurslaag moet een van {list(BESTUURSLAGEN)} zijn"
+    if not fout and not isinstance(meta_in, dict):
+        fout = "metadata moet een object zijn"
+    if fout:
+        conn.close()
+        return jsonify({"error": fout}), 400
+    bezet = _externe_ids_bezet(conn, ext, behalve=eid)
+    if bezet:
+        conn.close()
+        return jsonify({"error": "externe id hoort al bij een andere entiteit",
+                        "bezet": bezet}), 409
+    gewijzigd = {}
+    for stelsel, w in ext:
+        if conn.execute("INSERT OR IGNORE INTO externe_ids (entity_id, stelsel, waarde) "
+                        "VALUES (?, ?, ?)", (eid, stelsel, w)).rowcount:
+            gewijzigd.setdefault("externe_ids", []).append(f"{stelsel}:{w}")
+    if laag and not rij["bestuurslaag"]:
+        conn.execute("UPDATE entities SET bestuurslaag = ? WHERE id = ?", (laag, eid))
+        gewijzigd["bestuurslaag"] = laag
+    try:
+        meta = json.loads(rij["metadata"]) if rij["metadata"] else {}
+    except (TypeError, ValueError):
+        meta = {}
+    nieuw = {k: v for k, v in meta_in.items() if k not in meta}
+    if nieuw:
+        meta.update(nieuw)
+        conn.execute("UPDATE entities SET metadata = ? WHERE id = ?",
+                     (json.dumps(meta, ensure_ascii=False), eid))
+        gewijzigd["metadata"] = nieuw
+    if gewijzigd:
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('entities', ?, 'updated', ?, ?, ?)
+        """, (eid, g.user["username"], json.dumps(gewijzigd, ensure_ascii=False),
+              (data.get("reden") or "registerkoppeling (tools/registers)")[:300]))
+    conn.commit()
+    conn.close()
+    return jsonify({"entity_id": eid, "gewijzigd": gewijzigd})
+
+
+@app.route("/api/relations/<int:rid>/looptijd", methods=["POST"])
+@require_user()
+def api_relation_looptijd(rid):
+    """Een registerfeit loopt af (Uitbreiding C, scripts/registers_sync.py): het register noemt
+    het ambt, de nevenfunctie of de toegangspas niet meer. Zet alleen `active_until` (vult wat
+    leeg is; een andere einddatum overschrijft het niet), alleen voor een verband dat een
+    registercitatie draagt, alleen door het account `registercheck` of een maintainer, en altijd
+    met de reden (welke uitgave, welk record) in edit_log. Terug te draaien door een maintainer."""
+    data = request.json or {}
+    conn = get_db()
+    if g.user["username"] != "registercheck" and not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "alleen de registercheck of een maintainer"}), 403
+    rel = conn.execute("SELECT id, active_until, vervangen FROM relations WHERE id = ?", (rid,)).fetchone()
+    if not rel or rel["vervangen"]:
+        conn.close()
+        return jsonify({"error": "verband niet gevonden"}), 404
+    uit_register = conn.execute("""
+        SELECT 1 FROM arguments a JOIN citations c ON c.argument_id = a.id
+        JOIN sources s ON s.id = c.source_id
+        WHERE a.relation_id = ? AND c.methode = 'officieel_register_scrape'
+          AND COALESCE(s.cluster_key, '') LIKE 'register:%' LIMIT 1""", (rid,)).fetchone()
+    tot = (data.get("active_until") or "").strip()
+    reden = (data.get("reden") or "").strip()
+    fout = None
+    if not uit_register:
+        fout = "alleen voor een verband uit een register (registercitatie)"
+    elif not re.match(r"^\d{4}(-\d{2}(-\d{2})?)?$", tot):
+        fout = "active_until moet JJJJ, JJJJ-MM of JJJJ-MM-DD zijn"
+    elif not reden:
+        fout = "reden is verplicht (welke uitgave, welk record)"
+    elif rel["active_until"]:
+        fout = f"het verband heeft al een einddatum ({rel['active_until']})"
+    if fout:
+        conn.close()
+        return jsonify({"error": fout}), 400
+    conn.execute("UPDATE relations SET active_until = ? WHERE id = ?", (tot, rid))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+    """, (rid, g.user["username"], json.dumps({"active_until": None}), json.dumps({"active_until": tot}),
+          f"registers-sync: {reden}"[:300]))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": rid, "active_until": tot})
+
+
 @app.route("/api/entities", methods=["POST"])
 @require_user()
 def create_entity():
@@ -2965,17 +3144,38 @@ def create_entity():
     active_from = (data.get("active_from") or "").strip() or None
     active_until = (data.get("active_until") or "").strip() or None
     contributed_by = g.user["username"]
+    # Uitbreiding C (besluitvorming, 2026-10-07): bestuurslaag, registersoort (metadata) en
+    # externe id's (tooi/oo/tk_persoon/wikidata/ep_mep) — zie _externe_ids_uit.
+    bestuurslaag = (data.get("bestuurslaag") or "").strip() or None
+    if bestuurslaag is not None and bestuurslaag not in BESTUURSLAGEN:
+        return jsonify({"error": f"bestuurslaag moet een van {list(BESTUURSLAGEN)} zijn"}), 400
+    metadata = data.get("metadata")
+    if metadata is not None and not isinstance(metadata, dict):
+        return jsonify({"error": "metadata moet een object zijn"}), 400
+    ext, fout = _externe_ids_uit(data.get("externe_ids"))
+    if fout:
+        return jsonify({"error": fout}), 400
 
     conn = get_db()
+    bezet = _externe_ids_bezet(conn, ext)
+    if bezet:
+        conn.close()
+        return jsonify({"error": "externe id hoort al bij een andere entiteit",
+                        "entity_id": bezet[0]["entity_id"], "bezet": bezet}), 409
     # Moderatiewachtrij: admin → meteen 'goedgekeurd'; ieder ander → 'voorgesteld'
     # (onzichtbaar in viz/scores tot een reviewer goedkeurt).
     status = "goedgekeurd" if heeft_rol(conn, g.user, "maintainer") else "voorgesteld"
     try:
         cur = conn.execute("""
-            INSERT INTO entities (name, type, primary_role_id, description, active_from, active_until, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (name, etype, primary_role_id, description, active_from, active_until, status))
+            INSERT INTO entities (name, type, primary_role_id, description, active_from, active_until,
+                                  status, bestuurslaag, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, etype, primary_role_id, description, active_from, active_until, status,
+              bestuurslaag, json.dumps(metadata, ensure_ascii=False) if metadata else None))
         eid = cur.lastrowid
+        for stelsel, waarde in ext:
+            conn.execute("INSERT INTO externe_ids (entity_id, stelsel, waarde) VALUES (?, ?, ?)",
+                         (eid, stelsel, waarde))
 
         # Klasse↔instantie-link meteen materialiseren als er een rol-suggestie is (spiegelt
         # create_relation): zonder deze rij telt de entiteit na goedkeuring niet mee in de
@@ -3035,6 +3235,8 @@ def create_relation():
 
     mechanism_id = data.get("mechanism_id") or None
     description = (data.get("description") or "").strip() or None
+    # Uitbreiding C: de ambtstitel zoals het register hem geeft (bij relation_type 'ambt').
+    functie = (data.get("functie") or "").strip()[:200] or None
     bidirectional = 1 if data.get("bidirectional") else 0
     active_from = (data.get("active_from") or "").strip() or None
     active_until = (data.get("active_until") or "").strip() or None
@@ -3073,10 +3275,10 @@ def create_relation():
     try:
         cur = conn.execute("""
             INSERT INTO relations
-                (source_id, target_id, relation_type, mechanism_id, description,
+                (source_id, target_id, relation_type, mechanism_id, description, functie,
                  certainty, influence, bidirectional, active_from, active_until, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (source_id, target_id, rtype, mechanism_id, description,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (source_id, target_id, rtype, mechanism_id, description, functie,
               certainty, influence, bidirectional, active_from, active_until, status))
         rid = cur.lastrowid
 
@@ -3798,6 +4000,66 @@ def create_mechanism():
         conn.rollback()
         conn.close()
         return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/mechanisms/<int:mid>/filters", methods=["POST"])
+@require_user()
+def api_mechanism_filters(mid):
+    """Overlap (Uitbreiding C, 2026-10-07): extra categorieën aan een BESTAAND mechanisme
+    hangen of weghalen (`mechanism_filters`). Zelfde status als het direct toevoegen van een
+    theorie-element: alleen een globale maintainer, in de opbouwfase, gelogd en betwistbaar
+    (een classificatiedebat loopt via aspect-argumenten met property='filter'). De primaire
+    filter (`mechanisms.filter`) blijft altijd staan.
+    Body: {"toevoegen": [...], "verwijderen": [...], "motivatie": "..."}."""
+    conn = get_db()
+    if not heeft_rol(conn, g.user, "maintainer"):
+        conn.close()
+        return jsonify({"error": "Categorieën van een mechanisme wijzigen vereist een globale "
+                                 "maintainer; stel het anders voor via een argument met "
+                                 "property 'filter'."}), 403
+    d = request.json or {}
+    toevoegen = [f for f in (d.get("toevoegen") or []) if isinstance(f, str)]
+    verwijderen = [f for f in (d.get("verwijderen") or []) if isinstance(f, str)]
+    motivatie = (d.get("motivatie") or "").strip()
+    toegestaan = set(voorstellen.MECHANISME_FILTERS) - {"cross_filter"}
+    fout = [f for f in toevoegen + verwijderen if f not in toegestaan]
+    if fout or not (toevoegen or verwijderen) or not motivatie:
+        conn.close()
+        return jsonify({"error": "geef toevoegen/verwijderen uit "
+                                 f"{sorted(toegestaan)} en een motivatie",
+                        "ongeldig": fout}), 400
+    mech = conn.execute("SELECT id, name, filter, vervangen FROM mechanisms WHERE id = ?",
+                        (mid,)).fetchone()
+    if not mech or mech["vervangen"]:
+        conn.close()
+        return jsonify({"error": "mechanisme niet gevonden of vervangen"}), 404
+    if mech["filter"] in verwijderen:
+        conn.close()
+        return jsonify({"error": "de primaire filter kan niet weg (wijzig die via een RfC)"}), 400
+    # De primaire filter hoort zelf ook als rij in mechanism_filters (KOPPEL-MECH-FILTER).
+    if mech["filter"] in toegestaan:
+        conn.execute("INSERT OR IGNORE INTO mechanism_filters (mechanism_id, filter) "
+                     "VALUES (?, ?)", (mid, mech["filter"]))
+    toegevoegd = [f for f in toevoegen if conn.execute(
+        "INSERT OR IGNORE INTO mechanism_filters (mechanism_id, filter) VALUES (?, ?)",
+        (mid, f)).rowcount]
+    weg = [f for f in verwijderen if conn.execute(
+        "DELETE FROM mechanism_filters WHERE mechanism_id = ? AND filter = ?",
+        (mid, f)).rowcount]
+    if toegevoegd or weg:
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('mechanisms', ?, 'updated', ?, ?, ?)
+        """, (mid, g.user["username"],
+              json.dumps({"filters_toegevoegd": toegevoegd, "filters_verwijderd": weg}),
+              ("Categorieën gewijzigd door maintainer (opbouwfase, langs RfC heen) — "
+               f"betwistbaar: {motivatie}")[:500]))
+    conn.commit()
+    filters = [r[0] for r in conn.execute(
+        "SELECT filter FROM mechanism_filters WHERE mechanism_id = ? ORDER BY filter", (mid,))]
+    conn.close()
+    return jsonify({"id": mid, "name": mech["name"], "toegevoegd": toegevoegd,
+                    "verwijderd": weg, "filters": filters})
 
 
 @app.route("/api/mechanisms/<int:mid>", methods=["DELETE"])
@@ -6762,7 +7024,8 @@ def nieuws_doelen_patch(did):
 # blijft op de 0,05-vloer tot een mens merget.
 
 NIEUWS_AUTOKEUR_RELATIETYPES = ("personeel", "dienstverband", "bestuurder", "adviseur",
-                                "woordvoerder_van", "lidmaatschap", "eigendom")
+                                "woordvoerder_van", "lidmaatschap", "eigendom",
+                                "ambt", "zeggenschap", "controle", "geschenk")
 NIEUWS_AUTOKEUR_MOTIVATIE = "auto-keur nieuws-pijplijn (eigenaarsbesluit 2026-09-30)"
 NIEUWS_AUTOKEUR_REDEN_PREFIX = "auto-keur nieuws-pijplijn"
 NIEUWS_INTREK_REDEN_PREFIX = "intrekken auto-keur nieuws-pijplijn"
@@ -7063,6 +7326,49 @@ BEOORDELING_MOTIVATIE = ("automatische beoordeling: bewijs onafhankelijk gecontr
                          "(eigenaarsbesluit 2026-10-06)")
 BEOORDELING_REDEN_PREFIX = "automatische beoordeling"
 BEOORDELING_PLAFOND_DEFAULT = 200
+# Uitbreiding C (2026-10-07): registerfeiten (tools/registers/, gecontroleerd door de
+# deterministische scripts/registercheck.py) hebben een eigen dagplafond, zodat een import van
+# duizenden ambten het gewone plafond niet opsoupeert. Hun reden begint óók met
+# BEOORDELING_REDEN_PREFIX, zodat intrekken/heropenen ze blijven herkennen.
+REGISTER_REDEN_PREFIX = "automatische beoordeling (register)"
+REGISTER_MOTIVATIE = ("automatische beoordeling (register): registerfeit deterministisch "
+                      "gecontroleerd tegen de bewaarde registeruitgave (eigenaarsbesluit 2026-10-07)")
+REGISTER_PLAFOND_DEFAULT = 5000
+REGISTER_CLUSTER_PREFIX = "register:"   # sources.cluster_key van een registeruitgave
+
+
+def _register_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_REGISTER_PLAFOND",
+                                         REGISTER_PLAFOND_DEFAULT)))
+    except ValueError:
+        return REGISTER_PLAFOND_DEFAULT
+
+
+def _alleen_registercitaties(conn, arg_id):
+    """True als het argument ≥1 citatie heeft en ALLE citaties letterlijke registerregels
+    zijn (methode officieel_register_scrape, met quote, uit een registeruitgave)."""
+    rij = conn.execute("""
+        SELECT COUNT(*) AS n,
+               SUM(CASE WHEN c.methode = 'officieel_register_scrape'
+                         AND TRIM(COALESCE(c.quote, '')) <> ''
+                         AND s.cluster_key LIKE ? THEN 1 ELSE 0 END) AS reg
+        FROM citations c JOIN sources s ON s.id = c.source_id
+        WHERE c.argument_id = ?""", (REGISTER_CLUSTER_PREFIX + "%", arg_id)).fetchone()
+    return bool(rij["n"]) and rij["n"] == rij["reg"]
+
+
+def _registerelement(conn, tabel, rid):
+    """Is dit element een registerfeit (eigen plafond, eigen motivatie)? Een entiteit als
+    ze een externe id heeft; een relatie als al haar levende steunende roots alleen
+    registercitaties dragen."""
+    if tabel == "entities":
+        return conn.execute("SELECT 1 FROM externe_ids WHERE entity_id = ? LIMIT 1",
+                            (rid,)).fetchone() is not None
+    roots = [r["id"] for r in conn.execute("""
+        SELECT id FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL
+          AND stance = 'supporting' AND NOT vervangen AND status <> 'verworpen'""", (rid,))]
+    return bool(roots) and all(_alleen_registercitaties(conn, a) for a in roots)
 
 
 def _beoordeling_plafond():
@@ -7073,13 +7379,21 @@ def _beoordeling_plafond():
         return BEOORDELING_PLAFOND_DEFAULT
 
 
-def _beoordeling_vandaag(conn):
-    """Aantal automatische goedkeuringen van de beoordeling vandaag (lokale kalenderdag)."""
+def _beoordeling_vandaag(conn, register=False):
+    """Aantal automatische goedkeuringen van de beoordeling vandaag (lokale kalenderdag).
+    ``register=True`` telt alleen registerfeiten (eigen plafond); anders alles behalve die."""
+    if register:
+        return conn.execute("""
+            SELECT COUNT(*) FROM edit_log
+            WHERE action = 'updated' AND table_name IN ('entities', 'relations')
+              AND reason LIKE ? AND date(created_at, 'localtime') = date('now', 'localtime')
+        """, (REGISTER_REDEN_PREFIX + "%",)).fetchone()[0]
     return conn.execute("""
         SELECT COUNT(*) FROM edit_log
         WHERE action = 'updated' AND table_name IN ('entities', 'relations')
-          AND reason LIKE ? AND date(created_at, 'localtime') = date('now', 'localtime')
-    """, (BEOORDELING_REDEN_PREFIX + "%",)).fetchone()[0]
+          AND reason LIKE ? AND reason NOT LIKE ?
+          AND date(created_at, 'localtime') = date('now', 'localtime')
+    """, (BEOORDELING_REDEN_PREFIX + "%", REGISTER_REDEN_PREFIX + "%")).fetchone()[0]
 
 
 def _beoordeling_basis(conn, tabel, rid):
@@ -7151,9 +7465,20 @@ def _bewijs_entiteit_redenen(conn, eid):
     if not (rij["type"] or "").strip():
         redenen.append("geen entiteittype")
     sleutel = _naam_sleutel(rij["name"])
+    # Uitbreiding C: een entiteit met een externe id (registerpijplijn) is uniek door die id;
+    # naamgelijkenis zegt dan niets ("J. de Vries (wethouder Utrecht)" ≠ "Jack de Vries").
+    # Alleen een exact gelijke naamvorm parkeert haar nog (dan had de import moeten koppelen).
+    met_id = conn.execute("SELECT 1 FROM externe_ids WHERE entity_id = ? LIMIT 1",
+                          (eid,)).fetchone() is not None
     for ander in conn.execute("""SELECT id, name FROM entities
                                  WHERE status = 'goedgekeurd' AND NOT vervangen AND id <> ?""",
                               (eid,)):
+        if met_id:
+            if _naam_sleutel(ander["name"]) == sleutel:
+                redenen.append(f"zelfde naam als bestaande entiteit #{ander['id']} "
+                               f"'{ander['name']}' — koppelen in plaats van dupliceren")
+                break
+            continue
         if _naam_sleutel(ander["name"]) == sleutel:
             gelijk = 1.0
         elif dedup is not None:
@@ -7239,17 +7564,24 @@ def beoordeling_autokeur(tabel, rid):
     if conn.execute(f"SELECT 1 FROM {tabel} WHERE id = ?", (rid,)).fetchone() is None:
         conn.close()
         return jsonify({"error": "Niet gevonden"}), 404
-    plafond, vandaag = _beoordeling_plafond(), _beoordeling_vandaag(conn)
+    register = _registerelement(conn, tabel, rid)
+    soort = "register" if register else "gewoon"
+    if register:
+        plafond, vandaag = _register_plafond(), _beoordeling_vandaag(conn, register=True)
+    else:
+        plafond, vandaag = _beoordeling_plafond(), _beoordeling_vandaag(conn)
     if vandaag >= plafond:
         conn.close()
         return jsonify({"goedgekeurd": False, "plafond": plafond, "vandaag": vandaag,
-                        "error": f"dagplafond bereikt ({vandaag}/{plafond})"}), 429
+                        "soort": soort,
+                        "error": f"dagplafond ({soort}) bereikt ({vandaag}/{plafond})"}), 429
     ok, redenen = bewijs_autokeur_toegestaan(conn, tabel, rid, strikt=True)
     if not ok:
         conn.close()
         return jsonify({"goedgekeurd": False, "redenen": redenen}), 409
-    ok, fout, code, _extra = _modereer_kern(conn, tabel, rid, "goedgekeurd",
-                                            g.user["username"], BEOORDELING_MOTIVATIE)
+    ok, fout, code, _extra = _modereer_kern(
+        conn, tabel, rid, "goedgekeurd", g.user["username"],
+        REGISTER_MOTIVATIE if register else BEOORDELING_MOTIVATIE)
     if not ok:
         conn.close()
         return jsonify({"goedgekeurd": False, "redenen": [fout], "kern_http": code}), 409

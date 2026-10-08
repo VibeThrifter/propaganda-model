@@ -1,0 +1,735 @@
+{
+ "_toelichting": "Basistheorie van Uitbreiding C (besluitvorming, eigenaarsbesluit 2026-10-07). Ingediend met scripts/theorie_indienen.py: rollen en mechanismen via de maintainer-route (opbouwfase, betwistbaar), elk met een steunend argument met letterlijk citaat (account assistent). Zie DOCUMENTATIE.md § Uitbreiding C en VOORSTEL_besluitvorming-als-categorieen.md.",
+ "bronnen": [
+  {
+   "key": "grondwet",
+   "titel": "Grondwet voor het Koninkrijk der Nederlanden",
+   "type": "wetgeving",
+   "url": "https://wetten.overheid.nl/BWBR0001840",
+   "publisher": "Overheid.nl (wetten.overheid.nl)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair"
+  },
+  {
+   "key": "gemeentewet",
+   "titel": "Gemeentewet",
+   "type": "wetgeving",
+   "url": "https://wetten.overheid.nl/BWBR0005416",
+   "publisher": "Overheid.nl (wetten.overheid.nl)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair"
+  },
+  {
+   "key": "kaderwet_zbo",
+   "titel": "Kaderwet zelfstandige bestuursorganen",
+   "type": "wetgeving",
+   "url": "https://wetten.overheid.nl/BWBR0020495",
+   "publisher": "Overheid.nl (wetten.overheid.nl)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair"
+  },
+  {
+   "key": "kaderwet_adviescolleges",
+   "titel": "Kaderwet adviescolleges",
+   "type": "wetgeving",
+   "url": "https://wetten.overheid.nl/BWBR0008159",
+   "publisher": "Overheid.nl (wetten.overheid.nl)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair"
+  },
+  {
+   "key": "mededingingswet",
+   "titel": "Mededingingswet",
+   "type": "wetgeving",
+   "url": "https://wetten.overheid.nl/BWBR0008691",
+   "publisher": "Overheid.nl (wetten.overheid.nl)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair"
+  },
+  {
+   "key": "tk_lobby",
+   "titel": "Lobbyisten — Tweede Kamer der Staten-Generaal",
+   "type": "website",
+   "url": "https://www.tweedekamer.nl/contact_en_bezoek/lobbyisten",
+   "publisher": "Tweede Kamer der Staten-Generaal",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "tk_registers",
+   "titel": "Openbare registers (nevenfuncties, geschenken, reizen) — Tweede Kamer der Staten-Generaal",
+   "type": "website",
+   "url": "https://www.tweedekamer.nl/kamerleden_en_commissies/openbare_registers",
+   "publisher": "Tweede Kamer der Staten-Generaal",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "ser_over",
+   "titel": "Sociaal-Economische Raad — over de SER",
+   "type": "website",
+   "url": "https://www.ser.nl/nl/ser",
+   "publisher": "Sociaal-Economische Raad",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "ser_wie",
+   "titel": "Wie zitten er in de SER? — Sociaal-Economische Raad",
+   "type": "website",
+   "url": "https://www.ser.nl/nl/ser/over-ser/wie-zitten-er-in-de-ser",
+   "publisher": "Sociaal-Economische Raad",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "eu_wetgeving",
+   "titel": "Soorten wetgeving — Europese Unie",
+   "type": "website",
+   "url": "https://european-union.europa.eu/institutions-law-budget/law/types-legislation_nl",
+   "publisher": "Europese Unie",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "abd_tmg",
+   "titel": "Topmanagementgroep — Algemene Bestuursdienst",
+   "type": "website",
+   "url": "https://www.algemenebestuursdienst.nl/kennis-maken-met-dgabd-en-abdtopconsult/topmanagementgroep",
+   "publisher": "Algemene Bestuursdienst (Ministerie van BZK)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "abd_functies",
+   "titel": "Functies binnen de topmanagementgroep — Algemene Bestuursdienst",
+   "type": "website",
+   "url": "https://www.algemenebestuursdienst.nl/kennis-maken-met-dgabd-en-abdtopconsult/topmanagementgroep/functies-binnen-de-topmanagementgroep",
+   "publisher": "Algemene Bestuursdienst (Ministerie van BZK)",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "ro_agentschappen",
+   "titel": "Agentschappen Rijksoverheid — Rijksoverheid.nl",
+   "type": "website",
+   "url": "https://www.rijksoverheid.nl/onderwerpen/rijksoverheid/agentschappen",
+   "publisher": "Rijksoverheid",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "ro_inhuur",
+   "titel": "Inzet op minder externe inhuur bij de rijksoverheid",
+   "type": "persbericht",
+   "url": "https://www.rijksoverheid.nl/actueel/nieuws/2025/04/18/inzet-op-minder-externe-inhuur-bij-de-rijksoverheid",
+   "publisher": "Rijksoverheid",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair",
+   "datum": "2025-04-18"
+  },
+  {
+   "key": "ro_pensioenakkoord",
+   "titel": "Evenwichtig pensioenstelsel, AOW-leeftijd stijgt langzamer",
+   "type": "persbericht",
+   "url": "https://www.rijksoverheid.nl/actueel/nieuws/2019/06/05/evenwichtig-pensioenstelsel-aow-stijgt-langzamer",
+   "publisher": "Rijksoverheid",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "primair",
+   "datum": "2019-06-05"
+  },
+  {
+   "key": "rechtspraak_urgenda",
+   "titel": "Klimaatzaak Urgenda — Rechtspraak.nl",
+   "type": "website",
+   "url": "https://www.rechtspraak.nl/bekende-rechtszaken/klimaatzaak-urgenda",
+   "publisher": "De Rechtspraak",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  },
+  {
+   "key": "rechtspraak_rvs",
+   "titel": "Raad van State — Rechtspraak.nl",
+   "type": "website",
+   "url": "https://www.rechtspraak.nl/organisatie-en-contact/organisatie/raad-van-state",
+   "publisher": "De Rechtspraak",
+   "onderwerp": "nl_systeem",
+   "betrouwbaarheid": "institutioneel"
+  }
+ ],
+ "rollen": [
+  {
+   "naam": "bewindspersoon",
+   "categorie": "formele_macht",
+   "definitie": "Minister of staatssecretaris: politiek verantwoordelijk voor het beleid en de uitvoering van een departement en daarover verantwoording schuldig aan het parlement.",
+   "voorbeelden": "minister van Financiën, staatssecretaris van Defensie, minister-president",
+   "argument": {
+    "claim": "De Grondwet legt de verantwoordelijkheid bij de ministers: de Koning is onschendbaar, de ministers zijn verantwoordelijk (art. 42).",
+    "bron": "grondwet",
+    "quote": "De Koning is onschendbaar; de ministers zijn verantwoordelijk."
+   }
+  },
+  {
+   "naam": "topambtenaar",
+   "categorie": "formele_macht",
+   "definitie": "Benoemde (niet gekozen) leiding van een overheidsorganisatie: secretaris-generaal, directeur-generaal, inspecteur-generaal, directeur van een agentschap of voorzitter van een zbo of adviescollege. Blijft zitten als bewindspersonen wisselen.",
+   "voorbeelden": "secretaris-generaal van een ministerie, directeur-generaal Belastingdienst, voorzitter van de Kiesraad",
+   "argument": {
+    "claim": "De ambtelijke top van de rijksoverheid — secretarissen-generaal, directeuren-generaal, inspecteurs-generaal en leiders van grote uitvoerende diensten — vormt de topmanagementgroep van de Algemene Bestuursdienst.",
+    "bron": "abd_tmg",
+    "quote": "Deze groep bestaat uit secretarissen-generaal, plaatsvervangend secretarissen-generaal, directeuren-generaal, inspecteurs-generaal, managers van grote uitvoerende diensten, directeuren van planbureaus en enkele hiermee gelijkgestelde functies."
+   }
+  },
+  {
+   "naam": "departement",
+   "categorie": "formele_macht",
+   "definitie": "Ministerie of onderdeel daarvan (directoraat-generaal) als beleidsapparaat: bereidt besluiten voor, voert ze uit en stuurt uitvoeringsorganisaties aan.",
+   "voorbeelden": "Ministerie van Binnenlandse Zaken en Koninkrijksrelaties, DG Klimaat en Energie",
+   "argument": {
+    "claim": "Ministeries worden bij koninklijk besluit ingesteld en staan onder leiding van een minister (Grondwet art. 44).",
+    "bron": "grondwet",
+    "quote": "Bij koninklijk besluit worden ministeries ingesteld. Zij staan onder leiding van een minister."
+   }
+  },
+  {
+   "naam": "uitvoeringsorganisatie",
+   "categorie": "formele_macht",
+   "definitie": "Organisatie die overheidsbesluiten uitvoert en vaak zelf beslist over burgers en bedrijven: een agentschap (onder de minister) of een zelfstandig bestuursorgaan (zbo, op afstand).",
+   "voorbeelden": "Belastingdienst, UWV, DUO, RVO, CBR",
+   "argument": {
+    "claim": "Een zelfstandig bestuursorgaan is een bestuursorgaan van de centrale overheid met openbaar gezag dat niet hiërarchisch ondergeschikt is aan een minister (Kaderwet zelfstandige bestuursorganen, art. 1).",
+    "bron": "kaderwet_zbo",
+    "quote": "een bestuursorgaan van de centrale overheid dat bij de wet, krachtens de wet bij algemene maatregel van bestuur of krachtens de wet bij ministeriële regeling met openbaar gezag is bekleed, en dat niet hiërarchisch ondergeschikt is aan een minister"
+   }
+  },
+  {
+   "naam": "decentrale_overheid",
+   "categorie": "formele_macht",
+   "definitie": "Provincie, gemeente of waterschap: eigen bestuur met eigen bevoegdheden, dat daarnaast rijksbeleid uitvoert (medebewind).",
+   "voorbeelden": "Gemeente Amsterdam, Provincie Gelderland, Hoogheemraadschap van Rijnland",
+   "argument": {
+    "claim": "Provincies en gemeenten regelen en besturen hun eigen huishouding (Grondwet art. 124).",
+    "bron": "grondwet",
+    "quote": "Voor provincies en gemeenten wordt de bevoegdheid tot regeling en bestuur inzake hun huishouding aan hun besturen overgelaten."
+   }
+  },
+  {
+   "naam": "lokale_bestuurder",
+   "categorie": "formele_macht",
+   "definitie": "Lid van het dagelijks bestuur van een decentrale overheid: burgemeester, wethouder, gedeputeerde, commissaris van de Koning of dijkgraaf.",
+   "voorbeelden": "burgemeester van Rotterdam, wethouder Wonen, dijkgraaf",
+   "argument": {
+    "claim": "Elke gemeente heeft een raad, een college en een burgemeester (Gemeentewet art. 6).",
+    "bron": "gemeentewet",
+    "quote": "In elke gemeente is een raad, een college en een burgemeester."
+   }
+  },
+  {
+   "naam": "eu_instelling",
+   "categorie": "formele_macht",
+   "definitie": "Instelling van de Europese Unie die regels vaststelt die Nederland binden of omzet in nationaal beleid.",
+   "voorbeelden": "Europese Commissie, Raad van de Europese Unie, Europees Parlement",
+   "argument": {
+    "claim": "Een EU-verordening is een bindende rechtshandeling die in de hele EU van toepassing is.",
+    "bron": "eu_wetgeving",
+    "quote": "Een “verordening” is een bindende rechtshandeling die in de hele EU van toepassing is."
+   }
+  },
+  {
+   "naam": "adviesorgaan",
+   "categorie": "kennis_advies",
+   "definitie": "Wettelijk ingesteld college dat de regering of het parlement gevraagd en ongevraagd adviseert en zo mede bepaalt welke opties op tafel komen.",
+   "voorbeelden": "Raad van State (advisering), WRR, Gezondheidsraad, Onderwijsraad, Raad voor de leefomgeving en infrastructuur",
+   "argument": {
+    "claim": "Een adviescollege heeft krachtens publiekrecht tot taak de regering te adviseren over regelgeving of te voeren beleid van het Rijk (Kaderwet adviescolleges, art. 1).",
+    "bron": "kaderwet_adviescolleges",
+    "quote": "een college dat krachtens publiekrecht tot taak heeft de regering te adviseren over algemeen verbindende voorschriften of te voeren beleid van het Rijk"
+   }
+  },
+  {
+   "naam": "consultant",
+   "categorie": "kennis_advies",
+   "definitie": "Extern adviesbureau of ingehuurde adviseur die voor de overheid beleid, reorganisaties of uitvoeringsplannen voorbereidt.",
+   "voorbeelden": "strategie- en organisatieadviesbureaus, accountantskantoren met adviestak",
+   "argument": {
+    "claim": "De rijksoverheid huurt extern personeel in; het kabinet wil dat er minder extern personeel wordt ingehuurd.",
+    "bron": "ro_inhuur",
+    "quote": "Het kabinet wil dat bij de rijksoverheid minder extern personeel wordt ingehuurd."
+   }
+  },
+  {
+   "naam": "sociale_partner",
+   "categorie": "polder",
+   "definitie": "Werkgevers- of werknemersorganisatie die in de polder (SER, Stichting van de Arbeid, overlegtafels) meeonderhandelt over sociaal-economisch beleid.",
+   "voorbeelden": "FNV, CNV, VCP, VNO-NCW, MKB-Nederland, LTO Nederland",
+   "argument": {
+    "claim": "In de SER zitten ondernemers, werknemers en onafhankelijke deskundigen.",
+    "bron": "ser_wie",
+    "quote": "In de SER zitten drie partijen: ondernemers, werknemers en onafhankelijk deskundigen."
+   }
+  },
+  {
+   "naam": "controleorgaan",
+   "categorie": "tegenmacht",
+   "definitie": "Onafhankelijk orgaan dat het bestuur controleert en zijn bevindingen openbaar maakt zonder zelf te kunnen ingrijpen: rekenkamer, ombudsman, inspectie.",
+   "voorbeelden": "Algemene Rekenkamer, Nationale ombudsman, Inspectie Gezondheidszorg en Jeugd",
+   "argument": {
+    "claim": "De Algemene Rekenkamer is grondwettelijk belast met het onderzoek van de ontvangsten en uitgaven van het Rijk (art. 76).",
+    "bron": "grondwet",
+    "quote": "De Algemene Rekenkamer is belast met het onderzoek van de ontvangsten en uitgaven van het Rijk."
+   }
+  },
+  {
+   "naam": "bestuursrechter",
+   "categorie": "tegenmacht",
+   "definitie": "Rechter die besluiten van de overheid toetst aan wet en verdrag en ze kan vernietigen of de overheid kan opdragen anders te handelen.",
+   "voorbeelden": "Afdeling bestuursrechtspraak van de Raad van State, Centrale Raad van Beroep, College van Beroep voor het bedrijfsleven, Hoge Raad",
+   "argument": {
+    "claim": "De Afdeling bestuursrechtspraak van de Raad van State is de hoogste bestuursrechter van Nederland.",
+    "bron": "rechtspraak_rvs",
+    "quote": "De Afdeling bestuursrechtspraak van de Raad van State is de hoogste bestuursrechter van Nederland."
+   }
+  }
+ ],
+ "mechanismen": [
+  {
+   "naam": "ministeriele_verantwoordelijkheid",
+   "filter": "formele_macht",
+   "extra_filters": [],
+   "mechanisme_type": "juridisch",
+   "aard": "direct",
+   "bron_rol": "bewindspersoon",
+   "doel_rol": "departement",
+   "definitie": "De bewindspersoon staat aan het hoofd van het departement en is politiek verantwoordelijk voor alles wat het doet; hij legt daarover verantwoording af aan het parlement.",
+   "effect": "Besluiten van het departement volgen de politieke lijn van de bewindspersoon; het parlement kan hem aanspreken, het departement zelf niet.",
+   "argument": {
+    "claim": "Ministers en staatssecretarissen moeten de Kamers de inlichtingen geven die leden verlangen (Grondwet art. 68).",
+    "bron": "grondwet",
+    "quote": "De ministers en de staatssecretarissen geven de kamers elk afzonderlijk en in verenigde vergadering mondeling of schriftelijk de door een of meer leden verlangde inlichtingen"
+   }
+  },
+  {
+   "naam": "ambtelijke_leiding",
+   "filter": "formele_macht",
+   "extra_filters": [],
+   "mechanisme_type": "structureel",
+   "aard": "direct",
+   "bron_rol": "topambtenaar",
+   "doel_rol": "departement",
+   "definitie": "De benoemde ambtelijke leiding (secretaris-generaal, directeur-generaal, directeur van een agentschap of zbo) stuurt de voorbereiding en uitvoering van beleid en blijft zitten als bewindspersonen wisselen.",
+   "effect": "Welke opties, cijfers en risico's de bewindspersoon bereiken, wordt mede bepaald door een vaste, niet-gekozen top; continuïteit van beleid gaat boven politieke wisselingen.",
+   "argument": {
+    "claim": "De hoogste ambtelijke functies van de rijksoverheid vormen samen de topmanagementgroep van de Algemene Bestuursdienst.",
+    "bron": "abd_functies",
+    "quote": "De hoogste functies binnen de Algemene Bestuursdienst (ABD) vormen de topmanagementgroep (TMG)"
+   }
+  },
+  {
+   "naam": "hierarchische_aansturing",
+   "filter": "formele_macht",
+   "extra_filters": [],
+   "mechanisme_type": "structureel",
+   "aard": "direct",
+   "bron_rol": "departement",
+   "doel_rol": "uitvoeringsorganisatie",
+   "definitie": "Een ministerie stuurt een eigen onderdeel of agentschap direct aan: opdrachten, budget en benoemingen lopen via de lijn, en de minister is volledig verantwoordelijk.",
+   "effect": "Uitvoering volgt de prioriteiten en het budget van het departement; problemen in de uitvoering zijn politiek de verantwoordelijkheid van de minister.",
+   "argument": {
+    "claim": "Een minister is verantwoordelijk voor de agentschappen binnen zijn ministerie.",
+    "bron": "ro_agentschappen",
+    "quote": "Een minister is verantwoordelijk voor de agentschappen binnen zijn ministerie."
+   }
+  },
+  {
+   "naam": "verzelfstandigd_bestuur",
+   "filter": "formele_macht",
+   "extra_filters": [],
+   "mechanisme_type": "juridisch",
+   "aard": "direct",
+   "bron_rol": "departement",
+   "doel_rol": "uitvoeringsorganisatie",
+   "definitie": "Een zelfstandig bestuursorgaan neemt eigen besluiten op afstand van de minister: de minister benoemt het bestuur, stelt kaders en budget vast, maar kan niet ingrijpen in individuele besluiten.",
+   "effect": "Besluiten over burgers en markten worden genomen buiten directe politieke sturing; de parlementaire controle loopt via de minister en is daardoor beperkt.",
+   "argument": {
+    "claim": "De minister benoemt, schorst en ontslaat de leden van een zelfstandig bestuursorgaan (Kaderwet zelfstandige bestuursorganen, art. 12).",
+    "bron": "kaderwet_zbo",
+    "quote": "Onze Minister benoemt, schorst en ontslaat de leden van een zelfstandig bestuursorgaan."
+   }
+  },
+  {
+   "naam": "lokaal_bestuursmandaat",
+   "filter": "formele_macht",
+   "extra_filters": [],
+   "mechanisme_type": "juridisch",
+   "aard": "direct",
+   "bron_rol": "lokale_bestuurder",
+   "doel_rol": "decentrale_overheid",
+   "definitie": "Burgemeester, wethouders, gedeputeerden, de commissaris van de Koning en de dijkgraaf vormen het dagelijks bestuur van hun overheid: zij bereiden besluiten voor en voeren ze uit.",
+   "effect": "Lokale besluiten (wonen, vergunningen, openbare orde, water) liggen bij een klein college dat verantwoording aflegt aan raad, staten of algemeen bestuur.",
+   "argument": {
+    "claim": "Het college van burgemeester en wethouders voert het dagelijks bestuur van de gemeente (Gemeentewet art. 160).",
+    "bron": "gemeentewet",
+    "quote": "het dagelijks bestuur van de gemeente te voeren, voor zover niet bij of krachtens de wet de raad of de burgemeester hiermee is belast"
+   }
+  },
+  {
+   "naam": "kamerzetel",
+   "filter": "formele_macht",
+   "extra_filters": [
+    "tegenmacht"
+   ],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "politicus",
+   "doel_rol": "parlementair_controleur",
+   "definitie": "Een gekozen volksvertegenwoordiger beslist in de Kamer, de staten of de raad mee over wetten, begrotingen en verordeningen, en controleert het bestuur.",
+   "effect": "Besluiten hebben een meerderheid van gekozen vertegenwoordigers nodig; hun fractie- en partijbinding bepaalt mee hoe die meerderheid tot stand komt.",
+   "argument": {
+    "claim": "Wetten worden vastgesteld door de regering en de Staten-Generaal gezamenlijk (Grondwet art. 81).",
+    "bron": "grondwet",
+    "quote": "De vaststelling van wetten geschiedt door de regering en de Staten-Generaal gezamenlijk."
+   }
+  },
+  {
+   "naam": "europese_doorwerking",
+   "filter": "formele_macht",
+   "extra_filters": [],
+   "mechanisme_type": "juridisch",
+   "aard": "direct",
+   "bron_rol": "eu_instelling",
+   "doel_rol": "departement",
+   "definitie": "EU-verordeningen gelden rechtstreeks en EU-richtlijnen moeten worden omgezet in nationaal recht; nationaal en decentraal beleid moet daarbinnen blijven.",
+   "effect": "De ruimte voor eigen keuzes is begrensd door regels die in Brussel zijn vastgesteld; nationale debatten gaan dan over de uitvoering, niet over het besluit zelf.",
+   "argument": {
+    "claim": "Een EU-richtlijn legt een doel vast dat de lidstaten moeten bereiken; zij stellen zelf de wetgeving vast om dat doel te bereiken.",
+    "bron": "eu_wetgeving",
+    "quote": "Een “richtlijn” is een rechtshandeling die een bepaald doel vastlegt dat de EU-landen moeten bereiken. Zij mogen echter zelf de wetgeving vaststellen om dat doel te bereiken."
+   }
+  },
+  {
+   "naam": "markttoezicht",
+   "filter": "formele_macht",
+   "extra_filters": [
+    "tegenmacht"
+   ],
+   "mechanisme_type": "juridisch",
+   "aard": "direct",
+   "bron_rol": "toezichthouder",
+   "doel_rol": "belanghebbende",
+   "definitie": "Een markttoezichthouder neemt bindende besluiten over een markt: vergunningen, tarieven, boetes en voorwaarden bij fusies.",
+   "effect": "Marktuitkomsten worden mede door een benoemd orgaan bepaald; de nabijheid tot de sector die het controleert (kennis, personeel, informatie) kan het toezicht kleuren.",
+   "argument": {
+    "claim": "Bij een overtreding van het kartelverbod of van het verbod op misbruik van een economische machtspositie kan de ACM een bestuurlijke boete of een last onder dwangsom opleggen (Mededingingswet art. 56).",
+    "bron": "mededingingswet",
+    "quote": "kan de Autoriteit Consument en Markt de overtreder: a. een besluit nemen tot vaststelling van die overtreding; b. een bestuurlijke boete opleggen; c. een last onder dwangsom opleggen."
+   }
+  },
+  {
+   "naam": "lobbytoegang",
+   "filter": "belangen",
+   "extra_filters": [],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "lobbyist",
+   "doel_rol": "parlementair_controleur",
+   "definitie": "Belangenbehartigers met een vaste toegangspas tot de Tweede Kamer kunnen Kamerleden zonder afspraak aanspreken in de semi-openbare ruimte van het gebouw.",
+   "effect": "Georganiseerde belangen zijn vaker en eerder in gesprek met wetgevers dan ongeorganiseerde; hun informatie en voorstellen bereiken het parlement zonder dat de herkomst zichtbaar is.",
+   "argument": {
+    "claim": "De Tweede Kamer houdt sinds 1 juli 2012 een openbaar register bij van lobbyisten met een vaste toegangspas, die toegang geeft tot de semi-openbare ruimte van het Kamergebouw.",
+    "bron": "tk_lobby",
+    "quote": "Sinds 1 juli 2012 kent de Tweede Kamer een openbaar register van belangenbehartigers/lobbyisten met een vaste toegangspas voor de Kamer. Deze pas geeft toegang tot de semi-openbare ruimte in het Tweede Kamergebouw."
+   }
+  },
+  {
+   "naam": "geschenk_en_gastvrijheid",
+   "filter": "belangen",
+   "extra_filters": [],
+   "mechanisme_type": "psychologisch",
+   "aard": "direct",
+   "bron_rol": "belanghebbende",
+   "doel_rol": "politicus",
+   "definitie": "Organisaties geven ambtsdragers geschenken, diners, uitnodigingen of betaalde reizen; Kamerleden moeten die boven een drempelbedrag openbaar registreren.",
+   "effect": "Gastvrijheid schept contact, toegang en een gevoel van wederkerigheid, zonder dat er een tegenprestatie wordt afgesproken.",
+   "argument": {
+    "claim": "Kamerleden melden ontvangen geschenken en voordelen met een waarde boven €50 binnen een week in een openbaar register.",
+    "bron": "tk_registers",
+    "quote": "De Griffie plenair houdt een register bij waarin Kamerleden de door hen ontvangen geschenken en voordelen met een hogere waarde dan €50 vermelden, uiterlijk 1 week na ontvangst van het geschenk of het voordeel."
+   }
+  },
+  {
+   "naam": "nevenfunctie_verstrengeling",
+   "filter": "belangen",
+   "extra_filters": [
+    "werving"
+   ],
+   "mechanisme_type": "structureel",
+   "aard": "direct",
+   "bron_rol": "politicus",
+   "doel_rol": "belanghebbende",
+   "definitie": "Een ambtsdrager heeft naast zijn ambt lopende functies (bestuurslid, toezichthouder, adviseur, lid van een comité) bij organisaties die belang hebben bij zijn besluiten. Het register maakt ze openbaar maar verbiedt ze niet.",
+   "effect": "Beslissers en belanghebbenden delen bestuurstafels en netwerken; belangen lopen door elkaar, ook zonder dat er iets onrechtmatigs gebeurt.",
+   "argument": {
+    "claim": "Kamerleden vermelden hun nevenactiviteiten, de (te verwachten) inkomsten en relevante belangen in een openbaar register.",
+    "bron": "tk_registers",
+    "quote": "Tot slot beheert de Griffie plenair een register waarin de Kamerleden hun nevenactiviteiten en de (te verwachten) inkomsten vermelden, alsmede belangen die redelijkerwijs als relevant kunnen worden beschouwd."
+   }
+  },
+  {
+   "naam": "institutioneel_advies",
+   "filter": "kennis_advies",
+   "extra_filters": [],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "adviesorgaan",
+   "doel_rol": "departement",
+   "definitie": "Een wettelijk adviescollege adviseert de regering of het parlement, gevraagd en ongevraagd; over elk wetsvoorstel adviseert de Raad van State.",
+   "effect": "Het advies bepaalt mede welke opties serieus worden genomen; wat een adviescollege niet onderzoekt of afraadt, komt moeilijk op de agenda.",
+   "argument": {
+    "claim": "De Raad van State wordt gehoord over voorstellen van wet en ontwerpen van algemene maatregelen van bestuur (Grondwet art. 73).",
+    "bron": "grondwet",
+    "quote": "De Raad van State of een afdeling van de Raad wordt gehoord over voorstellen van wet en ontwerpen van algemene maatregelen van bestuur"
+   }
+  },
+  {
+   "naam": "inhuur_consultancy",
+   "filter": "kennis_advies",
+   "extra_filters": [
+    "belangen"
+   ],
+   "mechanisme_type": "economisch",
+   "aard": "direct",
+   "bron_rol": "consultant",
+   "doel_rol": "departement",
+   "definitie": "De overheid huurt externe adviesbureaus in om beleid, reorganisaties of uitvoeringsplannen voor te bereiden of uit te voeren.",
+   "effect": "Methoden, aannames en standaardoplossingen van adviesbureaus worden onderdeel van het beleid; kennis verschuift van de ambtelijke organisatie naar private partijen met eigen commerciële belangen.",
+   "argument": {
+    "claim": "Volgens het kabinet lagen de uitgaven aan externe inhuur de afgelopen jaren boven de in 2010 afgesproken norm van 10% van de personeelsuitgaven.",
+    "bron": "ro_inhuur",
+    "quote": "In 2010 is afgesproken dat de uitgaven aan externe inhuur maximaal 10% van de totale personeelsuitgaven mogen zijn; de zogeheten Roemernorm. De afgelopen jaren is deze overschreden en het kabinet wil de externe inhuur de komende tijd weer terugbrengen."
+   }
+  },
+  {
+   "naam": "polderoverleg",
+   "filter": "polder",
+   "extra_filters": [],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "sociale_partner",
+   "doel_rol": "elite_forum",
+   "definitie": "Werkgevers- en werknemersorganisaties onderhandelen in de SER, de Stichting van de Arbeid en overlegtafels met elkaar en met het kabinet over sociaal-economisch beleid.",
+   "effect": "Sociaal-economisch beleid komt tot stand via consensus tussen georganiseerde partijen; wie niet aan tafel zit (niet-georganiseerde werkenden, zzp'ers, toekomstige generaties), weegt minder mee.",
+   "argument": {
+    "claim": "De SER adviseert regering en parlement over het sociaal-economisch beleid en faciliteert akkoorden en convenanten.",
+    "bron": "ser_over",
+    "quote": "De SER adviseert de regering en het parlement over het sociaal-economisch beleid. Ook faciliteert de SER akkoorden en convenanten."
+   }
+  },
+  {
+   "naam": "akkoord_preemptie",
+   "filter": "polder",
+   "extra_filters": [
+    "formele_macht"
+   ],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "elite_forum",
+   "doel_rol": "parlementair_controleur",
+   "definitie": "Een akkoord tussen kabinet en maatschappelijke partijen (pensioenakkoord, klimaatakkoord) legt de hoofdlijnen van een besluit vast voordat het parlement erover spreekt.",
+   "effect": "Het parlement kan het akkoord in hoofdlijnen alleen nog aanvaarden of 'openbreken'; afwijken geldt als het verstoren van een zorgvuldig evenwicht.",
+   "argument": {
+    "claim": "In juni 2019 presenteerde het kabinet samen met werkgevers- en werknemersorganisaties en de SER een principeakkoord over het pensioenstelsel.",
+    "bron": "ro_pensioenakkoord",
+    "quote": "Het kabinet heeft woensdagochtend samen met werkgevers- en werknemersorganisaties en de SER een principeakkoord gepresenteerd over een toekomstbestendig en evenwichtig pensioenstelsel."
+   }
+  },
+  {
+   "naam": "kroonbenoeming",
+   "filter": "werving",
+   "extra_filters": [],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "bewindspersoon",
+   "doel_rol": "topambtenaar",
+   "definitie": "Burgemeesters, commissarissen van de Koning, topambtenaren, zbo-bestuurders en leden van adviescolleges worden benoemd door de Kroon, de ministerraad of de minister, na een selectie via de ABD, vertrouwenscommissies of het departement.",
+   "effect": "Wie de niet-gekozen posities bekleedt, wordt bepaald via politieke en ambtelijke netwerken; de selectie is weinig zichtbaar en houdt een betrekkelijk kleine kring in roulatie.",
+   "argument": {
+    "claim": "De burgemeester wordt bij koninklijk besluit op voordracht van de minister benoemd voor zes jaar (Gemeentewet art. 61).",
+    "bron": "gemeentewet",
+    "quote": "De burgemeester wordt bij koninklijk besluit op voordracht van Onze Minister benoemd voor de tijd van zes jaar."
+   }
+  },
+  {
+   "naam": "onafhankelijke_controle",
+   "filter": "tegenmacht",
+   "extra_filters": [],
+   "mechanisme_type": "procedureel",
+   "aard": "direct",
+   "bron_rol": "controleorgaan",
+   "doel_rol": "departement",
+   "definitie": "Rekenkamer, ombudsman en inspecties onderzoeken of het bestuur rechtmatig, doelmatig en behoorlijk handelt en maken hun bevindingen openbaar.",
+   "effect": "Misstanden en verspilling worden zichtbaar en bespreekbaar in parlement en media; het controleorgaan kan zelf niet ingrijpen, dus het effect hangt af van wie het oppakt.",
+   "argument": {
+    "claim": "De Nationale ombudsman doet op verzoek of uit eigen beweging onderzoek naar gedragingen van bestuursorganen van het Rijk (Grondwet art. 78a).",
+    "bron": "grondwet",
+    "quote": "De Nationale ombudsman verricht op verzoek of uit eigen beweging onderzoek naar gedragingen van bestuursorganen van het Rijk"
+   }
+  },
+  {
+   "naam": "beleid_via_rechter",
+   "filter": "tegenmacht",
+   "extra_filters": [
+    "formele_macht"
+   ],
+   "mechanisme_type": "juridisch",
+   "aard": "direct",
+   "bron_rol": "bestuursrechter",
+   "doel_rol": "departement",
+   "definitie": "Een rechter toetst overheidsbesluiten aan wet en verdrag en kan ze vernietigen of de overheid opdragen anders te handelen; zo wordt beleid in de rechtszaal afgedwongen of tegengehouden.",
+   "effect": "Uitspraken (zoals Urgenda over klimaat en de PAS-uitspraak over stikstof) dwingen het bestuur tot beleid dat politiek niet tot stand kwam; de rechter wordt zo een besluitvormer.",
+   "argument": {
+    "claim": "De Hoge Raad bepaalde op 20 december 2019 dat de uitstoot van broeikasgassen eind 2020 met ten minste 25 procent verminderd moest zijn ten opzichte van 1990.",
+    "bron": "rechtspraak_urgenda",
+    "quote": "De uitstoot van broeikasgassen moet eind 2020 met tenminste 25 procent verminderd worden ten opzichte van 1990."
+   }
+  }
+ ],
+ "overlap": [
+  {
+   "mechanisme": "draaideurconstructie",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: de draaideur is het candidate-selection-proces van Domhoff (wie komt waar terecht)."
+  },
+  {
+   "mechanisme": "draaideur_politiek_bedrijfsleven",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: loopbaanstap politiek → bedrijfsleven = werving."
+  },
+  {
+   "mechanisme": "draaideur_politiek_institutie",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: loopbaanstap politiek → gezagsinstituut = werving."
+  },
+  {
+   "mechanisme": "draaideur_politiek_lobby",
+   "categorieen": [
+    "werving",
+    "belangen"
+   ],
+   "motivatie": "Uitbreiding C: loopbaanstap politiek → lobby = werving én het special-interest-proces."
+  },
+  {
+   "mechanisme": "draaideur_journalistiek_politiek",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: loopbaanstap journalistiek → politiek = werving."
+  },
+  {
+   "mechanisme": "partijlijn",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: de partij selecteert en bindt haar kandidaten (candidate-selection process)."
+  },
+  {
+   "mechanisme": "politieke_kadervorming",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: kadervormingsprogramma's selecteren en vormen aanstaande bestuurders."
+  },
+  {
+   "mechanisme": "staatspartijfinanciering",
+   "categorieen": [
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: zetelafhankelijke partijfinanciering bepaalt mee welke partijen kandidaten kunnen werven."
+  },
+  {
+   "mechanisme": "lobbyist_naar_politicus",
+   "categorieen": [
+    "belangen"
+   ],
+   "motivatie": "Uitbreiding C: lobby richting politici is het special-interest-proces van Domhoff."
+  },
+  {
+   "mechanisme": "belangenbehartiging",
+   "categorieen": [
+    "belangen"
+   ],
+   "motivatie": "Uitbreiding C: een belanghebbende zet een lobbyist in = special-interest-proces."
+  },
+  {
+   "mechanisme": "partijfinanciering",
+   "categorieen": [
+    "belangen",
+    "werving"
+   ],
+   "motivatie": "Uitbreiding C: giften aan partijen zijn belangenbehartiging en voeden de kandidaatstelling."
+  },
+  {
+   "mechanisme": "kapitaalvluchtdreiging",
+   "categorieen": [
+    "belangen"
+   ],
+   "motivatie": "Uitbreiding C: dreigen met vertrek disciplineert overheidsbeleid = special-interest-proces."
+  },
+  {
+   "mechanisme": "overheidssubsidie_ngo",
+   "categorieen": [
+    "belangen"
+   ],
+   "motivatie": "Uitbreiding C: subsidie bindt organisaties aan het beleidsnetwerk van de financier."
+  },
+  {
+   "mechanisme": "overheidssubsidie_denktank",
+   "categorieen": [
+    "belangen",
+    "kennis_advies"
+   ],
+   "motivatie": "Uitbreiding C: subsidie aan denktanks raakt belangen én het policy-planning-netwerk."
+  },
+  {
+   "mechanisme": "denktank_naar_politiek",
+   "categorieen": [
+    "kennis_advies"
+   ],
+   "motivatie": "Uitbreiding C: denktanks leveren beleidsadvies = policy-planning-proces van Domhoff."
+  },
+  {
+   "mechanisme": "belanghebbende_als_adviseur",
+   "categorieen": [
+    "kennis_advies",
+    "belangen"
+   ],
+   "motivatie": "Uitbreiding C: een belanghebbende levert de kennisbasis voor regels die haarzelf raken."
+  },
+  {
+   "mechanisme": "begrotingsorthodoxie",
+   "categorieen": [
+    "kennis_advies"
+   ],
+   "motivatie": "Uitbreiding C: de begrotingsnormen van planbureau en ministerie begrenzen welke beleidsopties als verantwoord gelden."
+  },
+  {
+   "mechanisme": "politieke_synchronisatie",
+   "categorieen": [
+    "kennis_advies"
+   ],
+   "motivatie": "Uitbreiding C: elite-fora zijn in Domhoffs policy-planning-netwerk de plek waar beleidsconsensus ontstaat."
+  },
+  {
+   "mechanisme": "institutionele_gezagsketen",
+   "categorieen": [
+    "kennis_advies"
+   ],
+   "motivatie": "Uitbreiding C: formeel gekoppelde adviesorganen vormen één gezaghebbend adviesblok."
+  }
+ ]
+}

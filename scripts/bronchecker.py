@@ -73,6 +73,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+from registercheck import REGISTER_ARG_SQL  # noqa: E402  Uitbreiding C: registerfeiten zijn niet voor mij
+
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 ACCOUNT = "bronchecker"
 DEFAULT_TOKEN = ROOT / "data" / "tokens" / f"{ACCOUNT}.token"
@@ -97,7 +100,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML
 
 SYSTEM_PROMPT = (
     "Je bent een nauwgezette bronchecker voor een onderzoeksdatabase over het Nederlandse "
-    "mediasysteem. Je beoordeelt uitsluitend of een gegeven brontekst de FEITELIJKE inhoud van "
+    "media- en bestuurssysteem. Je beoordeelt uitsluitend of een gegeven brontekst de FEITELIJKE inhoud van "
     "een bewering draagt: wie, wat, wanneer, waar. De duiding die de database eraan geeft (een "
     "mechanisme, 'draaideur', 'tegenmacht', 'invloed') is analyse van de database zelf; die hoeft "
     "een bron niet te noemen en speelt in je oordeel geen rol. Je voegt geen kennis van buiten de "
@@ -438,6 +441,7 @@ def kandidaten(conn, ids=None) -> list[sqlite3.Row]:
         SELECT a.* FROM arguments a
         WHERE a.status = 'voorgesteld' AND NOT a.vervangen
           AND COALESCE(a.contributed_by, '') <> ?
+          AND NOT {REGISTER_ARG_SQL}
           AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
                           AND o.fase = 'herverificatie' AND o.door = ?){filt}
         ORDER BY a.id DESC""", params).fetchall()  # noqa: S608 - alleen placeholders
@@ -523,6 +527,7 @@ def controle_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
           AND (a.entity_id IS NULL OR e.status = 'goedgekeurd')
           AND COALESCE(a.contributed_by, '') <> ?
           AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
+          AND NOT {REGISTER_ARG_SQL}
           AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
                           AND o.fase = 'herverificatie'
                           AND (o.door = ? OR o.verdict = 'klopt')){filt}""",

@@ -24,11 +24,13 @@ MAX_VOORBEELDEN = 8
 BEKENDE_DDL_VERSCHILLEN = {
     "entities": "schema.sql staat LEGACY-types toe voor seed-replay; live is opgeschoond "
                 "(migrate_clean_entity_types.py). Ook de status-CHECK leeft alleen in "
-                "schema.sql; live kolom kwam via ALTER TABLE (migrate_moderatie_wachtrij.py)",
+                "schema.sql; live kolom kwam via ALTER TABLE (migrate_moderatie_wachtrij.py). "
+                "bestuurslaag kwam via ALTER TABLE (migrate_add_besluitvorming.py)",
     "mechanisms": "aard-CHECK leeft alleen in schema.sql; live kolom kwam via ALTER TABLE "
                   "(zie CLAUDE.md)",
     "relations": "status-CHECK (moderatiewachtrij) leeft alleen in schema.sql; live kolom "
-                 "kwam via ALTER TABLE (migrate_moderatie_wachtrij.py)",
+                 "kwam via ALTER TABLE (migrate_moderatie_wachtrij.py); functie kwam via ALTER "
+                 "TABLE (migrate_add_besluitvorming.py)",
     "sources": "CHECK op reliability_voorgesteld/onderwerp_voorgesteld leeft alleen in "
                "schema.sql; live kolommen kwamen via ALTER TABLE "
                "(migrate_classificatie_voorstel.py)",
@@ -96,6 +98,20 @@ def check_koppelingsplicht(conn):
             ORDER BY e.id
         """)]
 
+    # Uitbreiding C (2026-10-07): mechanism_filters bevat alle filter-tags INCLUSIEF de
+    # primaire. Ontbreekt die rij, dan verdringt de eerste extra categorie (overlap) de
+    # primaire filter uit de lijst van de viz (viz_data.py valt alleen terug op de primaire
+    # als er géén rijen zijn). cross_filter is geen tag (zie DOCUMENTATIE.md).
+    mech_zonder_primair = [
+        f"mechanisme #{m['id']}: {m['name']} (filter {m['filter']})"
+        for m in conn.execute("""
+            SELECT m.id, m.name, m.filter FROM mechanisms m
+            WHERE NOT m.vervangen AND m.filter NOT IN ('cross_filter', 'systeemactor')
+              AND NOT EXISTS (SELECT 1 FROM mechanism_filters mf
+                              WHERE mf.mechanism_id = m.id AND mf.filter = m.filter)
+            ORDER BY m.id
+        """)]
+
     ent_zonder_inst = [
         f"entiteit #{e['id']}: {e['name']} ({e['type']})"
         for e in conn.execute("""
@@ -121,6 +137,10 @@ def check_koppelingsplicht(conn):
         _bevinding("KOPPEL-ENT-INST", "Entiteiten zonder rol-instantiatie", "waarschuwing",
                    ent_zonder_inst,
                    "Wel of geen rol, maar geen instantiations-rij: onzichtbaar voor de rolscore."),
+        _bevinding("KOPPEL-MECH-FILTER", "Mechanismen zonder hun primaire filter in "
+                   "mechanism_filters", "fout", mech_zonder_primair,
+                   "mechanism_filters hoort alle filter-tags te bevatten, inclusief de primaire; "
+                   "anders verdringt een extra (overlappende) categorie de primaire filter."),
     ]
 
 

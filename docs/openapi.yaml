@@ -5,7 +5,9 @@ info:
   description: >
     Geversioneerde, gedocumenteerde export van de structuur-, eigendoms- en
     geldstroomgraaf van het Nederlandse mediasysteem (propagandamodel, Herman &
-    Chomsky toegepast op Nederland). Twee soorten endpoints:
+    Chomsky toegepast op Nederland) en, in hetzelfde netwerk, de besluitvorming
+    (Uitbreiding C, 2026-10-07: wie beslist, wie adviseert, wie zit aan tafel, wie
+    heeft belang; kolommen `bestuurslaag` en `functie`). Twee soorten endpoints:
 
     (1) OPEN + ONGEMETERD — dezelfde data die de publieke portal-visualisatie
     laadt. Geen key nodig.

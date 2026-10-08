@@ -89,6 +89,9 @@ FILTER_LABELS = {
     "sourcing": "3. Sourcing", "flak": "4. Flak", "ideologie": "5. Ideologie",
     "systeemactor": "Systeemactor", "tegenmacht": "Tegenmacht",
     "cross_filter": "Cross-filter", "overig": "Overig",
+    # Uitbreiding C (besluitvorming, 2026-10-07)
+    "formele_macht": "Formele macht", "belangen": "Belangen",
+    "kennis_advies": "Kennis & advies", "polder": "Polder", "werving": "Werving",
 }
 
 

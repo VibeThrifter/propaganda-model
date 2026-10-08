@@ -60,6 +60,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import bronchecker as bc  # noqa: E402
+from registercheck import REGISTER_ARG_SQL  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 ACCOUNT = "bronzoeker"
@@ -81,7 +82,8 @@ VERBODEN_HOSTS = ("wikipedia.org", "wikiwand.com", "localhost", "127.0.0.1", "tw
                   "reddit.com", "youtube.com")
 
 SYSTEM_PROMPT = (
-    "Je bent bronzoeker voor een onderzoeksdatabase over het Nederlandse mediasysteem. Je "
+    "Je bent bronzoeker voor een onderzoeksdatabase over het Nederlandse media- en "
+    "bestuurssysteem. Je "
     "zoekt op het web een openbare, betrouwbare bron die de FEITELIJKE inhoud van een "
     "bewering draagt (wie, wat, wanneer) en neemt daaruit letterlijk een citaat over. Je "
     "verzint nooit een bron, url of citaat: je gebruikt alleen pagina's die je met WebFetch "
@@ -195,6 +197,11 @@ _ARGUMENT_KOLOMMEN = """
           AND a.stance IN ('supporting', 'contradicting')
           AND COALESCE(a.property, 'existence') IN ('existence', 'influence')
           AND (a.relation_id IS NOT NULL OR a.entity_id IS NOT NULL)"""
+
+
+# Uitbreiding C: een registerfeit repareert de registercheck niet met een andere bron; het
+# register is de bron. Zulke argumenten zijn dus nooit werk voor de bronzoeker.
+_ARGUMENT_KOLOMMEN += f"\n          AND NOT {REGISTER_ARG_SQL}"
 
 
 def sleutel(item: dict) -> str:

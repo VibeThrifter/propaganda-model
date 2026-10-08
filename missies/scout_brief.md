@@ -40,8 +40,13 @@ verbanden die het model *compliceren*).
 
 1. **Neutrale missievraag, eerst zoeken.** Formuleer de zoekvraag zónder modelclaim
    (*"welke partijen financieren / besturen / leveren bronnen aan NL-media en zitten
-   nog niet in kaart?"* — nooit *"zoek een verband dat bevestigt dat X de pers
-   stuurt"*). Lees de database NIET vóór het zoeken; pas bij het indienen koppel je de
+   nog niet in kaart?"*, of sinds 2026-10-07 ook *"wie beslist over X, wie adviseert,
+   wie zit aan tafel, wie heeft er belang bij?"* — nooit *"zoek een verband dat bevestigt
+   dat X de pers stuurt"*). Media en besluitvorming zijn één netwerk: een ambt, een
+   adviesrol, een nevenfunctie of een plek aan de polder-tafel hoort erin met het
+   mechanisme van zijn categorie (`formele_macht`, `belangen`, `kennis_advies`, `polder`,
+   `werving`). Wat al uit de registers komt (ambtsdragers, overheidsorganisaties,
+   Kamerleden met nevenfuncties en geschenken) hoef je niet opnieuw in te dienen. Lees de database NIET vóór het zoeken; pas bij het indienen koppel je de
    vondst aan bestaande knopen. Onderwerp uit de top van `data/onderzoeksagenda.json`
    (`python3 scripts/onderzoeksagenda.py`) tenzij de eigenaar anders brieft —
    de `ontbreekt`-lijst wijst expliciet naar wat het corpus mist.

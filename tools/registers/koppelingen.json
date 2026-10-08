@@ -1,0 +1,187 @@
+{
+ "_toelichting": "Register van overheidsorganisaties (oo systeemId) → bestaande entiteit in het model. Met de hand nagelopen op 2026-10-08 (Uitbreiding C). Alleen organisaties die al in het model stonden vóór de registerimport; nieuwe organisaties koppelen via externe_ids. Afgewezen kandidaten staan onder 'niet' met de reden.",
+ "organisaties": {
+  "123": 582,
+  "2515": 86,
+  "4958": 85,
+  "9632": 821,
+  "10621": 819,
+  "11906": 585,
+  "19087": 863,
+  "68820": 584,
+  "71852": 132,
+  "8591": 586,
+  "112773": 628,
+  "22387697": 587,
+  "19432": 107,
+  "312": 380,
+  "18595": 223,
+  "7799": 1161,
+  "66175": 1167,
+  "66176": 166,
+  "28199715": 982,
+  "28212627": 222,
+  "28212470": 316,
+  "13080": 670,
+  "66101": 82,
+  "94546": 1118,
+  "28325623": 615,
+  "28351125": 49,
+  "22938": 1273,
+  "25698": 229,
+  "28797": 440,
+  "32510": 1257,
+  "94018": 792,
+  "28455002": 822,
+  "213": 581,
+  "9633": 173,
+  "98010": 172,
+  "68888": 52,
+  "13333": 588,
+  "28963276": 83,
+  "112992": 865,
+  "66140": 827,
+  "22660975": 84,
+  "58628": 313,
+  "26140472": 48,
+  "28212111": 253,
+  "28212037": 131,
+  "28212029": 196,
+  "28212147": 815,
+  "28212006": 290,
+  "28212015": 866,
+  "28212129": 602,
+  "28212584": 307,
+  "28211997": 50,
+  "28212566": 1013
+ },
+ "niet": {
+  "35518": "Gemeente Castricum ≠ #647 Theater Koningsduyn (Castricum)",
+  "16412": "Provincie Noord-Holland ≠ #519 NH (regionale omroep)",
+  "29908865": "Sociaal-economische en ruimtelijke statistieken ≠ #822 SER (afkorting toevallig gelijk)",
+  "30650433": "Dienst Publiek en Communicatie (onderdeel) is hetzelfde als het agentschap 94546",
+  "156": "Ministerie van Binnenlandse Zaken (#156) is een dubbel van #821; samenvoegen via een samenvoegen-RfC",
+  "820": "Ministerie van Volksgezondheid, Welzijn en Sport (#820, 0 verbanden) is een dubbel van #586 'Ministerie van VWS'; samenvoegen via een samenvoegen-RfC"
+ },
+ "namen_verschillen": {
+  "10621": "register 'Economische Zaken en Klimaat', model 'Ministerie van Economische Zaken' (#819): hetzelfde ministerie",
+  "22387697": "register 'Landbouw, Visserij, Voedselzekerheid en Natuur', model 'Ministerie van LNV' (#587): hetzelfde ministerie (hernoemd)",
+  "112773": "register 'Infrastructuur en Waterstaat', model 'Ministerie van I&W' (#628)",
+  "71852": "register 'Onderwijs, Cultuur en Wetenschap', model 'Ministerie van OCW' (#132)",
+  "68888": "register 'Directoraat-generaal Belastingdienst', model 'Belastingdienst' (#52)"
+ },
+ "personen": {
+  "_toelichting": "Registernaam (letterlijk) → bestaande persoon, met de hand nagelopen 2026-10-08, voor wie de automatische regel (unieke achternaam + voorletter + beschrijving noemt plaats of functie) te voorzichtig is.",
+  "Drs. F. Karimi": 227,
+  "drs. A. Griffioen": 1139,
+  "Drs. P.H. van Meenen": 392
+ },
+ "tk_personen": {
+  "_toelichting": "Tweede Kamer: Persoon-Id (open data) → bestaande persoon, met de hand nagelopen, voor wie de automatische regel (volledige naam + passende rol) niet volstaat."
+ },
+ "tk_namen": {
+  "_toelichting": "Schrijfwijze in de Kamerregisters (letterlijk) → naam in het model. Zowel de import (tk_naar_model.py) als de registercheck (tk.controleer) gebruiken dit; met de hand nagelopen 2026-10-08.",
+  "Toqueville stichting": "Tocqueville Stichting",
+  "Torqueville Stichting": "Tocqueville Stichting",
+  "Vrije Universiteit": "Vrije Universiteit Amsterdam",
+  "de Nederlandse bank": "De Nederlandsche Bank (DNB)"
+ },
+ "lobby_organisaties": {
+  "_toelichting": "Lobbyistenregister: werkgever zonder rechtsvorm in de naam → naam, type (structurele vorm) en rol in het model; met de hand vastgelegd 2026-10-08. Staat de organisatie al in het model, dan wint die knoop.",
+  "Universal Music Group": {
+   "naam": "Universal Music Group",
+   "type": "bedrijf",
+   "rol": "belanghebbende"
+  },
+  "Verus": {
+   "naam": "Verus",
+   "type": "lobbygroep",
+   "rol": "belanghebbende"
+  },
+  "Interstedelijk Studenten Overleg": {
+   "naam": "Interstedelijk Studenten Overleg (ISO)",
+   "type": "lobbygroep",
+   "rol": "belanghebbende"
+  },
+  "VleesNL": {
+   "naam": "VleesNL",
+   "type": "lobbygroep",
+   "rol": "belanghebbende"
+  },
+  "BPRA Public affairs": {
+   "naam": "BPRA Public affairs",
+   "type": "pr_bureau",
+   "rol": "lobbyist"
+  },
+  "PAG Consult": {
+   "naam": "PAG Consult",
+   "type": "pr_bureau",
+   "rol": "lobbyist"
+  },
+  "Plantum": {
+   "naam": "Plantum",
+   "type": "lobbygroep",
+   "rol": "belanghebbende"
+  },
+  "Brabantstad": {
+   "naam": "BrabantStad",
+   "type": "overheidsinstelling",
+   "rol": "decentrale_overheid",
+   "bestuurslaag": "regio"
+  },
+  "Verbond van Verzekeraars": {
+   "naam": "Verbond van Verzekeraars",
+   "type": "lobbygroep",
+   "rol": "belanghebbende"
+  },
+  "Women Inc.": {
+   "naam": "Women Inc.",
+   "type": "ngo",
+   "rol": "maatschappelijke_organisatie"
+  },
+  "MRA": {
+   "naam": "Metropoolregio Amsterdam (MRA)",
+   "type": "overheidsinstelling",
+   "rol": "decentrale_overheid",
+   "bestuurslaag": "regio",
+   "oo": "30474994"
+  },
+  "Dierencoalitie": {
+   "naam": "Dierencoalitie",
+   "type": "ngo",
+   "rol": "maatschappelijke_organisatie"
+  },
+  "Statendaal": {
+   "naam": "Statendaal",
+   "type": "pr_bureau",
+   "rol": "lobbyist"
+  },
+  "VNG": {
+   "naam": "Vereniging van Nederlandse Gemeenten (VNG)",
+   "type": "lobbygroep",
+   "rol": "belanghebbende",
+   "oo": "28110850"
+  },
+  "Exelcom Public Affairs": {
+   "naam": "Exelcom Public Affairs",
+   "type": "pr_bureau",
+   "rol": "lobbyist"
+  },
+  "Dierenbescherming": {
+   "naam": "Dierenbescherming",
+   "type": "ngo",
+   "rol": "maatschappelijke_organisatie"
+  },
+  "Pensioenfonds Zorg en Welzijn": {
+   "naam": "Pensioenfonds Zorg en Welzijn (PFZW)",
+   "type": "vermogensbeheerder",
+   "rol": "belanghebbende"
+  },
+  "Nederlandse orde van advocaten": {
+   "naam": "Nederlandse Orde van Advocaten (NOvA)",
+   "type": "overheidsinstelling",
+   "rol": "belanghebbende",
+   "oo": "27906613"
+  }
+ }
+}

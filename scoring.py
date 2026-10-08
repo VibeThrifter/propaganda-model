@@ -889,6 +889,8 @@ def compute_all_scores(conn, exclude_cluster=None, bridged_weights=None) -> dict
         target_role_sets["public"] = pub
     if (pol := _role_ids("politicus", "partij")):
         target_role_sets["politiek"] = pol
+    if (bes := _role_ids(*influence_graph.BESLUIT_ROLLEN)):
+        target_role_sets["besluitvorming"] = bes
     role_influence = influence_graph.compute_role_influence(
         role_ids, mech_edges, target_role_sets=target_role_sets, field_mode="collapse")
     role_influence_clean = influence_graph.compute_role_influence(
