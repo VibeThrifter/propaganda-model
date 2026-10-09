@@ -1,46 +1,11 @@
-data/*.db
-data/secret_key
-data/tokens/
+# Alles in data/ is runtime van deze machine, niets ervan hoort in git: de live database
+# (ook -wal/-shm, met wachtwoord- en tokenhashes), tokens, logs van launchd en de ronde,
+# registeruitgaven, back-ups en regenereerbare analyse-uitvoer. releases/ wordt wél ingecheckt.
+data/
+
 __pycache__/
 *.pyc
 .DS_Store
-data/gevoeligheid.json
-# Fase 2: herleidbare analyse-uitvoer (regenereerbaar uit de DB)
-data/granulariteit.json
-data/kalibratie.json
-data/bridging.json
-# Fase 3: idem (releases/ daarentegen wordt ingecheckt — dat ís de release)
-data/onderzoeksagenda.json
-data/voorspellingen_kalibratie.json
-data/kleurmeter.json
-# Adviserende agent-uitvoer (beslissteun, telt nergens mee in het model)
-data/review_advies.json
-data/bron_suggesties.json
-# Regenereerbare meter-rapporten (uit de DB, zie scripts/*_meter.py)
-data/doelgroep.json
-data/bereik.json
-# Per-host runtime-log van scripts/archiveer_bronnen.py (C3)
-data/archiveer_log.jsonl
-# Scout-onderzoeksuitvoer (ruwe JSON; het mission-log in missies/logs/ is de ingecheckte neerslag)
-data/scout/
 # LinkedIn-integratie: gescrapete persoonsdata + auth-sessie + geïsoleerde venv
-data/linkedin/
 tools/linkedin/session.json
 tools/linkedin/.venv/
-
-# Fase 3: auto-merge + scheduler runtime (regenereerbaar/adviserend)
-data/auto_merge_log.json
-data/auto_merge_state.json
-data/voorspelling_voorstellen.json
-data/agent_runs.jsonl
-data/monitor_agents_state.json
-
-# Fase 6: feed-API-keys (alleen sha256-hash, nooit committen)
-data/api_keys/
-
-# Epic 12 (nieuws-pijplijn): autokeur-auditlog + runner-locks (runtime, per host)
-data/nieuws_autokeur_log.jsonl
-data/locks/
-
-# Uitbreiding C: registeruitgaven (grote snapshots, regenereerbaar met tools/registers/haal.py)
-data/registers/

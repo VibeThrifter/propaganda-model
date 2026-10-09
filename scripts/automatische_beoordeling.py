@@ -16,7 +16,8 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
    nieuws toont eerst: haalt de bron op, zoekt het citaat letterlijk terug, en een model zegt
    of de bron de bewering draagt — en (v3) of bewering en bron over dít verband gaan. Plus
    ``--max-specifiek`` gemergede argumenten over verbanden uit het nieuws waarop een eerdere
-   versie 'klopt' zei (geen massale herbeoordeling).
+   versie 'klopt' zei (geen massale herbeoordeling). Een storing van het model is geen oordeel;
+   een 'twijfel' die vóór 2026-10-09 zo'n storing was, wordt opnieuw bekeken (``--storing``).
 3. **Smaadtoets** (scripts/smaadtoets.py, Opus): claims over personen — feitelijk, gedragen
    door de bron, over de publieke rol? Dan smaad_hold eraf en de gewone poorten; zo niet,
    dan teruggekoppeld (stap 11 en 12). Eigen afwijzingen die een nieuw 'klopt'/'feitelijk'
@@ -857,37 +858,58 @@ def stap_zonder_bron(token, args, meld) -> dict:
     return tel
 
 
+# Welk dagplafond een element raakt: dezelfde regel als de server (`_registerelement`): een
+# entiteit met een externe id, of een relatie waarvan elke levende steunende root alleen
+# registercitaties draagt (registercheck.REGISTER_ARG_SQL)
+_LEVENDE_ROOT = """a.relation_id = x.id AND a.parent_argument_id IS NULL AND a.stance = 'supporting'
+    AND NOT a.vervangen AND a.status <> 'verworpen'"""
+SOORT_SQL = {
+    "entities": "EXISTS (SELECT 1 FROM externe_ids e WHERE e.entity_id = x.id)",
+    "relations": f"""(EXISTS (SELECT 1 FROM arguments a WHERE {_LEVENDE_ROOT})
+        AND NOT EXISTS (SELECT 1 FROM arguments a WHERE {_LEVENDE_ROOT}
+                        AND NOT {registercheck.REGISTER_ARG_SQL}))""",
+}
+
+
 def stap_goedkeuren(token, args, meld) -> dict:
-    """Relaties en entiteiten met gecontroleerd bewijs: entiteiten eerst, dan relaties."""
-    tel = {"entities": 0, "relations": 0}
+    """Relaties en entiteiten met gecontroleerd bewijs: entiteiten eerst, dan relaties. Twee
+    dagplafonds (Uitbreiding C): gewoon en register. Is er één vol, dan vraagt de ronde voor die
+    soort niets meer (geen duizenden geweigerde verzoeken) en gaat de andere soort door."""
+    tel = {"entities": 0, "relations": 0, "plafond_overgeslagen": 0}
     uitgeput: set[str] = set()
     for tabel in ("entities", "relations"):
         conn = db()
         try:
-            ids = [r["id"] for r in conn.execute(f"""
-                SELECT id FROM {tabel} WHERE status = 'voorgesteld' AND NOT vervangen
-                ORDER BY id""")]  # noqa: S608 - vaste tabelnaam
+            rijen = [(r["id"], "register" if r["register"] else "gewoon") for r in conn.execute(f"""
+                SELECT x.id, {SOORT_SQL[tabel]} AS register FROM {tabel} x
+                WHERE x.status = 'voorgesteld' AND NOT x.vervangen
+                ORDER BY x.id""")]  # noqa: S608 - vaste tabelnaam en vaste SQL
         finally:
             conn.close()
-        for rid in ids:
+        for rid, soort in rijen:
+            if soort in uitgeput:
+                tel["plafond_overgeslagen"] += 1
+                continue
             methode = "GET" if args.droog else "POST"
             status, antwoord = req(methode, f"/api/beoordeling/autokeur/{tabel}/{rid}", token)
             if status == 503:
                 meld(f"Goedkeuren gestopt: {antwoord.get('error')}")
                 return tel
             if status == 429:
-                # Twee plafonds (Uitbreiding C): gewoon en register. Is er één bereikt, dan
-                # gaan elementen van de andere soort gewoon door.
-                soort = antwoord.get("soort") or "gewoon"
+                soort = antwoord.get("soort") or soort
                 if soort not in uitgeput:
                     meld(f"Dagplafond ({soort}) bereikt: {antwoord.get('error')}")
                 uitgeput.add(soort)
                 if {"gewoon", "register"} <= uitgeput:
-                    return tel
+                    break
                 continue
             if (args.droog and antwoord.get("toegestaan")) or antwoord.get("goedgekeurd"):
                 tel[tabel] += 1
-    meld(f"Goedgekeurd: {tel['entities']} entiteit(en), {tel['relations']} relatie(s)")
+        if {"gewoon", "register"} <= uitgeput:
+            break
+    meld(f"Goedgekeurd: {tel['entities']} entiteit(en), {tel['relations']} relatie(s)"
+         + (f"; {tel['plafond_overgeslagen']} wachten op het plafond van morgen"
+            if tel["plafond_overgeslagen"] else ""))
     return tel
 
 
@@ -1081,6 +1103,10 @@ def ronde(args, meld=print) -> dict:
     uitkomst["a1_controle"] = bronchecker.draai(max_n=args.max_controle, droog=args.droog,
                                                 parallel=args.parallel, modus="controle",
                                                 meld=meld)
+    # Een 'twijfel' die een storing van het model was (vóór 2026-10-09): opnieuw
+    uitkomst["a1_storing"] = bronchecker.draai(max_n=args.max_controle, droog=args.droog,
+                                               parallel=args.parallel, modus="storing",
+                                               meld=meld)
     # 2a. A1 v3 voor verbanden uit het nieuws: gaat het bewijs over dít verband? (begrensd)
     if args.max_specifiek > 0:
         uitkomst["a1_specifiek"] = bronchecker.draai(max_n=args.max_specifiek,

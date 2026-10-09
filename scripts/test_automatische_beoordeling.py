@@ -25,6 +25,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -111,12 +112,130 @@ def test_helpers():
         "teruggekoppeld: de feitelijke versie komt met dezelfde bronnen opnieuw binnen")
 
 
+def test_storing_en_plafond():
+    """Een storing van het model is geen oordeel (2026-10-09), en goedkeuren vraagt niets meer
+    voor een soort waarvan het dagplafond vol is."""
+    print("1b. Storing van het model en het dagplafond")
+    bc = laad_script("bronchecker")
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        token = tmp / "token"
+        token.write_text("x")
+        bc.POGINGEN_PATH, bc.LOG_PATH = tmp / "pogingen.json", tmp / "log.jsonl"
+
+        class Leeg:
+            def close(self):
+                pass
+
+        bc.db = Leeg
+        uitkomsten, gevraagd, geschreven = {}, [], []
+
+        def beoordeel(arg_id):
+            gevraagd.append(arg_id)
+            time.sleep(0.05)  # een modelvraag duurt even: de ronde kan de rest nog afzeggen
+            return dict(uitkomsten[arg_id])
+
+        bc._beoordeel_los = beoordeel
+        bc.post_oordeel = (lambda api, tok, arg_id, uitkomst, herzien=False:
+                           geschreven.append((arg_id, uitkomst["verdict"], herzien,
+                                              uitkomst.get("detail"))) or (201, {}))
+        storing = {"verdict": None, "detail": bc.MODEL_STORING, "storing": "model"}
+        klopt = {"verdict": "klopt", "detail": "citaat letterlijk gevonden", "model": True}
+
+        def ronde(ids, modus="nieuw"):
+            rijen = [{"id": i} for i in ids]
+            bc.MODI = {modus: (lambda conn, sel=None: rijen, modus == "storing")}
+            return bc.draai(token_pad=token, parallel=1, modus=modus, meld=lambda *_: None)
+
+        # Volledige uitval (sessielimiet): niets geschreven, niets geteld, vroeg gestopt
+        for i in range(1, 21):
+            uitkomsten[i] = storing
+        tel = ronde(range(1, 21))
+        eis(not geschreven and not json.loads(bc.POGINGEN_PATH.read_text())
+            and len(gevraagd) <= bc.STORING_STOP + 2,
+            f"uitval: geen oordeel, geen poging, stopt na {len(gevraagd)} vragen ({tel})")
+        # Werkt het model voor de rest, dan telt een storing bij één argument als poging
+        uitkomsten.update({30: klopt, 31: klopt, 32: storing})
+        for n in (1, 2):
+            gevraagd.clear(), geschreven.clear()
+            ronde([30, 31, 32])
+            eis([g[0] for g in geschreven] == [30, 31] or sorted(g[0] for g in geschreven) == [30, 31],
+                f"ronde {n}: alleen de oordelen geschreven, #32 later opnieuw")
+        geschreven.clear()
+        ronde([30, 31, 32])
+        eis((32, "twijfel", False, f"{bc.MAX_POGINGEN} keer {bc.MODEL_STORING}")
+            in geschreven, "na 3 rondes met een werkend model: 'twijfel' (3 keer)")
+        # --storing: herziet het eigen oordeel; een nieuwe storing verandert niets
+        geschreven.clear()
+        uitkomsten.update({40: klopt, 41: storing})
+        ronde([40, 41], modus="storing")
+        eis([(g[0], g[1], g[2]) for g in geschreven] == [(40, "klopt", True)],
+            "--storing: herziet het oordeel bij een antwoord, laat een storing staan")
+        # De selectie pakt de oude storing-twijfel, niet het "3 keer"-oordeel van nu
+        like = sqlite3.connect(":memory:")
+        eis(like.execute("SELECT ? LIKE ?", (f"[bronchecker v2] {bc.MODEL_STORING}",
+                                             bc.STORING_DETAIL)).fetchone()[0] == 1
+            and like.execute("SELECT ? LIKE ?", (f"{bc.VERSIE} 3 keer {bc.MODEL_STORING}",
+                                                 bc.STORING_DETAIL)).fetchone()[0] == 0,
+            "storing-selectie: alleen de oude storing-twijfel")
+        like.close()
+
+        # Goedkeuren: het registerplafond is vol → geen verzoeken meer voor registerfeiten
+        ab = laad_script("automatische_beoordeling")
+        pad = tmp / "mini.db"
+        c = sqlite3.connect(pad)
+        c.executescript("""
+            CREATE TABLE entities (id INTEGER PRIMARY KEY, status TEXT, vervangen INTEGER DEFAULT 0);
+            CREATE TABLE relations (id INTEGER PRIMARY KEY, status TEXT, vervangen INTEGER DEFAULT 0);
+            CREATE TABLE externe_ids (entity_id INTEGER, stelsel TEXT, waarde TEXT);
+            CREATE TABLE arguments (id INTEGER PRIMARY KEY, relation_id INTEGER,
+                parent_argument_id INTEGER, stance TEXT, vervangen INTEGER DEFAULT 0, status TEXT);
+            CREATE TABLE sources (id INTEGER PRIMARY KEY, cluster_key TEXT);
+            CREATE TABLE citations (id INTEGER PRIMARY KEY, argument_id INTEGER, source_id INTEGER,
+                methode TEXT, quote TEXT);
+            INSERT INTO sources VALUES (1, 'register:tk'), (2, 'nos.nl');
+            INSERT INTO entities (id, status) VALUES (1, 'voorgesteld'), (2, 'voorgesteld');
+            INSERT INTO externe_ids VALUES (1, 'tk_persoon', 'x');
+            INSERT INTO relations (id, status) VALUES (10, 'voorgesteld'), (11, 'voorgesteld'),
+                (12, 'voorgesteld'), (13, 'voorgesteld');
+            INSERT INTO arguments (id, relation_id, stance, status) VALUES
+                (100, 10, 'supporting', 'ongecontroleerd'), (101, 11, 'supporting', 'ongecontroleerd'),
+                (102, 12, 'supporting', 'ongecontroleerd'), (103, 13, 'supporting', 'ongecontroleerd');
+            INSERT INTO citations (argument_id, source_id, methode, quote) VALUES
+                (100, 1, 'officieel_register_scrape', 'regel'), (101, 2, 'verbatim_quote', 'c'),
+                (102, 1, 'officieel_register_scrape', 'regel'), (103, 2, 'verbatim_quote', 'c');
+        """)
+        c.commit()
+        c.close()
+
+        def mini():
+            conn = sqlite3.connect(pad)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+        verzoeken = []
+
+        def req(methode, pad_, tok, body=None):
+            tabel, rid = pad_.rsplit("/", 2)[-2:]
+            verzoeken.append((tabel, int(rid)))
+            if (tabel, int(rid)) in (("entities", 1), ("relations", 10), ("relations", 12)):
+                return 429, {"soort": "register", "error": "dagplafond (register) bereikt"}
+            return 200, {"goedgekeurd": True}
+
+        ab.db, ab.req = mini, req
+        tel = ab.stap_goedkeuren("t", type("A", (), {"droog": False})(), lambda *_: None)
+        eis(verzoeken == [("entities", 1), ("entities", 2), ("relations", 11), ("relations", 13)]
+            and tel["plafond_overgeslagen"] == 2 and tel["relations"] == 2,
+            f"plafond vol: registerfeiten wachten zonder verzoek, de rest gaat door ({verzoeken})")
+
+
 def main():
     os.environ["PROPAGANDA_AUTO_MERGE"] = "1"
     os.environ["PROPAGANDA_AUTOMATISCHE_BEOORDELING"] = "1"
     # Stap 3–22 toetsen de poorten van vóór de stemtoets; stap 23 zet haar aan
     os.environ["PROPAGANDA_STEMTOETS"] = "0"
     test_helpers()
+    test_storing_en_plafond()
     with tempfile.TemporaryDirectory() as tmp:
         db = Path(tmp) / "vers.db"
         print("2. Verse build (schema → theorie → instanties)")

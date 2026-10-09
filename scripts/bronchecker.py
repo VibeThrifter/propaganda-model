@@ -52,12 +52,20 @@ geen verband met één genoemd medium of één genoemde partij: 'klopt-niet', "g
   ALLEEN voor verbanden die het nieuws toont (nieuws_voorrang, nieuws_doelen), begrensd per
   ronde (geen massale herbeoordeling); het eigen oordeel wordt bijgewerkt (``herzien``).
 
+Storing van het model (2026-10-09): geeft het model geen bruikbaar oordeel (sessielimiet,
+time-out), dan is dat een storing en géén oordeel, net als een bron die niet te lezen is. Of het
+aan het argument ligt, blijkt pas als het model in dezelfde ronde wél oordelen gaf: alleen dan
+telt het als poging (na 3 pogingen 'twijfel'). Een ronde waarin het model niets zegt, telt niets
+en stopt na een paar vergeefse vragen. Tot 2026-10-09 schreef een storing meteen 'twijfel';
+``--storing`` bekijkt die argumenten opnieuw en werkt het eigen oordeel bij (``herzien``).
+
 Gebruik:
     python3 scripts/bronchecker.py --droog            # toon oordelen, schrijf niets
     python3 scripts/bronchecker.py --max 40 --json    # echt, hooguit 40 argumenten
     python3 scripts/bronchecker.py --ids 3912,3913    # alleen deze argumenten
     python3 scripts/bronchecker.py --controle --max 60  # gemerged, nooit gecontroleerd
     python3 scripts/bronchecker.py --specifiek --max 20 # nieuws-verbanden met de v3-vraag
+    python3 scripts/bronchecker.py --storing --max 60   # oordelen die een storing waren
 """
 from __future__ import annotations
 
@@ -96,6 +104,10 @@ VERSIE = "[bronchecker v3]"
 # Alle versies vanaf v2 dragen "[bronchecker vN]"; v1 schreef "[bronchecker]"
 VERSIE_GEZET = "[bronchecker v%"
 MAX_POGINGEN = 3
+# Een storing van het model (geen bruikbaar antwoord) is geen oordeel; zoveel vergeefse vragen
+# zonder één oordeel en de ronde stopt (sessielimiet, time-out)
+MODEL_STORING = "model gaf geen bruikbaar oordeel"
+STORING_STOP = 6
 LINKEDIN_DIR = ROOT / "data" / "linkedin"
 CLAUDE = shutil.which("claude") or "/usr/local/bin/claude"
 MODEL = "sonnet"
@@ -674,6 +686,31 @@ def specifiek_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
     return sorteer_op_voorrang(conn, rijen)
 
 
+# Het detail van een storing die tot 2026-10-09 meteen als 'twijfel' werd geschreven (elke
+# versie; niet het "3 keer …"-oordeel van nu, dat wél een oordeel is)
+STORING_DETAIL = "[bronchecker%] " + MODEL_STORING
+
+
+def storing_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
+    """Argumenten waarop een eerdere versie 'twijfel' schreef omdat het model geen oordeel gaf
+    (een storing, geen oordeel): opnieuw, wat het nieuws toont eerst. Ook wat de beoordeling op
+    zo'n oordeel verwierp; bevestigt het oordeel nu de bron, dan heropent zij haar afwijzing."""
+    filt, params = "", [ACCOUNT, STORING_DETAIL]
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params += list(ids)
+    rijen = conn.execute(f"""
+        SELECT a.*, r.source_id AS rel_bron, r.target_id AS rel_doel FROM arguments a
+        JOIN immuun_oordelen o ON o.argument_id = a.id AND o.fase = 'herverificatie'
+          AND o.door = ?
+        LEFT JOIN relations r ON r.id = a.relation_id
+        WHERE a.status IN ('voorgesteld', 'ongecontroleerd', 'bronvermelding_nodig',
+                           'geverifieerd', 'verworpen')
+          AND NOT a.vervangen AND o.verdict = 'twijfel' AND o.detail LIKE ?{filt}""",
+                         params).fetchall()  # noqa: S608 - alleen placeholders
+    return sorteer_op_voorrang(conn, rijen)
+
+
 # Welke argumenten een ronde bekijkt, en of het eigen eerdere oordeel wordt herzien
 MODI = {
     "nieuw": (kandidaten, False),
@@ -683,6 +720,7 @@ MODI = {
     "pdf": (pdf_kandidaten, True),
     "buiten": (buiten_kandidaten, False),
     "specifiek": (specifiek_kandidaten, True),
+    "storing": (storing_kandidaten, True),
 }
 
 
@@ -757,8 +795,9 @@ def beoordeel_argument(conn, arg) -> dict:
                   + "Geef in 'reden' één korte zin.")
         antwoord = vraag_model(prompt, SCHEMA_VERBAND if verband else SCHEMA_ARGUMENT)
         if not antwoord:
-            uitkomsten.append({"verdict": "twijfel", "bron_id": bron["bron_id"],
-                               "detail": "model gaf geen bruikbaar oordeel"})
+            # Storing van het model: geen oordeel (draai beslist of het als poging telt)
+            uitkomsten.append({"verdict": None, "bron_id": bron["bron_id"],
+                               "detail": MODEL_STORING, "storing": "model"})
             continue
         oordeel = antwoord.get("oordeel")
         verdict = {"draagt": "klopt", "deels": "twijfel", "draagt_niet": "klopt-niet"}.get(
@@ -774,10 +813,11 @@ def beoordeel_argument(conn, arg) -> dict:
         uitkomsten.append({
             "verdict": verdict, "bron_id": bron["bron_id"],
             "verbatim_span": citaat if (verdict == "klopt" and citaat) else None,
-            "detail": f"{gelezen}; {reden}",
+            "detail": f"{gelezen}; {reden}", "model": True,
         })
     rang = {"klopt": 0, "twijfel": 1, "klopt-niet": 2, None: 3}
-    return min(uitkomsten, key=lambda u: rang[u["verdict"]])
+    # Zonder enig oordeel gaat een storing van het model voor een onleesbare bron
+    return min(uitkomsten, key=lambda u: (rang[u["verdict"]], u.get("storing") != "model"))
 
 
 def beoordeel_bezwaar(conn, reply) -> dict:
@@ -809,10 +849,10 @@ def beoordeel_bezwaar(conn, reply) -> dict:
               "'deels' bij twijfel. Geef in 'reden' één korte zin.")
     antwoord = vraag_model(prompt, SCHEMA_BEZWAAR)
     if not antwoord:
-        return {"verdict": "twijfel", "detail": "model gaf geen bruikbaar oordeel"}
+        return {"verdict": None, "detail": MODEL_STORING, "storing": "model"}
     verdict = {"houdt_stand": "klopt", "deels": "twijfel",
                "houdt_geen_stand": "klopt-niet"}.get(antwoord.get("oordeel"), "twijfel")
-    return {"verdict": verdict,
+    return {"verdict": verdict, "model": True,
             "detail": f"bezwaar {'houdt stand' if verdict == 'klopt' else 'getoetst'}: "
                       f"{antwoord.get('reden', '').strip()}"}
 
@@ -858,8 +898,9 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, id
     """Eén ronde. → samenvatting {bekeken, klopt, twijfel, klopt_niet, technisch,
     geschreven, fouten}. ``modus`` (zie MODI): 'nieuw' (voorgesteld, standaard), 'herzien'
     (v1-twijfel op voorgesteld; ook via ``herzien=True``), 'controle' (gemerged, nooit
-    gecontroleerd), 'heropenen' (verworpen op een v1-oordeel) of 'specifiek' (v3: gemerged werk
-    over een verband uit het nieuws waarop een eerdere versie 'klopt' zei)."""
+    gecontroleerd), 'heropenen' (verworpen op een v1-oordeel), 'specifiek' (v3: gemerged werk
+    over een verband uit het nieuws waarop een eerdere versie 'klopt' zei) of 'storing' (een
+    'twijfel' die een storing van het model was)."""
     modus = modus or ("herzien" if herzien else "nieuw")
     selectie, herzien = MODI[modus]
     token = None
@@ -876,51 +917,92 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, id
         tel = {"bekeken": 0, "klopt": 0, "twijfel": 0, "klopt-niet": 0, "technisch": 0,
                "geschreven": 0, "fouten": 0}
         pogingen = _laad_pogingen()
+
+        def poging(arg, uitkomst):
+            """Technische storing: pas na MAX_POGINGEN rondes een twijfel-oordeel → het oordeel,
+            of None (later opnieuw)."""
+            sleutel = str(arg["id"])
+            pogingen[sleutel] = pogingen.get(sleutel, 0) + (0 if droog else 1)
+            if pogingen[sleutel] < MAX_POGINGEN:
+                tel["technisch"] += 1
+                meld(f"  · #{arg['id']}: later opnieuw — {uitkomst.get('detail')}")
+                return None
+            return {**uitkomst, "verdict": "twijfel",
+                    "detail": f"{MAX_POGINGEN} keer {uitkomst.get('detail')}"}
+
+        def schrijf(arg, uitkomst):
+            tel[uitkomst["verdict"]] += 1
+            regel = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
+                     "argument_id": arg["id"], "herzien": herzien, "modus": modus,
+                     **uitkomst}
+            if not droog:
+                status, antwoord = post_oordeel(api, token, arg["id"], uitkomst,
+                                                herzien=herzien)
+                regel["http"] = status
+                if status in (200, 201):
+                    tel["geschreven"] += 1
+                elif status != 409:
+                    tel["fouten"] += 1
+                    regel["fout"] = antwoord.get("error")
+                time.sleep(0.3)
+            meld(f"  · #{arg['id']}: {uitkomst['verdict']} — {(uitkomst.get('detail') or '')[:110]}")
+            if not droog:
+                LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+                with open(LOG_PATH, "a", encoding="utf-8") as log:
+                    log.write(json.dumps(regel, ensure_ascii=False) + "\n")
+
+        model_oordelen = 0
+        model_storing = []  # (arg, uitkomst): pas na de ronde beslist
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
             toekomst = {pool.submit(_beoordeel_los, a["id"]): a for a in rijen}
             for f in concurrent.futures.as_completed(toekomst):
                 arg = toekomst[f]
                 try:
                     uitkomst = f.result()
+                except concurrent.futures.CancelledError:
+                    continue
                 except Exception as exc:  # noqa: BLE001 - één fout stopt de ronde niet
                     tel["fouten"] += 1
                     meld(f"  ✗ #{arg['id']}: {exc}")
                     continue
                 tel["bekeken"] += 1
-                if uitkomst["verdict"] is None and modus == "specifiek":
+                if uitkomst.get("model"):
+                    model_oordelen += 1
+                if uitkomst["verdict"] is None and modus in ("specifiek", "storing"):
                     # Herbeoordeling: een storing verandert niets aan het eerdere oordeel
                     tel["technisch"] += 1
                     meld(f"  · #{arg['id']}: later opnieuw — {uitkomst.get('detail')}")
-                    continue
-                if uitkomst["verdict"] is None:
-                    # Technische storing: pas na MAX_POGINGEN rondes een twijfel-oordeel
-                    sleutel = str(arg["id"])
-                    pogingen[sleutel] = pogingen.get(sleutel, 0) + (0 if droog else 1)
-                    if pogingen[sleutel] < MAX_POGINGEN:
-                        tel["technisch"] += 1
-                        meld(f"  · #{arg['id']}: later opnieuw — {uitkomst.get('detail')}")
-                        continue
-                    uitkomst = {**uitkomst, "verdict": "twijfel",
-                                "detail": f"{MAX_POGINGEN} keer {uitkomst.get('detail')}"}
-                tel[uitkomst["verdict"]] += 1
-                regel = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
-                         "argument_id": arg["id"], "herzien": herzien, "modus": modus,
-                         **uitkomst}
-                if not droog:
-                    status, antwoord = post_oordeel(api, token, arg["id"], uitkomst,
-                                                    herzien=herzien)
-                    regel["http"] = status
-                    if status in (200, 201):
-                        tel["geschreven"] += 1
-                    elif status != 409:
-                        tel["fouten"] += 1
-                        regel["fout"] = antwoord.get("error")
-                    time.sleep(0.3)
-                meld(f"  · #{arg['id']}: {uitkomst['verdict']} — {(uitkomst.get('detail') or '')[:110]}")
-                if not droog:
-                    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-                    with open(LOG_PATH, "a", encoding="utf-8") as log:
-                        log.write(json.dumps(regel, ensure_ascii=False) + "\n")
+                    if uitkomst.get("storing") == "model":
+                        model_storing.append((arg, uitkomst))
+                elif uitkomst["verdict"] is None and uitkomst.get("storing") == "model":
+                    # Het model zei niets: of dat aan dit argument ligt, beslist het eind
+                    model_storing.append((arg, uitkomst))
+                    tel["technisch"] += 1
+                elif uitkomst["verdict"] is None:
+                    uitkomst = poging(arg, uitkomst)
+                    if uitkomst:
+                        schrijf(arg, uitkomst)
+                else:
+                    schrijf(arg, uitkomst)
+                if not model_oordelen and len(model_storing) >= STORING_STOP:
+                    # Sessielimiet of uitval: niet de hele lijst langs een model dat niets zegt
+                    for t in toekomst:
+                        t.cancel()
+                    meld(f"Model geeft geen oordeel ({len(model_storing)} keer op rij): "
+                         f"bronchecker ({modus}) stopt, volgende ronde opnieuw")
+                    break
+        if model_storing and modus not in ("specifiek", "storing"):
+            if not model_oordelen:
+                # Storing van het model: niets geteld, alles komt een volgende ronde terug
+                meld(f"  · {len(model_storing)} argument(en) later opnieuw: het model gaf deze "
+                     "ronde geen enkel oordeel")
+            else:
+                # Het model werkte voor andere argumenten: dit telt als poging
+                tel["technisch"] -= len(model_storing)
+                for arg, uitkomst in model_storing:
+                    uitkomst = poging(arg, uitkomst)
+                    if uitkomst:
+                        schrijf(arg, uitkomst)
         if not droog:
             _bewaar_pogingen(pogingen)
         tel["klopt_niet"] = tel.pop("klopt-niet")
@@ -961,12 +1043,16 @@ def main():
     groep.add_argument("--specifiek", action="store_true",
                        help="v3: gemerged werk over verbanden uit het nieuws opnieuw (gaat het "
                             "over dít verband?)")
+    groep.add_argument("--storing", action="store_true",
+                       help="oordelen die een storing van het model waren ('twijfel' zonder "
+                            "oordeel) opnieuw")
     ap.add_argument("--json", action="store_true", help="eindig met één JSON-regel")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",") if x.strip().isdigit()] or None
     modus = ("herzien" if args.herzien else "controle" if args.controle
              else "heropenen" if args.heropenen else "pdf" if args.pdf
-             else "buiten" if args.buiten else "specifiek" if args.specifiek else "nieuw")
+             else "buiten" if args.buiten else "specifiek" if args.specifiek
+             else "storing" if args.storing else "nieuw")
     tel = draai(api=args.api, token_pad=args.token, max_n=args.max, droog=args.droog,
                 ids=ids, parallel=args.parallel, modus=modus)
     if args.json:
