@@ -33,6 +33,18 @@ Nooit: een bron verzinnen of een citaat parafraseren (het script controleert dat
 propagandamodel, Wikipedia of sociale media als bron, iets anders schrijven dan bronnen en
 argumenten.
 
+Sinds 2026-10-08 (eigenaarsbesluit: "PVV censureert AD … niet van belang"; "deze taal moeten
+we niet overnemen"):
+- een bron telt alleen als ze beide partijen van het verband noemt (het script controleert dat
+  in de opgehaalde tekst); een bron over "de pers" of "journalisten" draagt geen verband met
+  één genoemd medium;
+- één feit per bewering: een samengestelde bewering (een bestuursfunctie én een kandidatuur)
+  wordt gesplitst; het eerste feit gaat de gewone weg, elk ander feit met een eigen bron wordt
+  een eigen argument op hetzelfde doel ("Afgesplitst van #…"). Een feit over een ánder
+  verband valt af (in het logboek);
+- de bewering staat in neutrale eigen woorden: wie deed of zei wat, wanneer; een oordeel alleen
+  als citaat met naam van wie het uitsprak (de stemtoets toetst dat daarna).
+
 Gebruik:
     python3 scripts/bronzoeker.py --droog --max 3     # zoeken en natrekken, niets schrijven
     python3 scripts/bronzoeker.py --max 8 --json      # echt
@@ -89,7 +101,14 @@ SYSTEM_PROMPT = (
     "verzint nooit een bron, url of citaat: je gebruikt alleen pagina's die je met WebFetch "
     "werkelijk hebt geopend, en je kopieert het citaat teken voor teken zoals het op de pagina "
     "staat. De duiding van de database (een mechanisme, 'invloed', 'draaideur') hoeft een bron "
-    "niet te noemen. Antwoord alleen met het gevraagde JSON."
+    "niet te noemen. Een bron telt alleen als ze BEIDE partijen van het verband bij naam noemt "
+    "en over hún band gaat; een bron over 'de pers', 'journalisten' of 'de media' in het "
+    "algemeen draagt geen verband met één genoemd medium. Eén feit per bewering. Je schrijft "
+    "in neutrale eigen woorden: wie deed of zei wat, wanneer, in welke functie — geen oordeel "
+    "over gevolgen of motieven ('ondermijnt het vertrouwen', 'bedreiging'), geen etiket "
+    "('populistisch', 'extreemrechts', 'linkse media', 'neoliberale consensus') en geen retoriek "
+    "van één kant; zo'n oordeel alleen als citaat met de naam van wie het uitsprak. Antwoord "
+    "alleen met het gevraagde JSON."
 )
 SCHEMA = {
     "type": "object",
@@ -114,8 +133,37 @@ SCHEMA = {
             },
         },
         "toelichting": {"type": "string"},
+        "extra": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "bewering": {"type": "string"},
+                    "bronnen": {
+                        "type": "array",
+                        "maxItems": 2,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string"},
+                                "titel": {"type": "string"},
+                                "uitgever": {"type": "string"},
+                                "datum": {"type": "string"},
+                                "soort": {"type": "string", "enum": list(BRONSOORTEN)},
+                                "citaat": {"type": "string"},
+                            },
+                            "required": ["url", "titel", "uitgever", "datum", "soort", "citaat"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["bewering", "bronnen"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["gevonden", "bewering", "bronnen", "toelichting"],
+    "required": ["gevonden", "bewering", "bronnen", "toelichting", "extra"],
     "additionalProperties": False,
 }
 
@@ -336,7 +384,9 @@ def prompt_voor(arg: dict) -> str:
         regels.append("Er is nog geen argument met een bron voor dit verband. Formuleer in "
                       "'bewering' de feitelijke bewering die het verband draagt (wie, wat, "
                       f"wanneer), met {arg['bron_naam']} en {arg['doel_naam']} allebei bij "
-                      "naam, en zoek een bron die haar draagt.")
+                      "naam, en zoek een bron die haar draagt. Neem geen kwalificaties of "
+                      "oordelen over uit de omschrijving in de database: die is een eerste "
+                      "opzet, geen bron.")
         return "\n".join(regels + [OPDRACHT])
     regels = [f"Bewering: {arg['claim']}",
               f"Context: dit argument {rol} {doel} in de database."]
@@ -350,7 +400,7 @@ def prompt_voor(arg: dict) -> str:
     else:
         oud = "; ".join(f"{b.get('title') or '?'} ({b.get('url') or 'geen url'})"
                         for b in arg["bronnen"]) or "?"
-        waarom = (arg.get("a1_detail") or "").replace(bc.VERSIE, "").strip()
+        waarom = bc.zonder_versie(arg.get("a1_detail"))
         regels.append(f"De huidige bron ({oud}) volstaat niet volgens de bronchecker: "
                       f"{waarom[:400] or 'de bron draagt de bewering niet'}. Zoek een betere.")
     return "\n".join(regels + [OPDRACHT])
@@ -379,8 +429,22 @@ OPDRACHT = (
     "('Nederlandse nieuwssites', 'de media') in plaats van deze partijen; een bron die laat zien "
     "dat het verband niet klopt of voorbij is (noem dat dan in 'toelichting' — tegenbewijs gaat "
     "langs een andere weg het model in).\n"
-    "6. Niets betrouwbaars gevonden: gevonden = false, bronnen = [], en zeg in 'toelichting' "
-    "kort wat je zocht.\n"
+    "6. Niets betrouwbaars gevonden: gevonden = false, bronnen = [], extra = [], en zeg in "
+    "'toelichting' kort wat je zocht.\n"
+    "7. Een bron telt alleen als ze BEIDE partijen bij naam noemt (een functionaris, onderdeel "
+    "of titel van een partij bij naam mag) en over hún band gaat. Het script controleert dat in "
+    "de tekst van de pagina.\n"
+    "8. Eén feit per bewering. Bevat de bewering twee of meer losse feiten (bijvoorbeeld een "
+    "bestuursfunctie én een kandidatuur), zet dan het eerste in 'bewering' met zijn bronnen, en "
+    "elk ander feit over DEZELFDE twee partijen als apart item in 'extra', met een eigen bron "
+    "die dat feit draagt. Een feit over een ánder verband (andere partijen) of zonder bron laat "
+    "je weg en noem je in 'toelichting'. Geen tweede feit: extra = [].\n"
+    "9. Schrijf de bewering in neutrale eigen woorden: wie deed of zei wat, wanneer, in welke "
+    "functie. Geen oordeel over gevolgen of motieven ('ondermijnt het vertrouwen in de "
+    "journalistiek', 'bedreiging voor de persvrijheid'), geen etiket ('rechts-populistisch', "
+    "'extreemrechts', 'linkse media', 'mainstream', 'neoliberale consensus', 'omstreden'), "
+    "geen retoriek van één kant. Zo'n oordeel alleen als citaat met de naam van wie het "
+    "uitsprak ('De NVJ noemde de uitspraak …').\n"
     f"Hooguit {MAX_BRONNEN} bronnen; liever één goede dan twee matige.")
 
 
@@ -443,9 +507,15 @@ def namen_van(naam: str | None) -> set[str]:
 
 
 def noemt(tekst: str | None, naam: str | None) -> bool:
-    """Noemt de tekst deze partij (als heel woord)?"""
+    """Noemt de tekst deze partij (als heel woord)? Een naam van meerdere woorden telt ook
+    aaneengeschreven ("Haya van Somerenstichting" voor "Haya van Someren Stichting")."""
     gewoon = bc.normaliseer(tekst)
-    return any(re.search(rf"(?<![\w]){re.escape(n)}(?![\w])", gewoon) for n in namen_van(naam))
+    namen = namen_van(naam)
+    if any(re.search(rf"(?<![\w]){re.escape(n)}(?![\w])", gewoon) for n in namen):
+        return True
+    aaneen = gewoon.replace(" ", "").replace("-", "")
+    return any(len(n.replace(" ", "")) >= 10 and " " in n
+               and n.replace(" ", "").replace("-", "") in aaneen for n in namen)
 
 
 def verboden(url: str) -> bool:
@@ -457,8 +527,9 @@ def verboden(url: str) -> bool:
             or any(host == v or host.endswith("." + v) for v in VERBODEN_HOSTS))
 
 
-def natrekken(bron: dict) -> tuple[dict | None, str]:
-    """Haal de bron zelf op en zoek het citaat letterlijk terug. → (bron, reden)."""
+def natrekken(bron: dict, partijen: list[str] | None = None) -> tuple[dict | None, str]:
+    """Haal de bron zelf op en zoek het citaat letterlijk terug; met ``partijen`` moet de
+    pagina ze ook allemaal noemen (een verband: beide partijen). → (bron, reden)."""
     url = (bron.get("url") or "").strip()
     citaat = (bron.get("citaat") or "").strip()
     if not url.startswith(("http://", "https://")):
@@ -473,40 +544,62 @@ def natrekken(bron: dict) -> tuple[dict | None, str]:
     gevonden, letterlijk, _pos = bc.zoek_citaat(citaat, tekst)
     if not gevonden:
         return None, f"citaat niet teruggevonden ({bc.host_van(gelezen or url)})"
+    ontbreekt = [naam for naam in (partijen or []) if naam and not noemt(tekst, naam)]
+    if ontbreekt:
+        return None, f"bron noemt {', '.join(ontbreekt)} niet ({bc.host_van(gelezen or url)})"
     return {**bron, "url": url, "citaat": citaat, "letterlijk": letterlijk,
             "datum": datum_van(bron.get("datum"))}, "ok"
 
 
-def zoek(arg: dict) -> dict:
-    """→ {uitkomst: gevonden|niets|fout, bronnen, bewering, toelichting, afgevallen}."""
-    antwoord = vraag_zoeker(prompt_voor(arg))
-    if not antwoord:
-        return {"uitkomst": "fout", "toelichting": "model gaf geen bruikbaar antwoord"}
-    gehouden, afgevallen = [], []
-    for bron in (antwoord.get("bronnen") or [])[:MAX_BRONNEN + 1]:
-        goed, reden = natrekken(bron)
+def _bronnen_natrekken(bronnen, partijen, afgevallen) -> list[dict]:
+    gehouden = []
+    for bron in (bronnen or [])[:MAX_BRONNEN + 1]:
+        goed, reden = natrekken(bron, partijen)
         if goed:
             if len(gehouden) < MAX_BRONNEN:
                 gehouden.append(goed)
         else:
             afgevallen.append({"url": bron.get("url"), "reden": reden})
+    return gehouden
+
+
+def zoek(arg: dict) -> dict:
+    """→ {uitkomst: gevonden|niets|fout, bronnen, bewering, extra, toelichting, afgevallen}.
+    ``extra``: afgesplitste feiten over dezelfde partijen, elk met eigen nagetrokken bronnen."""
+    antwoord = vraag_zoeker(prompt_voor(arg))
+    if not antwoord:
+        return {"uitkomst": "fout", "toelichting": "model gaf geen bruikbaar antwoord"}
+    # Een bron telt alleen als ze de partijen noemt; een bewering blijft over dezelfde
+    # partijen, bij naam (geen algemene uitspraak over een sector of "de pers")
+    partijen = ([arg["bron_naam"], arg["doel_naam"]] if arg["relation_id"]
+                else [arg["entiteit_naam"]])
+    afgevallen = []
+    gehouden = _bronnen_natrekken(antwoord.get("bronnen"), partijen, afgevallen)
     bewering = (antwoord.get("bewering") or "").strip() or arg["claim"]
     if gehouden and not bewering:
         afgevallen.append({"url": None, "reden": "geen bewering geformuleerd"})
         gehouden = []
-    # Een herformulering (en de bewering bij een verband zonder argument) blijft over dezelfde
-    # partijen, bij naam (geen algemene uitspraak over een sector)
-    partijen = ([arg["bron_naam"], arg["doel_naam"]] if arg["relation_id"]
-                else [arg["entiteit_naam"]])
     ontbreekt = [naam for naam in partijen if naam and not noemt(bewering, naam)]
     nieuw = (arg.get("soort") == "verband"
              or bc.normaliseer(bewering) != bc.normaliseer(arg["claim"]))
     if gehouden and ontbreekt and nieuw:
         afgevallen.append({"url": None, "reden": f"bewering noemt {', '.join(ontbreekt)} niet"})
         gehouden = []
+    # Eén feit per bewering: wat de zoeker afsplitste, met een eigen bron over dezelfde partijen
+    extra = []
+    for item in (antwoord.get("extra") or [])[:3] if gehouden else []:
+        tekst = (item.get("bewering") or "").strip()
+        mist = [naam for naam in partijen if naam and not noemt(tekst, naam)]
+        if not tekst or mist or bc.normaliseer(tekst) == bc.normaliseer(bewering):
+            afgevallen.append({"url": None, "reden": f"afgesplitst feit valt af: "
+                                                     f"{'noemt ' + ', '.join(mist) + ' niet' if mist else 'leeg of dubbel'}"})
+            continue
+        bronnen = _bronnen_natrekken(item.get("bronnen"), partijen, afgevallen)
+        if bronnen:
+            extra.append({"bewering": tekst, "bronnen": bronnen})
     return {"uitkomst": "gevonden" if gehouden else "niets", "bronnen": gehouden,
-            "bewering": bewering, "toelichting": (antwoord.get("toelichting") or "")[:600],
-            "afgevallen": afgevallen}
+            "bewering": bewering, "extra": extra,
+            "toelichting": (antwoord.get("toelichting") or "")[:600], "afgevallen": afgevallen}
 
 
 # ------------------------------------------------------------------ schrijven
@@ -563,7 +656,7 @@ def indiening(arg: dict, gevonden: dict, citaties: list[dict]) -> tuple[str, dic
             "relation_id": arg["relation_id"], "stance": "supporting", "claim": bewering,
             "reasoning": f"{merk} zonder argument (bronzoeker): {toelichting}"[:1500],
             "citations": citaties, "negeer_duplicaten": True}
-    waarom = (arg.get("a1_detail") or "").replace(bc.VERSIE, "").strip()
+    waarom = bc.zonder_versie(arg.get("a1_detail"))
     merk = VERVANGING.format(id=arg["id"])
     body = {"stance": arg["stance"], "claim": bewering, "citations": citaties,
             "reasoning": (f"{merk} (de bronchecker: {waarom[:300] or 'bron draagt het niet'}). "
@@ -575,20 +668,49 @@ def indiening(arg: dict, gevonden: dict, citaties: list[dict]) -> tuple[str, dic
     return "/api/arguments", body
 
 
-def dien_in(api, token, arg: dict, gevonden: dict) -> tuple[int | None, str | None]:
+AFGESPLITST = "Afgesplitst van #{id}"
+
+
+def citaties_voor(api, token, bronnen) -> list[dict]:
     citaties = []
-    for bron in gevonden["bronnen"]:
+    for bron in bronnen:
         sid = registreer_bron(api, token, bron)
         if sid:
             citaties.append({"source_id": sid, "quote": bron["citaat"],
                              "methode": "verbatim_quote"})
+    return citaties
+
+
+def afgesplitst(arg: dict, item: dict, citaties: list[dict], nieuw_id) -> dict:
+    """Een afgesplitst feit wordt een eigen argument op hetzelfde doel, met dezelfde stance."""
+    herkomst = arg["id"] or nieuw_id or f"verband {arg['relation_id']}"
+    body = {"stance": arg["stance"], "claim": item["bewering"], "citations": citaties,
+            "reasoning": (f"{AFGESPLITST.format(id=herkomst)}: één feit per argument "
+                          "(bronzoeker)")[:1500],
+            "negeer_duplicaten": True}
+    for kolom in ("relation_id", "entity_id"):
+        if arg.get(kolom) is not None:
+            body[kolom] = arg[kolom]
+    if arg.get("property") and arg["property"] != "existence":
+        body["property"] = arg["property"]
+    return body
+
+
+def dien_in(api, token, arg: dict, gevonden: dict) -> tuple[int | None, str | None]:
+    citaties = citaties_voor(api, token, gevonden["bronnen"])
     if not citaties:
         return None, "bron niet te registreren"
     pad, body = indiening(arg, gevonden, citaties)
     status, antwoord = api_post(api, token, pad, body)
     if status != 201:
         return None, f"geweigerd ({status}): {antwoord.get('error')}"
-    return antwoord.get("id"), None
+    nieuw_id = antwoord.get("id")
+    # Eén feit per argument: de afgesplitste feiten als eigen argumenten (best effort)
+    for item in gevonden.get("extra") or []:
+        extra_cit = citaties_voor(api, token, item["bronnen"])
+        if extra_cit:
+            api_post(api, token, "/api/arguments", afgesplitst(arg, item, extra_cit, nieuw_id))
+    return nieuw_id, None
 
 
 # ------------------------------------------------------------------ ronde

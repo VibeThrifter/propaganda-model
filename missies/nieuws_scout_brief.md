@@ -59,6 +59,35 @@ wachtrij, de afbakening en de snelheidsrem toe.
   ("Heinen van Financiën" = dubbel van Eelco Heinen) → `overgeslagen`; onderzoek het dubbel niet
   opnieuw.
 
+## Doelen `redactieleiding:<medium>` (eigenaarsbesluit 2026-10-08)
+
+Naast namen uit het nieuws staan er acht doelen van een andere soort in de wachtrij (soort
+`organisatie`, sleutel `redactieleiding:<medium>`, `context.soort_doel = "redactieleiding"`), één
+per hoofdbron van de nieuws-app: NOS, RTL Nieuws, NU.nl, AD, De Telegraaf, Het Parool, de
+Volkskrant, Trouw (aangemaakt door `scripts/nieuws_redactieleiding_doelen.py`). Aanleiding: de
+eigenaar wil meer verbanden zoals Kamran Ullah (VVD-bestuur Amsterdam-West 2006–2010, nu
+hoofdredactie De Telegraaf) en Kees Berghuis (RTL Nieuws → VVD-voorlichting).
+
+- **Wie:** de hoofdredacteur en adjunct-hoofdredacteuren (nu en de afgelopen tien jaar), de chef
+  politiek of de leiding van de Haagse redactie, en de drie tot zes bekendste politieke
+  verslaggevers en presentatoren. `context.bekend_in_model` noemt wie het model al aan het medium
+  koppelt: vul aan, dubbel niet (een bekend persoon zonder partijband mag je wel op banden
+  onderzoeken).
+- **Wat:** per persoon de functie bij het medium (`personeel` of `dienstverband`, gedateerd), en
+  gedocumenteerde banden met partijen en de politiek: lidmaatschap of bestuur van een partij of
+  afdeling, een kandidatuur (Kiesraad-lijst), een functie bij een partij, fractie of
+  bewindspersoon (voorlichter, woordvoerder, beleidsmedewerker: `woordvoerder_van`/`personeel`),
+  een wetenschappelijk bureau of denktank, en overstappen tussen politiek en media in beide
+  richtingen (`draaideur`, gedateerd). Volg de precedenten (Kamran Ullah, Kees Berghuis, Frits
+  Wester) voor relatietype en mechanisme.
+- **Grenzen:** alleen de publieke rol; alleen wat een bron bij naam zegt (colofon, aankondiging
+  van het medium of de uitgever, Villamedia, Parlement.com, Kiesraad, partijsites; LinkedIn achter
+  de rem). Nooit een partijvoorkeur afleiden uit stemgedrag, columns of opinies; geen privézaken.
+  Eén feit per argument, in neutrale eigen woorden (zie § Eigen stem en specificiteit).
+- **Afsluiten:** hooguit zes personen per doel per ronde; is er meer, zet het doel dan op `klaar`
+  met in het verslag wie nog volgt (de wachtrij heropent het niet vanzelf). Niets gevonden over
+  partijbanden is een geldige uitkomst: dan alleen de functies, en `klaar`.
+
 ## De ronde
 
 **Maximaal 3 doelen per ronde.**
@@ -249,6 +278,25 @@ curl -s -X PATCH http://localhost:5000/api/nieuws/doelen/<id> \
   de aangemaakte source-/entity-/relation-/argument-id's, negatieve resultaten (alleen in
   het log), de LinkedIn-remstatus (`python3 tools/linkedin/snelheidsrem.py status`) en
   de stance-balans.
+
+## Eigen stem en specificiteit (eigenaarsbesluit 2026-10-08)
+
+"'Ondermijnt zo het vertrouwen in de journalistiek' … deze taal moeten we niet overnemen, dit is
+duidelijk een politiek spelletje … waak hier streng voor"; "PVV censureert AD … niet van belang".
+Voor alles wat je als bewering (claim), beschrijving of herformulering indient:
+
+- **Eigen stem = wat er gebeurde**: wie deed of zei wat, wanneer, waar, in welke functie. Geen
+  oordeel over gevolgen of motieven ("ondermijnt het vertrouwen", "bedreiging voor de
+  persvrijheid", "om journalisten te intimideren"), geen etiket ("rechts-populistisch",
+  "extreemrechts", "linkse media", "mainstream", "neoliberale consensus", "omstreden") en geen
+  retoriek van één kant. Zo'n oordeel alleen als citaat, met de naam van wie het uitsprak ("De
+  NVJ noemde de uitspraak …"). De stemtoets (`scripts/stemtoets.py`, account `stemtoets`) toetst
+  elk voorstel; wat niet neutraal is, merget niet en komt in neutrale vorm opnieuw binnen.
+- **Over dát verband**: een argument over een verband noemt beide partijen, en de bron ook. Een
+  uitspraak over "de pers", "journalisten" of "de media" draagt geen verband met één genoemd
+  medium; de bronchecker (v3) zegt dan `klopt-niet` ("gaat niet over …").
+- **Eén feit per argument**: een bestuursfunctie en een kandidatuur zijn twee argumenten, elk met
+  een eigen bron die dát feit draagt. Een feit over een ánder verband hoort bij dat verband.
 
 ## Harde grenzen
 

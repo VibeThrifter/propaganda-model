@@ -66,6 +66,9 @@ SYSTEM_PROMPT = (
     "publieke uitspraken en optredens), niet over het privéleven (gezondheid, gezin, relaties, "
     "geloof, adres) tenzij de bron dat zelf in verband met de publieke rol publiek maakt. "
     "Een kritisch of onwelgevallig feit is publiceerbaar als het aan alle drie voldoet. "
+    "Een herformulering schrijf je in neutrale eigen woorden: wie deed of zei wat, wanneer; "
+    "geen oordeel over gevolgen of motieven en geen etiket, zo'n oordeel alleen als citaat met "
+    "de naam van wie het uitsprak (de stemtoets toetst dat daarna). "
     "Antwoord alleen met het gevraagde JSON."
 )
 SCHEMA = {

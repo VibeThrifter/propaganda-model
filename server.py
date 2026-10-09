@@ -176,8 +176,10 @@ RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur",
 # score-manipulatie door volume en heeft hier geen functie, terwijl de nieuws-backend per
 # cyclus ~12–30 doelen tegelijk aanbiedt. Wie hier mag schrijven, poorten de endpoints zelf
 # (nieuws-agent/nieuws-scout/maintainer). Idem de voorrang uit het nieuws (2026-10-06).
+# Idem een stemtoets (2026-10-08): procesmetadata over de eigen stem, poort = niet de auteur.
 RATE_LIMIT_VRIJE_ENDPOINTS = {"nieuws_doelen_upsert", "nieuws_doelen_claim_volgende",
-                              "nieuws_doelen_claim", "nieuws_doelen_patch", "nieuws_voorrang"}
+                              "nieuws_doelen_claim", "nieuws_doelen_patch", "nieuws_voorrang",
+                              "stemtoets_vastleggen"}
 
 
 def _rate_limit_ok(user) -> bool:
@@ -2193,6 +2195,11 @@ def tegenspraak(arg_id):
 #     alleen de bron verbetert, bv. van de bronzoeker) merget op A1 'klopt' alleen: er komt
 #     geen nieuwe bewering in het model, alleen een bron die de oude draagt. Raakt ze een
 #     persoon, dan alleen zonder negatief-feitelijke lading (smaad-lexicon).
+#   - een STEMREVISIE (2026-10-08: de herformulering die de stemtoets gaf voor een gemerged
+#     argument, met dezelfde bronnen) merget op A1 'klopt' + stemtoets 'neutraal', zonder A2:
+#     er gaat alleen een oordeel in de eigen stem uit.
+# Sinds 2026-10-08 merget niets uit de praktijklaag zonder een stemtoets 'neutraal' van een
+# ander account (behalve letterlijke registerregels; kill-switch PROPAGANDA_STEMTOETS=0).
 # Al het andere blijft zoals het was: invloedsclaims vergen A1 én A2, negatieve claims
 # over personen nooit automatisch, aspect/duiding/theorie blijven buiten A7.
 BEOORDELING_STRUCTUURTYPES = ("personeel", "dienstverband", "bestuurder", "adviseur",
@@ -2317,6 +2324,14 @@ def _ondergraving_toegestaan(conn, arg):
                            "(niet 'klopt')")
         if a1["door"] in (arg["contributed_by"], ouder["contributed_by"]):
             redenen.append("A1: oordeel door de auteur van het bezwaar of van de parent")
+    # Stemtoets (2026-10-08): ook een bezwaar spreekt in de eigen stem van het model
+    if _stemtoets_vereist(conn, arg):
+        stem = _stemtoets(conn, "argument", arg["id"], arg["contributed_by"], arg["claim"])
+        if stem is None:
+            redenen.append("stemtoets: nog geen oordeel over de eigen stem")
+        elif stem["verdict"] == "niet_neutraal":
+            return (False, [f"stemtoets: niet neutraal — {stem['reden']}"],
+                    "geblokkeerd-hoog-inzet")
     if redenen:
         return (False, redenen, "geparkeerd-twijfel")
     return (True, [], "auto-gemerged")
@@ -2373,6 +2388,18 @@ def auto_merge_toegestaan(conn, arg_id):
     # Die bewering stond al in het model: alleen de onafhankelijke A1 (de nieuwe bron draagt
     # haar) telt.
     bronrevisie = _bronrevisie(conn, arg)
+    # Stemrevisie (2026-10-08): een gemerged argument neutraal gemaakt met de herformulering
+    # van de stemtoets en dezelfde bronnen — er gaat alleen een oordeel uit, er komt niets bij.
+    stemrevisie = _stemrevisie(conn, arg)
+
+    # (8) Stemtoets (2026-10-08): de eigen stem is neutraal — wie deed of zei wat, geen oordeel
+    # over gevolgen of motieven, geen etiket, geen retoriek van één kant. Niet voor letterlijke
+    # registerregels en theorie-argumenten; kill-switch PROPAGANDA_STEMTOETS=0.
+    stem_vereist = _stemtoets_vereist(conn, arg)
+    stem = (_stemtoets(conn, "argument", arg_id, arg["contributed_by"], arg["claim"])
+            if stem_vereist else None)
+    if stem is not None and stem["verdict"] == "niet_neutraal":
+        return (False, [f"stemtoets: niet neutraal — {stem['reden']}"], "geblokkeerd-hoog-inzet")
 
     # (7) Smaad-firewall (D2.3), sinds 2026-10-06 door agents: een claim die een natuurlijk
     # persoon raakt ("raken" = het doel van de boom is een 'persoon'-entiteit, of een relatie
@@ -2392,6 +2419,8 @@ def auto_merge_toegestaan(conn, arg_id):
     redenen = []
     if raakt_persoon and not structuur and smaad is None:
         redenen.append("smaadtoets: nog geen oordeel (de claim raakt een natuurlijk persoon)")
+    if stem_vereist and stem is None:
+        redenen.append("stemtoets: nog geen oordeel over de eigen stem")
 
     # (2) Citatiepoort — een echte citatie (quote óf vindplaats).
     n_echt = conn.execute("""
@@ -2424,7 +2453,7 @@ def auto_merge_toegestaan(conn, arg_id):
         SELECT verdict, door, model_familie FROM immuun_oordelen
         WHERE argument_id = ? AND fase = 'tegenspraak'
         ORDER BY id DESC LIMIT 1""", (arg_id,)).fetchone()
-    zonder_a2 = structuur or bronrevisie
+    zonder_a2 = structuur or bronrevisie or stemrevisie
     if zonder_a2:
         pass
     elif a2 is None:
@@ -3508,12 +3537,16 @@ def _heraanmeld(tabel, rid, bewerkbaar):
         conn.close()
         return jsonify({"error": "Niet gevonden"}), 404
     _auteur = _creator_van(conn, tabel, rid)
+    # Een maintainer mag dit voor agent-werk én voor seed-werk zonder auteur (zelfde scope als
+    # _maintainer_mag_direct): zo is ook een automatische afwijzing van een verband uit de
+    # eerste opzet ("zonder bron", 2026-10-08) terug te draaien.
     if (_auteur != g.user["username"]
-            and not (heeft_rol(conn, g.user, "maintainer") and _is_agent(conn, _auteur))):
+            and not (heeft_rol(conn, g.user, "maintainer")
+                     and (_auteur is None or _is_agent(conn, _auteur)))):
         conn.close()
         return jsonify({"error": "Alleen de auteur dient zijn afgewezen item opnieuw in "
-                                 "(een maintainer mag dit voor agent-werk doen; een mens "
-                                 "meldt zijn eigen werk zelf opnieuw aan)"}), 403
+                                 "(een maintainer mag dit voor agent- en seed-werk doen; een "
+                                 "mens meldt zijn eigen werk zelf opnieuw aan)"}), 403
     if rij["status"] != "afgewezen":
         conn.close()
         return jsonify({"error": f"Alleen een afgewezen item kun je opnieuw indienen "
@@ -7633,7 +7666,7 @@ def _nieuwste_a1(conn, arg_id):
 
 
 def _a1_detail(a1):
-    return (a1["detail"] or "").replace("[bronchecker v2] ", "").strip()[:400]
+    return re.sub(r"^\[bronchecker v\d+\]\s*", "", (a1["detail"] or "")).strip()[:400]
 
 
 def verificatie_besluit(conn, arg_id):
@@ -7643,7 +7676,21 @@ def verificatie_besluit(conn, arg_id):
     if arg is None:
         return None, ["niet gevonden"], None
     redenen = []
-    if arg["status"] not in ("ongecontroleerd", "bronvermelding_nodig"):
+    # Bronchecker v3 (2026-10-08): een AUTOMATISCH geverifieerd argument dat een nieuwer A1-
+    # oordeel niet meer draagt (de strengere vraag: gaat de bron over DIT verband tussen deze
+    # twee partijen?), krijgt opnieuw zijn status van dat oordeel. Wat een mens verifieerde,
+    # blijft staan (de mens-check hieronder).
+    opnieuw = False
+    if arg["status"] == "geverifieerd":
+        a1_nu = _nieuwste_a1(conn, arg_id)
+        laatste = conn.execute("""
+            SELECT reason, created_at FROM edit_log WHERE table_name = 'arguments'
+              AND record_id = ? AND action = 'verified' ORDER BY id DESC LIMIT 1""",
+                               (arg_id,)).fetchone()
+        opnieuw = (a1_nu is not None and a1_nu["verdict"] == "klopt-niet" and laatste is not None
+                   and (laatste["reason"] or "").startswith(VERIFICATIE_REDEN_PREFIX)
+                   and str(a1_nu["created_at"]) > str(laatste["created_at"]))
+    if arg["status"] not in ("ongecontroleerd", "bronvermelding_nodig") and not opnieuw:
         redenen.append(f"status is '{arg['status']}' (alleen nooit gecontroleerd werk)")
     if arg["vervangen"]:
         redenen.append("vervangen")
@@ -7678,7 +7725,7 @@ def verificatie_besluit(conn, arg_id):
             return None, ["citatiepoort: geen echte bron (quote óf vindplaats)"], None
         return ("geverifieerd", [], f"{VERIFICATIE_REDEN_PREFIX}: de bron draagt de bewering "
                 f"(onafhankelijk A1-oordeel van {a1['door']}: {_a1_detail(a1)})")
-    if a1["verdict"] == "klopt-niet" and arg["status"] == "ongecontroleerd":
+    if a1["verdict"] == "klopt-niet" and arg["status"] in ("ongecontroleerd", "geverifieerd"):
         return ("bronvermelding_nodig", [], f"{VERIFICATIE_REDEN_PREFIX}: de bron draagt de "
                 f"bewering niet (A1-oordeel van {a1['door']}: {_a1_detail(a1)}); de bronzoeker "
                 "zoekt een betere bron")
@@ -7705,6 +7752,10 @@ def heropen_besluit(conn, arg_id):
           AND new_value LIKE '%verworpen%' ORDER BY id DESC LIMIT 1""", (arg_id,)).fetchone()
     if afwijzing is None or not (afwijzing["reason"] or "").startswith(BEOORDELING_REDEN_PREFIX):
         redenen.append("niet verworpen door de automatische beoordeling — blijft staan")
+    elif (afwijzing["reason"] or "").startswith(BEOORDELING_REDEN_PREFIX
+                                               + ": teruggekoppeld door de stemtoets"):
+        # De eigen stem was niet neutraal: een neutrale versie kwam ervoor in de plaats
+        redenen.append("teruggekoppeld door de stemtoets — de neutrale versie gaat verder")
     a1 = _nieuwste_a1(conn, arg_id)
     toets = _smaadtoets(conn, arg_id, arg["contributed_by"])
     na = str(afwijzing["created_at"]) if afwijzing is not None else ""
@@ -7957,6 +8008,438 @@ def beoordeling_smaad_vrijgeven(arg_id):
     conn.commit()
     conn.close()
     return jsonify({"vrijgegeven": True, "id": arg_id}), 200
+
+
+# ── Stemtoets (eigenaarsbesluit 2026-10-08: "'ondermijnt het vertrouwen in de journalistiek'
+# … deze taal moeten we niet overnemen, dit is duidelijk een politiek spelletje … waak hier
+# streng voor") ──
+# De eigen stem van het model zegt wat er gebeurde: wie deed of zei wat, wanneer, waar, in
+# welke functie. Een oordeel over gevolgen of motieven ("ondermijnt het vertrouwen", "bedreigt
+# de persvrijheid"), een etiket ("rechts-populistisch", "neoliberale consensus", "linkse
+# media") of de retoriek van één kant staat er alleen als citaat, met naam toegeschreven. Een
+# agent (account 'stemtoets', nooit de auteur) toetst daarop argument-claims en beschrijvingen
+# van relaties en entiteiten in de praktijklaag; het oordeel geldt voor de tekst die hij zag
+# (tekst_hash). Gevolgen:
+#   - A7 merget geen voorstel zonder 'neutraal' (behalve letterlijke registerregels en
+#     theorie-argumenten; kill-switch PROPAGANDA_STEMTOETS=0);
+#   - een niet-neutraal voorstel wordt teruggekoppeld en komt in zijn neutrale vorm opnieuw
+#     binnen (scripts/automatische_beoordeling.py, account 'bronzoeker');
+#   - een niet-neutraal GEMERGED argument krijgt een stemrevisie (dezelfde bronnen, de neutrale
+#     claim) die merget op A1 'klopt' + 'neutraal', zonder A2: er komt geen bewering bij, alleen
+#     een oordeel gaat eruit;
+#   - een niet-neutrale beschrijving van een seed- of agent-element herschrijft de beoordeling
+#     zelf (POST /api/beoordeling/beschrijving/<tabel>/<id>); de oude tekst staat in edit_log.
+# Werk van een mens herschrijft niemand automatisch: het oordeel staat er, de mens herziet.
+# Procesmetadata in `stem_toetsen`; telt nergens in de score.
+STEMTOETS_VERDICTS = ("neutraal", "niet_neutraal")
+STEMTOETS_SOORTEN = {"argument": ("arguments", "claim"),
+                     "relatie": ("relations", "description"),
+                     "entiteit": ("entities", "description")}
+BESCHRIJVING_REDEN_PREFIX = BEOORDELING_REDEN_PREFIX + ": stemtoets"
+BESCHRIJVING_MAX_HERSCHRIJVINGEN = 2
+STEM_PLAFOND_DEFAULT = 300
+
+
+def stem_hash(tekst):
+    """sha256 van een tekst met samengevouwen witruimte: een stemtoets geldt voor precies
+    deze tekst (verandert ze, dan moet ze opnieuw getoetst worden)."""
+    return hashlib.sha256(" ".join((tekst or "").split()).encode("utf-8")).hexdigest()
+
+
+def _stem_tekst_en_auteur(conn, soort, doel_id):
+    """(huidige tekst, auteur, bestaat) van het getoetste doel."""
+    tabel, kolom = STEMTOETS_SOORTEN[soort]
+    rij = conn.execute(f"SELECT {kolom} AS tekst FROM {tabel} WHERE id = ?",  # noqa: S608
+                       (doel_id,)).fetchone()
+    if rij is None:
+        return None, None, False
+    if soort == "argument":
+        auteur = conn.execute("SELECT contributed_by FROM arguments WHERE id = ?",
+                              (doel_id,)).fetchone()["contributed_by"]
+    else:
+        auteur = _creator_van(conn, tabel, doel_id)
+    return rij["tekst"], auteur, True
+
+
+def _stemtoets(conn, soort, doel_id, auteur=None, tekst=None):
+    """Nieuwste stemtoets van een ander account dan de auteur over de HUIDIGE tekst, of None.
+    Zonder ``tekst`` haalt de functie tekst en auteur zelf op."""
+    if tekst is None:
+        tekst, auteur, _bestaat = _stem_tekst_en_auteur(conn, soort, doel_id)
+    try:
+        return conn.execute("""
+            SELECT verdict, reden, herformulering, door, created_at FROM stem_toetsen
+            WHERE soort = ? AND doel_id = ? AND tekst_hash = ?
+              AND COALESCE(door, '') <> COALESCE(?, '')
+            ORDER BY created_at DESC, id DESC LIMIT 1""",
+                            (soort, doel_id, stem_hash(tekst), auteur)).fetchone()
+    except sqlite3.OperationalError:  # database van vóór de stemtoets
+        return None
+
+
+def _stemtoets_aan():
+    return os.environ.get("PROPAGANDA_STEMTOETS", "1") != "0"
+
+
+def _stemtoets_vereist(conn, arg):
+    """Moet dit argument door de stemtoets voordat A7 het merget? Ja voor elk argument in de
+    praktijklaag (de boom wijst naar een relatie of entiteit); nee voor letterlijke
+    registerregels (die zeggen alleen wat het register zegt) en theorie-argumenten (rol,
+    mechanisme, emergent veld: daar is de analyse van het model zelf de inhoud)."""
+    if not _stemtoets_aan() or _alleen_registercitaties(conn, arg["id"]):
+        return False
+    wortel = _wortel(conn, arg)
+    return bool(wortel["relation_id"] or wortel["entity_id"])
+
+
+def _stemrevisie(conn, arg) -> bool:
+    """Is dit een revisie die een al gemerged argument alleen neutraal maakt — precies de
+    herformulering die de stemtoets (een ander account dan de auteur van het origineel) over
+    de huidige tekst van het origineel gaf, met (een deel van) dezelfde bronnen? Dan komt er
+    geen nieuwe bewering in het model: alleen een oordeel gaat eruit."""
+    if not arg["reviseert_id"]:
+        return False
+    oud = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg["reviseert_id"],)).fetchone()
+    if (oud is None or oud["vervangen"] or oud["status"] in ("voorgesteld", "verworpen")):
+        return False
+    kolommen = ("relation_id", "entity_id", "parent_argument_id", "stance", "property")
+    if any(oud[k] != arg[k] for k in kolommen):
+        return False
+    toets = _stemtoets(conn, "argument", oud["id"], oud["contributed_by"], oud["claim"])
+    if toets is None or toets["verdict"] != "niet_neutraal":
+        return False
+    if " ".join((arg["claim"] or "").split()) != " ".join((toets["herformulering"] or "").split()):
+        return False
+    if validation.eigen_stem_treffers(arg["claim"]):
+        return False  # de herformulering zelf bevat nog een oordeel of etiket
+    oude = {r[0] for r in conn.execute("SELECT source_id FROM citations WHERE argument_id = ?",
+                                       (oud["id"],))}
+    nieuwe = {r[0] for r in conn.execute("SELECT source_id FROM citations WHERE argument_id = ?",
+                                         (arg["id"],))}
+    return bool(nieuwe) and nieuwe <= oude
+
+
+@app.route("/api/stemtoets", methods=["POST"])
+@require_user()
+def stemtoets_vastleggen():
+    """Stemtoets door een ander account dan de auteur: {soort: argument|relatie|entiteit,
+    doel_id, tekst_hash, verdict: neutraal|niet_neutraal, reden, herformulering?}. tekst_hash
+    is de hash van de tekst die de toets zag (stem_hash); wijkt hij af van de huidige tekst,
+    dan 409 (de tekst veranderde intussen). Eén oordeel per account per doel: een oordeel over
+    een gewijzigde tekst, of met "herzien": true, werkt het eigen oordeel bij (nooit een
+    tweede stem). 403 voor de auteur van de tekst."""
+    data = request.get_json(silent=True) or {}
+    soort = data.get("soort")
+    if soort not in STEMTOETS_SOORTEN:
+        return jsonify({"error": "soort moet 'argument', 'relatie' of 'entiteit' zijn"}), 400
+    doel_id = data.get("doel_id")
+    if isinstance(doel_id, bool) or not isinstance(doel_id, int) or doel_id <= 0:
+        return jsonify({"error": "doel_id moet een positief geheel getal zijn"}), 400
+    verdict = data.get("verdict")
+    if verdict not in STEMTOETS_VERDICTS:
+        return jsonify({"error": "verdict moet 'neutraal' of 'niet_neutraal' zijn"}), 400
+    reden = (data.get("reden") or "").strip()[:1500]
+    if not reden:
+        return jsonify({"error": "een stemtoets vergt een reden"}), 400
+    herformulering = (data.get("herformulering") or "").strip()[:2000] or None
+    conn = get_db()
+    tekst, auteur, bestaat = _stem_tekst_en_auteur(conn, soort, doel_id)
+    if not bestaat:
+        conn.close()
+        return jsonify({"error": f"{soort} #{doel_id} niet gevonden"}), 404
+    if not (tekst or "").strip():
+        conn.close()
+        return jsonify({"error": "er is geen tekst om te toetsen"}), 400
+    if auteur and auteur == g.user["username"]:
+        conn.close()
+        return jsonify({"error": "De auteur toetst zijn eigen tekst niet"}), 403
+    hash_nu = stem_hash(tekst)
+    if data.get("tekst_hash") != hash_nu:
+        conn.close()
+        return jsonify({"error": "de tekst veranderde sinds de toets (tekst_hash wijkt af)",
+                        "tekst_hash": hash_nu}), 409
+    oud = conn.execute("SELECT id, tekst_hash FROM stem_toetsen WHERE soort = ? AND doel_id = ? "
+                       "AND door = ?", (soort, doel_id, g.user["username"])).fetchone()
+    if oud is not None and oud["tekst_hash"] == hash_nu and data.get("herzien") is not True:
+        conn.close()
+        return jsonify({"error": "Je toetste deze tekst al (stuur \"herzien\": true om je "
+                                 "oordeel bij te werken)"}), 409
+    if oud is not None:
+        conn.execute("""UPDATE stem_toetsen SET tekst_hash = ?, verdict = ?, reden = ?,
+                        herformulering = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                     (hash_nu, verdict, reden, herformulering, oud["id"]))
+        tid = oud["id"]
+    else:
+        tid = conn.execute("""INSERT INTO stem_toetsen (soort, doel_id, tekst_hash, verdict,
+                              reden, herformulering, door) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                           (soort, doel_id, hash_nu, verdict, reden, herformulering,
+                            g.user["username"])).lastrowid
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+        VALUES ('stem_toetsen', ?, ?, ?, ?, ?)
+    """, (tid, "updated" if oud else "created", g.user["username"],
+          json.dumps({"soort": soort, "doel_id": doel_id, "verdict": verdict}),
+          f"stemtoets: {verdict}"))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": tid, "soort": soort, "doel_id": doel_id, "verdict": verdict,
+                    "herzien": oud is not None}), 200 if oud else 201
+
+
+def _stem_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_STEM_PLAFOND", STEM_PLAFOND_DEFAULT)))
+    except ValueError:
+        return STEM_PLAFOND_DEFAULT
+
+
+def beschrijving_besluit(conn, tabel, rid):
+    """Mag de automatische beoordeling deze beschrijving vervangen door de neutrale
+    herformulering van de stemtoets? → (nieuwe tekst — None = wissen, redenen waarom niet,
+    motivatie). Een lege herformulering betekent: er blijft geen neutraal feit over, de
+    beschrijving wordt gewist. Alleen voor seed- en agent-werk (een mens herziet zijn eigen
+    tekst), alleen over de huidige tekst, en hooguit twee keer per element (geen lus)."""
+    soort = "relatie" if tabel == "relations" else "entiteit"
+    rij = conn.execute(f"SELECT id, description FROM {tabel} WHERE id = ?",  # noqa: S608
+                       (rid,)).fetchone()
+    if rij is None:
+        return None, ["niet gevonden"], None
+    redenen = []
+    auteur = _creator_van(conn, tabel, rid)
+    if auteur and not _is_agent(conn, auteur):
+        redenen.append(f"geschreven door een mens ({auteur}) — die herformuleert zelf")
+    if not (rij["description"] or "").strip():
+        redenen.append("geen beschrijving")
+    toets = _stemtoets(conn, soort, rid, auteur, rij["description"])
+    if toets is None:
+        redenen.append("stemtoets: nog geen oordeel over deze tekst")
+    elif toets["verdict"] != "niet_neutraal":
+        redenen.append("stemtoets: neutraal — niets te doen")
+    n = conn.execute("SELECT COUNT(*) FROM edit_log WHERE table_name = ? AND record_id = ? "
+                     "AND reason LIKE ?", (tabel, rid, BESCHRIJVING_REDEN_PREFIX + "%")).fetchone()[0]
+    if n >= BESCHRIJVING_MAX_HERSCHRIJVINGEN:
+        redenen.append(f"al {n} keer herschreven — niet nog eens automatisch")
+    if redenen:
+        return None, redenen, None
+    nieuw = (toets["herformulering"] or "").strip() or None
+    wat = ("eigen stem neutraal gemaakt" if nieuw
+           else "geen neutraal feit over, beschrijving gewist")
+    return (nieuw, [], f"{BESCHRIJVING_REDEN_PREFIX}: {wat} ({toets['door']}: "
+                       f"{(toets['reden'] or '')[:300]})")
+
+
+@app.route("/api/beoordeling/beschrijving/<tabel>/<int:rid>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_beschrijving(tabel, rid):
+    """De automatische beoordeling (merge-service) vervangt een niet-neutrale beschrijving van
+    een relatie of entiteit door de herformulering van de stemtoets; de oude tekst gaat mee in
+    edit_log (old_value), zodat een maintainer haar kan terugzetten. GET = droogloop.
+    Kill-switch → 503, dagplafond PROPAGANDA_STEM_PLAFOND → 429, niet toegestaan → 409."""
+    if tabel not in ("entities", "relations"):
+        return jsonify({"error": "tabel moet 'entities' of 'relations' zijn"}), 400
+    conn = get_db()
+    nieuw, redenen, motivatie = beschrijving_besluit(conn, tabel, rid)
+    if request.method == "GET" or redenen == ["niet gevonden"]:
+        conn.close()
+        if redenen == ["niet gevonden"]:
+            return jsonify({"error": "Niet gevonden"}), 404
+        return jsonify({"tabel": tabel, "id": rid, "toegestaan": not redenen,
+                        "nieuw": nieuw, "redenen": redenen})
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        conn.close()
+        return jsonify({"herschreven": False, "error": "automatische beoordeling "
+                        "uitgeschakeld (PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    vandaag = conn.execute("""SELECT COUNT(*) FROM edit_log WHERE reason LIKE ?
+                              AND date(created_at, 'localtime') = date('now', 'localtime')""",
+                           (BESCHRIJVING_REDEN_PREFIX + "%",)).fetchone()[0]
+    if vandaag >= _stem_plafond():
+        conn.close()
+        return jsonify({"herschreven": False,
+                        "error": f"dagplafond bereikt ({vandaag}/{_stem_plafond()})"}), 429
+    if redenen:
+        conn.close()
+        return jsonify({"herschreven": False, "redenen": redenen}), 409
+    oud = conn.execute(f"SELECT description FROM {tabel} WHERE id = ?",  # noqa: S608
+                       (rid,)).fetchone()["description"]
+    conn.execute(f"UPDATE {tabel} SET description = ? WHERE id = ?", (nieuw, rid))  # noqa: S608
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES (?, ?, 'updated', ?, ?, ?, ?)
+    """, (tabel, rid, g.user["username"], json.dumps({"description": oud}, ensure_ascii=False),
+          json.dumps({"description": nieuw}, ensure_ascii=False), motivatie))
+    conn.commit()
+    conn.close()
+    return jsonify({"herschreven": True, "tabel": tabel, "id": rid, "description": nieuw}), 200
+
+
+# ── Verbanden zonder bron eindigen (eigenaarsbesluit 2026-10-08: "dit slaat nergens op …
+# staat niet eens op waar het vandaan komt") ──
+# Een goedgekeurd verband dat door geen enkele bron gedragen wordt (geen levend steunend
+# argument met een echte bron die volgens het nieuwste A1-oordeel de bewering draagt), waarvoor
+# de bronzoeker zocht en niets vond en waaraan niets meer in behandeling is, blijft niet als
+# "onbewezen" in de graaf hangen: de automatische beoordeling (merge-service) wijst het af, met
+# zijn argumenten mee (zoals een gewone afwijzing). Meestal een verband uit de eerste opzet van
+# het model (juni 2026). Een mens die het goedkeurde, wint (blijft staan). Terug: heraanmelden
+# (een maintainer, ook voor seed-werk) en het komt via de gewone bewijspoort terug zodra er een
+# bron is. Kill-switch PROPAGANDA_AUTOMATISCHE_BEOORDELING=0, dagplafond
+# PROPAGANDA_ZONDER_BRON_PLAFOND (standaard 50).
+ZONDER_BRON_REDEN_PREFIX = BEOORDELING_REDEN_PREFIX + ": zonder bron"
+ZONDER_BRON_PLAFOND_DEFAULT = 50
+SEED_ACCOUNTS = ("legacy",)
+
+
+def _zonder_bron_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_ZONDER_BRON_PLAFOND",
+                                         ZONDER_BRON_PLAFOND_DEFAULT)))
+    except ValueError:
+        return ZONDER_BRON_PLAFOND_DEFAULT
+
+
+def _bronzoeker_pogingen():
+    """De pogingen van de bronzoeker (data/bronzoeker_pogingen.json naast de database)."""
+    try:
+        return json.loads((DB_PATH.parent / "bronzoeker_pogingen.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _gedragen_door(conn, rid):
+    """Het id van een levend steunend argument met een echte bron dat het verband draagt
+    (gemerged, niet verworpen of verouderd, en het nieuwste A1-oordeel is niet 'klopt-niet'),
+    of None."""
+    rij = conn.execute("""
+        SELECT a.id FROM arguments a
+        WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
+          AND a.stance = 'supporting' AND COALESCE(a.property, 'existence') = 'existence'
+          AND a.status IN ('ongecontroleerd', 'geverifieerd', 'betwist')
+          AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id AND (
+                TRIM(COALESCE(c.quote, '')) <> ''
+                OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id)))
+          AND COALESCE((SELECT o.verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
+                          AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
+                          LIMIT 1), '') <> 'klopt-niet'
+        ORDER BY a.id LIMIT 1""", (rid,)).fetchone()
+    return rij["id"] if rij else None
+
+
+def zonder_bron_besluit(conn, rid, pogingen=None, inhoud=False):
+    """Mag de automatische beoordeling dit goedgekeurde verband afwijzen omdat geen bron het
+    draagt? → (ok, redenen waarom niet, motivatie). ``inhoud=True``: de beoordeling meldt dat
+    het enige steunende argument om de inhoud betwist werd (dan repareert de bronzoeker het
+    niet); de server controleert dan zelf dat elk levend steunend argument 'betwist' is en geen
+    bron heeft."""
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rel is None:
+        return False, ["niet gevonden"], None
+    redenen = []
+    if rel["status"] != "goedgekeurd" or rel["vervangen"]:
+        redenen.append(f"status is '{rel['status']}'{' (vervangen)' if rel['vervangen'] else ''}"
+                       " — alleen goedgekeurde verbanden")
+    if _registerelement(conn, "relations", rid):
+        redenen.append("registerfeit — het register is de bron")
+    drager = _gedragen_door(conn, rid)
+    if drager:
+        redenen.append(f"gedragen door argument #{drager}")
+    if conn.execute("""SELECT 1 FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL
+                         AND NOT vervangen AND stance = 'supporting' AND status = 'voorgesteld'
+                       LIMIT 1""", (rid,)).fetchone():
+        redenen.append("er is een steunend voorstel in behandeling")
+    try:
+        if conn.execute("SELECT 1 FROM nieuws_doelen WHERE relation_id = ? AND status IN "
+                        "('open', 'bezig') LIMIT 1", (rid,)).fetchone():
+            redenen.append("een bewijsdoel uit het nieuws loopt nog")
+    except sqlite3.OperationalError:  # database van vóór de nieuws-pijplijn
+        pass
+    mens = conn.execute("""
+        SELECT l.changed_by FROM edit_log l JOIN users u ON u.username = l.changed_by
+        WHERE l.table_name = 'relations' AND l.record_id = ? AND u.kind = 'mens'
+          AND l.new_value LIKE '%goedgekeurd%' ORDER BY l.id DESC LIMIT 1""", (rid,)).fetchone()
+    if mens:
+        redenen.append(f"een mens ({mens['changed_by']}) keurde het goed — blijft staan")
+    steun = conn.execute("""SELECT id, status FROM arguments WHERE relation_id = ?
+                              AND parent_argument_id IS NULL AND NOT vervangen
+                              AND stance = 'supporting'
+                              AND status NOT IN ('verworpen', 'verouderd')""", (rid,)).fetchall()
+    pogingen = _bronzoeker_pogingen() if pogingen is None else pogingen
+    sleutels = [f"relatie:{rid}"] + [str(a["id"]) for a in steun]
+    niets = [pogingen[k] for k in sleutels if (pogingen.get(k) or {}).get("uitkomst") == "niets"]
+    om_inhoud = (inhoud and steun and all(
+        a["status"] == "betwist" and not conn.execute(
+            "SELECT 1 FROM citations WHERE argument_id = ? LIMIT 1", (a["id"],)).fetchone()
+        for a in steun))
+    if not niets and not om_inhoud:
+        redenen.append("de bronzoeker zocht nog niet (of vond iets dat nog beoordeeld wordt)")
+    if redenen:
+        return False, redenen, None
+    maker = _creator_van(conn, "relations", rid)
+    seed = maker is None or maker in SEED_ACCOUNTS
+    waarom = (f"de bronzoeker zocht op {str(niets[-1].get('op') or '')[:10]} en vond niets"
+              if niets else "het enige steunende argument is om de inhoud betwist en heeft "
+                            "geen bron")
+    return True, [], (f"{ZONDER_BRON_REDEN_PREFIX}: geen bron die dit verband draagt ({waarom})"
+                      + ("; uit de eerste opzet van het model (juni 2026)" if seed else "")
+                      + " — afgewezen; komt terug zodra er een bron is")
+
+
+@app.route("/api/beoordeling/zonder_bron/<int:rid>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_zonder_bron(rid):
+    """Een goedgekeurd verband zonder bron afwijzen (merge-service; GET = droogloop). Body
+    (optioneel): {"inhoud": true} als het enige steunende argument om de inhoud betwist werd.
+    Het besluit wordt hier ALTIJD zelf genomen. Kill-switch → 503, dagplafond → 429, niet
+    toegestaan → 409 + redenen."""
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    ok, redenen, motivatie = zonder_bron_besluit(conn, rid, inhoud=data.get("inhoud") is True
+                                                 or request.args.get("inhoud") == "1")
+    if redenen == ["niet gevonden"]:
+        conn.close()
+        return jsonify({"error": "Relatie niet gevonden"}), 404
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"id": rid, "toegestaan": ok, "redenen": redenen, "motivatie": motivatie})
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        conn.close()
+        return jsonify({"afgewezen": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    vandaag = conn.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name = 'relations'
+                              AND reason LIKE ?
+                              AND date(created_at, 'localtime') = date('now', 'localtime')""",
+                           (ZONDER_BRON_REDEN_PREFIX + "%",)).fetchone()[0]
+    if vandaag >= _zonder_bron_plafond():
+        conn.close()
+        return jsonify({"afgewezen": False,
+                        "error": f"dagplafond bereikt ({vandaag}/{_zonder_bron_plafond()})"}), 429
+    if not ok:
+        conn.close()
+        return jsonify({"afgewezen": False, "redenen": redenen}), 409
+    conn.execute("UPDATE relations SET status = 'afgewezen' WHERE id = ?", (rid,))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+    """, (rid, g.user["username"], json.dumps({"status": "goedgekeurd"}),
+          json.dumps({"status": "afgewezen"}), motivatie))
+    # Zoals bij elke afwijzing: de discussie(sub)boom gaat mee (verworpen, terug te halen)
+    boom = conn.execute("""
+        WITH RECURSIVE boom(id) AS (
+          SELECT id FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL
+          UNION ALL
+          SELECT a.id FROM arguments a JOIN boom b ON a.parent_argument_id = b.id
+        )
+        SELECT a.id, a.status FROM arguments a
+        WHERE a.id IN (SELECT id FROM boom) AND a.status <> 'verworpen' AND NOT a.vervangen
+    """, (rid,)).fetchall()
+    for ar in boom:
+        conn.execute("UPDATE arguments SET status = 'verworpen' WHERE id = ?", (ar["id"],))
+        conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+                        VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)""",
+                     (ar["id"], g.user["username"], json.dumps({"status": ar["status"]}),
+                      json.dumps({"status": "verworpen"}), f"mee-afgewezen met relations #{rid}"))
+    conn.commit()
+    conn.close()
+    return jsonify({"afgewezen": True, "id": rid, "argumenten_mee_afgewezen": len(boom),
+                    "motivatie": motivatie}), 200
 
 
 # ── Mechanisme voor een kandidaat-verband (2026-10-06: agents doen alles) ──

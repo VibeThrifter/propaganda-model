@@ -43,11 +43,21 @@ gecontroleerd werd, krijgt een oordeel.
   ``--pdf`` bekijkt wat eerder 'twijfel' kreeg omdat de pdf niet te lezen was.
 Wat lezers van de nieuws-aggregator zien (nieuws_voorrang, nieuws_doelen) gaat steeds voor.
 
+Versie 3 (2026-10-08, eigenaarsbesluit: "PVV censureert AD … dit is niet echt van belang als we
+AD-artikelen lezen"): een argument over een VERBAND moet over dát verband gaan. De vraag noemt
+beide partijen en het model zegt ook of bewering én bron over de band tussen déze twee gaan. Een
+bewering of bron over een groep in het algemeen ('de pers', 'journalisten', 'de media') draagt
+geen verband met één genoemd medium of één genoemde partij: 'klopt-niet', "gaat niet over …".
+- ``--specifiek`` bekijkt gemergede argumenten opnieuw waarop een eerdere versie 'klopt' zei,
+  ALLEEN voor verbanden die het nieuws toont (nieuws_voorrang, nieuws_doelen), begrensd per
+  ronde (geen massale herbeoordeling); het eigen oordeel wordt bijgewerkt (``herzien``).
+
 Gebruik:
     python3 scripts/bronchecker.py --droog            # toon oordelen, schrijf niets
     python3 scripts/bronchecker.py --max 40 --json    # echt, hooguit 40 argumenten
     python3 scripts/bronchecker.py --ids 3912,3913    # alleen deze argumenten
     python3 scripts/bronchecker.py --controle --max 60  # gemerged, nooit gecontroleerd
+    python3 scripts/bronchecker.py --specifiek --max 20 # nieuws-verbanden met de v3-vraag
 """
 from __future__ import annotations
 
@@ -82,7 +92,9 @@ DEFAULT_TOKEN = ROOT / "data" / "tokens" / f"{ACCOUNT}.token"
 DEFAULT_API = "http://127.0.0.1:5000"
 LOG_PATH = ROOT / "data" / "bronchecker_log.jsonl"
 POGINGEN_PATH = ROOT / "data" / "bronchecker_pogingen.json"
-VERSIE = "[bronchecker v2]"
+VERSIE = "[bronchecker v3]"
+# Alle versies vanaf v2 dragen "[bronchecker vN]"; v1 schreef "[bronchecker]"
+VERSIE_GEZET = "[bronchecker v%"
 MAX_POGINGEN = 3
 LINKEDIN_DIR = ROOT / "data" / "linkedin"
 CLAUDE = shutil.which("claude") or "/usr/local/bin/claude"
@@ -105,13 +117,26 @@ SYSTEM_PROMPT = (
     "mechanisme, 'draaideur', 'tegenmacht', 'invloed') is analyse van de database zelf; die hoeft "
     "een bron niet te noemen en speelt in je oordeel geen rol. Je voegt geen kennis van buiten de "
     "bron toe. Let op overdrijving, een andere persoon of organisatie, een andere periode, en "
-    "feitelijke conclusies die verder gaan dan de bron. Antwoord alleen met het gevraagde JSON."
+    "feitelijke conclusies die verder gaan dan de bron. Gaat een argument over een verband "
+    "tussen twee partijen, dan draagt alleen een bewering en een bron over DIE twee partijen het "
+    "verband: een uitspraak over een groep in het algemeen ('de pers', 'journalisten', 'de "
+    "media', 'Nederlandse kranten', 'de politiek') zegt niets over één genoemd medium of één "
+    "genoemde partij. Antwoord alleen met het gevraagde JSON."
 )
 SCHEMA_ARGUMENT = {
     "type": "object",
     "properties": {"oordeel": {"type": "string", "enum": ["draagt", "deels", "draagt_niet"]},
                    "reden": {"type": "string"}},
     "required": ["oordeel", "reden"],
+    "additionalProperties": False,
+}
+SCHEMA_VERBAND = {
+    "type": "object",
+    "properties": {"oordeel": {"type": "string", "enum": ["draagt", "deels", "draagt_niet"]},
+                   "over_dit_verband": {"type": "string", "enum": ["ja", "nee"]},
+                   "ontbreekt": {"type": "string"},
+                   "reden": {"type": "string"}},
+    "required": ["oordeel", "over_dit_verband", "ontbreekt", "reden"],
     "additionalProperties": False,
 }
 SCHEMA_BEZWAAR = {
@@ -417,6 +442,29 @@ def doel_tekst(conn, arg) -> str:
     return "de betrokkenen"
 
 
+def zonder_versie(detail: str | None) -> str:
+    """Een oordeel-detail zonder het versiemerk ("[bronchecker v2] …" → "…")."""
+    return re.sub(r"^\[bronchecker(?: v\d+)?\]\s*", "", detail or "").strip()
+
+
+def verband_van(conn, arg) -> dict | None:
+    """Het verband waar dit argument over gaat, als het een root op een relatie is (bewijs of
+    invloed): {bron, doel, relation_type, mech}; anders None (entiteit, theorie, reactie,
+    duiding of aspect)."""
+    if arg["parent_argument_id"] is not None or not arg["relation_id"]:
+        return None
+    if arg["stance"] not in ("supporting", "contradicting"):
+        return None
+    if (arg["property"] or "existence") not in ("existence", "influence"):
+        return None
+    r = conn.execute("""SELECT s.name AS bron, t.name AS doel, r.relation_type, m.name AS mech
+                        FROM relations r JOIN entities s ON s.id = r.source_id
+                        JOIN entities t ON t.id = r.target_id
+                        LEFT JOIN mechanisms m ON m.id = r.mechanism_id
+                        WHERE r.id = ?""", (arg["relation_id"],)).fetchone()
+    return dict(r) if r else None
+
+
 def bronnen_van(conn, arg_id) -> list[dict]:
     rijen = conn.execute("""
         SELECT c.quote, s.id AS bron_id, s.title, s.publisher, s.date_published,
@@ -449,7 +497,7 @@ def kandidaten(conn, ids=None) -> list[sqlite3.Row]:
 
 def herzien_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
     """Voorgestelde argumenten waarop de bronchecker v1 'twijfel' gaf: opnieuw bekijken."""
-    filt, params = "", [ACCOUNT, VERSIE + "%"]
+    filt, params = "", [ACCOUNT, VERSIE_GEZET]
     if ids:
         filt = f" AND a.id IN ({','.join('?' * len(ids))})"
         params += list(ids)
@@ -539,7 +587,7 @@ def heropen_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
     """Argumenten die de automatische beoordeling verwierp op een niet-'klopt'-oordeel van
     bronchecker v1 (die eiste ten onrechte dat een bron ook de duiding van het model noemde):
     met v2 opnieuw bekijken."""
-    filt, params = "", [ACCOUNT, VERSIE + "%"]
+    filt, params = "", [ACCOUNT, VERSIE_GEZET]
     if ids:
         filt = f" AND a.id IN ({','.join('?' * len(ids))})"
         params += list(ids)
@@ -596,6 +644,36 @@ def pdf_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
     return sorteer_op_voorrang(conn, rijen)
 
 
+def specifiek_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
+    """Versie 3: gemergede argumenten over een verband dat het NIEUWS toont (nieuws_voorrang,
+    nieuws_doelen), waarop een eerdere versie van de bronchecker 'klopt' zei: opnieuw, met de
+    vraag of bewering en bron over dít verband gaan. Alleen roots (bewijs of invloed), geen
+    registerfeiten; laatst gemeld eerst. Geen massale herbeoordeling: alleen het nieuws."""
+    relaties, _ = nieuws_voorrang(conn)
+    if not relaties and not ids:
+        return []
+    filt, params = "", [ACCOUNT, VERSIE + "%", ACCOUNT]
+    if ids:
+        filt = f" AND a.id IN ({','.join('?' * len(ids))})"
+        params += list(ids)
+    else:
+        rel_ids = list(relaties)
+        filt = f" AND a.relation_id IN ({','.join('?' * len(rel_ids))})"
+        params += rel_ids
+    rijen = conn.execute(f"""
+        SELECT a.*, r.source_id AS rel_bron, r.target_id AS rel_doel FROM arguments a
+        JOIN relations r ON r.id = a.relation_id
+        JOIN immuun_oordelen o ON o.argument_id = a.id AND o.fase = 'herverificatie'
+          AND o.door = ?
+        WHERE a.status IN ('ongecontroleerd', 'geverifieerd') AND NOT a.vervangen
+          AND a.parent_argument_id IS NULL AND a.stance IN ('supporting', 'contradicting')
+          AND COALESCE(a.property, 'existence') IN ('existence', 'influence')
+          AND o.verdict = 'klopt' AND COALESCE(o.detail, '') NOT LIKE ?
+          AND COALESCE(a.contributed_by, '') <> ?
+          AND NOT {REGISTER_ARG_SQL}{filt}""", params).fetchall()  # noqa: S608
+    return sorteer_op_voorrang(conn, rijen)
+
+
 # Welke argumenten een ronde bekijkt, en of het eigen eerdere oordeel wordt herzien
 MODI = {
     "nieuw": (kandidaten, False),
@@ -604,6 +682,7 @@ MODI = {
     "heropenen": (heropen_kandidaten, True),
     "pdf": (pdf_kandidaten, True),
     "buiten": (buiten_kandidaten, False),
+    "specifiek": (specifiek_kandidaten, True),
 }
 
 
@@ -621,10 +700,12 @@ def _bewaar_pogingen(pogingen: dict) -> None:
 
 # ------------------------------------------------------------------ beoordelen
 def beoordeel_argument(conn, arg) -> dict:
-    """→ {verdict, detail, verbatim_span, bron_id}."""
+    """→ {verdict, detail, verbatim_span, bron_id}. Voor een argument over een verband (v3)
+    ook: gaan bewering en bron over dít verband? Zo niet → 'klopt-niet' ("gaat niet over …")."""
     doel = doel_tekst(conn, arg)
     rol = {"supporting": "steunt", "contradicting": "spreekt tegen"}.get(arg["stance"],
                                                                        "nuanceert")
+    verband = verband_van(conn, arg)
     bronnen = bronnen_van(conn, arg["id"])
     if not bronnen:
         return {"verdict": "twijfel", "detail": "geen bron aan dit argument gekoppeld"}
@@ -643,8 +724,14 @@ def beoordeel_argument(conn, arg) -> dict:
                                "detail": f"citaat niet teruggevonden in de bron ({host_van(url)})"})
             continue
         stuk = fragment(tekst, pos, len(normaliseer(citaat)))
-        prompt = (f"Bewering: {arg['claim']}\n"
-                  f"Dit argument {rol} een verband tussen {doel}.\n"
+        if verband:
+            hoe = ", ".join(x for x in (verband["relation_type"],
+                                        (verband["mech"] or "").replace("_", " ")) if x)
+            over = (f"Dit argument {rol} het verband tussen {verband['bron']} en "
+                    f"{verband['doel']} ({hoe}).\n")
+        else:
+            over = f"Dit argument {rol} een verband tussen {doel}.\n"
+        prompt = (f"Bewering: {arg['claim']}\n" + over +
                   f"Bron: {bron.get('title') or '?'} ({bron.get('publisher') or host_van(url)}, "
                   f"{bron.get('date_published') or 'datum onbekend'}) {url}\n"
                   + (f"Aangehaald citaat (in de bron teruggevonden"
@@ -660,8 +747,15 @@ def beoordeel_argument(conn, arg) -> dict:
                   "- 'deels': de bron draagt een duidelijk zwakkere of andere feitelijke bewering "
                   "(overdrijving, een andere persoon of periode, een conclusie die verder gaat).\n"
                   "- 'draagt_niet': de bron zegt het niet of zegt iets anders.\n"
-                  "Geef in 'reden' één korte zin.")
-        antwoord = vraag_model(prompt, SCHEMA_ARGUMENT)
+                  + (f"Vraag 2: gaan de bewering én de bron over DIT verband, de band tussen "
+                     f"{verband['bron']} en {verband['doel']}? 'ja' als beide partijen (of hun "
+                     "functionarissen, onderdelen of titels, bij naam) erin voorkomen en het feit "
+                     "over hún band gaat. 'nee' als de bewering of de bron over een groep in het "
+                     "algemeen gaat ('de pers', 'journalisten', 'de media', 'Nederlandse kranten', "
+                     "'de politiek') of over een ander verband; noem dan in 'ontbreekt' de partij "
+                     "waar het niet over gaat (anders een lege tekst).\n" if verband else "")
+                  + "Geef in 'reden' één korte zin.")
+        antwoord = vraag_model(prompt, SCHEMA_VERBAND if verband else SCHEMA_ARGUMENT)
         if not antwoord:
             uitkomsten.append({"verdict": "twijfel", "bron_id": bron["bron_id"],
                                "detail": "model gaf geen bruikbaar oordeel"})
@@ -669,11 +763,18 @@ def beoordeel_argument(conn, arg) -> dict:
         oordeel = antwoord.get("oordeel")
         verdict = {"draagt": "klopt", "deels": "twijfel", "draagt_niet": "klopt-niet"}.get(
             oordeel, "twijfel")
+        reden = antwoord.get("reden", "").strip()
+        gelezen = (f"{'citaat letterlijk' if letterlijk else 'citaat bijna letterlijk' if citaat else 'zonder citaat'}"
+                   f" gevonden ({host_van(url)})")
+        if verband and antwoord.get("over_dit_verband") == "nee":
+            # v3: niet over dít verband → draagt het verband niet, wat de feiten ook zijn
+            wie = (antwoord.get("ontbreekt") or "").strip() or verband["doel"]
+            verdict = "klopt-niet"
+            reden = f"gaat niet over {wie} (niet over het verband {verband['bron']} – {verband['doel']}): {reden}"
         uitkomsten.append({
             "verdict": verdict, "bron_id": bron["bron_id"],
             "verbatim_span": citaat if (verdict == "klopt" and citaat) else None,
-            "detail": (f"{'citaat letterlijk' if letterlijk else 'citaat bijna letterlijk' if citaat else 'zonder citaat'}"
-                       f" gevonden ({host_van(url)}); {antwoord.get('reden', '').strip()}"),
+            "detail": f"{gelezen}; {reden}",
         })
     rang = {"klopt": 0, "twijfel": 1, "klopt-niet": 2, None: 3}
     return min(uitkomsten, key=lambda u: rang[u["verdict"]])
@@ -757,7 +858,8 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, id
     """Eén ronde. → samenvatting {bekeken, klopt, twijfel, klopt_niet, technisch,
     geschreven, fouten}. ``modus`` (zie MODI): 'nieuw' (voorgesteld, standaard), 'herzien'
     (v1-twijfel op voorgesteld; ook via ``herzien=True``), 'controle' (gemerged, nooit
-    gecontroleerd) of 'heropenen' (verworpen op een v1-oordeel)."""
+    gecontroleerd), 'heropenen' (verworpen op een v1-oordeel) of 'specifiek' (v3: gemerged werk
+    over een verband uit het nieuws waarop een eerdere versie 'klopt' zei)."""
     modus = modus or ("herzien" if herzien else "nieuw")
     selectie, herzien = MODI[modus]
     token = None
@@ -785,6 +887,11 @@ def draai(*, api=DEFAULT_API, token_pad=DEFAULT_TOKEN, max_n=60, droog=False, id
                     meld(f"  ✗ #{arg['id']}: {exc}")
                     continue
                 tel["bekeken"] += 1
+                if uitkomst["verdict"] is None and modus == "specifiek":
+                    # Herbeoordeling: een storing verandert niets aan het eerdere oordeel
+                    tel["technisch"] += 1
+                    meld(f"  · #{arg['id']}: later opnieuw — {uitkomst.get('detail')}")
+                    continue
                 if uitkomst["verdict"] is None:
                     # Technische storing: pas na MAX_POGINGEN rondes een twijfel-oordeel
                     sleutel = str(arg["id"])
@@ -851,12 +958,15 @@ def main():
                        help="argumenten met een onleesbare pdf-bron opnieuw (nu via PDFKit)")
     groep.add_argument("--buiten", action="store_true",
                        help="wat na 14 dagen werd opgeruimd zonder dat een poort besliste")
+    groep.add_argument("--specifiek", action="store_true",
+                       help="v3: gemerged werk over verbanden uit het nieuws opnieuw (gaat het "
+                            "over dít verband?)")
     ap.add_argument("--json", action="store_true", help="eindig met één JSON-regel")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",") if x.strip().isdigit()] or None
     modus = ("herzien" if args.herzien else "controle" if args.controle
              else "heropenen" if args.heropenen else "pdf" if args.pdf
-             else "buiten" if args.buiten else "nieuw")
+             else "buiten" if args.buiten else "specifiek" if args.specifiek else "nieuw")
     tel = draai(api=args.api, token_pad=args.token, max_n=args.max, droog=args.droog,
                 ids=ids, parallel=args.parallel, modus=modus)
     if args.json:

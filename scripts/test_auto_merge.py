@@ -38,6 +38,9 @@ def eis(conditie, melding):
 def main():
     # Kill-switch standaard aan tijdens de test (kan door de omgeving anders staan).
     os.environ["PROPAGANDA_AUTO_MERGE"] = "1"
+    # De stemtoets (2026-10-08) is een eigen poort met eigen tests (scripts/test_stemtoets.py,
+    # stap 23 van scripts/test_automatische_beoordeling.py); hier gaat het om de oude takken.
+    os.environ["PROPAGANDA_STEMTOETS"] = "0"
 
     with tempfile.TemporaryDirectory() as tmp:
         db = Path(tmp) / "vers.db"

@@ -14,14 +14,20 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
 2. **A1 — bronchecker** (scripts/bronchecker.py): elk nieuw voorstel (ook wat stap 1 net
    indiende) en ``--max-controle`` gemergede argumenten die nooit gecontroleerd zijn, wat het
    nieuws toont eerst: haalt de bron op, zoekt het citaat letterlijk terug, en een model zegt
-   of de bron de bewering draagt.
+   of de bron de bewering draagt — en (v3) of bewering en bron over dít verband gaan. Plus
+   ``--max-specifiek`` gemergede argumenten over verbanden uit het nieuws waarop een eerdere
+   versie 'klopt' zei (geen massale herbeoordeling).
 3. **Smaadtoets** (scripts/smaadtoets.py, Opus): claims over personen — feitelijk, gedragen
    door de bron, over de publieke rol? Dan smaad_hold eraf en de gewone poorten; zo niet,
    dan teruggekoppeld (stap 11 en 12). Eigen afwijzingen die een nieuw 'klopt'/'feitelijk'
    kregen, gaan terug naar 'voorgesteld' (heropenen).
+3b. **Stemtoets** (scripts/stemtoets.py, Sonnet): de eigen stem is neutraal — wie deed of zei
+   wat, geen oordeel over gevolgen of motieven, geen etiket, geen retoriek van één kant. Elk
+   voorstel in de praktijklaag (A7 merget niets zonder 'neutraal'), plus ``--max-stem-veeg``
+   bestaande teksten (claims en beschrijvingen; lexicon-treffers eerst, dan het nieuws).
 4. **A2 — aanklager** (Opus, ``--a2-rondes-per-dag``, binnen de actieve uren) voor wat A1 én
-   zo nodig de smaadtoets doorstond en een tegenstander nodig heeft (geen structuurfeit,
-   ondergraving of bronrevisie).
+   zo nodig de smaad- en stemtoets doorstond en een tegenstander nodig heeft (geen
+   structuurfeit, ondergraving, bron- of stemrevisie).
 5. **A7 — mergen** (``POST /api/arguments/<id>/auto_merge``, merge-service): de server checkt
    het predikaat zelf.
 6. **Verificatie** (``POST /api/beoordeling/verificatie/<id>``): gemerged werk krijgt zijn
@@ -32,11 +38,19 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
 9. **Bronklassen** (scripts/bronklasse.py): twee onafhankelijke oordelen over de
    betrouwbaarheid en het onderwerp van een bron; bij verschil de voorzichtigste.
 10. **Goedkeuren**: relaties en entiteiten met gecontroleerd bewijs gaan de graaf in.
+10b. **Beschrijvingen**: een niet-neutrale beschrijving van een relatie of entiteit (seed- of
+    agentwerk, nooit van een mens) wordt de neutrale herformulering van de stemtoets
+    (``POST /api/beoordeling/beschrijving/<tabel>/<id>``; de oude tekst staat in edit_log).
 11. **Opruimen** (status-PATCH door merge-service, altijd met reden): wat de bron niet draagt
-    en niet te repareren is (na de poging van de bronzoeker), wat de smaadtoets terugkoppelde,
-    en wat na ``--wachttijd-dagen`` (14) nog niet door de poort komt.
-12. **Feitelijke versies**: wat de smaadtoets terugkoppelde, komt in zijn feitelijke vorm
-    opnieuw binnen (en gaat weer langs alle controles).
+    en niet te repareren is (na de poging van de bronzoeker), wat de smaad- of stemtoets
+    terugkoppelde, en wat na ``--wachttijd-dagen`` (14) nog niet door de poort komt.
+11b. **Zonder bron**: een goedgekeurd verband dat geen bron draagt, waarvoor de bronzoeker zocht
+    en niets vond (of waarvan het enige argument om de inhoud betwist is) en waaraan niets meer
+    in behandeling is, wordt afgewezen (``POST /api/beoordeling/zonder_bron/<id>``).
+12. **Feitelijke en neutrale versies**: wat de smaadtoets of de stemtoets terugkoppelde, komt
+    in zijn feitelijke of neutrale vorm opnieuw binnen; gemerged werk dat niet neutraal is,
+    krijgt een stemrevisie (dezelfde bronnen, de neutrale bewering). Alles gaat weer langs de
+    controles.
 13. **Archiveren** (scripts/archiveer_bronnen.py): ``--max-archief`` nieuwe bronnen naar de
     Wayback Machine, zodat de bronchecker ze ook later nog kan lezen.
 
@@ -75,6 +89,7 @@ import mechanisme_toewijzer  # noqa: E402
 import registercheck  # noqa: E402
 import rfc_beoordeling  # noqa: E402
 import smaadtoets  # noqa: E402
+import stemtoets  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 API = "http://127.0.0.1:5000"
@@ -90,6 +105,7 @@ STRUCTUURTYPES = ("personeel", "dienstverband", "bestuurder", "adviseur", "woord
                   "lidmaatschap", "eigendom", "draaideur",
                   "ambt", "zeggenschap", "controle", "geschenk")  # Uitbreiding C (2026-10-07)
 REDEN = "automatische beoordeling"
+STEM_REDEN = f"{REDEN}: teruggekoppeld door de stemtoets"
 
 
 # ------------------------------------------------------------------ helpers
@@ -144,6 +160,18 @@ def _zelfde(claim: str, ander: str) -> bool:
     return difflib.SequenceMatcher(None, claim or "", ander or "").ratio() >= 0.85
 
 
+def stem_van(conn, a) -> sqlite3.Row | None:
+    """Het nieuwste stemtoets-oordeel van een ander account over de huidige claim, of None."""
+    return stemtoets.oordeel_voor(conn, "argument", a["id"], a["claim"], a["contributed_by"])
+
+
+def is_mens(conn, gebruikersnaam: str | None) -> bool:
+    if not gebruikersnaam:
+        return False
+    rij = conn.execute("SELECT kind FROM users WHERE username = ?", (gebruikersnaam,)).fetchone()
+    return bool(rij and rij["kind"] == "mens")
+
+
 def a2_wachtrij(conn) -> list[dict]:
     """Voorgestelde argumenten die de bronchecker op 'klopt' zette en die nog op een
     tegenspraak-certificaat wachten: invloedsclaims, duiding, aspecten, theorie-argumenten en
@@ -186,6 +214,9 @@ def a2_wachtrij(conn) -> list[dict]:
                                  (a["id"], a["contributed_by"])).fetchone()
             if not toets or toets["verdict"] != "feitelijk":
                 continue  # eerst de smaadtoets
+        stem = stem_van(conn, a)
+        if stem is not None and stem["verdict"] == "niet_neutraal":
+            continue  # teruggekoppeld door de stemtoets: komt neutraal opnieuw binnen
         uit.append({k: a[k] for k in ("id", "claim", "relation_id", "entity_id",
                                        "contributed_by", "created_at", "a1", "a1_op")})
     return uit
@@ -328,12 +359,16 @@ def stap_verifieren(token, args, meld) -> dict:
                       AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
                       LIMIT 1) AS a1
             FROM arguments a
-            WHERE a.status IN ('ongecontroleerd', 'bronvermelding_nodig') AND NOT a.vervangen
+            WHERE a.status IN ('ongecontroleerd', 'bronvermelding_nodig', 'geverifieerd')
+              AND NOT a.vervangen
             ORDER BY a.id""").fetchall()
     finally:
         conn.close()
+    # Geverifieerd werk alleen als een nieuwer oordeel 'klopt-niet' zegt (bronchecker v3: gaat
+    # niet over dít verband); de server neemt het besluit en laat wat een mens deed staan
     ids = [r["id"] for r in rijen
-           if r["a1"] == "klopt" or (r["a1"] == "klopt-niet" and r["status"] == "ongecontroleerd")]
+           if (r["status"] != "geverifieerd" and r["a1"] == "klopt")
+           or (r["a1"] == "klopt-niet" and r["status"] in ("ongecontroleerd", "geverifieerd"))]
     tel = {"geverifieerd": 0, "bron_nodig": 0, "blijft": 0}
     for arg_id in ids:
         status, antwoord = req("GET" if args.droog else "POST",
@@ -341,6 +376,9 @@ def stap_verifieren(token, args, meld) -> dict:
         if status in (429, 503):
             meld(f"Verifiëren gestopt: {antwoord.get('error')}")
             break
+        if status == 409:
+            tel["blijft"] += 1
+            continue
         nieuw = (antwoord.get("nieuwe_status") if args.droog
                  else antwoord.get("status") if antwoord.get("gewijzigd") else None)
         tel[{"geverifieerd": "geverifieerd",
@@ -357,6 +395,24 @@ def stap_smaadtoets(args, meld) -> dict:
     if not args.droog and not smaadtoets.DEFAULT_TOKEN.exists():
         return {"gestart": False, "reden": "geen token voor het account 'smaadtoets'"}
     return smaadtoets.draai(max_n=args.max_smaad, droog=args.droog, meld=meld)
+
+
+def stap_stemtoets(args, meld) -> dict:
+    """De eigen stem toetsen: alle voorstellen in de praktijklaag, plus een veegronde over wat
+    er al staat (lexicon-treffers eerst, dan wat het nieuws toont)."""
+    if args.max_stem_nieuw <= 0 and args.max_stem_veeg <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    if not args.droog and not stemtoets.DEFAULT_TOKEN.exists():
+        return {"gestart": False, "reden": "geen token voor het account 'stemtoets'"}
+    conn = db()
+    try:
+        if not bronchecker.heeft_tabel(conn, "stem_toetsen"):
+            return {"gestart": False, "reden": "tabel stem_toetsen ontbreekt "
+                                               "(scripts/migrate_add_stem_toetsen.py)"}
+    finally:
+        conn.close()
+    return stemtoets.draai(token_pad=stemtoets.DEFAULT_TOKEN, max_nieuw=args.max_stem_nieuw,
+                           max_veeg=args.max_stem_veeg, droog=args.droog, meld=meld)
 
 
 def stap_smaad_vrijgeven(token, args, meld) -> dict:
@@ -462,11 +518,16 @@ def stap_archiveren(args, meld) -> dict:
 FEITELIJKE_VERSIE = "Feitelijke versie van #{id} na de smaadtoets"
 
 
-def feitelijke_versie(orig: dict, citaties: list[dict], herformulering: str, reden: str) -> dict:
-    """De body van een nieuw argument met de feitelijke formulering die de smaadtoets gaf:
-    hetzelfde doel, dezelfde stance en dezelfde bronnen (de controles beginnen opnieuw)."""
+NEUTRALE_VERSIE = "Neutrale versie van #{id} na de stemtoets"
+
+
+def feitelijke_versie(orig: dict, citaties: list[dict], herformulering: str, reden: str,
+                      merk: str = FEITELIJKE_VERSIE) -> dict:
+    """De body van een nieuw argument met de feitelijke (smaadtoets) of neutrale (stemtoets)
+    formulering: hetzelfde doel, dezelfde stance en dezelfde bronnen (de controles beginnen
+    opnieuw)."""
     body = {"stance": orig["stance"], "claim": herformulering.strip(),
-            "reasoning": f"{FEITELIJKE_VERSIE.format(id=orig['id'])}: {reden}"[:1500],
+            "reasoning": f"{merk.format(id=orig['id'])}: {reden}"[:1500],
             "negeer_duplicaten": True,
             "citations": [{k: c[k] for k in ("source_id", "quote", "methode") if c.get(k)}
                           for c in citaties]}
@@ -528,6 +589,274 @@ def stap_feitelijke_versies(args, meld) -> dict:
     return tel
 
 
+def laatste_verwerping(conn, arg_id) -> str:
+    rij = conn.execute("""SELECT l.reason FROM edit_log l WHERE l.table_name = 'arguments'
+                            AND l.record_id = ? AND l.new_value LIKE '%verworpen%'
+                          ORDER BY l.id DESC LIMIT 1""", (arg_id,)).fetchone()
+    return (rij["reason"] if rij else "") or ""
+
+
+def stap_neutrale_versies(args, meld) -> dict:
+    """Terugkoppelen tot het eind: een voorstel dat de stemtoets 'niet neutraal' vond en dat de
+    opruimstap daarom verwierp, komt in de neutrale formulering van de stemtoets opnieuw binnen
+    (account 'bronzoeker', dezelfde bronnen) en gaat weer langs alle controles. Eén keer: geen
+    neutrale versie van een neutrale versie, en nooit voor werk van een mens."""
+    if not bronzoeker.DEFAULT_TOKEN.exists() and not args.droog:
+        return {"ingediend": 0, "reden": "geen token"}
+    conn = db()
+    try:
+        werk = []
+        for r in conn.execute("""SELECT a.* FROM arguments a WHERE a.status = 'verworpen'
+                                   AND NOT a.vervangen
+                                   AND COALESCE(a.reasoning, '') NOT LIKE 'Neutrale versie van #%'
+                                 ORDER BY a.id"""):
+            if not laatste_verwerping(conn, r["id"]).startswith(STEM_REDEN):
+                continue
+            stem = stem_van(conn, r)
+            if stem is None or stem["verdict"] != "niet_neutraal":
+                continue
+            if not (stem["herformulering"] or "").strip() or is_mens(conn, r["contributed_by"]):
+                continue
+            merk = NEUTRALE_VERSIE.format(id=r["id"]) + "%"
+            if conn.execute("SELECT 1 FROM arguments WHERE reasoning LIKE ? LIMIT 1",
+                            (merk,)).fetchone():
+                continue  # al opnieuw ingediend
+            citaties = [dict(c) for c in conn.execute(
+                "SELECT source_id, quote, methode FROM citations WHERE argument_id = ?",
+                (r["id"],))]
+            if citaties or r["parent_argument_id"] or r["stance"] == "contextual":
+                werk.append(feitelijke_versie(dict(r), citaties, stem["herformulering"],
+                                              stem["reden"] or "", merk=NEUTRALE_VERSIE))
+    finally:
+        conn.close()
+    tel = {"ingediend": 0, "fouten": 0, "kandidaten": len(werk)}
+    if args.droog:
+        meld(f"Stemtoets: {len(werk)} neutrale versie(s) zouden opnieuw binnenkomen (droog)")
+        return tel
+    token = bronzoeker.DEFAULT_TOKEN.read_text().strip()
+    for body in werk[:args.max_stemrevisie]:
+        status, antwoord = req("POST", "/api/arguments", token, body)
+        if status == 201:
+            tel["ingediend"] += 1
+        else:
+            tel["fouten"] += 1
+            meld(f"  ✗ neutrale versie niet ingediend ({status}): {antwoord.get('error')}")
+    meld(f"Stemtoets: {tel['ingediend']} neutrale versie(s) opnieuw ingediend")
+    return tel
+
+
+def mens_besliste(conn, arg_id) -> bool:
+    """Nam een mens een statusbesluit over dit argument (dan blijft het staan)?"""
+    return conn.execute("""SELECT 1 FROM edit_log l JOIN users u ON u.username = l.changed_by
+                           WHERE l.table_name = 'arguments' AND l.record_id = ?
+                             AND l.action IN ('verified', 'disputed') AND u.kind = 'mens'
+                           LIMIT 1""", (arg_id,)).fetchone() is not None
+
+
+def stap_stemrevisies(token, args, meld) -> dict:
+    """Gemerged werk dat de stemtoets niet neutraal vond: een stemrevisie (POST
+    /api/arguments/<id>/revisie, account 'bronzoeker') met de neutrale bewering van de stemtoets
+    en dezelfde bronnen. Die merget op A1 'klopt' + stemtoets 'neutraal' (er gaat alleen een
+    oordeel uit) en vervangt dan het origineel. Eén poging per argument; nooit werk van een
+    mens (die herziet zelf). Blijft er geen neutraal feit over (lege herformulering), dan is
+    het geen bewijs: verworpen met de reden (merge-service) — tenzij een mens over de status
+    besliste."""
+    if args.max_stemrevisie <= 0:
+        return {"ingediend": 0, "reden": "uitgezet"}
+    if not bronzoeker.DEFAULT_TOKEN.exists() and not args.droog:
+        return {"ingediend": 0, "reden": "geen token"}
+    conn = db()
+    try:
+        werk, leeg = [], []
+        if bronchecker.heeft_tabel(conn, "stem_toetsen"):
+            ids = [r[0] for r in conn.execute("""
+                SELECT DISTINCT doel_id FROM stem_toetsen WHERE soort = 'argument'
+                  AND verdict = 'niet_neutraal'""")]
+        else:
+            ids = []
+        for arg_id in ids:
+            r = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+            if (r is None or r["vervangen"] or r["status"] not in (
+                    "ongecontroleerd", "geverifieerd", "betwist", "bronvermelding_nodig")):
+                continue
+            stem = stem_van(conn, r)
+            if stem is None or stem["verdict"] != "niet_neutraal":
+                continue  # oordeel over een oudere tekst, of inmiddels neutraal
+            if is_mens(conn, r["contributed_by"]):
+                continue
+            if conn.execute("SELECT 1 FROM arguments WHERE reviseert_id = ? AND status = "
+                            "'voorgesteld' AND NOT vervangen LIMIT 1", (arg_id,)).fetchone():
+                continue  # er loopt al een revisie
+            if conn.execute("SELECT 1 FROM arguments WHERE reasoning LIKE ? LIMIT 1",
+                            (NEUTRALE_VERSIE.format(id=arg_id) + "%",)).fetchone():
+                continue  # één poging per argument
+            if not (stem["herformulering"] or "").strip():
+                if not mens_besliste(conn, arg_id):
+                    leeg.append((arg_id, stem["reden"] or ""))
+                continue
+            werk.append((arg_id, stem["herformulering"].strip(), stem["reden"] or ""))
+    finally:
+        conn.close()
+    tel = {"ingediend": 0, "fouten": 0, "kandidaten": len(werk), "verworpen": 0,
+           "zonder_feit": len(leeg)}
+    if args.droog:
+        meld(f"Stemtoets: {len(werk)} stemrevisie(s) van gemerged werk, {len(leeg)} zonder "
+             "neutraal feit (droog)")
+        return tel
+    for arg_id, reden in leeg[:args.max_stemrevisie]:
+        status, antwoord = req("PATCH", f"/api/arguments/{arg_id}/status", token,
+                               {"status": "verworpen", "motivatie":
+                                f"{STEM_REDEN} — geen neutraal feit over: {reden}"[:900]})
+        if status == 200:
+            tel["verworpen"] += 1
+        else:
+            meld(f"  ✗ #{arg_id} verwerpen: {antwoord.get('error')}")
+    token = bronzoeker.DEFAULT_TOKEN.read_text().strip()
+    for arg_id, claim, reden in werk[:args.max_stemrevisie]:
+        status, antwoord = req("POST", f"/api/arguments/{arg_id}/revisie", token,
+                               {"claim": claim, "reasoning":
+                                f"{NEUTRALE_VERSIE.format(id=arg_id)}: {reden}"[:1500]})
+        if status == 201:
+            tel["ingediend"] += 1
+        else:
+            tel["fouten"] += 1
+            meld(f"  ✗ stemrevisie van #{arg_id} niet ingediend ({status}): "
+                 f"{antwoord.get('error')}")
+    meld(f"Stemtoets: {tel['ingediend']} stemrevisie(s) van gemerged werk ingediend, "
+         f"{tel['verworpen']} zonder neutraal feit verworpen")
+    return tel
+
+
+def stap_beschrijvingen(token, args, meld) -> dict:
+    """Niet-neutrale beschrijvingen van relaties en entiteiten worden de neutrale
+    herformulering van de stemtoets (de server beslist: alleen seed- en agentwerk, alleen over
+    de huidige tekst, hooguit twee keer per element; de oude tekst staat in edit_log)."""
+    if args.max_beschrijving <= 0:
+        return {"herschreven": 0, "reden": "uitgezet"}
+    conn = db()
+    try:
+        werk = []
+        if bronchecker.heeft_tabel(conn, "stem_toetsen"):
+            for soort, tabel in (("relatie", "relations"), ("entiteit", "entities")):
+                for r in conn.execute(f"""
+                        SELECT t.id, t.description,
+                               (SELECT changed_by FROM edit_log l WHERE l.table_name = ?
+                                  AND l.record_id = t.id AND l.action = 'created'
+                                ORDER BY l.id LIMIT 1) AS auteur
+                        FROM {tabel} t WHERE t.status = 'goedgekeurd' AND NOT t.vervangen
+                          AND t.id IN (SELECT doel_id FROM stem_toetsen WHERE soort = ?
+                                         AND verdict = 'niet_neutraal')""",  # noqa: S608
+                                      (tabel, soort)):
+                    stem = stemtoets.oordeel_voor(conn, soort, r["id"], r["description"],
+                                                  r["auteur"])
+                    if (stem is not None and stem["verdict"] == "niet_neutraal"
+                            and not is_mens(conn, r["auteur"])):
+                        werk.append((tabel, r["id"]))
+    finally:
+        conn.close()
+    tel = {"herschreven": 0, "blijft": 0, "kandidaten": len(werk)}
+    for tabel, rid in werk[:args.max_beschrijving]:
+        status, antwoord = req("GET" if args.droog else "POST",
+                               f"/api/beoordeling/beschrijving/{tabel}/{rid}", token)
+        if status in (429, 503):
+            meld(f"Beschrijvingen gestopt: {antwoord.get('error')}")
+            break
+        if (args.droog and antwoord.get("toegestaan")) or antwoord.get("herschreven"):
+            tel["herschreven"] += 1
+        else:
+            tel["blijft"] += 1
+    meld(f"Stemtoets: {tel['herschreven']} beschrijving(en) neutraal gemaakt"
+         f"{' (droog)' if args.droog else ''}")
+    return tel
+
+
+def zonder_bron_kandidaten(conn, pogingen: dict) -> tuple[list[tuple[int, bool]], int]:
+    """Goedgekeurde verbanden zonder een argument dat ze draagt (zie server._gedragen_door),
+    geen registerfeit. → ([(relatie-id, inhoud)], aantal dat nog op de bronzoeker wacht).
+    ``inhoud``: het enige steunende argument is om de inhoud betwist en heeft geen bron (de
+    bronzoeker repareert dat niet). De server beslist; dit is alleen de voorselectie."""
+    rijen = conn.execute("""
+        SELECT r.id FROM relations r
+        WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
+          AND NOT EXISTS (
+            SELECT 1 FROM arguments a
+            WHERE a.relation_id = r.id AND a.parent_argument_id IS NULL AND NOT a.vervangen
+              AND a.stance = 'supporting' AND COALESCE(a.property, 'existence') = 'existence'
+              AND a.status IN ('ongecontroleerd', 'geverifieerd', 'betwist')
+              AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id AND (
+                    TRIM(COALESCE(c.quote, '')) <> ''
+                    OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id)))
+              AND COALESCE((SELECT o.verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
+                              AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
+                              LIMIT 1), '') <> 'klopt-niet')
+          AND NOT EXISTS (SELECT 1 FROM arguments a JOIN citations c ON c.argument_id = a.id
+                          WHERE a.relation_id = r.id AND c.methode = 'officieel_register_scrape')
+        ORDER BY r.id""").fetchall()
+    uit, wacht = [], 0
+    for r in rijen:
+        steun = conn.execute("""
+            SELECT a.id, a.status,
+                   (SELECT COUNT(*) FROM citations c WHERE c.argument_id = a.id) AS n_cit,
+                   (SELECT l.reason FROM edit_log l WHERE l.table_name = 'arguments'
+                      AND l.record_id = a.id AND l.action = 'disputed'
+                    ORDER BY l.id DESC LIMIT 1) AS betwist_reden
+            FROM arguments a WHERE a.relation_id = ? AND a.parent_argument_id IS NULL
+              AND NOT a.vervangen AND a.stance = 'supporting'
+              AND COALESCE(a.property, 'existence') = 'existence'
+              AND a.status NOT IN ('verworpen', 'verouderd')""", (r["id"],)).fetchall()
+        sleutels = [f"relatie:{r['id']}"] + [str(a["id"]) for a in steun]
+        niets = any((pogingen.get(k) or {}).get("uitkomst") == "niets" for k in sleutels)
+        inhoud = bool(steun) and all(
+            a["status"] == "betwist" and not a["n_cit"]
+            and not bronzoeker.bronprobleem(a["betwist_reden"]) for a in steun)
+        if niets or inhoud:
+            uit.append((r["id"], inhoud))
+        else:
+            wacht += 1
+    return uit, wacht
+
+
+def stap_zonder_bron(token, args, meld) -> dict:
+    """Verbanden die geen bron draagt, eindigen: na de poging van de bronzoeker (niets
+    gevonden) of als het enige argument om de inhoud betwist is, en alleen als niets meer in
+    behandeling is, wijst de beoordeling ze af (de server beslist en logt de reden). Wat het
+    nieuws toont, is niet uitgezonderd maar staat apart in het logboek."""
+    if args.max_zonder_bron <= 0:
+        return {"afgewezen": 0, "reden": "uitgezet"}
+    pogingen = bronzoeker.laad_pogingen()
+    conn = db()
+    try:
+        kandidaten, wacht = zonder_bron_kandidaten(conn, pogingen)
+        nieuws, _ent = bronchecker.nieuws_voorrang(conn)
+    finally:
+        conn.close()
+    tel = {"afgewezen": 0, "blijft": 0, "wacht_op_bronzoeker": wacht, "kandidaten": len(kandidaten),
+           "nieuws": []}
+    for rid, inhoud in kandidaten[:args.max_zonder_bron]:
+        pad = f"/api/beoordeling/zonder_bron/{rid}"
+        if args.droog:
+            status, antwoord = req("GET", pad + ("?inhoud=1" if inhoud else ""), token)
+            gedaan = bool(antwoord.get("toegestaan"))
+        else:
+            status, antwoord = req("POST", pad, token, {"inhoud": inhoud})
+            gedaan = bool(antwoord.get("afgewezen"))
+        if status in (429, 503):
+            meld(f"Zonder bron: gestopt — {antwoord.get('error')}")
+            break
+        if gedaan:
+            tel["afgewezen"] += 1
+            if rid in nieuws:
+                tel["nieuws"].append(rid)
+            meld(f"  · verband #{rid}{' (in het nieuws)' if rid in nieuws else ''}: "
+                 f"{(antwoord.get('motivatie') or '')[:140]}")
+        else:
+            tel["blijft"] += 1
+    meld(f"Zonder bron: {tel['afgewezen']} verband(en) afgewezen{' (droog)' if args.droog else ''}"
+         f", {tel['blijft']} blijven (in behandeling of een mens keurde goed), "
+         f"{wacht} wachten op de bronzoeker")
+    return tel
+
+
 def stap_goedkeuren(token, args, meld) -> dict:
     """Relaties en entiteiten met gecontroleerd bewijs: entiteiten eerst, dan relaties."""
     tel = {"entities": 0, "relations": 0}
@@ -568,11 +897,15 @@ def motivatie_voor(a: dict, *, wacht_a2, wacht_zoeker, pogingen, wachttijd, nu):
     eerst een poging van de bronzoeker (als die het kan repareren) en wordt daarna meteen
     verworpen — met de vervanger erbij, of de reden waarom er geen is. Dode wachttijd is er
     alleen nog voor wat op de aanklager wacht (A2-budget)."""
-    detail = (a["a1_detail"] or "").replace("[bronchecker] ", "").strip()
+    detail = bronchecker.zonder_versie(a["a1_detail"])
     if a["smaad"] == "niet_feitelijk":
         return (f"{REDEN}: teruggekoppeld door de smaadtoets — {a['smaad_reden']}"
                 + (f" Feitelijk zou zijn: {a['smaad_herformulering']}"
                    if a["smaad_herformulering"] else "")), None
+    if a.get("stem") == "niet_neutraal":
+        return (f"{STEM_REDEN} — {a['stem_reden']}"
+                + (f" Neutraal zou zijn: {a['stem_herformulering']}"
+                   if a.get("stem_herformulering") else "")), None
     if a["a1"] in ("klopt-niet", "twijfel"):
         if a["id"] in wacht_zoeker:
             return None, "bronzoeker"
@@ -611,7 +944,7 @@ def stap_opruimen(token, args, meld) -> dict:
     conn = db()
     try:
         args_rijen = [dict(r) for r in conn.execute("""
-            SELECT a.id, a.created_at, a.parent_argument_id, a.contributed_by,
+            SELECT a.id, a.created_at, a.parent_argument_id, a.contributed_by, a.claim,
                    (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
                       AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS a1,
                    (SELECT detail FROM immuun_oordelen o WHERE o.argument_id = a.id
@@ -633,6 +966,11 @@ def stap_opruimen(token, args, meld) -> dict:
                       AND l.record_id = a.id
                       AND l.reason LIKE 'automatische beoordeling: heropend%') AS heropend_op
             FROM arguments a WHERE a.status = 'voorgesteld' AND NOT a.vervangen""")]
+        for a in args_rijen:
+            stem = stem_van(conn, a)
+            a["stem"] = stem["verdict"] if stem else None
+            a["stem_reden"] = stem["reden"] if stem else None
+            a["stem_herformulering"] = stem["herformulering"] if stem else None
         wacht_a2 = {r["id"]: r for r in a2_wachtrij(conn)}
         # Nog niet door de bronchecker bekeken (boven --max-bron): eerst controleren
         ongecontroleerd = {r["id"] for r in bronchecker.kandidaten(conn)}
@@ -650,7 +988,8 @@ def stap_opruimen(token, args, meld) -> dict:
     finally:
         conn.close()
     for a in args_rijen:
-        if a["id"] in ongecontroleerd and a["smaad"] != "niet_feitelijk":
+        if (a["id"] in ongecontroleerd and a["smaad"] != "niet_feitelijk"
+                and a["stem"] != "niet_neutraal"):
             continue
         motivatie, wacht = motivatie_voor(a, wacht_a2=wacht_a2, wacht_zoeker=wacht_zoeker,
                                           pogingen=pogingen, wachttijd=args.wachttijd_dagen,
@@ -742,12 +1081,19 @@ def ronde(args, meld=print) -> dict:
     uitkomst["a1_controle"] = bronchecker.draai(max_n=args.max_controle, droog=args.droog,
                                                 parallel=args.parallel, modus="controle",
                                                 meld=meld)
+    # 2a. A1 v3 voor verbanden uit het nieuws: gaat het bewijs over dít verband? (begrensd)
+    if args.max_specifiek > 0:
+        uitkomst["a1_specifiek"] = bronchecker.draai(max_n=args.max_specifiek,
+                                                     droog=args.droog, parallel=args.parallel,
+                                                     modus="specifiek", meld=meld)
     # 2b. A1 voor registerfeiten (Uitbreiding C): deterministisch tegen de bewaarde uitgave
     uitkomst["registercheck"] = registercheck.draai(droog=args.droog, meld=meld)
     # 3. Smaad-firewall door een agent, en eigen afwijzingen terug na een nieuw 'klopt'
     uitkomst["smaadtoets"] = stap_smaadtoets(args, meld)
     uitkomst["smaad_vrijgegeven"] = stap_smaad_vrijgeven(token, args, meld)
     uitkomst["heropend"] = stap_heropenen(token, args, meld)
+    # 3b. De eigen stem: elk voorstel vóór A7, plus een veegronde over wat er staat
+    uitkomst["stemtoets"] = stap_stemtoets(args, meld)
     # 4. A2: de aanklager
     conn = db()
     try:
@@ -766,10 +1112,16 @@ def ronde(args, meld=print) -> dict:
     uitkomst["rfc"] = stap_rfc(token, args, meld)
     uitkomst["bronklassen"] = stap_bronklassen(token, args, meld)
     uitkomst["goedgekeurd"] = stap_goedkeuren(token, args, meld)
-    # 11–12. Opruimen, en wat de smaadtoets terugkoppelde in zijn feitelijke vorm opnieuw
+    # 10b. Niet-neutrale beschrijvingen (seed- en agentwerk) neutraal maken
+    uitkomst["beschrijvingen"] = stap_beschrijvingen(token, args, meld)
+    # 11–12. Opruimen; verbanden zonder bron eindigen; wat de smaad- of stemtoets
+    #        terugkoppelde komt in zijn feitelijke of neutrale vorm opnieuw binnen
     if not args.zonder_opruimen:
         uitkomst["opgeruimd"] = stap_opruimen(token, args, meld)
+        uitkomst["zonder_bron"] = stap_zonder_bron(token, args, meld)
     uitkomst["feitelijke_versies"] = stap_feitelijke_versies(args, meld)
+    uitkomst["neutrale_versies"] = stap_neutrale_versies(args, meld)
+    uitkomst["stemrevisies"] = stap_stemrevisies(token, args, meld)
     # 13. Nieuwe bronnen archiveren (zodat de bronchecker ze later nog kan lezen)
     uitkomst["archief"] = stap_archiveren(args, meld)
     uitkomst["gemerged"] = uitkomst["a7"]["gemerged"]
@@ -800,6 +1152,18 @@ def main():
     ap.add_argument("--zonder-bronzoeker", action="store_true", help="geen bronnen zoeken")
     ap.add_argument("--max-smaad", type=int, default=20,
                     help="hooguit zoveel smaadtoetsen per ronde (0 = uit)")
+    ap.add_argument("--max-specifiek", type=int, default=20,
+                    help="hooguit zoveel v3-herbeoordelingen van verbanden uit het nieuws (0 = uit)")
+    ap.add_argument("--max-stem-nieuw", type=int, default=200,
+                    help="hooguit zoveel voorstellen per ronde door de stemtoets")
+    ap.add_argument("--max-stem-veeg", type=int, default=48,
+                    help="hooguit zoveel bestaande teksten per ronde door de stemtoets (0 = uit)")
+    ap.add_argument("--max-beschrijving", type=int, default=40,
+                    help="hooguit zoveel beschrijvingen per ronde neutraal maken (0 = uit)")
+    ap.add_argument("--max-stemrevisie", type=int, default=20,
+                    help="hooguit zoveel neutrale versies en stemrevisies per ronde (0 = uit)")
+    ap.add_argument("--max-zonder-bron", type=int, default=20,
+                    help="hooguit zoveel verbanden zonder bron per ronde afwijzen (0 = uit)")
     ap.add_argument("--max-mechanismen", type=int, default=12,
                     help="hooguit zoveel kandidaat-verbanden per ronde (0 = uit)")
     ap.add_argument("--max-rfc", type=int, default=3,

@@ -141,6 +141,27 @@ te coderen.
    missielog, nooit als `contextual` argument; een entiteit zonder citeerbaar materiaal
    blijft **onbepaald**.
 
+## Eigen stem en specificiteit (eigenaarsbesluit 2026-10-08)
+
+"'Ondermijnt zo het vertrouwen in de journalistiek' … deze taal moeten we niet overnemen, dit is
+duidelijk een politiek spelletje … waak hier streng voor"; "PVV censureert AD … niet van belang".
+Voor alles wat je als bewering (claim), beschrijving of herformulering indient:
+
+- **Eigen stem = wat er gebeurde**: wie deed of zei wat, wanneer, waar, in welke functie. Geen
+  oordeel over gevolgen of motieven ("ondermijnt het vertrouwen", "bedreiging voor de
+  persvrijheid", "om journalisten te intimideren"), geen etiket ("rechts-populistisch",
+  "extreemrechts", "linkse media", "mainstream", "neoliberale consensus", "omstreden") en geen
+  retoriek van één kant. Zo'n oordeel alleen als citaat, met de naam van wie het uitsprak ("De
+  NVJ noemde de uitspraak …"). De stemtoets (`scripts/stemtoets.py`, account `stemtoets`) toetst
+  elk voorstel; wat niet neutraal is, merget niet en komt in neutrale vorm opnieuw binnen.
+- **Over dát verband**: een argument over een verband noemt beide partijen, en de bron ook. Een
+  uitspraak over "de pers", "journalisten" of "de media" draagt geen verband met één genoemd
+  medium; de bronchecker (v3) zegt dan `klopt-niet` ("gaat niet over …").
+- **Eén feit per argument**: een bestuursfunctie en een kandidatuur zijn twee argumenten, elk met
+  een eigen bron die dát feit draagt. Een feit over een ánder verband hoort bij dat verband.
+- **Classificaties**: de as of klasse staat in `property_value`; de bewering zelf zegt wat de
+  partij deed, zei of publiceerde (met bron), niet hoe de database haar noemt.
+
 ## Harde grenzen
 - **Nooit** statuswijzigingen, merges, source-classificaties of verwijderingen — reviewer+/
   maintainer én mensenwerk. Jij stelt voor, een mens beslist; alles blijft `voorgesteld`.

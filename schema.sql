@@ -964,6 +964,31 @@ CREATE TABLE smaad_toetsen (
 );
 
 --------------------------------------------------------------
+-- STEM_TOETSEN (eigenaarsbesluit 2026-10-08: "deze taal moeten we niet overnemen … waak
+-- hier streng voor"): het oordeel van een agent (nooit de auteur) over de EIGEN STEM van een
+-- tekst van het model — een argument-claim of de beschrijving van een relatie of entiteit:
+-- 'neutraal' (wie deed of zei wat, wanneer) of 'niet_neutraal' (een oordeel over gevolgen of
+-- motieven, een etiket, retoriek van één kant in eigen woorden), met reden en een neutrale
+-- herformulering. tekst_hash = sha256 van de getoetste tekst: verandert de tekst, dan geldt
+-- het oordeel niet meer. De immuunpoort (A7) en de automatische beoordeling lezen het;
+-- PROCESMETADATA, telt in niets mee. Aangelegd via schema.sql (verse build) én
+-- scripts/migrate_add_stem_toetsen.py.
+--------------------------------------------------------------
+
+CREATE TABLE stem_toetsen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    soort TEXT NOT NULL CHECK(soort IN ('argument', 'relatie', 'entiteit')),
+    doel_id INTEGER NOT NULL,             -- argument-, relatie- of entiteit-id (naar soort)
+    tekst_hash TEXT NOT NULL,             -- sha256 van de getoetste tekst
+    verdict TEXT NOT NULL CHECK(verdict IN ('neutraal', 'niet_neutraal')),
+    reden TEXT NOT NULL,
+    herformulering TEXT,                  -- dezelfde feiten, oordeel weg of toegeschreven
+    door TEXT REFERENCES users(username),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(soort, doel_id, door)
+);
+
+--------------------------------------------------------------
 -- INDEXEN
 --------------------------------------------------------------
 
@@ -1009,6 +1034,7 @@ CREATE INDEX idx_leads_status ON leads(status);
 CREATE INDEX idx_leads_ip ON leads(ingezonden_ip_hash);
 CREATE INDEX idx_nieuws_doelen_status ON nieuws_doelen(status, prioriteit);
 CREATE INDEX idx_smaad_toetsen_argument ON smaad_toetsen(argument_id);
+CREATE INDEX idx_stem_toetsen_doel ON stem_toetsen(soort, doel_id);
 
 --------------------------------------------------------------
 -- SEED DATA: ROLLEN (theoretisch model)

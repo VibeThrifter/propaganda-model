@@ -677,6 +677,111 @@ _NEUTRALITEIT_TOELICHTING = (
     "(mogelijk false-positives); herformuleer met bron/attributie of controleer.")
 
 
+# ── Eigen stem (stemtoets, eigenaarsbesluit 2026-10-08) ───────
+# "'ondermijnt zo het vertrouwen in de journalistiek' … deze taal moeten we niet overnemen, dit
+# is duidelijk een politiek spelletje … waak hier streng voor." De eigen stem van het model zegt
+# wat er gebeurde (wie deed of zei wat, wanneer); een oordeel over gevolgen of motieven, een
+# etiket of de retoriek van één kant staat er alleen als citaat, met naam toegeschreven. Het
+# oordeel per tekst geeft de stemtoets (scripts/stemtoets.py, een taalmodel); dit lexicon is
+# de deterministische ondergrens: STRENG zijn uitdrukkingen die buiten een citaat of
+# toeschrijving altijd een oordeel of etiket zijn (de geratchete fout NEUTRALITEIT-EIGEN-STEM),
+# RUIM wijst de stemtoets aan waar ze eerst moet kijken (ook woorden die soms feitelijk zijn).
+EIGEN_STEM_STRENG = (
+    (r"ondermijn\w*\s+(?:zo\s+|daarmee\s+|daardoor\s+|zij\s+|hij\s+)?(?:het\s+|de\s+)?"
+     r"(?:publieke\s+)?vertrouwen", "ondermijnt het vertrouwen"),
+    (r"\bvertrouwen\s+(?:in|van)\s+[^.:;]{0,60}?\bte\s+ondermijnen", "vertrouwen … te ondermijnen"),
+    (r"\bbedreiging\s+(?:voor|van)\s+(?:de\s+|het\s+)?(?:onafhankelijke\s+|vrije\s+)?"
+     r"(?:journalisti\w*|democratie|persvrijheid|rechtsstaat|pers|media|nieuwsvoorziening)",
+     "bedreiging voor de journalistiek/democratie"),
+    (r"\bdirecte\s+bedreiging", "directe bedreiging"),
+    (r"\b(?:rechts|links)[- ]?populist\w*|\bpopulistisch\w*|\bpopulisten\b", "populistisch"),
+    (r"\bneoliberale\s+(?:consensus|hegemonie)", "neoliberale consensus"),
+    (r"\blinkse\s+(?:kerk|media|pers|elite)|\brechtse\s+(?:media|pers)", "linkse/rechtse media"),
+    (r"\bmainstream[- ]?media\b|\bmainstreammedia\b", "mainstream media"),
+)
+EIGEN_STEM_RUIM = EIGEN_STEM_STRENG + (
+    (r"\bondermijn\w*", "ondermijnt"),
+    (r"\bbedreig\w*", "bedreigt"),
+    (r"\bextreem[- ]?(?:rechts|links)\w*|\bradicaal[- ]?(?:rechts|links)\w*"
+     r"|\buiterst[- ](?:rechts|links)\w*", "extreem/radicaal rechts of links"),
+    (r"\bnepnieuws\b|\bpropaganda\b|\bcomplot\w*|\bwappie\w*|\bhetze\b", "nepnieuws/propaganda"),
+    (r"\bnarratie\w*", "narratief"),
+    (r"\w+-gezind\w*", "-gezind"),
+    (r"\bschadelijk\w*|\bgevaarlijk\w*", "schadelijk/gevaarlijk"),
+    (r"\bpolaris\w*", "polariseert"),
+    (r"\bdesinformatie\w*|\bmanipul\w*|\bmisleid\w*", "desinformatie/misleiding"),
+    (r"\bintimid\w*", "intimideert"),
+    (r"\bkernpositie|\bzeer\s+invloedrijk\w*|\bmachtig\w*|\bberucht\w*|\bomstreden"
+     r"|\bkritiekloos\w*", "versterker"),
+    (r"\belite\b|\bconsensus\b|\bhegemon\w*|\bideologisch\w*|\bestablishment\b",
+     "analysewoord als etiket"),
+    (r"\bactivist\w*|\bradica\w*|\bextreem\w*|\blinkse\b|\brechtse\b", "etiket"),
+)
+_EIGEN_STEM_STRENG_RE = [(re.compile(p, re.IGNORECASE), label) for p, label in EIGEN_STEM_STRENG]
+_EIGEN_STEM_RUIM_RE = [(re.compile(p, re.IGNORECASE), label) for p, label in EIGEN_STEM_RUIM]
+# Citaten (dubbele, enkele en typografische aanhalingstekens): wat erbinnen staat, is van een ander
+_CITAAT_SPAN = re.compile(r"\"[^\"]{1,400}\"|“[^”]{1,400}”|„[^“”]{1,400}[“”]|«[^»]{1,400}»"
+                          r"|‘[^’]{1,400}’|(?<!\w)'[^']{1,400}'(?!\w)")
+# Een zinsdeel dat een oordeel aan iemand toeschrijft ("volgens de NVJ …", "X noemde …")
+_TOESCHRIJVING = re.compile(
+    r"\b(?:volgens|aldus|naar eigen zeggen|zei|zegt|zeggen|stelt|stelde|stellen|beweert|"
+    r"beweerde|schreef|schrijft|verklaarde|verklaart|oordeelde|oordeelt|concludeert|"
+    r"concludeerde|noemde|noemt|noemen|betoogt|betoogde|waarschuwde|waarschuwt|vindt|vond|"
+    r"bekritiseerde|bekritiseert|aangemerkt|aanmerkt|merkte|bestempel\w*|beschuldig\w*|"
+    r"framet|framede|framen|geframed|etiketteer\w*|omschrijft|omschreef|omschreven|typeer\w*|"
+    r"kwalificeer\w*|identificeert|profileert|geprofileerd|positioneert|zelfverklaard\w*|"
+    r"according to)\b", re.IGNORECASE)
+_ZINSDEEL_SPLIT = re.compile(r"(?<=[.!?:;])\s+|\s+[—–]\s+")
+
+
+def eigen_stem_treffers(tekst, streng=True):
+    """Welke oordelen of etiketten staan er in de EIGEN STEM van deze tekst: buiten citaten en
+    in een zinsdeel dat ze niet aan iemand toeschrijft? → lijst van labels (leeg = niets).
+    ``streng=False`` gebruikt het ruime lexicon (alleen om de stemtoets te laten voorgaan)."""
+    patronen = _EIGEN_STEM_STRENG_RE if streng else _EIGEN_STEM_RUIM_RE
+    gevonden = []
+    for deel in _ZINSDEEL_SPLIT.split(tekst or ""):
+        kaal = _CITAAT_SPAN.sub(" ", deel)
+        if _TOESCHRIJVING.search(kaal):
+            continue
+        for regex, label in patronen:
+            if regex.search(kaal) and label not in gevonden:
+                gevonden.append(label)
+    return gevonden
+
+
+def check_eigen_stem(conn):
+    """NEUTRALITEIT-EIGEN-STEM (fout, geratchet; eigenaarsbesluit 2026-10-08): teksten van het
+    levende model — gemergede argument-claims in de praktijklaag en de beschrijvingen van
+    goedgekeurde relaties en entiteiten — met een oordeel of etiket uit het STRENGE lexicon in
+    de eigen stem (niet in een citaat, niet toegeschreven). De stemtoets herschrijft de
+    bestaande; de ratchet (validatie_baseline.json) houdt nieuwe buiten."""
+    gevlagd = []
+    for a in conn.execute("""
+            SELECT id, claim FROM arguments
+            WHERE NOT vervangen AND (relation_id IS NOT NULL OR entity_id IS NOT NULL)
+              AND status IN ('ongecontroleerd', 'geverifieerd', 'betwist', 'bronvermelding_nodig')"""):
+        treffers = eigen_stem_treffers(a["claim"])
+        if treffers:
+            gevlagd.append(f"argument #{a['id']} ({', '.join(treffers)}): {(a['claim'] or '')[:110]}")
+    for tabel, label in (("relations", "relatie"), ("entities", "entiteit")):
+        for r in conn.execute(f"""SELECT id, description FROM {tabel}
+                                  WHERE NOT vervangen AND status = 'goedgekeurd'
+                                    AND description IS NOT NULL"""):  # noqa: S608 - vaste tabel
+            treffers = eigen_stem_treffers(r["description"])
+            if treffers:
+                gevlagd.append(f"{label} #{r['id']} ({', '.join(treffers)}): "
+                               f"{(r['description'] or '')[:110]}")
+    return [_bevinding(
+        "NEUTRALITEIT-EIGEN-STEM", "Oordelen of etiketten in de eigen stem van het model",
+        "fout", gevlagd,
+        "De eigen stem zegt wat er gebeurde (wie deed of zei wat, wanneer); een oordeel over "
+        "gevolgen of motieven ('ondermijnt het vertrouwen'), een etiket ('rechts-populistisch', "
+        "'neoliberale consensus') of de retoriek van één kant alleen als citaat, met naam "
+        "toegeschreven (eigenaarsbesluit 2026-10-08). De stemtoets (scripts/stemtoets.py) "
+        "herschrijft wat er staat; deze geratchete fout houdt nieuwe buiten.")]
+
+
 # ── Schema-pariteit (Z9) ─────────────────────────────────────
 
 def _strip_sql_commentaar(sql):
@@ -1172,6 +1277,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_methode(conn)
     bevindingen += check_immuunsysteem(conn)
     bevindingen += check_neutraliteit(conn)
+    bevindingen += check_eigen_stem(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)

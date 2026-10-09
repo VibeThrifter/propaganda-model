@@ -274,12 +274,48 @@ Zie "Scores: van discussieboom naar theorie".
 | `argument_ratings` | M2.5: oordelen óver argumenten (nooit over waarheid); agent-ratings = advies | argument_id, rater, oordeel (`nuttig`/`niet_nuttig`), reden (gestructureerd), motivatie; UNIQUE per (argument, rater) |
 | `watchlists` | M2.4: volglijsten op de recent-changes-feed | user_id, table_name, record_id |
 | `lineage` | M2.6: opvolging bij splitsen/samenvoegen/hernoemen — niets wissen | soort, element_type, oud_id, nieuw_id, voorstel_id, reden |
+| `stem_toetsen` | 2026-10-08: het oordeel van de stemtoets (account `stemtoets`, nooit de auteur) over de eigen stem van een tekst; procesmetadata, telt nergens mee | soort (`argument`/`relatie`/`entiteit`), doel_id, tekst_hash (sha256 van de getoetste tekst), verdict (`neutraal`/`niet_neutraal`), reden, herformulering, door; UNIQUE per (soort, doel_id, door) |
 | `predictions` | M3.4: voorspellingsregister — toetsbare verwachtingen, vastgelegd vóór de uitkomst | claim, afleiding, meetcriterium, kans (0–1 exclusief), deadline (toekomst), theorie-anker (mechanism_id/role_id/emergent_effect_id, ≥1), status (`open`/`uitgekomen`/`niet_uitgekomen`/`onbeslisbaar`), uitkomst, brier, self_scored, contributed_by, beoordeeld_door |
 
 Argumenten vormen een boomstructuur:
 - **Root-argumenten** (`parent_argument_id = NULL`) hangen direct aan een relatie of entiteit
 - **Reacties** (`parent_argument_id = <id>`) reageren op een ander argument
 - Elk argument kan gericht zijn op een **relatie** (`relation_id`) of een **entiteit** (`entity_id`), minstens één is verplicht
+
+### Eigen stem, specificiteit en één feit per argument (eigenaarsbesluit 2026-10-08)
+
+Aanleiding: onder "Wie zit erachter?" in de nieuws-app stond "PVV censureert AD", met als bewijs
+een argument dat in de eigen stem van het model zei dat de PVV "zo het vertrouwen in de
+journalistiek ondermijnt", en een bron over Wilders' uitspraak over journalisten in het algemeen.
+De eigenaar: "deze taal moeten we niet overnemen, dit is duidelijk een politiek spelletje … waak
+hier streng voor"; en zo'n verband zegt niets over het AD. Drie regels, die de automatische
+beoordeling afdwingt:
+
+1. **Eigen stem = wat er gebeurde.** Een claim, beschrijving of herformulering zegt wie wat deed of
+   zei, wanneer, waar, in welke functie. Geen oordeel over gevolgen of motieven ("ondermijnt het
+   vertrouwen", "bedreiging voor de persvrijheid"), geen etiket ("rechts-populistisch",
+   "extreemrechts", "linkse media", "mainstream", "neoliberale consensus", "omstreden"), geen
+   retoriek van één kant. Een oordeel alleen als citaat met de naam van wie het uitsprak ("De NVJ
+   noemde de uitspraak …"). De **stemtoets** (`scripts/stemtoets.py`, Sonnet, account `stemtoets`)
+   oordeelt per tekst (`stem_toetsen`, geldig voor precies die tekst): A7 merget in de praktijklaag
+   niets zonder `neutraal` (registerregels en theorie niet; kill-switch `PROPAGANDA_STEMTOETS=0`);
+   een niet-neutraal voorstel wordt teruggekoppeld en komt in de neutrale vorm opnieuw binnen;
+   gemerged werk krijgt een **stemrevisie** (dezelfde bronnen, de neutrale bewering; merget op A1 +
+   neutraal, zonder A2); een beschrijving van seed- of agentwerk wordt herschreven (de oude tekst
+   blijft in `edit_log`; werk van een mens herschrijft niemand automatisch). De deterministische
+   check `NEUTRALITEIT-EIGEN-STEM` (validation.py, fout, geratchet) houdt nieuwe buiten.
+   Classificaties (politieke positie, doelgroep, bereik) zetten de as of klasse in
+   `property_value`; de bewering zelf zegt wat de partij deed of zei.
+2. **Over dát verband.** Een argument over een verband noemt beide partijen, en zijn bron ook. Een
+   uitspraak over "de pers", "journalisten" of "de media" draagt geen verband met één genoemd
+   medium: de bronchecker (v3) geeft `klopt-niet` ("gaat niet over …"); de bronzoeker accepteert
+   alleen een bron waarvan de pagina beide partijen noemt. Een goedgekeurd verband dat daarna door
+   geen enkele bron gedragen wordt, eindigt: na een vergeefse zoektocht van de bronzoeker (of als
+   het enige argument om de inhoud betwist is) wijst de automatische beoordeling het af, zolang er
+   niets meer loopt en geen mens het goedkeurde (terug te draaien met heraanmelden).
+3. **Eén feit per argument.** Een bestuursfunctie en een kandidatuur zijn twee argumenten, elk met
+   een eigen bron die dát feit draagt; de bronzoeker splitst samengestelde beweringen ("Afgesplitst
+   van #…"). Een feit over een ánder verband hoort bij dat verband.
 
 ### Identiteit & poorten (M0.6)
 

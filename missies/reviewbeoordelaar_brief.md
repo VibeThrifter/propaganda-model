@@ -190,6 +190,17 @@ Per item exact één verdict:
    kaart. Dit bestand is het enige dat je "schrijft": een gewoon JSON-bestand, geen
    API-schrijfactie en geen migratie.
 
+## Eigen stem en specificiteit (eigenaarsbesluit 2026-10-08)
+
+Twee vragen horen sinds 2026-10-08 bij elk oordeel over een argument op een verband:
+- **Gaat het over dát verband?** Bewering én bron noemen beide partijen (of hun functionarissen,
+  onderdelen of titels bij naam) en gaan over hún band. Een uitspraak over "de pers",
+  "journalisten" of "de media" in het algemeen draagt geen verband met één genoemd medium: dan
+  `klopt-niet`, met als reden "gaat niet over <partij>". De bronchecker (v3) vraagt dit ook.
+- **Eigen stem**: een oordeel over gevolgen of motieven, een etiket of de retoriek van één kant
+  in de eigen woorden van de bewering is geen feit dat een bron kan dragen; dat toetst de
+  stemtoets (`scripts/stemtoets.py`), niet jij — maar noem het in je detail als je het ziet.
+
 ## Harde grenzen
 
 - **Geen token, geen schrijfacties.** Nooit status zetten, nooit mergen, nooit

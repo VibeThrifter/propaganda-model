@@ -114,6 +114,8 @@ def test_helpers():
 def main():
     os.environ["PROPAGANDA_AUTO_MERGE"] = "1"
     os.environ["PROPAGANDA_AUTOMATISCHE_BEOORDELING"] = "1"
+    # Stap 3–22 toetsen de poorten van vóór de stemtoets; stap 23 zet haar aan
+    os.environ["PROPAGANDA_STEMTOETS"] = "0"
     test_helpers()
     with tempfile.TemporaryDirectory() as tmp:
         db = Path(tmp) / "vers.db"
@@ -848,8 +850,17 @@ def main():
         bz.vraag_zoeker = lambda prompt: gevonden
         eis(bz.zoek(verband)["uitkomst"] == "niets", "geen bewering geformuleerd → niets")
         gevonden["bewering"] = "Het RIVM was de belangrijkste bron voor De Telegraaf."
+        uit = bz.zoek(verband)
+        eis(uit["uitkomst"] == "niets"
+            and any("noemt De Telegraaf niet" in a["reden"] for a in uit["afgevallen"]),
+            "v3: een bron die De Telegraaf niet noemt, draagt het verband niet (alleen 'de "
+            "landelijke dagbladen')")
+        telegraaf = ("Tijdens de coronacrisis was het RIVM de belangrijkste bron voor de "
+                     "berichtgeving van De Telegraaf. " * 30)
+        bz.bc.haal_bron = lambda bron, citaat=None: (telegraaf, "ok", bron["url"])
         eis(bz.zoek(verband)["uitkomst"] == "gevonden",
-            "een bewering met beide partijen en een citaat dat in de bron staat → gevonden")
+            "een bewering met beide partijen, een bron die beide noemt en een citaat dat in de "
+            "bron staat → gevonden")
         gevonden["bewering"] = "Het RIVM was de belangrijkste bron voor de kranten."
         eis(bz.zoek(verband)["uitkomst"] == "niets",
             "een bewering zonder de tweede partij → niets (geen algemene uitspraak)")
@@ -1000,6 +1011,148 @@ def main():
                                     "aangevraagd, 0 zonder snapshot, 1 door fout/rate-limit "
                                     "open.").groups() == ("3", "2", "0", "1"),
             "de ronde leest de uitkomst van het archiefscript")
+
+        print("23. Bronchecker v3: gaat het bewijs over dít verband?")
+        bc.DB_PATH = db
+        pagina_alg = ("Op een bijeenkomst zei de partijleider dat journalisten gewoon tuig van "
+                      "de richel zijn, en dat herhaalde hij later. " * 20)
+        algemeen_arg = argument(invloed, "assistent",
+                                claim="Denktank Voorbeeld viel Omroep Voorbeeld publiekelijk aan.",
+                                citations=[{"source_id": bron("assistent"),
+                                            "quote": "journalisten gewoon tuig van de richel zijn"}])
+        gevraagd = {}
+
+        def nep_model(prompt, schema, systeem=None, model=None):
+            gevraagd["prompt"], gevraagd["schema"] = prompt, schema
+            return dict(gevraagd["antwoord"])
+
+        bc.haal_bron = lambda bron_, citaat=None: (pagina_alg, "ok", bron_.get("url"))
+        bc.vraag_model = nep_model
+        gevraagd["antwoord"] = {"oordeel": "draagt", "over_dit_verband": "nee",
+                                "ontbreekt": "Omroep Voorbeeld",
+                                "reden": "de bron gaat over journalisten in het algemeen"}
+        c = lees()
+        try:
+            arg_rij = c.execute("SELECT * FROM arguments WHERE id = ?", (algemeen_arg,)).fetchone()
+            eis(bc.verband_van(c, arg_rij)["doel"] == "Omroep Voorbeeld",
+                "het verband van een root op een relatie")
+            uit = bc.beoordeel_argument(c, arg_rij)
+        finally:
+            c.close()
+        eis(gevraagd["schema"] is bc.SCHEMA_VERBAND and "Denktank Voorbeeld" in gevraagd["prompt"]
+            and "Omroep Voorbeeld" in gevraagd["prompt"] and "'de pers'" in gevraagd["prompt"],
+            "de vraag noemt beide partijen en de regel over groepen in het algemeen")
+        eis(uit["verdict"] == "klopt-niet" and "gaat niet over Omroep Voorbeeld" in uit["detail"]
+            and "citaat letterlijk gevonden" in uit["detail"],
+            "een bron over 'journalisten' draagt het verband met één medium niet → klopt-niet")
+        gevraagd["antwoord"] = {"oordeel": "draagt", "over_dit_verband": "ja", "ontbreekt": "",
+                                "reden": "de bron noemt beide"}
+        c = lees()
+        try:
+            uit = bc.beoordeel_argument(c, c.execute("SELECT * FROM arguments WHERE id = ?",
+                                                     (algemeen_arg,)).fetchone())
+        finally:
+            c.close()
+        eis(uit["verdict"] == "klopt", "over dít verband en gedragen → klopt")
+        ent_bron = bron("assistent")  # eerst de bron (de API schrijft zelf)
+        c = lees()
+        try:
+            ent_arg = c.execute("INSERT INTO arguments (entity_id, stance, claim, status, "
+                                "contributed_by) VALUES (?, 'supporting', 'Anouk Verbeek is "
+                                "journalist.', 'voorgesteld', 'assistent')", (persoon,)).lastrowid
+            c.execute("INSERT INTO citations (argument_id, source_id, quote) VALUES (?, ?, ?)",
+                      (ent_arg, ent_bron, "journalisten gewoon tuig van de richel zijn"))
+            c.commit()
+            gevraagd["antwoord"] = {"oordeel": "draagt", "reden": "x"}
+            bc.beoordeel_argument(c, c.execute("SELECT * FROM arguments WHERE id = ?",
+                                               (ent_arg,)).fetchone())
+        finally:
+            c.close()
+        eis(gevraagd["schema"] is bc.SCHEMA_ARGUMENT,
+            "een argument over één entiteit krijgt de gewone vraag (geen verband)")
+        oud_v2 = argument(invloed, "assistent", claim="Denktank Voorbeeld leverde Omroep "
+                                                      "Voorbeeld in 2022 een rapport aan.")
+        api("post", f"/api/arguments/{oud_v2}/merge", "t-admin")
+        api("post", f"/api/arguments/{oud_v2}/herverificatie", "bronchecker",
+            {"verdict": "klopt", "detail": "[bronchecker v2] citaat letterlijk gevonden"})
+        al_v3 = argument(invloed, "assistent", claim="Omroep Voorbeeld citeerde Denktank "
+                                                     "Voorbeeld op 4 april 2025.")
+        api("post", f"/api/arguments/{al_v3}/merge", "t-admin")
+        api("post", f"/api/arguments/{al_v3}/herverificatie", "bronchecker",
+            {"verdict": "klopt", "detail": "[bronchecker v3] citaat letterlijk gevonden"})
+        buiten = argument(ander_doel, "assistent", claim="Partij Voorbeeld vroeg Denktank "
+                                                         "Voorbeeld in 2021 om advies.")
+        api("post", f"/api/arguments/{buiten}/merge", "t-admin")
+        api("post", f"/api/arguments/{buiten}/herverificatie", "bronchecker",
+            {"verdict": "klopt", "detail": "[bronchecker v2] citaat letterlijk gevonden"})
+        c = lees()
+        try:
+            herbekijk = {r["id"] for r in bc.specifiek_kandidaten(c)}
+        finally:
+            c.close()
+        eis(oud_v2 in herbekijk and al_v3 not in herbekijk and buiten not in herbekijk,
+            "--specifiek: alleen verbanden uit het nieuws, alleen een 'klopt' van een eerdere "
+            "versie (geen massale herbeoordeling)")
+        eis(bc.zonder_versie("[bronchecker v2] citaat x") == "citaat x"
+            and bc.zonder_versie("[bronchecker] y") == "y", "het versiemerk gaat eraf")
+
+        print("24. Bronzoeker: één feit per bewering, een bron noemt beide partijen")
+        bz.DB_PATH = db
+
+        def via_client(api_url, token, pad, body):
+            server._rate_emmers.clear()
+            r = client.post(pad, json=body, headers={"Authorization": f"Bearer {token}"})
+            return r.status_code, (r.get_json() or {})
+
+        bz.api_post = via_client
+        twee = ("Denktank Voorbeeld leverde in 2025 duiding aan Omroep Voorbeeld. Een analist "
+                "van Denktank Voorbeeld trad op 3 maart op bij Omroep Voorbeeld. ") * 20
+        bz.bc.haal_bron = lambda bron_, citaat=None: (twee, "ok", bron_["url"])
+        bijbron = lambda citaat: {"url": "https://nos.nl/x", "titel": "x", "uitgever": "NOS",  # noqa: E731
+                                  "datum": "2025-03-03", "soort": "nieuwsartikel", "citaat": citaat}
+        bz.vraag_zoeker = lambda prompt: {
+            "gevonden": True, "toelichting": "",
+            "bewering": "Denktank Voorbeeld leverde in 2025 duiding aan Omroep Voorbeeld.",
+            "bronnen": [bijbron("Denktank Voorbeeld leverde in 2025 duiding aan Omroep Voorbeeld")],
+            "extra": [{"bewering": "Een analist van Denktank Voorbeeld trad op 3 maart 2025 op "
+                                   "bij Omroep Voorbeeld.",
+                       "bronnen": [bijbron("Een analist van Denktank Voorbeeld trad op 3 maart "
+                                           "op bij Omroep Voorbeeld")]},
+                      {"bewering": "De Haya van Someren Stichting is het opleidingsinstituut van "
+                                   "de VVD.",
+                       "bronnen": [bijbron("Denktank Voorbeeld leverde in 2025 duiding")]}]}
+        splits = {"id": None, "soort": "verband", "claim": "", "relation_id": invloed,
+                  "bron_naam": "Denktank Voorbeeld", "doel_naam": "Omroep Voorbeeld",
+                  "entiteit_naam": None, "entity_id": None, "stance": "supporting",
+                  "mechanisme": "x", "relation_type": "beinvloeding", "property": None,
+                  "probleem": "geen_argument", "bronnen": [], "status": "goedgekeurd"}
+        uit = bz.zoek(splits)
+        eis(uit["uitkomst"] == "gevonden" and len(uit["extra"]) == 1
+            and any("afgesplitst feit valt af" in a["reden"] for a in uit["afgevallen"]),
+            "een tweede feit over dezelfde partijen blijft (eigen bron); een feit over een ander "
+            "verband valt af")
+        nieuw_id, fout = bz.dien_in("", tokens["bronzoeker"], splits, uit)
+        c = lees()
+        try:
+            afgesplitst_rij = c.execute("SELECT * FROM arguments WHERE reasoning LIKE ?",
+                                        (f"Afgesplitst van #{nieuw_id}%",)).fetchone()
+        finally:
+            c.close()
+        eis(nieuw_id and fout is None and afgesplitst_rij is not None
+            and afgesplitst_rij["relation_id"] == invloed
+            and afgesplitst_rij["claim"].startswith("Een analist"),
+            "elk feit een eigen argument op hetzelfde verband ('Afgesplitst van #…')")
+        eenzijdig = "Een analist trad op 3 maart op bij Omroep Voorbeeld. " * 30
+        bz.bc.haal_bron = lambda bron_, citaat=None: (eenzijdig, "ok", bron_["url"])
+        goed, reden = bz.natrekken(bijbron("Een analist trad op 3 maart op bij Omroep Voorbeeld"),
+                                   ["Denktank Voorbeeld", "Omroep Voorbeeld"])
+        eis(goed is None and "noemt Denktank Voorbeeld niet" in reden,
+            "een bron die één partij niet noemt, telt niet")
+        eis(bz.noemt("trainer bij de Haya van Somerenstichting", "Haya van Someren Stichting")
+            and not bz.noemt("trainer bij de VVD", "Haya van Someren Stichting"),
+            "een naam van meerdere woorden telt ook aaneengeschreven")
+        eis("Eén feit per bewering" in bz.OPDRACHT and "neutrale eigen woorden" in bz.OPDRACHT
+            and "BEIDE partijen" in bz.OPDRACHT, "de opdracht noemt de drie regels")
 
         print("\nALLE TESTS VAN DE AUTOMATISCHE BEOORDELING GESLAAGD")
 

@@ -54,7 +54,10 @@ ROLLEN = {
             "toetst of een voorstel klopt en past: (1) feiten kloppen (ga ze na op het web met "
             "WebSearch/WebFetch; verzin niets); (2) het past in de theorie en het model; (3) het "
             "is geen duplicaat of bijna-duplicaat van een bestaand element; (4) een nieuwe "
-            "definitie is helder en onderscheidend. 'akkoord' als het aan alles voldoet, anders "
+            "definitie is helder en onderscheidend; (5) de tekst neemt in eigen woorden geen "
+            "etiket of retoriek van één kant over ('ondermijnt het vertrouwen', "
+            "'rechts-populistisch', 'neoliberale consensus') en een voorbeeld over een genoemde "
+            "partij zegt wat die deed of zei. 'akkoord' als het aan alles voldoet, anders "
             "'afwijzen' met een concrete, controleerbare reden. Antwoord alleen met het JSON."),
     },
     "rfc-criticus": {
@@ -66,7 +69,8 @@ ROLLEN = {
             "werving). Hoe besluiten tot stand komen valt BINNEN het onderwerp. Je zoekt redenen "
             "om een voorstel af te wijzen: een duplicaat van een bestaand element, te vaag of "
             "niet onderscheidend, feitelijk onjuist (ga feiten na op het web met "
-            "WebSearch/WebFetch), of buiten het onderwerp van het model. Wijs alleen af met een "
+            "WebSearch/WebFetch), buiten het onderwerp van het model, of een tekst die in eigen "
+            "woorden een etiket of de retoriek van één kant overneemt. Wijs alleen af met een "
             "concrete, controleerbare reden; vind je die niet, dan 'akkoord'. Antwoord alleen "
             "met het JSON."),
     },

@@ -54,6 +54,11 @@ een tweede menselijke reviewer (de helft van de checks is een oordeel, geen meti
       verdienen agent-ratings nog hun (gecapte) gewicht?
 - [ ] Verlopen voorspellingen scoren (validator VOORSPELLING-DEADLINE) en het
       kalibratierapport draaien (`python3 scripts/voorspellingen.py`).
+- [ ] Eigen stem (2026-10-08): de teller NEUTRALITEIT-EIGEN-STEM (moet dalen) en een
+      steekproef van 20 stemtoets-oordelen uit `stem_toetsen` (neutraal én niet_neutraal):
+      klopt het oordeel, zegt de herformulering hetzelfde feit zonder oordeel?
+- [ ] Verbanden die "zonder bron" werden afgewezen (edit_log-reden "automatische beoordeling:
+      zonder bron"): steekproef — was er echt geen bron die dát verband draagt?
 - [ ] Afsluiten met een modelrelease (M3.1) waarvan de changelog de
       auditbevindingen samenvat.
 
