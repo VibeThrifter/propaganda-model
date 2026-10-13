@@ -14,6 +14,8 @@ Deterministisch, zonder LLM en zonder mens:
      aflopen, dan sluit de sync voor dat register niets af en meldt het (een kapotte of halve
      download mag het model niet leeghalen).
 Gebeurtenissen (geschenken, reizen) en de loopbaan lopen niet af; die blijven zoals ze zijn.
+  4. looptijd (2026-10-09): scripts/registers_looptijd.py zet het begin en eind dat elk record
+     noemt op verbanden die nog geen datum hebben, en legt vast waar het register geen begin noemt.
 
 Gepland via agent_schedule.py (wekelijks); los:
     python3 scripts/registers_sync.py [--droog] [--alleen oo,tk,ep,lobby] [--zonder-ophalen]
@@ -110,6 +112,12 @@ def indienen(bron: str, plan, rest, meld) -> dict:
 def geplande_verbanden(bron: str, plan, conn) -> set[tuple[int, int, str]]:
     """(bron_id, doel_id, type) van alles wat het plan van de nieuwste uitgave oplevert, voor
     zover de eindpunten al bestaan (na stap 2 is dat alles)."""
+    return set(geplande_relaties(bron, plan, conn))
+
+
+def geplande_relaties(bron: str, plan, conn) -> dict[tuple[int, int, str], dict]:
+    """Als geplande_verbanden, met per verband de planregel (recordsleutel, start, eind):
+    dezelfde koppeling als de import (externe id's, koppelingen), nooit op naam alleen."""
     ext = {(r["stelsel"], r["waarde"]): r["entity_id"] for r in conn.execute("SELECT * FROM externe_ids")}
 
     def eindpunt(ref):
@@ -126,11 +134,11 @@ def geplande_verbanden(bron: str, plan, conn) -> set[tuple[int, int, str]]:
         if soort == "persoon":
             return (plan.personen.get(w) or {}).get("bestaand")
         return None
-    uit = set()
+    uit: dict[tuple[int, int, str], dict] = {}
     for r in plan.relaties:
         s, t = eindpunt(r["bron"]), eindpunt(r["doel"])
         if s and t:
-            uit.add((s, t, r["type"]))
+            uit.setdefault((s, t, r["type"]), r)
     return uit
 
 
@@ -215,6 +223,12 @@ def draai(*, droog: bool = False, alleen=BRONNEN, ophalen_aan: bool = True, meld
             if status != 200:
                 u.setdefault("fouten", []).append(f"#{e['id']}: {status} {res.get('error')}")
         meld(f"{bron}: uitgave {uitgave}, {u.get('gepland')} gepland, {n_lopend} lopend, {len(eind)} afgelopen")
+        # 4. Looptijd: wat nieuw kwam (of nog geen datum had) krijgt het begin en eind uit zijn
+        #    record; noemt het register geen begin, dan wordt dat vastgelegd (2026-10-09)
+        import registers_looptijd  # noqa: PLC0415 — dat script importeert deze module
+        u["looptijd"] = registers_looptijd.draai(droog=droog, alleen=[bron], meld=meld,
+                                                 rest=check_rest,
+                                                 data_per_bron={bron: (uitgave, data)})[bron]
     return uitkomst
 
 

@@ -17,13 +17,21 @@ Standaard droog: toont de doelen. Met --indienen gaan ze via POST /api/nieuws/do
 'nieuws-agent', upsert op de sleutel: opnieuw draaien dubbelt niets). Alles wat de scout daarna
 indient, landt 'voorgesteld' en gaat langs de automatische beoordeling.
 
+Elk kwartaal opnieuw (eigenaar 2026-10-09: redacties veranderen, een nieuwe hoofdredacteur of
+een verslaggever die naar een partij overstapt): --periodiek zet alleen de doelen opnieuw in de
+wachtrij die meer dan --na-dagen (90) dagen geleden afgerond zijn ("opnieuw": true), en een doel
+dat er nog niet is. Een doel dat open of bezig is, blijft staan. agent_schedule.py draait dit
+dagelijks; meestal is er niets te doen.
+
 Gebruik:
     python3 scripts/nieuws_redactieleiding_doelen.py              # droog: toon de doelen
     python3 scripts/nieuws_redactieleiding_doelen.py --indienen   # zet ze in de wachtrij
+    python3 scripts/nieuws_redactieleiding_doelen.py --periodiek [--droog]  # alleen wat aan de beurt is
 """
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import re
 import sqlite3
@@ -38,6 +46,8 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 DEFAULT_API = "http://127.0.0.1:5000"
 DEFAULT_TOKEN = ROOT / "data" / "tokens" / "nieuws-agent.token"
 PRIORITEIT = 80.0  # boven de gewone namen uit het nieuws (± 70–75), onder spoed (≥ 90)
+NA_DAGEN = 90      # een afgerond doel komt na een kwartaal opnieuw
+AFGEROND = ("klaar", "niets_gevonden", "overgeslagen", "twijfel", "fout")
 
 # De acht hoofdbronnen van de nieuws-app (sinds 2026-10-07), met hun onderdelen in het model
 MEDIA = (
@@ -156,17 +166,61 @@ def post(api: str, token: str, body: dict) -> tuple[int, dict]:
             return e.code, {}
 
 
+def aan_de_beurt(conn, lijst: list[dict], na_dagen: int = NA_DAGEN,
+                 nu: datetime.datetime | None = None) -> list[dict]:
+    """De doelen die (opnieuw) in de wachtrij moeten: nog niet aanwezig, of afgerond en ouder
+    dan na_dagen. Elk krijgt "opnieuw": True als het al bestond."""
+    nu = nu or datetime.datetime.now()
+    stand = {r["sleutel"]: r for r in conn.execute(
+        "SELECT sleutel, status, bijgewerkt FROM nieuws_doelen WHERE sleutel LIKE 'redactieleiding:%'")}
+    uit = []
+    for d in lijst:
+        r = stand.get(d["sleutel"])
+        if r is None:
+            uit.append(d)
+            continue
+        if r["status"] not in AFGEROND:
+            continue
+        try:
+            bijgewerkt = datetime.datetime.fromisoformat(str(r["bijgewerkt"])[:19])
+        except ValueError:
+            continue
+        if (nu - bijgewerkt).days >= na_dagen:
+            uit.append({**d, "opnieuw": True})
+    return uit
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--api", default=DEFAULT_API)
     ap.add_argument("--token", default=str(DEFAULT_TOKEN))
     ap.add_argument("--indienen", action="store_true", help="echt in de wachtrij zetten")
+    ap.add_argument("--periodiek", action="store_true",
+                    help=f"alleen wat aan de beurt is (afgerond > --na-dagen geleden, of nieuw)")
+    ap.add_argument("--na-dagen", type=int, default=NA_DAGEN)
+    ap.add_argument("--droog", action="store_true", help="met --periodiek: niets indienen")
     args = ap.parse_args()
     conn = db()
     try:
         lijst = doelen(conn)
+        if args.periodiek:
+            lijst = aan_de_beurt(conn, lijst, args.na_dagen)
     finally:
         conn.close()
+    if args.periodiek:
+        if not lijst:
+            print("Redactieleiding: niets aan de beurt.")
+            return
+        if args.droog:
+            for d in lijst:
+                print(f"(droog) {d['sleutel']}{' — opnieuw' if d.get('opnieuw') else ''}")
+            return
+        token = Path(args.token).read_text().strip()
+        for d in lijst:
+            status, antwoord = post(args.api, token, d)
+            print(f"{d['sleutel']}{' (opnieuw)' if d.get('opnieuw') else ''}: {status} "
+                  f"{antwoord.get('error') or ''}".rstrip())
+        return
     if not args.indienen:
         for d in lijst:
             print(f"{d['sleutel']}: {d['naam']} (entiteit #{d['entity_id']}, "

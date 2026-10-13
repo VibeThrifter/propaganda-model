@@ -240,8 +240,9 @@ python3 scripts/scout_indienen.py data/scout/nieuws-<sleutel>.json --indienen \
   "X is woordvoerder van Y" — **geen** waarderende of beschuldigende taal over personen,
   geen motieven, geen "omstreden", "dubieus", "spilfiguur". De smaad-firewall houdt een
   negatieve persoonsclaim toch tegen; dien hem dus niet in.
-- Certainty/influence niet zetten (0,05-vloer). Datum (`active_from`/`active_until`)
-  alleen als de bron hem geeft.
+- Certainty/influence niet zetten (0,05-vloer). De looptijd wél: `active_from` (en
+  `active_until` als het voorbij is) is verplicht, uit de bron (zie § Looptijd); geen jaartal
+  gevonden → `zonder_jaar` met waar je zocht, nooit een gok.
 - **Sourcing-/invloedsverbanden** (iemand levert als expert aan media, lobbyt bij, …)
   alleen met een **gedocumenteerd patroon** (meerdere bronnen, niet één optreden); die
   blijven altijd mensenwerk (de autokeur raakt ze niet).
@@ -297,6 +298,16 @@ Voor alles wat je als bewering (claim), beschrijving of herformulering indient:
   medium; de bronchecker (v3) zegt dan `klopt-niet` ("gaat niet over …").
 - **Eén feit per argument**: een bestuursfunctie en een kandidatuur zijn twee argumenten, elk met
   een eigen bron die dát feit draagt. Een feit over een ánder verband hoort bij dat verband.
+
+## Looptijd: zonder jaartal geen verband (eigenaarsbesluit 2026-10-09)
+
+Elk verband dat je indient of onderbouwt, krijgt zijn looptijd: begin (`active_from`) en, als het
+voorbij is, einde (`active_until`), zo precies als de bron geeft (`JJJJ`, `JJJJ-MM`, `JJJJ-MM-DD`),
+met een citaat dat het jaartal noemt. Het begin van dít verband (benoeming, toetreding), niet de
+oprichting van de organisatie of de datum van het artikel. Vind je het echt niet: zeg waar je
+zocht (`zonder_jaar`) of laat het verband weg — nooit een geraden jaartal; de datumzoeker zoekt
+verder. Een datum bij een bestaand verband: een aspect-argument (`property` `active_from`/
+`active_until`, `property_value` de datum). Zie missies/README.md § Looptijd.
 
 ## Harde grenzen
 

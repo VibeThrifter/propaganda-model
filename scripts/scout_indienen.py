@@ -21,7 +21,10 @@ Manifest-schema:
                       "active_from", "active_until"}],
       "relaties":   [{"source", "target",          # int = bestaand DB-id, str = manifest-key
                       "relation_type", "mechanisme_id", "beschrijving",
-                      "active_from", "active_until",
+                      "active_from", "active_until",   # VERPLICHT: begin (en eind als voorbij)
+                      "zonder_jaar",                   # alleen als de bron echt geen begin geeft:
+                                                       # waar je zocht (komt in de log; de
+                                                       # datumzoeker zoekt daarna verder)
                       "argumenten": [{"claim", "stance", "bron",  # bron = manifest-key
                                       "quote", "property", "property_value"}]}],
       "argumenten": [{"doel": {"relation_id"|"entity_id"|"mechanism_id"|
@@ -261,6 +264,19 @@ class Indiener:
             if sid is None or tid is None:
                 continue
             rt = r["relation_type"]
+            # Looptijd (eigenaarsbesluit 2026-10-09): zonder jaartal geen verband — tenzij de
+            # scout uitlegt waar hij zocht ("zonder_jaar"); de goedkeurpoort wacht dan op de
+            # datumzoeker
+            if not str(r.get("active_from") or "").strip():
+                if not str(r.get("zonder_jaar") or "").strip():
+                    print(f"✗ relatie {self._naam(sid)} -{rt}-> {self._naam(tid)}: geen active_from "
+                          "— zoek het begin in de bron (of geef 'zonder_jaar' met waar je zocht); "
+                          "niet ingediend")
+                    self.stats["fouten"] = self.stats.get("fouten", 0) + 1
+                    self.stats["zonder_jaar_geweigerd"] = self.stats.get("zonder_jaar_geweigerd", 0) + 1
+                    continue
+                print(f"  ! zonder begin ({str(r['zonder_jaar']).strip()[:120]}) — de datumzoeker zoekt verder")
+                self.stats["zonder_jaar"] = self.stats.get("zonder_jaar", 0) + 1
             sleutel = (sid, tid, rt)
             if sleutel in self.relaties:
                 print(f"▸ relatie bestaat al: {self._naam(sid)} -{rt}-> {self._naam(tid)} — overgeslagen")

@@ -181,7 +181,7 @@ RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur",
 # Idem een stemtoets (2026-10-08): procesmetadata over de eigen stem, poort = niet de auteur.
 RATE_LIMIT_VRIJE_ENDPOINTS = {"nieuws_doelen_upsert", "nieuws_doelen_claim_volgende",
                               "nieuws_doelen_claim", "nieuws_doelen_patch", "nieuws_voorrang",
-                              "stemtoets_vastleggen"}
+                              "stemtoets_vastleggen", "looptijd_onderzoek_vastleggen"}
 
 
 def _rate_limit_ok(user) -> bool:
@@ -1455,6 +1455,13 @@ def create_argument():
                                  "root-argument vereist minstens één echte bron — een citaat "
                                  "met quote, óf een bron met vindplaats (locator). Geef die mee "
                                  "in 'citations' (source_id + quote, of een bron met url/doi/…)."}), 400
+
+    # Looptijd (2026-10-09): een datum-aspect zegt JJJJ, JJJJ-MM of JJJJ-MM-DD
+    if prop in ("active_from", "active_until") and prop_value is not None \
+            and not DATUM_RE.match(str(prop_value).strip()):
+        conn.close()
+        return jsonify({"error": f"property_value voor '{prop}' moet JJJJ, JJJJ-MM of "
+                                 "JJJJ-MM-DD zijn"}), 400
 
     # Classificatie-aspect 'mechanism': de voorgestelde mechanisme-ID moet bestaan.
     if prop == "mechanism" and not conn.execute(
@@ -3147,20 +3154,28 @@ def api_entity_register(eid):
     return jsonify({"entity_id": eid, "gewijzigd": gewijzigd})
 
 
+DATUM_RE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
+
+
 @app.route("/api/relations/<int:rid>/looptijd", methods=["POST"])
 @require_user()
 def api_relation_looptijd(rid):
-    """Een registerfeit loopt af (Uitbreiding C, scripts/registers_sync.py): het register noemt
-    het ambt, de nevenfunctie of de toegangspas niet meer. Zet alleen `active_until` (vult wat
-    leeg is; een andere einddatum overschrijft het niet), alleen voor een verband dat een
-    registercitatie draagt, alleen door het account `registercheck` of een maintainer, en altijd
-    met de reden (welke uitgave, welk record) in edit_log. Terug te draaien door een maintainer."""
+    """De looptijd van een registerfeit volgens het register (Uitbreiding C; eigenaarsbesluit
+    2026-10-09 "vul bij alles de goede jaartallen in"): `active_from` (scripts/
+    registers_looptijd.py: het begin dat het record zelf noemt) en/of `active_until`
+    (scripts/registers_sync.py: het register noemt het ambt, de nevenfunctie of de toegangspas
+    niet meer). Vult alleen wat leeg is; een andere datum overschrijft het niet (409-achtige
+    400 met de bestaande waarde), dezelfde datum is een no-op. Alleen voor een verband dat een
+    registercitatie draagt, alleen door het account `registercheck` of een maintainer, en
+    altijd met de reden (welke uitgave, welk record) in edit_log. Terug te draaien door een
+    maintainer."""
     data = request.json or {}
     conn = get_db()
     if g.user["username"] != "registercheck" and not heeft_rol(conn, g.user, "maintainer"):
         conn.close()
         return jsonify({"error": "alleen de registercheck of een maintainer"}), 403
-    rel = conn.execute("SELECT id, active_until, vervangen FROM relations WHERE id = ?", (rid,)).fetchone()
+    rel = conn.execute("SELECT id, active_from, active_until, vervangen FROM relations WHERE id = ?",
+                       (rid,)).fetchone()
     if not rel or rel["vervangen"]:
         conn.close()
         return jsonify({"error": "verband niet gevonden"}), 404
@@ -3169,29 +3184,42 @@ def api_relation_looptijd(rid):
         JOIN sources s ON s.id = c.source_id
         WHERE a.relation_id = ? AND c.methode = 'officieel_register_scrape'
           AND COALESCE(s.cluster_key, '') LIKE 'register:%' LIMIT 1""", (rid,)).fetchone()
-    tot = (data.get("active_until") or "").strip()
+    velden = {k: (data.get(k) or "").strip() for k in ("active_from", "active_until")}
+    velden = {k: v for k, v in velden.items() if v}
     reden = (data.get("reden") or "").strip()
     fout = None
     if not uit_register:
         fout = "alleen voor een verband uit een register (registercitatie)"
-    elif not re.match(r"^\d{4}(-\d{2}(-\d{2})?)?$", tot):
-        fout = "active_until moet JJJJ, JJJJ-MM of JJJJ-MM-DD zijn"
+    elif not velden:
+        fout = "geef active_from en/of active_until"
+    elif any(not DATUM_RE.match(v) for v in velden.values()):
+        fout = "een datum moet JJJJ, JJJJ-MM of JJJJ-MM-DD zijn"
     elif not reden:
         fout = "reden is verplicht (welke uitgave, welk record)"
-    elif rel["active_until"]:
-        fout = f"het verband heeft al een einddatum ({rel['active_until']})"
+    else:
+        for k, v in velden.items():
+            if rel[k] and rel[k] != v:
+                fout = f"het verband heeft al een {'begin' if k == 'active_from' else 'einddatum'} ({rel[k]})"
+        van = velden.get("active_from") or rel["active_from"]
+        tot = velden.get("active_until") or rel["active_until"]
+        if not fout and van and tot and van[:len(tot)] > tot[:len(van)]:
+            fout = f"het begin ({van}) ligt na het einde ({tot})"
     if fout:
         conn.close()
         return jsonify({"error": fout}), 400
-    conn.execute("UPDATE relations SET active_until = ? WHERE id = ?", (tot, rid))
-    conn.execute("""
-        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
-        VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
-    """, (rid, g.user["username"], json.dumps({"active_until": None}), json.dumps({"active_until": tot}),
-          f"registers-sync: {reden}"[:300]))
-    conn.commit()
+    nieuw = {k: v for k, v in velden.items() if rel[k] != v}
+    if nieuw:
+        conn.execute(f"UPDATE relations SET {', '.join(f'{k} = ?' for k in nieuw)} WHERE id = ?",  # noqa: S608 - vaste kolomnamen
+                     (*nieuw.values(), rid))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+        """, (rid, g.user["username"], json.dumps({k: rel[k] for k in nieuw}), json.dumps(nieuw),
+              f"{'register-looptijd' if 'active_from' in nieuw else 'registers-sync'}: {reden}"[:300]))
+        conn.commit()
     conn.close()
-    return jsonify({"id": rid, "active_until": tot})
+    return jsonify({"id": rid, **{k: velden.get(k) or rel[k] for k in ("active_from", "active_until")},
+                    "gewijzigd": sorted(nieuw)})
 
 
 @app.route("/api/entities", methods=["POST"])
@@ -7557,7 +7585,39 @@ def _bewijs_relatie_redenen(conn, rid):
     """, (rid,)).fetchone()[0]
     if n_tegen:
         redenen.append("er ligt een gemerged tegenargument op deze relatie")
+    looptijd = looptijd_reden(conn, rid)
+    if looptijd:
+        redenen.append(looptijd)
     return redenen
+
+
+def _looptijd_poort_aan():
+    return os.environ.get("PROPAGANDA_LOOPTIJD_POORT", "1") != "0"
+
+
+def looptijd_reden(conn, rid):
+    """Eigenaarsbesluit 2026-10-09 ("het model kijkt per tijdsvak … zorg dat dit overal wordt
+    gehandhaafd"): een verband wordt pas goedgekeurd met zijn begin (active_from). Uitzonderingen:
+    een registerfeit (het register is de bron van de datum; heeft het register er geen, dan zoekt
+    de datumzoeker verder zonder de import op te houden) en een verband waarvoor de datumzoeker
+    aantoonbaar zocht en niets vond (looptijd_onderzoek 'niets_gevonden'). → reden of None.
+    Kill-switch PROPAGANDA_LOOPTIJD_POORT=0."""
+    if not _looptijd_poort_aan():
+        return None
+    rij = conn.execute("SELECT active_from FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rij is None or (rij["active_from"] or "").strip():
+        return None
+    if _registerelement(conn, "relations", rid):
+        return None
+    try:
+        onderzoek = conn.execute("SELECT status FROM looptijd_onderzoek WHERE relation_id = ?",
+                                 (rid,)).fetchone()
+    except sqlite3.OperationalError:  # database van vóór de looptijdregel
+        return None
+    if onderzoek is not None and onderzoek["status"] == "niets_gevonden":
+        return None
+    return ("nog geen looptijd: het begin (active_from) ontbreekt — de datumzoeker zoekt het; "
+            "zonder jaartal geen verband")
 
 
 def _bewijs_entiteit_redenen(conn, eid):
@@ -8596,6 +8656,197 @@ def beoordeling_bron_dubbel(sid):
     conn.commit()
     conn.close()
     return jsonify({"samengevoegd": True, "id": sid, "blijft": blijvend, **uit["verhuisd"]}), 200
+
+
+# ── Looptijd van een verband (eigenaarsbesluit 2026-10-09: "vul bij alles de goede jaartallen
+# in he want het model kijkt gewoon per tijdsvak wat de relaties zijn") ──
+# Wat een register niet geeft, zoekt de datumzoeker (scripts/datumzoeker.py, account
+# `datumzoeker`): eerst in de eigen bronnen van het verband, dan op het web. Hij dient een
+# aspect-argument in (property active_from/active_until, property_value = JJJJ[-MM[-DD]], met
+# een letterlijk citaat). De bronchecker (A1, een ander account) toetst het; zegt die 'klopt',
+# dan zet de automatische beoordeling de datum hier op het verband (merge-service) en merget het
+# argument. Nooit een datum overschrijven: alleen wat leeg is. Vond de datumzoeker niets, dan
+# legt hij dat vast (looptijd_onderzoek 'niets_gevonden'): de enige reden waarom een verband
+# zonder begin goedgekeurd mag worden of mag blijven (looptijd_reden, RELATIE-ZONDER-JAAR).
+LOOPTIJD_VELDEN = ("active_from", "active_until")
+LOOPTIJD_STATUSSEN = ("gezocht", "gevonden", "niets_gevonden", "fout", "register_zonder_datum")
+# Wie zoekwerk vastlegt: de datumzoeker, en de registercheck voor registerfeiten waarvan het
+# register zelf geen begin noemt ("register_zonder_datum": de uitgave zegt alleen dat het
+# verband op die dag liep — dat is géén begin, dus active_from blijft leeg)
+LOOPTIJD_ACCOUNTS = {"datumzoeker": ("gezocht", "niets_gevonden", "fout"),
+                     "registercheck": ("register_zonder_datum",)}
+LOOPTIJD_REDEN_PREFIX = BEOORDELING_REDEN_PREFIX + ": looptijd"
+LOOPTIJD_PLAFOND_DEFAULT = 300
+
+
+@app.route("/api/looptijd_onderzoek", methods=["POST"])
+@require_user()
+def looptijd_onderzoek_vastleggen():
+    """{relation_id, status, detail?}: het zoekwerk per verband vastleggen. De datumzoeker:
+    gezocht|niets_gevonden|fout; de registercheck: register_zonder_datum (met de uitgave in
+    detail); een maintainer: elk van die. Elke melding telt als poging. 'gevonden' zet alleen
+    de beoordeling (bij het toepassen). Procesmetadata."""
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    gebruiker = g.user["username"]
+    mag = (("gezocht", "niets_gevonden", "fout", "register_zonder_datum")
+           if heeft_rol(conn, g.user, "maintainer") else LOOPTIJD_ACCOUNTS.get(gebruiker, ()))
+    if not mag:
+        conn.close()
+        return jsonify({"error": "alleen de datumzoeker, de registercheck of een maintainer"}), 403
+    rid = data.get("relation_id")
+    status = data.get("status")
+    if isinstance(rid, bool) or not isinstance(rid, int) or rid <= 0:
+        conn.close()
+        return jsonify({"error": "relation_id moet een positief geheel getal zijn"}), 400
+    if status not in mag:
+        conn.close()
+        return jsonify({"error": f"status moet een van {list(mag)} zijn"}), 400
+    if conn.execute("SELECT 1 FROM relations WHERE id = ?", (rid,)).fetchone() is None:
+        conn.close()
+        return jsonify({"error": f"verband #{rid} niet gevonden"}), 404
+    detail = (data.get("detail") or "").strip()[:1000] or None
+    nu = datetime.datetime.now().isoformat(timespec="seconds")
+    oud = conn.execute("SELECT status FROM looptijd_onderzoek WHERE relation_id = ?", (rid,)).fetchone()
+    conn.execute("""INSERT INTO looptijd_onderzoek (relation_id, status, pogingen, laatste_poging, detail, door)
+                    VALUES (?, ?, 1, ?, ?, ?)
+                    ON CONFLICT(relation_id) DO UPDATE SET status = excluded.status,
+                      pogingen = pogingen + 1, laatste_poging = excluded.laatste_poging,
+                      detail = excluded.detail, door = excluded.door""",
+                 (rid, status, nu, detail, g.user["username"]))
+    conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+                    VALUES ('looptijd_onderzoek', ?, ?, ?, ?, ?, ?)""",
+                 (rid, "updated" if oud else "created", g.user["username"],
+                  json.dumps({"status": oud["status"]}) if oud else None,
+                  json.dumps({"status": status}), f"looptijd: {status}"[:300]))
+    conn.commit()
+    conn.close()
+    return jsonify({"relation_id": rid, "status": status}), 200 if oud else 201
+
+
+def _jaar(waarde):
+    m = re.match(r"^(\d{4})", waarde or "")
+    return m.group(1) if m else None
+
+
+def looptijd_besluit(conn, arg_id):
+    """Mag de automatische beoordeling de datum uit dit aspect-argument op zijn verband zetten?
+    → (ok, redenen, {veld, waarde, relation_id})."""
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if arg is None:
+        return False, ["niet gevonden"], {}
+    veld, waarde, rid = arg["property"], (arg["property_value"] or "").strip(), arg["relation_id"]
+    info = {"veld": veld, "waarde": waarde, "relation_id": rid}
+    redenen = []
+    if veld not in LOOPTIJD_VELDEN or arg["parent_argument_id"] is not None or not rid:
+        return False, ["geen looptijd-argument (root op een verband met property "
+                       "active_from/active_until)"], info
+    if arg["status"] != "voorgesteld" or arg["vervangen"]:
+        redenen.append(f"status is '{arg['status']}'{' (vervangen)' if arg['vervangen'] else ''}, "
+                       "niet 'voorgesteld'")
+    if arg["stance"] != "supporting":
+        redenen.append("alleen een steunend argument zet een datum")
+    if not DATUM_RE.match(waarde):
+        redenen.append("property_value moet JJJJ, JJJJ-MM of JJJJ-MM-DD zijn")
+    else:
+        jaar = int(waarde[:4])
+        if not 1800 <= jaar <= datetime.datetime.now().year or waarde > datetime.datetime.now().date().isoformat()[:len(waarde)]:
+            redenen.append(f"onmogelijke datum {waarde}")
+        if waarde[:4] not in (arg["claim"] or ""):
+            redenen.append(f"de bewering noemt het jaar {waarde[:4]} niet")
+        quotes = [r["quote"] or "" for r in conn.execute(
+            "SELECT quote FROM citations WHERE argument_id = ?", (arg_id,))]
+        if not any(waarde[:4] in q for q in quotes):
+            redenen.append(f"geen citaat noemt het jaar {waarde[:4]}")
+    a1 = conn.execute("""SELECT verdict, door FROM immuun_oordelen WHERE argument_id = ?
+                         AND fase = 'herverificatie' ORDER BY created_at DESC, id DESC LIMIT 1""",
+                      (arg_id,)).fetchone()
+    if a1 is None:
+        redenen.append("wacht op A1 (bronchecker)")
+    elif a1["door"] == arg["contributed_by"]:
+        redenen.append("A1 is van de auteur zelf")
+    elif a1["verdict"] != "klopt":
+        redenen.append(f"A1 zegt '{a1['verdict']}'")
+    if _stemtoets_vereist(conn, arg):
+        stem = _stemtoets(conn, "argument", arg_id, arg["contributed_by"], arg["claim"])
+        if stem is None:
+            redenen.append("wacht op de stemtoets")
+        elif stem["verdict"] != "neutraal":
+            redenen.append("stemtoets: niet neutraal")
+    rel = conn.execute("SELECT status, vervangen, active_from, active_until FROM relations WHERE id = ?",
+                       (rid,)).fetchone()
+    if rel is None or rel["vervangen"] or rel["status"] not in ("goedgekeurd", "voorgesteld"):
+        redenen.append("het verband is er niet (meer)")
+    elif (rel[veld] or "").strip():
+        redenen.append(f"het verband heeft al {veld} = {rel[veld]} (nooit overschrijven)")
+    elif DATUM_RE.match(waarde):
+        van = waarde if veld == "active_from" else (rel["active_from"] or "")
+        tot = waarde if veld == "active_until" else (rel["active_until"] or "")
+        if van and tot and van[:len(tot)] > tot[:len(van)]:
+            redenen.append(f"het begin ({van}) ligt na het einde ({tot})")
+    return not redenen, redenen, info
+
+
+def _looptijd_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_LOOPTIJD_PLAFOND", LOOPTIJD_PLAFOND_DEFAULT)))
+    except ValueError:
+        return LOOPTIJD_PLAFOND_DEFAULT
+
+
+@app.route("/api/beoordeling/looptijd/<int:arg_id>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_looptijd(arg_id):
+    """De datum van een gecontroleerd looptijd-argument op zijn verband zetten (merge-service;
+    GET = droogloop). Zet alleen een leeg veld, logt oud/nieuw in edit_log (terug te draaien
+    door een maintainer) en merget het argument. Kill-switch → 503, dagplafond → 429, niet
+    toegestaan → 409 + redenen."""
+    conn = get_db()
+    ok, redenen, info = looptijd_besluit(conn, arg_id)
+    if redenen == ["niet gevonden"]:
+        conn.close()
+        return jsonify({"error": "Argument niet gevonden"}), 404
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"id": arg_id, "toegestaan": ok, "redenen": redenen, **info})
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        conn.close()
+        return jsonify({"gezet": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    vandaag = conn.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name = 'relations'
+                              AND reason LIKE ?
+                              AND date(created_at, 'localtime') = date('now', 'localtime')""",
+                           (LOOPTIJD_REDEN_PREFIX + "%",)).fetchone()[0]
+    if vandaag >= _looptijd_plafond():
+        conn.close()
+        return jsonify({"gezet": False,
+                        "error": f"dagplafond bereikt ({vandaag}/{_looptijd_plafond()})"}), 429
+    if not ok:
+        conn.close()
+        return jsonify({"gezet": False, "redenen": redenen}), 409
+    veld, waarde, rid = info["veld"], info["waarde"], info["relation_id"]
+    conn.execute(f"UPDATE relations SET {veld} = ? WHERE id = ?", (waarde, rid))  # noqa: S608 - veld uit LOOPTIJD_VELDEN
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+    """, (rid, g.user["username"], json.dumps({veld: None}), json.dumps({veld: waarde}),
+          f"{LOOPTIJD_REDEN_PREFIX} uit argument #{arg_id} (A1 klopt)"))
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    _merge_core(conn, arg, g.user["username"],
+                reason=f"{LOOPTIJD_REDEN_PREFIX}: {veld} = {waarde} op verband #{rid}")
+    if veld == "active_from":
+        try:
+            conn.execute("""INSERT INTO looptijd_onderzoek (relation_id, status, pogingen, laatste_poging, detail, door)
+                            VALUES (?, 'gevonden', 0, ?, ?, ?)
+                            ON CONFLICT(relation_id) DO UPDATE SET status = 'gevonden',
+                              detail = excluded.detail""",
+                         (rid, datetime.datetime.now().isoformat(timespec="seconds"),
+                          f"{veld} = {waarde} uit argument #{arg_id}", g.user["username"]))
+        except sqlite3.OperationalError:
+            pass
+    conn.commit()
+    conn.close()
+    return jsonify({"gezet": True, "relation_id": rid, "veld": veld, "waarde": waarde}), 200
 
 
 # ── Mechanisme voor een kandidaat-verband (2026-10-06: agents doen alles) ──

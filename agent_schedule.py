@@ -85,6 +85,14 @@ AGENTS = [
      "spec": ["scripts/registers_sync.py"], "timeout": 5400,
      "omschrijving": "Registers bijwerken: nieuwe uitgaven, nieuwe ambten en functies, afgelopen ambten",
      "default": {"eenheid": "dag", "elke": 7, "aan": True}},
+    # Eigenaar 2026-10-09: de redactieleiding van de acht hoofdbronnen en hun partijbanden elk
+    # kwartaal opnieuw laten uitzoeken (redacties veranderen). Dagelijks gecontroleerd; zet
+    # alleen doelen in nieuws_doelen die > 90 dagen geleden afgerond zijn (de nieuws-scout pakt
+    # ze op). Geen claude.
+    {"naam": "redactieleiding", "label": "redactieleiding", "soort": "script",
+     "spec": ["scripts/nieuws_redactieleiding_doelen.py", "--periodiek"], "timeout": 300,
+     "omschrijving": "Redactieleiding van de hoofdbronnen elk kwartaal opnieuw in de wachtrij",
+     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
     # Uit: geen onderdeel van de beoordeling (inhoud en meters). Aan te zetten op /beheer.
     {"naam": "monitor", "label": "monitor-agent", "soort": "runner",
      "spec": ["--agent", "monitor-agent", "--label", "monitor-agent",

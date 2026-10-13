@@ -988,6 +988,19 @@ CREATE TABLE stem_toetsen (
     UNIQUE(soort, doel_id, door)
 );
 
+-- Looptijd (eigenaarsbesluit 2026-10-09): het zoekwerk van de datumzoeker per verband.
+-- Procesmetadata, telt nergens mee. 'niets_gevonden' is de enige reden waarom een
+-- verband zonder begin goedgekeurd mag worden (en blijft) — zie looptijd_besluit.
+CREATE TABLE looptijd_onderzoek (
+    relation_id INTEGER PRIMARY KEY,      -- bewust geen FK (zoals nieuws_voorrang)
+    status TEXT NOT NULL CHECK(status IN ('gezocht', 'gevonden', 'niets_gevonden', 'fout',
+                                     'register_zonder_datum')),
+    pogingen INTEGER NOT NULL DEFAULT 0,
+    laatste_poging TEXT NOT NULL,         -- lokale ISO-tekst
+    detail TEXT,                          -- wat er gezocht/gevonden is (kort)
+    door TEXT REFERENCES users(username)
+);
+
 --------------------------------------------------------------
 -- INDEXEN
 --------------------------------------------------------------

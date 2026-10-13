@@ -99,6 +99,33 @@ Voor alles wat je als bewering (claim), beschrijving of herformulering indient:
 - **Eén feit per argument**: een bestuursfunctie en een kandidatuur zijn twee argumenten, elk met
   een eigen bron die dát feit draagt. Een feit over een ánder verband hoort bij dat verband.
 
+## Looptijd: elk verband krijgt zijn jaartallen (eigenaarsbesluit 2026-10-09)
+
+"Vul bij alles de goede jaartallen in he want het model kijkt gewoon per tijdsvak wat de
+relaties zijn.. zorg ook dat dit overal wordt gehandhaafd en dat alle agents dit weten want wordt
+vaak overgeslagen." De tijdbalk, de nieuws-app en de routes lezen een verband per periode: een
+verband zonder begin staat altijd en overal "aan".
+
+- **Elk verband krijgt zijn looptijd**: `active_from` (begin) en, als het voorbij is,
+  `active_until` (einde), zo precies als de bron geeft (`JJJJ`, `JJJJ-MM` of `JJJJ-MM-DD`; nooit
+  preciezer dan de bron). Met bron: het citaat noemt het jaartal. **Zonder jaartal geen
+  verband.**
+- **Het begin van dít verband**: de benoeming, de toetreding, de eerste opdracht. Niet de
+  oprichting van de organisatie, niet de publicatiedatum van het artikel, niet een ander ambt van
+  dezelfde persoon. "In 2019 was hij al …" is geen begin.
+- **Voorbij = einde invullen**: een vertrek, een afgelopen termijn, een opgeheven organisatie.
+  Een verband dat niet meer loopt zonder einde, is een fout in de tijdbalk.
+- **Vind je echt geen begin**: dien het verband in met `zonder_jaar` (scripts/scout_indienen.py:
+  waar je zocht) of laat het weg; nooit een geraden jaartal. De goedkeurpoort (`looptijd_reden`)
+  laat een verband zonder begin pas door nadat de datumzoeker (`scripts/datumzoeker.py`, account
+  `datumzoeker`) aantoonbaar zocht en niets vond (`looptijd_onderzoek`); de controle
+  `RELATIE-ZONDER-JAAR` (geratchet) houdt dat bij.
+- **Een datum bij een bestaand verband**: een aspect-argument (`property` `active_from` of
+  `active_until`, `property_value` de datum, letterlijk citaat dat het jaartal noemt). De
+  bronchecker toetst het; de automatische beoordeling zet de datum alleen in een leeg veld.
+- **Registers** geven hun datums zelf (`scripts/registers_looptijd.py`): noemt een register geen
+  begin, dan staat dat vastgelegd en wordt er niets verzonnen.
+
 ## Accounts
 
 | Account | Rol | Brief | Mag niet |

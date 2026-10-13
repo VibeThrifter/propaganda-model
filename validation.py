@@ -782,6 +782,36 @@ def check_eigen_stem(conn):
         "herschrijft wat er staat; deze geratchete fout houdt nieuwe buiten.")]
 
 
+def check_looptijd(conn):
+    """RELATIE-ZONDER-JAAR (fout, geratchet; eigenaarsbesluit 2026-10-09: "vul bij alles de
+    goede jaartallen in … het model kijkt per tijdsvak wat de relaties zijn"): goedgekeurde
+    verbanden zonder begin (active_from) waarvoor niemand aantoonbaar zocht. Een verband mag
+    alleen zonder begin blijven als de datumzoeker niets vond ('niets_gevonden') of het register
+    zelf geen begin noemt ('register_zonder_datum'); beide staan in looptijd_onderzoek. De
+    datumzoeker werkt de rest af; de ratchet houdt nieuwe buiten (en de goedkeurpoort
+    looptijd_reden in server.py laat ze niet meer toe)."""
+    try:
+        conn.execute("SELECT 1 FROM looptijd_onderzoek LIMIT 1")
+        uitgezocht = ("AND NOT EXISTS (SELECT 1 FROM looptijd_onderzoek o WHERE o.relation_id = r.id "
+                      "AND o.status IN ('niets_gevonden', 'register_zonder_datum'))")
+    except sqlite3.OperationalError:
+        uitgezocht = ""
+    rijen = conn.execute(f"""
+        SELECT r.id, s.name AS bron, r.relation_type, t.name AS doel FROM relations r
+        JOIN entities s ON s.id = r.source_id JOIN entities t ON t.id = r.target_id
+        WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
+          AND TRIM(COALESCE(r.active_from, '')) = '' {uitgezocht}
+        ORDER BY r.id""").fetchall()  # noqa: S608 - vaste SQL
+    return [_bevinding(
+        "RELATIE-ZONDER-JAAR", "Goedgekeurde verbanden zonder begin (en zonder vastgelegde zoektocht)",
+        "fout", [f"relatie #{r['id']}: {r['bron']} — {r['relation_type']} — {r['doel']}" for r in rijen],
+        "Elk verband draagt zijn looptijd: begin (active_from) en, als het voorbij is, einde "
+        "(active_until), zo precies als de bron geeft. De datumzoeker (scripts/datumzoeker.py) "
+        "zoekt wat ontbreekt; registerfeiten krijgen hun datum uit het record "
+        "(scripts/registers_looptijd.py). Zonder jaartal blijft alleen wat aantoonbaar is "
+        "uitgezocht (looptijd_onderzoek).")]
+
+
 # ── Schema-pariteit (Z9) ─────────────────────────────────────
 
 def _strip_sql_commentaar(sql):
@@ -1278,6 +1308,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_immuunsysteem(conn)
     bevindingen += check_neutraliteit(conn)
     bevindingen += check_eigen_stem(conn)
+    bevindingen += check_looptijd(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)

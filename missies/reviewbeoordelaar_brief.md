@@ -201,6 +201,16 @@ Twee vragen horen sinds 2026-10-08 bij elk oordeel over een argument op een verb
   in de eigen woorden van de bewering is geen feit dat een bron kan dragen; dat toetst de
   stemtoets (`scripts/stemtoets.py`), niet jij — maar noem het in je detail als je het ziet.
 
+## Looptijd: zonder jaartal geen verband (eigenaarsbesluit 2026-10-09)
+
+Elk verband dat je indient of onderbouwt, krijgt zijn looptijd: begin (`active_from`) en, als het
+voorbij is, einde (`active_until`), zo precies als de bron geeft (`JJJJ`, `JJJJ-MM`, `JJJJ-MM-DD`),
+met een citaat dat het jaartal noemt. Het begin van dít verband (benoeming, toetreding), niet de
+oprichting van de organisatie of de datum van het artikel. Vind je het echt niet: zeg waar je
+zocht (`zonder_jaar`) of laat het verband weg — nooit een geraden jaartal; de datumzoeker zoekt
+verder. Een datum bij een bestaand verband: een aspect-argument (`property` `active_from`/
+`active_until`, `property_value` de datum). Zie missies/README.md § Looptijd.
+
 ## Harde grenzen
 
 - **Geen token, geen schrijfacties.** Nooit status zetten, nooit mergen, nooit

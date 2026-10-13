@@ -539,6 +539,38 @@ def main():
         uit = registers_sync.draai(alleen=["oo"], ophalen_aan=False, meld=print,
                                    rest=rest_voor(tokens["register-import"]), check_rest=rest_voor(tokens["registercheck"]))
         eis("onderbreker" in uit["oo"], f"een halve uitgave haalt het model niet leeg: {uit['oo'].get('onderbreker')}")
+
+        print("11. Looptijd uit het record (eigenaarsbesluit 2026-10-09)")
+        import registers_looptijd
+        pad.write_text(fixture_xml(), encoding="utf-8")
+        (oo.MAP / "exportOO_2026-01-08.sha256").write_text(common.sha256_bestand(pad) + "\n")
+        oo._CACHE.clear() if hasattr(oo, "_CACHE") else None
+        heinen = conn.execute("""SELECT r.id, r.active_from FROM relations r JOIN entities e ON e.id = r.source_id
+            WHERE e.name = 'Eelco Heinen' AND r.relation_type = 'ambt'""").fetchone()
+        eis(heinen["active_from"] == "2024-07-02", "de import geeft een ambt het begin uit het record")
+        conn.execute("UPDATE relations SET active_from = NULL WHERE id = ?", (heinen["id"],))  # een oude import
+        conn.commit()
+        uit = registers_looptijd.draai(alleen=["oo"], meld=print, rest=rest_voor(tokens["registercheck"]))
+        eis(uit["oo"]["gezet"] >= 1 and not uit["oo"]["fouten"], f"backfill: {uit['oo']}")
+        eis(conn.execute("SELECT active_from FROM relations WHERE id = ?", (heinen["id"],)).fetchone()[0]
+            == "2024-07-02", "een verband zonder datum krijgt het begin uit zijn eigen record terug")
+        eis(conn.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name = 'relations' AND record_id = ?
+            AND reason LIKE 'register-looptijd:%' AND old_value LIKE '%null%'""", (heinen["id"],)).fetchone()[0] == 1,
+            "met oud/nieuw en de uitgave in edit_log")
+        partij = conn.execute("""SELECT r.id FROM relations r JOIN entities e ON e.id = r.target_id
+            WHERE e.name = 'Eelco Heinen' AND r.relation_type = 'lidmaatschap'""").fetchone()[0]
+        eis(conn.execute("SELECT active_from FROM relations WHERE id = ?", (partij,)).fetchone()[0] is None
+            and conn.execute("SELECT status FROM looptijd_onderzoek WHERE relation_id = ?", (partij,)).fetchone()[0]
+            == "register_zonder_datum",
+            "noemt het register geen begin (de partij van een minister), dan geen nep-begin maar een vastgelegde stand")
+        uit = registers_looptijd.draai(alleen=["oo"], meld=print, rest=rest_voor(tokens["registercheck"]))
+        eis(uit["oo"]["gezet"] == 0 and uit["oo"]["zonder_datum"] == 0, "een tweede run doet niets (idempotent)")
+        r = client.post(f"/api/relations/{heinen['id']}/looptijd", json={"active_from": "2020", "reden": "x"},
+                        headers={"Authorization": f"Bearer {tokens['registercheck']}"})
+        eis(r.status_code == 400, "een datum wordt nooit overschreven")
+        r = client.post(f"/api/relations/{heinen['id']}/looptijd", json={"active_from": "2024-07-02", "reden": "x"},
+                        headers={"Authorization": f"Bearer {tokens['registercheck']}"})
+        eis(r.status_code == 200 and r.get_json()["gewijzigd"] == [], "dezelfde datum is een no-op")
         conn.close()
     print("\nRegisterpijplijn: alles groen.")
 

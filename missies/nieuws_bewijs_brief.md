@@ -251,6 +251,16 @@ Voor alles wat je als bewering (claim), beschrijving of herformulering indient:
 - **Eén feit per argument**: een bestuursfunctie en een kandidatuur zijn twee argumenten, elk met
   een eigen bron die dát feit draagt. Een feit over een ánder verband hoort bij dat verband.
 
+## Looptijd: zonder jaartal geen verband (eigenaarsbesluit 2026-10-09)
+
+Elk verband dat je indient of onderbouwt, krijgt zijn looptijd: begin (`active_from`) en, als het
+voorbij is, einde (`active_until`), zo precies als de bron geeft (`JJJJ`, `JJJJ-MM`, `JJJJ-MM-DD`),
+met een citaat dat het jaartal noemt. Het begin van dít verband (benoeming, toetreding), niet de
+oprichting van de organisatie of de datum van het artikel. Vind je het echt niet: zeg waar je
+zocht (`zonder_jaar`) of laat het verband weg — nooit een geraden jaartal; de datumzoeker zoekt
+verder. Een datum bij een bestaand verband: een aspect-argument (`property` `active_from`/
+`active_until`, `property_value` de datum). Zie missies/README.md § Looptijd.
+
 ## Harde grenzen
 
 - Nooit mergen, goedkeuren, afwijzen, classificeren of verwijderen. Je hebt er het token

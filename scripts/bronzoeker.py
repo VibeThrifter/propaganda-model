@@ -107,8 +107,9 @@ SYSTEM_PROMPT = (
     "in neutrale eigen woorden: wie deed of zei wat, wanneer, in welke functie — geen oordeel "
     "over gevolgen of motieven ('ondermijnt het vertrouwen', 'bedreiging'), geen etiket "
     "('populistisch', 'extreemrechts', 'linkse media', 'neoliberale consensus') en geen retoriek "
-    "van één kant; zo'n oordeel alleen als citaat met de naam van wie het uitsprak. Antwoord "
-    "alleen met het gevraagde JSON."
+    "van één kant; zo'n oordeel alleen als citaat met de naam van wie het uitsprak. Noemt de "
+    "bron wanneer het verband begon (of eindigde), zet dat jaartal dan in de bewering en het "
+    "citaat: het model kijkt per tijdsvak (looptijd). Antwoord alleen met het gevraagde JSON."
 )
 SCHEMA = {
     "type": "object",

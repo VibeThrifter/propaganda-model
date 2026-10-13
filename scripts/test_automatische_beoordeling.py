@@ -234,6 +234,8 @@ def main():
     os.environ["PROPAGANDA_AUTOMATISCHE_BEOORDELING"] = "1"
     # Stap 3–22 toetsen de poorten van vóór de stemtoets; stap 23 zet haar aan
     os.environ["PROPAGANDA_STEMTOETS"] = "0"
+    # De looptijdpoort (2026-10-09) toetst scripts/test_datumzoeker.py; hier de oude poorten
+    os.environ["PROPAGANDA_LOOPTIJD_POORT"] = "0"
     test_helpers()
     test_storing_en_plafond()
     with tempfile.TemporaryDirectory() as tmp:
@@ -854,7 +856,9 @@ def main():
         wachtrij = {r["id"] for r in ab.a2_wachtrij(c)}
         toetsbaar = {r["id"] for r in sm.kandidaten(c)}
         c.close()
-        eis(aspect in wachtrij, "ook een aspect (sinds wanneer) wacht op de aanklager")
+        # Sinds 2026-10-09: een looptijd (sinds wanneer) is een datum uit een bron; A1 volstaat en
+        # stap 10c zet hem (test_datumzoeker.py) — geen aanklager
+        eis(aspect not in wachtrij, "een looptijd-aspect (sinds wanneer) wacht niet op de aanklager")
         eis(p_wacht not in wachtrij and p_wacht in toetsbaar,
             "een persoonsclaim gaat eerst langs de smaadtoets, pas daarna naar de aanklager")
         eis(structuurfeit not in toetsbaar and structuurfeit not in wachtrij,

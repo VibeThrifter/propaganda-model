@@ -438,7 +438,11 @@ class Plan:
             if pid:
                 self.relaties.append({
                     "bron": ("bestaand", pid), "doel": ("persoon", sleutel_p), "type": "lidmaatschap",
-                    "mechanisme": "partijlijn", "functie": None, "start": None, "sleutel": f["sleutel"],
+                    # Een Eerste Kamerfractie begint met de zetel; bij een burgemeester of
+                    # wethouder noemt het register geen begin van het partijlidmaatschap
+                    "mechanisme": "partijlijn", "functie": None,
+                    "start": f["start"] if "Fracties EK" in f["org_pad"] else None,
+                    "sleutel": f["sleutel"],
                     "regel": f["regel"], "url": org["url"],
                     "claim": (f"Volgens het register van overheidsorganisaties (uitgave {self.uitgave}) "
                               + (f"is {naam['weergave']} lid van de Eerste Kamerfractie van {partij}."
@@ -460,7 +464,9 @@ class Plan:
     def _rel(self, bron: dict, doel: dict, rtype: str, mech: str, record: dict, ww: str, rest: str):
         self.relaties.append({
             "bron": ("org", bron["oo_id"]), "doel": ("org", doel["oo_id"]), "type": rtype,
-            "mechanisme": mech, "functie": None, "start": None, "sleutel": record["sleutel"],
+            # Looptijd (eigenaarsbesluit 2026-10-09): het begin en eind dat het record noemt
+            "mechanisme": mech, "functie": None, "start": record.get("start"),
+            "eind": record.get("eind"), "sleutel": record["sleutel"],
             "regel": record["regel"], "url": record["url"],
             "claim": (f"Volgens het register van overheidsorganisaties (uitgave {self.uitgave}) "
                       f"{ww} {self.orgs[record['oo_id']]['naam']} {rest}."),
@@ -622,6 +628,8 @@ class Indiener:
                 body["functie"] = r["functie"]
             if r["start"]:
                 body["active_from"] = r["start"]
+            if r.get("eind"):
+                body["active_until"] = r["eind"]
             status, res = self.rest("POST", "/api/relations", body)
             if status != 201:
                 self.tel[f"relatie fout {status}"] += 1

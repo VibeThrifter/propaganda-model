@@ -86,6 +86,7 @@ class Plan:
             partij = ep.partij_van(p)
             if partij and partij in self.partij_id:
                 self._rel(("bestaand", self.partij_id[partij]), ("persoon", pid), "lidmaatschap", "partijlijn", rec,
+                          start=p["van"],
                           claim=f"Volgens de open data van het Europees Parlement (uitgave {self.uitgave}) zit "
                                 f"{p['naam']} er namens {p['partij']}.")
             else:

@@ -241,6 +241,10 @@ class Planner:
             self.log(f"  [relatie]   {rtype} ({soort}){periode} bestaat al — overgeslagen")
             self.telling["overgeslagen"] += 1
             return None
+        if not van:
+            # Looptijd (2026-10-09): het profiel gaf geen begin; de datumzoeker zoekt verder
+            self.log(f"  [!] {rtype}: het profiel geeft geen begin — de datumzoeker zoekt het")
+            self.telling["zonder_begin"] = self.telling.get("zonder_begin", 0) + 1
         if not self.indienen:
             self.log(f"  [relatie+]  {rtype} ({soort}){periode}")
             self.telling["relatie"] += 1

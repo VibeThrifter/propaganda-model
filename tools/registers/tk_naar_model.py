@@ -374,7 +374,7 @@ class Plan:
             pnaam = partij_naam(p.get("fractie_afkorting") or "") or partij_naam(p.get("fractie") or "")
             if pnaam and pnaam in self.partij_id:
                 self._rel(("bestaand", self.partij_id[pnaam]), ("persoon", pid), "lidmaatschap",
-                          "partijlijn", rec,
+                          "partijlijn", rec, start=p.get("van"),
                           claim=f"Volgens de open data van de Tweede Kamer (uitgave {self.uitgave}) zit "
                                 f"{p['naam']} in de Tweede Kamerfractie van {p['fractie']}.")
             else:

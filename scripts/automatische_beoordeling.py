@@ -91,6 +91,7 @@ sys.path.insert(1, str(ROOT))
 import bronchecker  # noqa: E402
 import bronklasse  # noqa: E402
 import bronzoeker  # noqa: E402
+import datumzoeker  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
 import opschonen  # noqa: E402  dubbel werk (repo-root, gedeeld met de server)
 import registercheck  # noqa: E402
@@ -203,6 +204,8 @@ def a2_wachtrij(conn) -> list[dict]:
         if (a["parent_argument_id"] is not None and a["stance"] == "contradicting"
                 and (a["reasoning"] or "").strip()):
             continue  # ondergraving: eigen route
+        if a["parent_argument_id"] is None and a["property"] in ("active_from", "active_until"):
+            continue  # looptijd: een datum uit een bron, A1 volstaat (stap 10c zet hem)
         personen, rtype = smaadtoets.personen_van(conn, a)
         if (a["parent_argument_id"] is None and a["stance"] == "supporting"
                 and rtype in STRUCTUURTYPES
@@ -323,6 +326,56 @@ def stap_bronzoeken(args, meld) -> dict:
     if not args.droog and not bronzoeker.DEFAULT_TOKEN.exists():
         return {"gestart": False, "reden": "geen token voor het account 'bronzoeker'"}
     return bronzoeker.draai(max_n=args.max_zoek, droog=args.droog, meld=meld)
+
+
+def stap_datumzoeken(args, meld) -> dict:
+    """Looptijd (2026-10-09): verbanden zonder begin krijgen een datum uit hun eigen bronnen of
+    van het web (aspect-argument; stap 2 controleert het, stap 10c zet het)."""
+    if args.max_datum <= 0 and args.max_datum_eigen <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    if args.droog:
+        return {"gestart": False, "reden": "droog (de datumzoeker roept het model aan)"}
+    if not datumzoeker.DEFAULT_TOKEN.exists():
+        return {"gestart": False, "reden": "geen token voor het account 'datumzoeker'"}
+    conn = db()
+    try:
+        if not bronchecker.heeft_tabel(conn, "looptijd_onderzoek"):
+            return {"gestart": False, "reden": "tabel looptijd_onderzoek ontbreekt "
+                                               "(scripts/migrate_add_looptijd_onderzoek.py)"}
+    finally:
+        conn.close()
+    return datumzoeker.draai(max_eigen=args.max_datum_eigen, max_web=args.max_datum, meld=meld)
+
+
+def stap_looptijd(token, args, meld) -> dict:
+    """Stap 10c: de datum van elk looptijd-argument dat A1 'klopt' gaf (en de stemtoets
+    neutraal) op zijn verband zetten; de server beslist (looptijd_besluit) en logt oud/nieuw."""
+    conn = db()
+    try:
+        ids = [r["id"] for r in conn.execute("""
+            SELECT a.id FROM arguments a
+            WHERE a.status = 'voorgesteld' AND NOT a.vervangen AND a.parent_argument_id IS NULL
+              AND a.property IN ('active_from', 'active_until') AND a.relation_id IS NOT NULL
+              AND (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
+                     AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
+                     LIMIT 1) = 'klopt'
+            ORDER BY a.id""")]
+    finally:
+        conn.close()
+    tel = {"gezet": 0, "blijft": 0}
+    for arg_id in ids:
+        pad = f"/api/beoordeling/looptijd/{arg_id}"
+        status, antwoord = req("GET" if args.droog else "POST", pad, token)
+        if status in (429, 503):
+            meld(f"Looptijd: gestopt — {antwoord.get('error')}")
+            break
+        if (args.droog and antwoord.get("toegestaan")) or antwoord.get("gezet"):
+            tel["gezet"] += 1
+        else:
+            tel["blijft"] += 1
+    meld(f"Looptijd: {tel['gezet']} datum(s) op een verband gezet{' (droog)' if args.droog else ''}"
+         f", {tel['blijft']} wachten (stemtoets) of mogen niet (veld al gevuld)")
+    return tel
 
 
 def stap_heropenen(token, args, meld) -> dict:
@@ -1132,6 +1185,8 @@ def ronde(args, meld=print) -> dict:
     # 1. Repareren: een bron waar die ontbreekt of niet volstaat (wat de bronzoeker indient,
     #    controleert stap 2 nog in dezelfde ronde)
     uitkomst["bronzoeker"] = stap_bronzoeken(args, meld)
+    # 1b. Looptijd: verbanden zonder begin krijgen een datum (eigen bronnen, dan het web)
+    uitkomst["datumzoeker"] = stap_datumzoeken(args, meld)
     # 2. A1: elk nieuw voorstel, en gemerged werk dat nooit gecontroleerd is (nieuws eerst)
     uitkomst["a1"] = bronchecker.draai(max_n=args.max_bron, droog=args.droog,
                                        parallel=args.parallel, meld=meld)
@@ -1176,6 +1231,8 @@ def ronde(args, meld=print) -> dict:
     uitkomst["goedgekeurd"] = stap_goedkeuren(token, args, meld)
     # 10b. Niet-neutrale beschrijvingen (seed- en agentwerk) neutraal maken
     uitkomst["beschrijvingen"] = stap_beschrijvingen(token, args, meld)
+    # 10c. Looptijd: een gecontroleerde datum op zijn verband zetten
+    uitkomst["looptijd"] = stap_looptijd(token, args, meld)
     # 11–12. Opruimen; verbanden zonder bron eindigen; wat de smaad- of stemtoets
     #        terugkoppelde komt in zijn feitelijke of neutrale vorm opnieuw binnen
     if not args.zonder_opruimen:
@@ -1224,6 +1281,10 @@ def main():
                     help="hooguit zoveel beschrijvingen per ronde neutraal maken (0 = uit)")
     ap.add_argument("--max-stemrevisie", type=int, default=20,
                     help="hooguit zoveel neutrale versies en stemrevisies per ronde (0 = uit)")
+    ap.add_argument("--max-datum", type=int, default=8,
+                    help="hooguit zoveel web-zoektochten van de datumzoeker per ronde (0 = uit)")
+    ap.add_argument("--max-datum-eigen", type=int, default=20,
+                    help="hooguit zoveel verbanden in de eigen-bronnenronde van de datumzoeker")
     ap.add_argument("--max-zonder-bron", type=int, default=20,
                     help="hooguit zoveel verbanden zonder bron per ronde afwijzen (0 = uit)")
     ap.add_argument("--max-mechanismen", type=int, default=12,
