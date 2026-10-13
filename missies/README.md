@@ -138,7 +138,13 @@ verband zonder begin staat altijd en overal "aan".
   citaat. (1) `active_until` met de datum. (2) `property` `opgegaan_in` met als `property_value` het
   id van de opvolger; de bewering noemt de opvolger bij naam. Nooit samenvoegen (M2.6): de banden van
   de voorganger blijven van haar. De viz en `/partijen` tonen de stamboom zelf. Een lid gaat alleen
-  over naar de opvolger als een bron dat voor die persoon zegt.
+  over naar de opvolger als een bron dat voor die persoon zegt. Bestaat de voorganger nog niet in het model, dien
+  haar dan in als entiteit, zonder datums bij het aanmaken, met de twee argumenten erbij. Haar fusie
+  laat haar goedkeuren; stap 10d hangt daarna de oude banden die het bewijs aan haar toeschrijft aan
+  haar.
+- **Een verkeerde organisatiedatum**: dien de juiste in als aspect-argument met een letterlijk citaat.
+  Een onbeschermde datum (geen mens, geen register, geen gemerged argument) wordt dan verfijnd of
+  verruimd. Een datum die het bestaan verkort, blijft staan tot een mens beslist.
 
 ## Accounts
 

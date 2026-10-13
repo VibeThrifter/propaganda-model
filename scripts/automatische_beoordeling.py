@@ -46,6 +46,10 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
 10b. **Beschrijvingen**: een niet-neutrale beschrijving van een relatie of entiteit (seed- of
     agentwerk, nooit van een mens) wordt de neutrale herformulering van de stemtoets
     (``POST /api/beoordeling/beschrijving/<tabel>/<id>``; de oude tekst staat in edit_log).
+10c. **Looptijd en fusies**: een gecontroleerde datum op zijn verband of organisatie, of een
+    fusie ('opgegaan_in'); een onbeschermde organisatiedatum mag een bron corrigeren.
+10d. **Verhangen** (``--max-verhang``): een verband van vóór (ná) een fusie naar de voorganger
+    (opvolger) die het bewijs noemt (``POST /api/beoordeling/verhangen/<id>``).
 11. **Opruimen** (status-PATCH door merge-service, altijd met reden): wat de bron niet draagt
     en niet te repareren is (na de poging van de bronzoeker), wat de smaad- of stemtoets
     terugkoppelde, en wat na ``--wachttijd-dagen`` (14) nog niet door de poort komt.
@@ -94,6 +98,7 @@ import bronzoeker  # noqa: E402
 import datumzoeker  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
 import opschonen  # noqa: E402  dubbel werk (repo-root, gedeeld met de server)
+import looptijd  # noqa: E402  bestaan, fusies en verhangen (repo-root, gedeeld met de server)
 import registercheck  # noqa: E402
 import rfc_beoordeling  # noqa: E402
 import smaadtoets  # noqa: E402
@@ -345,7 +350,8 @@ def stap_datumzoeken(args, meld) -> dict:
                                                "(scripts/migrate_add_looptijd_onderzoek.py)"}
     finally:
         conn.close()
-    return datumzoeker.draai(max_eigen=args.max_datum_eigen, max_web=args.max_datum, meld=meld)
+    return datumzoeker.draai(max_eigen=args.max_datum_eigen, max_web=args.max_datum,
+                             max_web_org=args.max_datum_org, meld=meld)
 
 
 def stap_looptijd(token, args, meld) -> dict:
@@ -373,12 +379,39 @@ def stap_looptijd(token, args, meld) -> dict:
         if status in (429, 503):
             meld(f"Looptijd: gestopt — {antwoord.get('error')}")
             break
-        if (args.droog and antwoord.get("toegestaan")) or antwoord.get("gezet"):
+        if (args.droog and antwoord.get("toegestaan")) or antwoord.get("gezet") or antwoord.get("bevestigd"):
             tel["gezet"] += 1
         else:
             tel["blijft"] += 1
     meld(f"Looptijd: {tel['gezet']} datum(s) of opvolger(s) gezet{' (droog)' if args.droog else ''}"
          f", {tel['blijft']} wachten (stemtoets) of mogen niet (veld al gevuld)")
+    return tel
+
+
+def stap_verhangen(token, args, meld) -> dict:
+    """Stap 10d (2026-10-13): een goedgekeurd verband dat helemaal vóór (of ná) het bestaan van
+    een eindpunt valt, gaat naar de voorganger (opvolger) die het bewijs noemt. De server beslist
+    (looptijd.verhangen_besluit); het verband houdt zijn id en boom."""
+    if args.max_verhang <= 0:
+        return {"verhangen": 0}
+    conn = db()
+    try:
+        ids = looptijd.verhangen_kandidaten(conn)
+    finally:
+        conn.close()
+    tel = {"verhangen": 0, "blijft": 0}
+    for rid in ids[:args.max_verhang]:
+        status, antwoord = req("GET" if args.droog else "POST", f"/api/beoordeling/verhangen/{rid}", token)
+        if status in (429, 503):
+            meld(f"Verhangen gestopt: {antwoord.get('error')}")
+            break
+        if (args.droog and antwoord.get("toegestaan")) or antwoord.get("verhangen"):
+            tel["verhangen"] += 1
+        else:
+            tel["blijft"] += 1
+    meld(f"Verhangen: {tel['verhangen']} verband(en) naar de voorganger of opvolger"
+         f"{' (droog)' if args.droog else ''}, {tel['blijft']} blijven (loopt over de fusie heen, "
+         "of het bewijs noemt de voorganger niet)")
     return tel
 
 
@@ -1237,6 +1270,8 @@ def ronde(args, meld=print) -> dict:
     uitkomst["beschrijvingen"] = stap_beschrijvingen(token, args, meld)
     # 10c. Looptijd: een gecontroleerde datum op zijn verband zetten
     uitkomst["looptijd"] = stap_looptijd(token, args, meld)
+    # 10d. Verhangen: een band van vóór een fusie naar de voorganger (en andersom)
+    uitkomst["verhangen"] = stap_verhangen(token, args, meld)
     # 11–12. Opruimen; verbanden zonder bron eindigen; wat de smaad- of stemtoets
     #        terugkoppelde komt in zijn feitelijke of neutrale vorm opnieuw binnen
     if not args.zonder_opruimen:
@@ -1287,6 +1322,8 @@ def main():
                     help="hooguit zoveel neutrale versies en stemrevisies per ronde (0 = uit)")
     ap.add_argument("--max-datum", type=int, default=8,
                     help="hooguit zoveel web-zoektochten van de datumzoeker per ronde (0 = uit)")
+    ap.add_argument("--max-datum-org", type=int, default=2,
+                    help="web-zoektochten per ronde naar het bestaan van organisaties (2026-10-13)")
     ap.add_argument("--max-datum-eigen", type=int, default=20,
                     help="hooguit zoveel verbanden in de eigen-bronnenronde van de datumzoeker")
     ap.add_argument("--max-zonder-bron", type=int, default=20,
@@ -1295,6 +1332,8 @@ def main():
                     help="hooguit zoveel kandidaat-verbanden per ronde (0 = uit)")
     ap.add_argument("--max-rfc", type=int, default=3,
                     help="hooguit zoveel open RfC's per ronde laten reviewen (0 = uit)")
+    ap.add_argument("--max-verhang", type=int, default=50,
+                    help="hooguit zoveel verbanden per ronde naar een voorganger of opvolger (0 = uit)")
     ap.add_argument("--max-ontdubbel", type=int, default=100,
                     help="hooguit zoveel dubbele bronnen en verbanden per ronde (0 = uit)")
     ap.add_argument("--max-bronklasse", type=int, default=160,

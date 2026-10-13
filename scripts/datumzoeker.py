@@ -20,6 +20,12 @@ veld, oud/nieuw in edit_log, terug te draaien). Niets gevonden → looptijd_onde
 'niets_gevonden' (de enige reden waarom een verband zonder begin mag blijven) en pas na 30 dagen
 opnieuw; een technische fout → na 20 uur opnieuw.
 
+Daarna (2026-10-13) het BESTAAN van organisaties: een goedgekeurde organisatie met verbanden maar
+zonder oprichtingsdatum krijgt een web-zoektocht (`--max-web-org` per ronde, eigen dagplafond
+DAG_PLAFOND_ORG) naar haar oprichting en eventuele opheffing. Dat wordt een aspect-argument op de
+entiteit (entity_id, property active_from/active_until); stap 10c zet het na A1. De stand staat in
+data/datumzoeker_organisaties.json (zelfde wachttijden).
+
 Account `datumzoeker` (bijdrager, eigen token). Stap 1b van scripts/automatische_beoordeling.py.
 Los:
     python3 scripts/datumzoeker.py [--droog] [--max-eigen 20] [--max-web 8] [--ids 1879,1880]
@@ -52,6 +58,7 @@ LLM_TIMEOUT_S = 600
 OPNIEUW_NA_DAGEN = 30
 FOUT_OPNIEUW_NA_UREN = 20
 DAG_PLAFOND = 150            # web-zoektochten per dag
+DAG_PLAFOND_ORG = 48         # en apart voor het bestaan van organisaties (2026-10-13)
 MERK = "Looptijd voor verband #{id}"
 DATUM_RE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
 
@@ -71,6 +78,22 @@ REGELS = (
     "wie, welke functie of band, bij wie, sinds wanneer (en tot wanneer). Antwoord alleen met "
     "het gevraagde JSON."
 )
+# Organisaties (2026-10-13): hun bestaan begrenst elk verband ermee (looptijd.py), dus ook dat
+# wordt opgezocht: oprichting en, als ze niet meer bestaat, opheffing of fusie.
+REGELS_ORG = (
+    "Je zoekt het BESTAAN van een organisatie in een onderzoeksdatabase over het Nederlandse "
+    "media- en bestuurssysteem: wanneer ze werd opgericht (en, als ze niet meer bestaat, wanneer "
+    "ze werd opgeheven of opging in een andere organisatie), zo precies als de bron het zegt "
+    "(jaar, jaar-maand of datum; nooit preciezer dan de bron). Een datum telt alleen met een "
+    "letterlijk citaat dat het jaartal noemt en over deze organisatie gaat. Bij een naamswijziging "
+    "of fusie: het begin van de organisatie zoals ze hier heet als die naam bij een nieuwe "
+    "organisatie hoort, anders de oprichting van de organisatie zelf; zeg het in de toelichting. "
+    "Raad nooit. Schrijf de bewering neutraal: de organisatie, opgericht (opgeheven) op/in. "
+    "Antwoord alleen met het gevraagde JSON."
+)
+ORG_STAND_PAD = ROOT / "data" / "datumzoeker_organisaties.json"
+ORG_TYPES_NIET = ("persoon",)
+
 EIGEN_SCHEMA = {
     "type": "object",
     "properties": {"uitkomsten": {"type": "array", "items": {
@@ -200,11 +223,11 @@ def verband_zin(r: dict) -> str:
 
 
 # ------------------------------------------------------------------ het model vragen
-def vraag(prompt: str, schema: dict, tools: bool) -> dict | None:
+def vraag(prompt: str, schema: dict, tools: bool, regels: str = REGELS) -> dict | None:
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cmd = [bc.CLAUDE, "-p", "--output-format", "json", "--strict-mcp-config",
            "--setting-sources", "", "--no-session-persistence", "--model", MODEL,
-           "--system-prompt", REGELS, "--json-schema", json.dumps(schema)]
+           "--system-prompt", regels, "--json-schema", json.dumps(schema)]
     cmd += (["--tools", "WebSearch,WebFetch", "--allowedTools", "WebSearch,WebFetch"] if tools
             else ["--tools", ""])
     with tempfile.TemporaryDirectory(prefix="datumzoeker-") as leeg:
@@ -363,11 +386,155 @@ def leg_vast(api, token, rid: int, status: str, detail: str) -> None:
                 {"relation_id": rid, "status": status, "detail": detail[:900]})
 
 
-def web_vandaag() -> int:
+# ------------------------------------------------------------------ organisaties (2026-10-13)
+def org_stand() -> dict:
+    try:
+        return json.loads(ORG_STAND_PAD.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def org_stand_zet(eid: int, status: str, detail: str) -> None:
+    stand = org_stand()
+    oud = stand.get(str(eid)) or {}
+    stand[str(eid)] = {"status": status, "laatste_poging": datetime.datetime.now().isoformat(
+        timespec="seconds"), "pogingen": int(oud.get("pogingen", 0)) + 1, "detail": detail[:400]}
+    ORG_STAND_PAD.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ORG_STAND_PAD.with_suffix(".tmp")
+    tmp.write_text(json.dumps(stand, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(ORG_STAND_PAD)
+
+
+def organisatie_kandidaten(conn, ids=None, nu=None) -> list[dict]:
+    """Goedgekeurde organisaties met een goedgekeurd verband maar zonder oprichtingsdatum, zonder
+    lopend active_from-argument, die aan de beurt zijn: wat het nieuws toont eerst, dan wie de
+    meeste verbanden heeft."""
+    nu = nu or datetime.datetime.now()
+    filt, params = "", []
+    if ids:
+        filt = f" AND e.id IN ({','.join('?' * len(ids))})"
+        params = list(ids)
+    rijen = [dict(r) for r in conn.execute(f"""
+        SELECT e.id, e.name, e.type, e.description, e.active_until,
+               (SELECT COUNT(*) FROM relations r WHERE (r.source_id = e.id OR r.target_id = e.id)
+                  AND r.status = 'goedgekeurd' AND NOT r.vervangen) AS n_rel
+        FROM entities e
+        WHERE e.status = 'goedgekeurd' AND NOT e.vervangen AND e.type <> 'persoon'
+          AND TRIM(COALESCE(e.active_from, '')) = ''
+          AND NOT EXISTS (SELECT 1 FROM arguments a WHERE a.entity_id = e.id
+                          AND a.property = 'active_from' AND NOT a.vervangen
+                          AND a.status <> 'verworpen')
+          {filt}""", params) if r["n_rel"]]  # noqa: S608 - alleen placeholders
+    stand = org_stand()
+    _, ent = bc.nieuws_voorrang(conn)
+    uit = [r for r in rijen if ids or mag_weer(stand.get(str(r["id"])), nu)]
+    uit.sort(key=lambda r: (0 if r["id"] in ent else 1, -r["n_rel"], r["id"]))
+    return uit
+
+
+def web_ronde_organisatie(e: dict) -> dict:
+    """Wanneer bestaat deze organisatie? → {uitkomst: gevonden|niets|fout, begin?, eind?, …}"""
+    oms = f" ({e['description'][:200]})" if e.get("description") else ""
+    prompt = (f"Organisatie: {e['name']} (soort: {e['type']}){oms}.\n\nZoek op het web wanneer "
+              f"deze organisatie werd opgericht, en of en wanneer ze werd opgeheven of opging in "
+              f"een andere organisatie. Een bron moet {e['name']} bij naam noemen. Open de pagina "
+              "met WebFetch en neem het citaat dat de datum geeft teken voor teken over. "
+              "Wikipedia, sociale media en deze database zelf zijn geen bron (Wikipedia mag als "
+              "vindplaats: volg de voetnoot). Primaire bronnen eerst: de eigen site (over ons, "
+              "geschiedenis), het register van overheidsorganisaties, Parlement.com, DNPP, "
+              "KvK-nieuws, jaarverslagen, persberichten. Geen datum gevonden: gevonden=false.")
+    antwoord = vraag(prompt, WEB_SCHEMA, tools=True, regels=REGELS_ORG)
+    if not antwoord:
+        return {"uitkomst": "fout", "toelichting": "model gaf geen bruikbaar antwoord"}
+    afgevallen: list[dict] = []
+    uit = {"uitkomst": "niets", "afgevallen": afgevallen,
+           "toelichting": (antwoord.get("toelichting") or "")[:600]}
+    if not antwoord.get("gevonden"):
+        return uit
+    for veld in ("begin", "eind"):
+        datum = schone_datum(antwoord.get(veld))
+        bron = antwoord.get(f"{veld}_bron") or {}
+        if not datum or not (bron.get("url") or "").strip():
+            continue
+        if veld == "eind" and e.get("active_until"):
+            continue
+        if not noemt_jaar(bron.get("citaat"), datum):
+            afgevallen.append({"url": bron.get("url"), "reden": f"citaat noemt {datum[:4]} niet"})
+            continue
+        goed, reden = bz.natrekken(bron, [e["name"]])
+        if not goed:
+            afgevallen.append({"url": bron.get("url"), "reden": reden})
+            continue
+        uit[veld] = {"datum": datum, "bron": goed}
+    if "begin" in uit or "eind" in uit:
+        uit["uitkomst"] = "gevonden"
+        uit["bewering"] = (antwoord.get("bewering") or "").strip()
+    return uit
+
+
+def dien_in_organisatie(api, token, e: dict, veld: str, datum: str, citatie: dict, voorstel):
+    if not (voorstel and datum[:4] in voorstel and bz.noemt(voorstel, e["name"])):
+        voorstel = (f"{e['name']} werd opgericht in {datum}." if veld == "active_from"
+                    else f"{e['name']} werd opgeheven in {datum}.")
+    body = {"entity_id": e["id"], "property": veld, "property_value": datum,
+            "stance": "supporting", "claim": voorstel[:600],
+            "reasoning": f"Bestaan van organisatie #{e['id']} ({'oprichting' if veld == 'active_from' else 'einde'}): "
+                         f"het citaat noemt {datum[:4]}.",
+            "citations": [citatie], "negeer_duplicaten": True}
+    status, res = bz.api_post(api, token, "/api/arguments", body)
+    return (res.get("id") if status == 201 else None), (None if status == 201 else f"{status} {res.get('error')}")
+
+
+def organisatie_ronde(api, token, max_web_org, ruimte, droog, meld, ids=None) -> dict:
+    tel = {"organisaties_aan_de_beurt": 0, "organisaties_gevonden": 0, "organisaties_niets": 0,
+           "organisaties_ingediend": 0, "organisaties_fout": 0, "web_gezocht": 0}
+    if max_web_org <= 0 or ruimte <= 0:
+        return tel
+    conn = db()
+    try:
+        alle = organisatie_kandidaten(conn, ids)
+    finally:
+        conn.close()
+    tel["organisaties_aan_de_beurt"] = len(alle)
+    for e in alle[:min(max_web_org, ruimte)]:
+        tel["web_gezocht"] += 1
+        uit = web_ronde_organisatie(e)
+        log({"organisatie": e["id"], "waar": "web", "uitkomst": uit["uitkomst"], "web_org": True,
+             **{k: uit[k] for k in ("begin", "eind", "toelichting", "afgevallen") if k in uit}}, droog)
+        if uit["uitkomst"] in ("fout", "niets"):
+            tel["organisaties_fout" if uit["uitkomst"] == "fout" else "organisaties_niets"] += 1
+            if not droog:
+                org_stand_zet(e["id"], "fout" if uit["uitkomst"] == "fout" else "niets_gevonden",
+                              uit.get("toelichting", ""))
+            continue
+        tel["organisaties_gevonden"] += 1
+        for veld, sleutel in (("active_from", "begin"), ("active_until", "eind")):
+            if sleutel not in uit:
+                continue
+            item = uit[sleutel]
+            if droog:
+                meld(f"  (droog) organisatie #{e['id']} {e['name']}: {veld} = {item['datum']} — "
+                     f"{item['bron']['url']}")
+                continue
+            bron_id = bz.registreer_bron(api, token, item["bron"])
+            if not bron_id:
+                tel["organisaties_fout"] += 1
+                continue
+            citatie = {"source_id": bron_id, "quote": item["bron"]["citaat"], "methode": "verbatim_quote"}
+            nieuw, fout = dien_in_organisatie(api, token, e, veld, item["datum"], citatie, uit.get("bewering"))
+            tel["organisaties_ingediend" if nieuw else "organisaties_fout"] += 1
+            if fout:
+                meld(f"  ✗ organisatie #{e['id']}: {fout}")
+        if not droog:
+            org_stand_zet(e["id"], "gezocht", "datum van het web ingediend")
+    return tel
+
+
+def web_vandaag(sleutel: str = "web") -> int:
     vandaag = datetime.date.today().isoformat()
     try:
         with open(LOG_PATH, encoding="utf-8") as f:
-            return sum(1 for regel in f if f'"ts": "{vandaag}' in regel and '"web": true' in regel)
+            return sum(1 for regel in f if f'"ts": "{vandaag}' in regel and f'"{sleutel}": true' in regel)
     except OSError:
         return 0
 
@@ -382,7 +549,7 @@ def log(regel: dict, droog: bool = False) -> None:
 
 
 def draai(*, api=DEFAULT_API, token_pad=None, max_eigen=20, max_web=8, droog=False,
-          ids=None, meld=print, dag_plafond=DAG_PLAFOND) -> dict:
+          ids=None, meld=print, dag_plafond=DAG_PLAFOND, max_web_org=0, org_ids=None) -> dict:
     conn = db()
     try:
         alle = kandidaten(conn, ids)
@@ -466,6 +633,15 @@ def draai(*, api=DEFAULT_API, token_pad=None, max_eigen=20, max_web=8, droog=Fal
                 meld(f"  ✗ #{r['id']}: {fout}")
         if not droog:
             leg_vast(api, token, r["id"], "gezocht", "datum van het web ingediend")
+    # Stap 3 (2026-10-13): het bestaan van organisaties, met wat er van het dagbudget over is
+    if max_web_org > 0:
+        org = organisatie_ronde(api, token, max_web_org, max(0, DAG_PLAFOND_ORG - web_vandaag("web_org")),
+                                droog, meld, org_ids)
+        tel.update({k: v for k, v in org.items() if k != "web_gezocht"})
+        tel["web_gezocht"] += org["web_gezocht"]
+        meld(f"Datumzoeker (organisaties): {org['organisaties_aan_de_beurt']} zonder oprichtingsdatum "
+             f"aan de beurt; {org['organisaties_gevonden']} gevonden, {org['organisaties_niets']} niets, "
+             f"{org['organisaties_ingediend']} argument(en) ingediend{' (droog)' if droog else ''}")
     meld(f"Datumzoeker: {tel['kandidaten']} verband(en) zonder begin aan de beurt; "
          f"{tel['uit_eigen_bronnen']} uit eigen bronnen, {tel['van_het_web']} van het web, "
          f"{tel['niets']} niets gevonden, {tel['ingediend']} argument(en) ingediend"
@@ -479,12 +655,16 @@ def main():
     ap.add_argument("--token", default=str(DEFAULT_TOKEN))
     ap.add_argument("--max-eigen", type=int, default=20, help="verbanden in de eigen-bronnenronde")
     ap.add_argument("--max-web", type=int, default=8, help="web-zoektochten per ronde")
+    ap.add_argument("--max-web-org", type=int, default=2,
+                    help="web-zoektochten per ronde naar het bestaan van organisaties (2026-10-13)")
     ap.add_argument("--ids", help="alleen deze verbanden (komma's), ongeacht de wachttijd")
+    ap.add_argument("--org-ids", help="alleen deze organisaties (komma's), ongeacht de wachttijd")
     ap.add_argument("--droog", action="store_true", help="niets indienen of vastleggen")
     a = ap.parse_args()
     ids = [int(x) for x in a.ids.split(",")] if a.ids else None
+    org_ids = [int(x) for x in a.org_ids.split(",")] if a.org_ids else None
     tel = draai(api=a.api, token_pad=Path(a.token), max_eigen=a.max_eigen, max_web=a.max_web,
-                droog=a.droog, ids=ids)
+                droog=a.droog, ids=ids, max_web_org=a.max_web_org, org_ids=org_ids)
     print(json.dumps(tel, ensure_ascii=False))
 
 

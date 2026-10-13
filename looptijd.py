@@ -235,3 +235,134 @@ def kring(opv: dict, voorganger: int, opvolger: int) -> bool:
         lijst = opv.get(eid) or []
         eid = lijst[0]["opvolger"] if lijst else None
     return False
+
+
+# ── Verhangen: een band van vóór (of ná) een fusie hoort bij de voorganger (of opvolger) ──
+
+VERHANG_REDEN = "automatische beoordeling: verhangen"
+
+
+def _naamvormen(naam):
+    vormen = {naam or ""}
+    m = re.match(r"^(.*?)\s*\(([^)]+)\)\s*$", naam or "")
+    if m:
+        vormen |= {m.group(1), m.group(2)}
+    return {v.strip() for v in vormen if len(v.strip()) >= 2}
+
+
+def noemt(naam, tekst) -> bool:
+    """Noemt de tekst deze organisatie als losse naam? 'KRO' telt niet binnen 'KRO-NCRV', 'VARA'
+    niet binnen 'BNNVARA'."""
+    for v in _naamvormen(naam):
+        if re.search(rf"(?<![\w-]){re.escape(v)}(?![\w-])", tekst or "", flags=re.I):
+            return True
+    return False
+
+
+def _bewijs_tekst(conn, rid) -> str:
+    delen = [r[0] or "" for r in conn.execute("SELECT description FROM relations WHERE id = ?", (rid,))]
+    for claim, quotes in conn.execute("""
+            SELECT a.claim, (SELECT group_concat(COALESCE(c.quote, ''), ' ') FROM citations c
+                             WHERE c.argument_id = a.id)
+            FROM arguments a WHERE a.relation_id = ? AND a.parent_argument_id IS NULL
+              AND NOT a.vervangen AND a.status <> 'verworpen'""", (rid,)):
+        delen += [claim or "", quotes or ""]
+    return " ".join(delen)
+
+
+def _omvat(ent, van, tot) -> bool:
+    e_van, e_tot = bestaan(ent)
+    return not (van and voor(van, e_van)) and not (tot and voor(e_tot, tot)) \
+        and not (van and voor(e_tot, van))
+
+
+def verhangen_besluit(conn, rid):
+    """Mag dit goedgekeurde verband naar de voorganger of opvolger van een eindpunt? Ja als zijn
+    eigen looptijd helemaal vóór het bestaan van dat eindpunt valt (of helemaal erna), precies
+    één voorganger (opvolger) die hele looptijd omvat, en het bewijs die organisatie bij naam
+    noemt. Voorbeeld: "Marcel van Dam was 1986–1995 voorzitter van de VARA" hing aan BNNVARA
+    (2014). Een verband dat over de fusie heen loopt, blijft staan: dat zijn twee banden.
+    → (ok, redenen, {kant, van, naar, richting, motivatie})."""
+    def rij(sql, args=()):
+        cur = conn.execute(sql, args)
+        r = cur.fetchone()
+        return dict(zip([d[0] for d in cur.description], r)) if r else None
+
+    rel = rij("SELECT * FROM relations WHERE id = ?", (rid,))
+    if rel is None:
+        return False, ["niet gevonden"], {}
+    if rel["status"] != "goedgekeurd" or rel["vervangen"]:
+        return False, [f"status '{rel['status']}'{' (vervangen)' if rel['vervangen'] else ''}"], {}
+    van, tot = _schoon(rel["active_from"]), _schoon(rel["active_until"])
+    if not (van or tot):
+        return False, ["het verband heeft geen eigen looptijd"], {}
+    ents = {}
+    for eid in (rel["source_id"], rel["target_id"]):
+        ents[eid] = rij("SELECT id, name, type, active_from, active_until, status, vervangen "
+                        "FROM entities WHERE id = ?", (eid,))
+    opv = opvolgingen(conn)
+    voorg = {}
+    for vg, lijst in opv.items():
+        for x in lijst:
+            voorg.setdefault(x["opvolger"], []).append(vg)
+    kandidaten = []
+    for kant in ("source_id", "target_id"):
+        y = ents[rel[kant]]
+        y_van, y_tot = bestaan(y)
+        if tot and y_van and voor(tot, y_van):
+            pool, richting = voorg.get(y["id"], []), "voorganger"
+        elif van and y_tot and voor(y_tot, van):
+            pool, richting = [x["opvolger"] for x in opv.get(y["id"], [])], "opvolger"
+        else:
+            continue
+        kandidaten.append((kant, y, richting, pool))
+    if not kandidaten:
+        return False, ["het verband valt niet helemaal vóór of ná het bestaan van een eindpunt"], {}
+    if len(kandidaten) > 1:
+        return False, ["beide eindpunten vallen buiten hun bestaan: niet automatisch"], {}
+    kant, y, richting, pool = kandidaten[0]
+    if not pool:
+        return False, [f"{y['name']} heeft geen {richting} in het model (fusie, 'opgegaan_in')"], {}
+    andere = rel["target_id"] if kant == "source_id" else rel["source_id"]
+    passend = []
+    for x in pool:
+        e = rij("SELECT id, name, type, active_from, active_until, status, vervangen FROM entities "
+                "WHERE id = ?", (x,))
+        if e and e["status"] == "goedgekeurd" and not e["vervangen"] and x != andere \
+                and _omvat(e, van, tot):
+            passend.append(e)
+    if not passend:
+        return False, [f"geen goedgekeurde {richting} van {y['name']} omvat de hele looptijd "
+                       f"({van or '…'}–{tot or 'heden'})"], {}
+    tekst = _bewijs_tekst(conn, rid)
+    genoemd = [e for e in passend if noemt(e["name"], tekst)]
+    if len(genoemd) != 1:
+        namen = ", ".join(e["name"] for e in passend)
+        return False, [f"het bewijs noemt niet eenduidig één {richting} ({namen})"], {}
+    x = genoemd[0]
+    motivatie = (f"{VERHANG_REDEN}: het verband ({van or '…'}–{tot or 'heden'}) valt "
+                 f"{'vóór' if richting == 'voorganger' else 'ná'} het bestaan van {y['name']} "
+                 f"({y['active_from'] or '…'}–{y['active_until'] or 'heden'}); het hoort bij "
+                 f"{richting} {x['name']}, die het bewijs noemt")
+    return True, [], {"kant": kant, "van": y["id"], "naar": x["id"], "richting": richting,
+                      "motivatie": motivatie}
+
+
+def verhangen_kandidaten(conn) -> list[int]:
+    """Goedgekeurde verbanden met een eigen datum buiten het bestaan van een eindpunt dat een
+    voorganger of opvolger heeft (de server beslist per verband)."""
+    opv = opvolgingen(conn)
+    verwant = set(opv) | {x["opvolger"] for v in opv.values() for x in v}
+    if not verwant:
+        return []
+    ents = {r[0]: {"id": r[0], "name": r[1], "type": r[2], "active_from": r[3], "active_until": r[4]}
+            for r in conn.execute("SELECT id, name, type, active_from, active_until FROM entities")}
+    uit = []
+    for rid, s, t, f, u in conn.execute(
+            """SELECT id, source_id, target_id, active_from, active_until FROM relations
+               WHERE status = 'goedgekeurd' AND NOT vervangen
+                 AND (active_from IS NOT NULL OR active_until IS NOT NULL)"""):
+        if (s in verwant or t in verwant) and conflicten(
+                {"active_from": f, "active_until": u}, ents.get(s), ents.get(t)):
+            uit.append(rid)
+    return uit

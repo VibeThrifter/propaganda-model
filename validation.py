@@ -876,7 +876,32 @@ def check_bestaan(conn):
             zonder_einde.append(f"entiteit #{vg} {e['name']}: opgegaan in "
                                 + ", ".join(namen.get(x["opvolger"], "?") for x in lijst)
                                 + ", maar zonder einddatum")
+    # Is het bestaan ingevuld? Organisaties met een goedgekeurd verband maar zonder oprichting
+    # (de datumzoeker zoekt ze op; wat hij vergeefs zocht staat in data/datumzoeker_organisaties.json)
+    try:
+        import json as _json
+        stand = _json.loads((Path(__file__).parent / "data" / "datumzoeker_organisaties.json")
+                            .read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        stand = {}
+    zonder_bestaan = [
+        f"entiteit #{r['id']} {r['name']} ({r['type']}, {r['n']} verbanden)"
+        for r in conn.execute("""
+            SELECT e.id, e.name, e.type, COUNT(*) AS n FROM entities e
+            JOIN relations r ON (r.source_id = e.id OR r.target_id = e.id)
+                             AND r.status = 'goedgekeurd' AND NOT r.vervangen
+            WHERE e.status = 'goedgekeurd' AND NOT e.vervangen AND e.type <> 'persoon'
+              AND TRIM(COALESCE(e.active_from, '')) = ''
+            GROUP BY e.id ORDER BY n DESC, e.id""")
+        if (stand.get(str(r["id"])) or {}).get("status") != "niets_gevonden"]
     return [
+        _bevinding(
+            "ORGANISATIE-ZONDER-BESTAAN", "Organisaties met verbanden maar zonder oprichtingsdatum",
+            "waarschuwing", zonder_bestaan,
+            "Zonder begin begrenst het bestaan van een organisatie haar verbanden niet. De "
+            "datumzoeker zoekt het op (--max-web-org per ronde), het overheidsregister geeft het "
+            "voor overheidsorganisaties (scripts/registers_looptijd.py); wat vergeefs gezocht is, "
+            "telt niet mee."),
         _bevinding(
             "LOOPTIJD-BUITEN-BESTAAN", "Verbanden met een datum buiten het bestaan van een eindpunt",
             "fout", buiten,

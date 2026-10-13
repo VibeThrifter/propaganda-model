@@ -21,6 +21,11 @@ liep, en dat is geen begin. Het verband krijgt dan in `looptijd_onderzoek` de st
 zo eerlijk (geen nep-begin), de goedkeuring loopt door (een registerfeit), en de datumzoeker
 pakt zulke verbanden als laatste op.
 
+Organisaties (2026-10-13): het OO-record geeft ook het bestaan van de organisatie zelf
+(startDatum/eindDatum). Dat gaat via POST /api/entities/<id>/looptijd; de server vult een leeg
+veld en vervangt een andere datum alleen als die onbeschermd is (geen mens, geen register, geen
+gemerged argument).
+
 Loopt ook mee in de wekelijkse registers-sync. Los:
     python3 scripts/registers_looptijd.py [--droog] [--alleen oo,tk,ep,lobby]
 """
@@ -103,6 +108,33 @@ def plan_looptijden(bron: str, uitgave: str, data: dict, conn) -> dict:
     return {"zetten": zetten, "zonder": zonder, "tel": tel}
 
 
+def plan_organisaties(uitgave: str, data: dict, conn) -> list[dict]:
+    """Het bestaan van overheidsorganisaties (2026-10-13): startDatum/eindDatum van het OO-record
+    op de entiteit met die oo-id. Een leeg veld wordt gevuld; een andere datum stuurt het mee,
+    en de server vervangt die alleen als hij onbeschermd is (seed- of agentwerk zonder bewijs)
+    en het bestaan verfijnt of verruimt (nooit verkort).
+    Zo krijgt de NPO 1988 in plaats van 2014. → [{id, velden, reden}]."""
+    uit = []
+    for eid, oo_id, af, au in conn.execute("""
+            SELECT e.id, x.waarde, e.active_from, e.active_until FROM entities e
+            JOIN externe_ids x ON x.entity_id = e.id AND x.stelsel = 'oo'
+            WHERE NOT e.vervangen AND e.status IN ('goedgekeurd', 'voorgesteld')
+              AND e.type <> 'persoon'"""):
+        o = data["organisaties"].get(str(oo_id))
+        if not o:
+            continue
+        velden = {}
+        start, eind = _datum(o.get("start")), _datum(o.get("eind"))
+        if start and start != (af or "").strip():
+            velden["active_from"] = start
+        if eind and eind != (au or "").strip():
+            velden["active_until"] = eind
+        if velden:
+            uit.append({"id": eid, "velden": velden,
+                        "reden": f"oo: record {o['sleutel']} ({o['naam']}) in uitgave {uitgave}"})
+    return uit
+
+
 def draai(*, droog: bool = False, alleen=registers_sync.BRONNEN, meld=print, rest=None,
           data_per_bron: dict | None = None) -> dict:
     if rest is None and not droog:
@@ -143,6 +175,27 @@ def draai(*, droog: bool = False, alleen=registers_sync.BRONNEN, meld=print, res
                 u["zonder_datum"] += 1
             else:
                 u["fouten"].append(f"#{z['id']}: {status} {res.get('error')}")
+        if bron == "oo":
+            u["organisaties"], u["blijft"] = 0, 0
+            conn = registers_sync.db()
+            try:
+                orgs = plan_organisaties(uitgave, data, conn)
+            finally:
+                conn.close()
+            for z in orgs:
+                if droog:
+                    u["organisaties"] += 1
+                    continue
+                status, res = rest("POST", f"/api/entities/{z['id']}/looptijd",
+                                   {**z["velden"], "reden": z["reden"]})
+                if status == 200 and res.get("gewijzigd"):
+                    u["organisaties"] += 1
+                elif status == 200:
+                    u["blijft"] += 1
+                else:
+                    u["fouten"].append(f"entiteit #{z['id']}: {status} {res.get('error')}")
+            meld(f"oo: {u['organisaties']} organisatie(s) kregen hun bestaan uit het register"
+                 f"{' (droog)' if droog else ''}; {u['blijft']} houden een beschermde datum")
         meld(f"{bron}: uitgave {uitgave}: {u['gezet']} verband(en) kregen hun datum uit het "
              f"record{' (droog)' if droog else ''}, {u['zonder_datum']} vastgelegd als "
              f"'register noemt geen begin'" + (f"; {len(u['fouten'])} fout(en)" if u["fouten"] else ""))

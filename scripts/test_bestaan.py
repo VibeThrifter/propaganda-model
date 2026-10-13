@@ -112,6 +112,7 @@ def main():
                                 ("bronchecker", "bijdrager", "agent"),
                                 ("merge-service", "reviewer", "agent"),
                                 ("stemtoets", "bijdrager", "agent"),
+                                ("registercheck", "bijdrager", "agent"),
                                 ("t-admin", "maintainer", "mens")):
             tokens[naam] = auth.new_token()
             conn.execute("INSERT OR IGNORE INTO users (username, kind, role, provenance, "
@@ -277,7 +278,8 @@ def main():
         a1(j["id"])
         neutraal(j["id"])
         s, j = api("get", f"/api/beoordeling/looptijd/{j['id']}", "merge-service")
-        eis(not j["toegestaan"] and any("nooit overschrijven" in x for x in j["redenen"]), "nooit overschrijven")
+        eis(not j["toegestaan"] and any("blijft" in x and "gemerged argument" in x for x in j["redenen"]),
+            "een datum met een gemerged argument wordt niet overschreven")
 
         print("6. De goedkeurpoort en de controles")
         laat = relatie(kees, pvda, "bestuurder", active_from="2026-09")   # na de opheffing
@@ -325,7 +327,194 @@ def main():
         eis(piet_rij["band_afgelopen"] and piet_rij["band"][0]["partij"]["id"] == pvda,
             "partijen: Piet telt mee bij Samen, met zijn eigen partij en een afgelopen band")
         c.close()
+        test_reparaties(api, rij, lees, bron, entiteit, relatie, bewijs, a1, neutraal, aspect,
+                        tokens, ab, server, validation, looptijd, db, tmp)
     print("test_bestaan: alles groen")
+
+
+def test_reparaties(api, rij, lees, bron, entiteit, relatie, bewijs, a1, neutraal, aspect,
+                    tokens, ab, server, validation, looptijd, db, tmp):
+    """Ronde twee (2026-10-13, "controleer nog veel meer van dit soort dingen en maak ze goed"):
+    datums corrigeren, het register, voorgangers goedkeuren, verhangen, de datumzoeker."""
+    import datumzoeker as dz
+    import bronzoeker as bz
+    print("8. Een onbeschermde datum corrigeren; verkorten en mensdatums niet")
+    omroep = entiteit("Proefomroep Nieuw", "omroep", active_from="2022")     # agent: geen bewijs
+    s, j = aspect(omroep, "active_from", "2019", "Proefomroep Nieuw werd in 2019 opgericht.",
+                  "De vereniging Proefomroep Nieuw is in 2019 opgericht.")
+    ruimer = j["id"]
+    s, j = aspect(omroep, "active_from", "2024", "Proefomroep Nieuw werd in 2024 opgericht.",
+                  "Proefomroep Nieuw, opgericht in 2024.")
+    korter = j["id"]
+    for a in (ruimer, korter):
+        a1(a)
+        neutraal(a)
+    s, j = api("get", f"/api/beoordeling/looptijd/{korter}", "merge-service")
+    eis(not j["toegestaan"] and any("verkorten" in x for x in j["redenen"]), "verkorten blijft mensenwerk")
+    s, j = api("post", f"/api/beoordeling/looptijd/{ruimer}", "merge-service")
+    eis(s == 200 and j["gecorrigeerd"] == "2022" and rij("entities", omroep)["active_from"] == "2019",
+        "een agentdatum zonder bewijs wijkt voor een eerdere datum uit een bron")
+    s, j = aspect(omroep, "active_from", "2019", "Proefomroep Nieuw bestaat sinds 2019.",
+                  "Proefomroep Nieuw bestaat sinds 2019.")
+    a1(j["id"]); neutraal(j["id"])
+    s, j2 = api("post", f"/api/beoordeling/looptijd/{j['id']}", "merge-service")
+    eis(s == 200 and j2["bevestigd"], "dezelfde datum: het argument bevestigt (merge, niets gewijzigd)")
+    s, j = api("post", "/api/entities", "t-admin", {"name": "Proefstichting Mens", "type": "stichting",
+                                                     "active_from": "2010"})
+    mens_ent = j["id"]
+    c = lees()
+    eis("mens" in (server._datum_beschermd(c, "entities", mens_ent, "active_from") or ""),
+        "een datum die een mens zette is beschermd")
+    eis(server._datum_beschermd(c, "entities", omroep, "active_from"), "en een datum met een gemerged argument ook")
+    c.close()
+
+    print("9. Het register geeft het bestaan van een overheidsorganisatie")
+    reg = entiteit("Proefraad", "overheidsinstelling", active_from="1997")
+    c = sqlite3.connect(db)
+    c.execute("INSERT INTO externe_ids (entity_id, stelsel, waarde) VALUES (?, 'oo', '777')", (reg,))
+    c.commit(); c.close()
+    s, j = api("post", f"/api/entities/{reg}/looptijd", "assistent", {"active_from": "1919", "reden": "x"})
+    eis(s == 403, "alleen de registercheck of een maintainer")
+    s, j = api("post", f"/api/entities/{reg}/looptijd", "registercheck",
+               {"active_from": "1919-02-21", "reden": "oo: record org:777 in uitgave 2026-10-08"})
+    eis(s == 200 and j["gewijzigd"] == ["active_from"] and rij("entities", reg)["active_from"] == "1919-02-21",
+        "een eerdere registerdatum vervangt een seed-/agentdatum")
+    s, j = api("post", f"/api/entities/{reg}/looptijd", "registercheck",
+               {"active_from": "1984-01-01", "reden": "oo: later record"})
+    eis(s == 200 and not j["gewijzigd"] and "active_from" in j["blijft"],
+        "een registerdatum die zelf door het register kwam, blijft (beschermd)")
+    # Een registerdatum die een goedgekeurd verband buiten het bestaan zet, gaat niet door
+    min_ = entiteit("Proefministerie", "overheidsinstelling")
+    c = sqlite3.connect(db)
+    c.execute("INSERT INTO externe_ids (entity_id, stelsel, waarde) VALUES (?, 'oo', '778')", (min_,))
+    c.commit(); c.close()
+    tak = entiteit("Proefdienst", "overheidsinstelling")
+    zeg = relatie(min_, tak, "zeggenschap", active_from="1995")
+    bewijs(zeg)
+    api("patch", f"/api/relations/{zeg}/status", "t-admin", {"status": "goedgekeurd", "motivatie": "test"})
+    s, j = api("post", f"/api/entities/{min_}/looptijd", "registercheck",
+               {"active_from": "2010-10-14", "reden": "oo: huidige vorm"})
+    eis(s == 200 and not j["gewijzigd"] and "buiten het bestaan" in j["blijft"]["active_from"],
+        "een registerdatum die een goedgekeurd verband buiten het bestaan zet, gaat niet door")
+    s, j = api("post", f"/api/entities/{reg}/looptijd", "registercheck", {"wis": ["active_from"], "reden": "test"})
+    eis(s == 200 and j["gewist"] == ["active_from"] and rij("entities", reg)["active_from"] is None,
+        "de registercheck draait zijn eigen registerdatum terug")
+    s, j = api("post", f"/api/entities/{omroep}/looptijd", "registercheck", {"wis": ["active_from"], "reden": "test"})
+    eis(s in (200, 400) and not j.get("gewist") and rij("entities", omroep)["active_from"] == "2019",
+        "maar niets wat het register niet zelf zette")
+    s, j = api("post", f"/api/entities/{piet_id(rij, lees)}/looptijd", "registercheck",
+               {"active_from": "1950", "reden": "x"})
+    eis(s == 400, "geen persoon, alleen een organisatie met een externe id")
+
+    print("10. Een voorganger komt binnen via haar fusie; verhangen")
+    opvolger = entiteit("Proefomroep VARANIEUW", "omroep", active_from="2014")
+    s, j = api("post", "/api/entities", "assistent", {"name": "Proefomroep VARA", "type": "omroep"})
+    voor = j["id"]                                   # voorgesteld, zonder eigen verbanden
+    # Wat ooit aan de opvolger hing, maar uit de tijd van de voorganger komt:
+    persoon = entiteit("Mies Proef", "persoon")
+    oud = relatie(persoon, opvolger, "bestuurder", active_from="1986", active_until="1995")
+    s, j = api("post", "/api/arguments", "assistent",
+               {"relation_id": oud, "stance": "supporting", "negeer_duplicaten": True,
+                "claim": "Mies Proef was van 1986 tot 1995 voorzitter van de Proefomroep VARA.",
+                "citations": [{"source_id": bron(), "quote": "Mies Proef, voorzitter van de Proefomroep VARA (1986-1995)."}]})
+    api("post", f"/api/arguments/{j['id']}/merge", "t-admin")
+    api("patch", f"/api/relations/{oud}/status", "t-admin", {"status": "goedgekeurd", "motivatie": "test"})
+    over = relatie(persoon, opvolger, "adviseur", active_from="2010", active_until="2020")   # over de fusie heen
+    bewijs(over)
+    api("patch", f"/api/relations/{over}/status", "t-admin", {"status": "goedgekeurd", "motivatie": "test"})
+    s, j = api("get", f"/api/beoordeling/verhangen/{oud}", "merge-service")
+    eis(not j["toegestaan"] and any("voorganger" in x for x in j["redenen"]), "zonder fusie geen verhangen")
+    # De voorganger: voorgesteld, zonder eigen verbanden, lijkt op de opvolger
+    s, j = aspect(voor, "active_until", "2014", "De Proefomroep VARA hield in 2014 op te bestaan.",
+                  "In 2014 fuseerde de Proefomroep VARA.")
+    eind_arg = j["id"]
+    s, j = aspect(voor, "opgegaan_in", str(opvolger),
+                  "De Proefomroep VARA ging in 2014 op in de Proefomroep VARANIEUW.",
+                  "In 2014 fuseerde de Proefomroep VARA tot de Proefomroep VARANIEUW.")
+    fusie_arg = j["id"]
+    for a in (eind_arg, fusie_arg):
+        a1(a); neutraal(a)
+    c = lees()
+    eis(not server.bewijs_autokeur_toegestaan(c, "entities", voor)[0], "vóór de fusie: geen goedkeuring")
+    c.close()
+    ab.stap_looptijd(tokens["merge-service"], argparse.Namespace(droog=False), print)
+    c = lees()
+    ok, redenen = server.bewijs_autokeur_toegestaan(c, "entities", voor)
+    c.close()
+    eis(ok, f"met de gemergede fusie is de voorganger goedkeurbaar (geen 'lijkt op' de opvolger) {redenen}")
+    s, j = api("post", f"/api/beoordeling/autokeur/entities/{voor}", "merge-service")
+    eis(rij("entities", voor)["status"] == "goedgekeurd", "de voorganger is goedgekeurd")
+    c = lees()
+    eis(oud in looptijd.verhangen_kandidaten(c), "verhangen_kandidaten vindt het verband")
+    c.close()
+    s, j = api("get", f"/api/beoordeling/verhangen/{over}", "merge-service")
+    eis(not j["toegestaan"], "een verband over de fusie heen blijft staan")
+    tel = ab.stap_verhangen(tokens["merge-service"], argparse.Namespace(droog=False, max_verhang=50), print)
+    eis(tel["verhangen"] == 1 and rij("relations", oud)["target_id"] == voor,
+        "stap 10d hangt het verband aan de voorganger die het bewijs noemt")
+    c = lees()
+    eis(c.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name = 'relations' AND record_id = ?
+                     AND reason LIKE 'automatische beoordeling: verhangen%'""", (oud,)).fetchone()[0] == 1,
+        "met oud/nieuw en de reden in edit_log")
+    eis(not any(f"#{oud}:" in v for v in validation.check_bestaan(c)[1]["voorbeelden"]),
+        "en het conflict is weg")
+    c.close()
+
+    print("11. De datumzoeker zoekt het bestaan van organisaties")
+    c = lees()
+    kand = dz.organisatie_kandidaten(c)
+    c.close()
+    eis(any(e["id"] == opvolger for e in kand) is False and any(e["id"] == krant_zonder(lees) for e in kand),
+        "kandidaten: organisaties met verbanden zonder oprichtingsdatum")
+    dz.DB_PATH = db
+    dz.ORG_STAND_PAD = Path(tmp) / "org.json"
+    dz.LOG_PATH = Path(tmp) / "dz.jsonl"
+    doel = krant_zonder(lees)
+    naam = rij("entities", doel)["name"]
+    dz.vraag = lambda prompt, schema, tools, regels=None: {
+        "gevonden": True, "begin": "1975", "eind": "",
+        "begin_bron": {"url": "https://bron.test/org", "titel": "Over ons", "uitgever": "Proef",
+                       "datum": "", "soort": "website", "citaat": f"{naam} werd in 1975 opgericht."},
+        "eind_bron": {"url": "", "titel": "", "uitgever": "", "datum": "", "soort": "website", "citaat": ""},
+        "bewering": f"{naam} werd in 1975 opgericht.", "toelichting": ""}
+    bz.natrekken = lambda b, partijen=None: (b, "")
+    tokpad = Path(tmp) / "dz.token"
+    tokpad.write_text(tokens["assistent"])
+    dz.bz.api_post = lambda api_url, token, pad, body: _via(api, pad, body)
+    dz.bz.registreer_bron = lambda api_url, token, b: bron()
+    tel = dz.organisatie_ronde("http://x", tokens["assistent"], 1, 5, False, print, [doel])
+    eis(tel["organisaties_ingediend"] == 1, f"een gevonden oprichting wordt een argument op de entiteit {tel}")
+    c = lees()
+    eis(c.execute("SELECT COUNT(*) FROM arguments WHERE entity_id = ? AND property = 'active_from' "
+                  "AND property_value = '1975'", (doel,)).fetchone()[0] == 1, "met de datum als waarde")
+    eis(any("ORGANISATIE-ZONDER-BESTAAN" == b["code"] for b in validation.check_bestaan(c)),
+        "de meter ORGANISATIE-ZONDER-BESTAAN bestaat")
+    c.close()
+
+
+def _via(api, pad, body):
+    return api("post", pad, "assistent", body)
+
+
+def piet_id(rij, lees):
+    c = lees()
+    try:
+        return c.execute("SELECT id FROM entities WHERE name = 'Piet Proef'").fetchone()[0]
+    finally:
+        c.close()
+
+
+def krant_zonder(lees):
+    """Een goedgekeurde organisatie met een goedgekeurd verband en zonder oprichtingsdatum."""
+    c = lees()
+    try:
+        return c.execute("""SELECT e.id FROM entities e WHERE e.status = 'goedgekeurd'
+            AND NOT e.vervangen AND e.type <> 'persoon' AND e.active_from IS NULL
+            AND EXISTS (SELECT 1 FROM relations r WHERE (r.source_id = e.id OR r.target_id = e.id)
+                        AND r.status = 'goedgekeurd' AND NOT r.vervangen)
+            ORDER BY e.id LIMIT 1""").fetchone()[0]
+    finally:
+        c.close()
 
 
 if __name__ == "__main__":
