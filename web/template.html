@@ -310,6 +310,23 @@ details.detail-section > .sec-body { margin-top: 8px; }
 .brug-rel:hover { border-color: var(--border-light); background: var(--bg-hover); }
 .brug-rel.afgelopen { opacity: 0.62; border-style: dashed; }
 
+/* Partijnetwerk (detailpaneel van een partij): posities van de verbonden personen */
+.pn-kop { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+.pn-groep { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); margin: 10px 0 2px; }
+.pn-klasse { border-bottom: 1px solid var(--border-zwak); }
+.pn-klasse > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
+  padding: 4px 0; font-size: 11.5px; color: var(--text-dim); }
+.pn-klasse > summary::-webkit-details-marker { display: none; }
+.pn-klasse > summary:hover { color: var(--text); }
+.pn-klasse .pn-label { flex: 0 0 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pn-klasse .pn-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--border-zwak); overflow: hidden; }
+.pn-klasse .pn-bar > span { display: block; height: 100%; background: var(--accent); opacity: 0.75; }
+.pn-klasse .pn-n { flex: 0 0 28px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.pn-klasse .brug-chips { padding: 2px 0 8px; }
+.pn-voet { font-size: 11px; margin-top: 8px; line-height: 1.5; }
+.pn-voet .pn-hint { color: var(--text-muted); }
+
 .score-bar { display: inline-flex; align-items: center; gap: 4px; }
 .score-bar .bar-track { width: 40px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
 .score-bar .bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
@@ -745,6 +762,7 @@ footer.hs-voet .hs-voet-merk { display: none; }
     <input type="text" id="search" placeholder="Zoek..." autocomplete="off" spellcheck="false">
   </div>
   <a class="admin-btn" href="/overzicht" style="text-decoration:none" title="Bladeren: alle entiteiten en mechanismen, elk met een eigen deelbare pagina">Overzicht</a>
+  <a class="admin-btn" href="/partijen" style="text-decoration:none" title="Per partij: wie eraan verbonden is en welke posities die mensen bekleden">Partijen</a>
   <a class="admin-btn" href="/methode" style="text-decoration:none" title="Methodologie &amp; verantwoording: de vijf filters, de scoring-discipline en de neutraliteitsverklaring">Methode</a>
   <button type="button" id="discussieBtn" class="admin-btn" title="Open de overlegpagina — alle threads én open voorstellen, op een eigen pagina">Overleg</button>
   <a id="beheerBtn" class="admin-btn" href="/beheer" style="display:none;text-decoration:none" title="Accountbeheer: rollen &amp; accounts (maintainer)">Beheer</a>
@@ -1104,27 +1122,7 @@ const TYPE_COLORS = {
   onderwijsinstelling: '#008a39', ngo: '#009520', vakbond: '#46b427',
   burgerinitiatief: '#93d044',
 };
-const RELATION_LABELS = {
-  // Eigendom & financiën
-  eigendom: 'Eigendom', financiering: 'Financiering', adverteerder: 'Adverteerder',
-  donor: 'Donor', investering: 'Investering',
-  // Organisatorisch
-  lidmaatschap: 'Lidmaatschap', personeel: 'Personeel', dienstverband: 'Dienstverband',
-  bestuurder: 'Bestuurder', adviseur: 'Adviseur', woordvoerder_van: 'Woordvoerder',
-  draaideur: 'Draaideur',
-  // Bestuur (Uitbreiding C, 2026-10-07)
-  ambt: 'Ambt', zeggenschap: 'Zeggenschap', controle: 'Controle', geschenk: 'Geschenk',
-  // Informatiestromen
-  bron_van: 'Bron van', mediaplatform: 'Mediaplatform', framing: 'Framing', citeert: 'Citeert',
-  // Macht & druk
-  lobbyt: 'Lobbyt', censuur: 'Censuur', flak: 'Flak', intimidatie: 'Intimidatie',
-  regulering: 'Regulering', zelfcensuur: 'Zelfcensuur',
-  // Politiek & ideologisch
-  alliantie: 'Alliantie', oppositie: 'Oppositie', beinvloeding: 'Beïnvloeding',
-  cooptatie: 'Coöptatie', etikettering: 'Etikettering',
-  // Algoritmisch
-  algoritmische_filtering: 'Algoritmische filtering',
-};
+// RELATION_LABELS staat in de gedeelde woordenschat (web/shared_vocab.js).
 // (FILTER_LABELS staat in de gedeelde woordenschat hierboven, web/shared_vocab.js.)
 
 // Thema's = dwarsliggende verbanden die meerdere filters overspannen (eigen selectie-as).
@@ -4418,7 +4416,8 @@ function selectNode(d) {
         directNeighborIds.add(sid);
         directNeighborIds.add(tid);
       });
-      const nodeOn = id => id === d.id || reached.has(id) || directNeighborIds.has(id);
+      const pn = partijNetwerk(d, visibleLinkSet);   // partij: ook de posities van haar mensen
+      const nodeOn = id => id === d.id || reached.has(id) || directNeighborIds.has(id) || pn.nodes.has(id);
       nodeElements.select('.node-circle').attr('opacity', n => nodeOn(n.id) ? 1 : 0.08);
       nodeElements.select('text').attr('opacity', n => nodeOn(n.id) ? 1 : 0.06);
       nodeElements.select('.field-halo').attr('opacity', n => nodeOn(n.id) ? fieldHaloOpacity(n) : 0.02);
@@ -4427,7 +4426,7 @@ function selectNode(d) {
       // in de DOM, de rest verdwijnt met een exit-fade (geen spookranden op 3% meer).
       // joinLinks zet markers en hoverbaarheid al goed; de verschijn-fade meteen afronden
       // zodat hij de sterkte-opacity hieronder niet alsnog overschrijft.
-      joinLinks(state.showDirect ? currentLinks.filter(l => linkStrength.has(l._idx) || directLinkIdx.has(l._idx)) : []);
+      joinLinks(state.showDirect ? currentLinks.filter(l => linkStrength.has(l._idx) || directLinkIdx.has(l._idx) || pn.links.has(l._idx)) : []);
       linkElements.interrupt('vis')
         // Cascade-pijl: feller naarmate het pad sterker is. Directe buur-pijl zonder
         // cascade-sterkte (m.n. inkomend): vaste, goed zichtbare opacity.
@@ -4449,8 +4448,8 @@ function selectNode(d) {
       // 'stable' doet syncSimulation niets; deselectNode → applyFilters herstelt.
       // NB: reached is een Map (id -> sterkte), dus expliciet de keys spreiden.
       // De directe buren (in-/uitgaand) horen ook in het subnetwerk dat zich hergroepeert.
-      syncSimulation(new Set([d.id, ...reached.keys(), ...directNeighborIds]),
-                     new Set([...linkStrength.keys(), ...directLinkIdx]));
+      syncSimulation(new Set([d.id, ...reached.keys(), ...directNeighborIds, ...pn.nodes]),
+                     new Set([...linkStrength.keys(), ...directLinkIdx, ...pn.links]));
 
       updateEmergentFields();   // velden van de geselecteerde node oplichten
       showDetail(d);
@@ -4464,7 +4463,8 @@ function selectNode(d) {
     ((typeof l.source === 'object' ? l.source.id : l.source) === d.id ||
      (typeof l.target === 'object' ? l.target.id : l.target) === d.id);
 
-  const connectedIds = new Set([d.id]);
+  const pn = partijNetwerk(d, visibleLinkSet);   // partij: ook de posities van haar mensen
+  const connectedIds = new Set([d.id, ...pn.nodes]);
   currentLinks.forEach(l => {
     if (!isConnected(l)) return;
     const sid = typeof l.source === 'object' ? l.source.id : l.source;
@@ -4481,12 +4481,12 @@ function selectNode(d) {
   // met een exit-fade (geen spookranden op 3% meer). joinLinks zet markers en
   // hoverbaarheid al goed; de verschijn-fade meteen afronden zodat hij de
   // highlight-opacity hieronder niet alsnog overschrijft.
-  joinLinks(state.showDirect ? currentLinks.filter(isConnected) : []);
+  joinLinks(state.showDirect ? currentLinks.filter(l => isConnected(l) || pn.links.has(l._idx)) : []);
   linkElements.interrupt('vis').attr('stroke-opacity', 0.8);
   if (edgeLabelElements) edgeLabelElements.interrupt('vis').attr('opacity', 1);
 
   // Zelfde selectie-volgende physics als in de cascade-tak hierboven.
-  syncSimulation(connectedIds, new Set(currentLinks.filter(isConnected).map(l => l._idx)));
+  syncSimulation(connectedIds, new Set([...currentLinks.filter(isConnected).map(l => l._idx), ...pn.links]));
 
   updateEmergentFields();   // velden van de geselecteerde node oplichten
   showDetail(d);
@@ -4954,6 +4954,116 @@ function renderBruggenSection(d) {
     { meta: tel(aff) || tel(bez), color: BRUG_COLOR });
 }
 
+// ── Partijnetwerk (praktijkmodel) ──────────────────────────────────────────
+// Een partij aanklikken licht naast haar directe buren ook de posities van haar mensen
+// op: de tweede stap partij → persoon → organisatie (ambt, bestuur, lidmaatschap,
+// dienstverband…). Zonder dit blijft die stap onzichtbaar: met invloed op de 0,05-vloer
+// haalt de invloedscascade hem nooit. Beschrijvend, zoals de bruggen.
+const PARTIJBAND_TYPES = new Set(['lidmaatschap', 'bestuurder', 'adviseur', 'personeel',
+  'dienstverband', 'woordvoerder_van', 'draaideur']);
+const POSITIE_TYPES = new Set([...PARTIJBAND_TYPES, 'ambt']);
+function partijLeden(partijId) {
+  const leden = new Set();
+  (DATA.relations || []).forEach(r => {
+    if (r.status !== 'goedgekeurd' || !PARTIJBAND_TYPES.has(r.relation_type)) return;
+    const ander = r.source_id === partijId ? r.target_id : (r.target_id === partijId ? r.source_id : null);
+    const e = ander != null && entityMap.get(ander);
+    if (e && e.type === 'persoon') leden.add(ander);
+  });
+  return leden;
+}
+function isLedenBand(r, partij) {
+  if (partij.type !== 'partij' || r.status !== 'goedgekeurd' || !PARTIJBAND_TYPES.has(r.relation_type)) return false;
+  const e = entityMap.get(r.source_id === partij.id ? r.target_id : r.source_id);
+  return !!e && e.type === 'persoon';
+}
+// {nodes, links}: de leden en hun organisaties + de zichtbare positie-edges ertussen.
+function partijNetwerk(d, visibleLinkSet) {
+  const nodes = new Set(), links = new Set();
+  if (state.model === 'theory' || d.type !== 'partij') return { nodes, links };
+  const leden = partijLeden(d.id);
+  currentLinks.forEach(l => {
+    if (!visibleLinkSet.has(l._idx) || !POSITIE_TYPES.has(l.relation_type)) return;
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    const lid = leden.has(sid) ? sid : (leden.has(tid) ? tid : null);
+    if (lid == null) return;
+    const ander = lid === sid ? tid : sid;
+    const e = entityMap.get(ander);
+    if (!e || e.type === 'persoon' || (e.type === 'partij' && ander !== d.id)) return;
+    links.add(l._idx); nodes.add(lid); nodes.add(ander);
+  });
+  return { nodes, links };
+}
+
+// Detailpaneel: posities van de verbonden personen per categorie, uit GET /api/partijen/<id>
+// (partijen.py — dezelfde indeling als de pagina /partijen). Lopend = band én positie niet beëindigd.
+const partijNetwerkCache = new Map();
+function renderPartijNetwerkSlot(d) {
+  return collapsibleSection('Partijnetwerk',
+    `<div id="pn-${d.id}"><div class="pn-kop">Posities van de verbonden personen laden…</div></div>`,
+    { open: true, meta: '…' });
+}
+async function vulPartijNetwerk(d) {
+  let data = partijNetwerkCache.get(d.id);
+  if (!data) {
+    try {
+      const resp = await fetch(`/api/partijen/${d.id}`);
+      if (!resp.ok) throw new Error(resp.status);
+      data = await resp.json();
+      partijNetwerkCache.set(d.id, data);
+    } catch (e) {
+      const slot = document.getElementById(`pn-${d.id}`);
+      if (slot) slot.innerHTML = `<div class="pn-kop">Het partijnetwerk kon niet worden geladen.</div>`;
+      return;
+    }
+  }
+  const slot = document.getElementById(`pn-${d.id}`);
+  if (!slot) return;   // intussen een ander element geselecteerd
+  const rendered = renderedNodeIds();
+  const chip = (p, pos) => {
+    const tip = escAttr(`${pos.label} · ${pos.org.naam}${pos.looptijd ? ' (' + pos.looptijd + ')' : ''}`);
+    const klik = rendered.has(p.id)
+      ? `const n=currentNodes.find(x=>x.id===${p.id});if(n)selectNode(n)`
+      : `location.href='/persoon/${p.id}'`;
+    return `<span class="brug-chip" title="${tip}" onclick="${klik}">${escAttr(p.naam)}</span>`;
+  };
+  const CAP = 24;
+  let html = `<div class="pn-kop">${data.n_personen[1]} verbonden personen met een lopende band`
+    + `${data.n_personen[0] > data.n_personen[1] ? ` (${data.n_personen[0]} ooit)` : ''}.`
+    + ` Klik een categorie voor de namen; de graaf licht hun posities mee op.</div>`;
+  const max = Math.max(1, ...data.klassen.map(k => (data.telling[k.key] || [0, 0])[1]));
+  let groep = null;
+  data.klassen.forEach(k => {
+    const nu = (data.telling[k.key] || [0, 0])[1];
+    if (!nu) return;
+    if (k.groep !== groep) { groep = k.groep; html += `<div class="pn-groep">${k.groep_label}</div>`; }
+    const mensen = [];
+    data.personen.forEach(p => {
+      if (p.band_afgelopen) return;
+      const pos = p.posities.find(x => x.klasse === k.key && x.nu);
+      if (pos) mensen.push([p, pos]);
+    });
+    const meer = mensen.length - CAP;
+    html += `<details class="pn-klasse"><summary><span class="pn-label">${k.label}</span>`
+      + `<span class="pn-bar"><span style="width:${Math.round(100 * nu / max)}%"></span></span>`
+      + `<span class="pn-n">${nu}</span></summary><div class="brug-chips">`
+      + mensen.slice(0, CAP).map(([p, pos]) => chip(p, pos)).join('')
+      + (meer > 0 ? `<a class="brug-chip more" href="/partijen#partij-${d.id}/${k.key}">+${meer} meer</a>` : '')
+      + `</div></details>`;
+  });
+  const gemeentelijk = ['burgemeester', 'wethouder', 'gemeente', 'waterschap']
+    .some(k => (data.telling[k] || [0, 0])[1] > 0);
+  const lagenUit = ['gemeente', 'waterschap'].filter(l => !state.activeLagen.has(l));
+  html += `<div class="pn-voet"><a href="/partijen#partij-${d.id}">↗ Alle namen en posities, en de vergelijking met andere partijen</a>`
+    + (gemeentelijk && lagenUit.length
+      ? `<div class="pn-hint">Burgemeesters, wethouders en waterschapsbestuurders staan in de graaf uit (zijbalk → Bestuurslaag); in deze lijst tellen ze wel mee.</div>` : '')
+    + `<div class="pn-hint">De relaties met de leden zelf staan niet hieronder bij de relaties, maar in deze sectie.</div></div>`;
+  slot.innerHTML = html;
+  const meta = slot.closest('details.detail-section')?.querySelector('.sec-meta');
+  if (meta) meta.textContent = `${data.n_personen[1]} pers.`;
+}
+
 // ── Rol-projectie (theoriemodel ↔ praktijkmodel consistent) ──
 // Géén nieuw begrip: dezelfde praktijk-bruggen, via de instantiatie (entity.role_ids)
 // samengevat op rolniveau. Voor rol R: pak de entiteiten die R instantiëren, neem hun
@@ -5305,8 +5415,9 @@ function showInstanceDetail(d, content, color) {
   const sortRels = arr => arr.slice().sort((a, b) =>
     (isAfgelopen(a) - isAfgelopen(b)) ||                                  // actief eerst
     ((parseYear(b.active_from) || 0) - (parseYear(a.active_from) || 0))); // recentste begin eerst
-  const outgoing = sortRels(allRels.filter(l => l.source_id === d.id));
-  const incoming = sortRels(allRels.filter(l => l.target_id === d.id));
+  // Bij een partij staan de banden met haar leden in de sectie Partijnetwerk, niet in de lijsten.
+  const outgoing = sortRels(allRels.filter(l => l.source_id === d.id && !isLedenBand(l, d)));
+  const incoming = sortRels(allRels.filter(l => l.target_id === d.id && !isLedenBand(l, d)));
   const relMeta = arr => { const af = arr.filter(isAfgelopen).length; return af ? `${arr.length} · ${af} afgelopen` : arr.length; };
 
   let html = `
@@ -5316,13 +5427,14 @@ function showInstanceDetail(d, content, color) {
       ${d.role_name ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">rol: ${d.role_name}</div>` : ''}
       <div style="margin-top:6px"><a href="/${d.type === 'persoon' ? 'persoon' : 'entiteit'}/${d.id}"
         style="font-size:12px;font-weight:600;color:var(--accent)"
-        title="Open de volledige, deelbare pagina van ${esc(d.name)} (met samenvatting, bronnen en scores)">↗ Bekijk volledige pagina</a></div>
+        title="Open de volledige, deelbare pagina van ${escAttr(d.name)} (met samenvatting, bronnen en scores)">↗ Bekijk volledige pagina</a></div>
       <div style="margin-top:4px"><a href="/tip?betreft=entity:${d.id}" rel="nofollow"
         style="font-size:11px;color:var(--text-muted)"
         title="Meld een feitelijke onjuistheid of draag een bron aan (eenrichting, geen account nodig)">⚑ Onjuistheid melden / bron voorstellen</a></div>
     </div>
   `;
   if (d.description) html += `<div class="detail-description">${d.description}</div>`;
+  if (d.type === 'partij') html += renderPartijNetwerkSlot(d);
   // Afgeleide geloofwaardigheid (laag B) met interval + vlaggen (scoring v2)
   if (d.score_detail) {
     const sd = d.score_detail;
@@ -5392,6 +5504,7 @@ function showInstanceDetail(d, content, color) {
   }
 
   setPanelContent(`ent-${d.id}`, html);
+  if (d.type === 'partij') vulPartijNetwerk(d);
 }
 
 function relationCard(otherName, r, direction) {

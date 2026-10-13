@@ -100,3 +100,26 @@ function weergaveNaam(naam) {
   const vlak = s.replace(/_/g, ' ').trim();
   return vlak.charAt(0).toUpperCase() + vlak.slice(1);
 }
+
+// Relatietypen (relations.relation_type) → leesbaar label. Gedeeld door de viz en /partijen.
+const RELATION_LABELS = {
+  // Eigendom & financiën
+  eigendom: 'Eigendom', financiering: 'Financiering', adverteerder: 'Adverteerder',
+  donor: 'Donor', investering: 'Investering',
+  // Organisatorisch
+  lidmaatschap: 'Lidmaatschap', personeel: 'Personeel', dienstverband: 'Dienstverband',
+  bestuurder: 'Bestuurder', adviseur: 'Adviseur', woordvoerder_van: 'Woordvoerder',
+  draaideur: 'Draaideur',
+  // Bestuur (Uitbreiding C, 2026-10-07)
+  ambt: 'Ambt', zeggenschap: 'Zeggenschap', controle: 'Controle', geschenk: 'Geschenk',
+  // Informatiestromen
+  bron_van: 'Bron van', mediaplatform: 'Mediaplatform', framing: 'Framing', citeert: 'Citeert',
+  // Macht & druk
+  lobbyt: 'Lobbyt', censuur: 'Censuur', flak: 'Flak', intimidatie: 'Intimidatie',
+  regulering: 'Regulering', zelfcensuur: 'Zelfcensuur',
+  // Politiek & ideologisch
+  alliantie: 'Alliantie', oppositie: 'Oppositie', beinvloeding: 'Beïnvloeding',
+  cooptatie: 'Coöptatie', etikettering: 'Etikettering',
+  // Algoritmisch
+  algoritmische_filtering: 'Algoritmische filtering',
+};

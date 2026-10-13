@@ -65,8 +65,8 @@ async function hsBouwTopbal() {
     if (key === actief) { a.classList.add('actief'); a.setAttribute('aria-current', 'page'); }
     return a;
   };
-  nav.append(link('/', 'Netwerk', 'netwerk'), link('/overleg', 'Overleg', 'overleg'),
-             link('/methode', 'Methode', 'methode'));
+  nav.append(link('/', 'Netwerk', 'netwerk'), link('/partijen', 'Partijen', 'partijen'),
+             link('/overleg', 'Overleg', 'overleg'), link('/methode', 'Methode', 'methode'));
 
   bal.prepend(merk, nav);
 

@@ -28,6 +28,7 @@ import politiek  # politieke kleurmeter: ideologische positie uit gesourcete sig
 import tegenmacht  # machtsvalentie: tegenmacht als gerichte edge-valentie (geen categorie)
 import doelgroep  # welstandsmeter: getargette marketing-/welstandsklasse per outlet
 import bereik  # bereikmeter: gesourcet publieksbereik (kijkers/lezers/invullers) per jaar
+import partijen  # partijnetwerk: wie aan welke partij verbonden is en welke posities die mensen bekleden
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
@@ -409,6 +410,14 @@ def methode_page():
     verklaring, de disclaimer en de art. 43-UAVG-grondslag. Openbaar (geen gate) —
     dit is het juridische schild en moet vindbaar zijn vanaf de voordeur."""
     return send_file(WEB_PATH / "methode.html")
+
+
+@app.route("/partijen")
+def partijen_page():
+    """Publiek overzicht van het partijnetwerk: per partij de verbonden personen en hun
+    posities (bestuur, overheid, daarbuiten) en de organisaties die mensen uit meerdere
+    partijen delen. De pagina haalt haar data uit /api/partijen (partijen.py)."""
+    return send_file(WEB_PATH / "partijen.html")
 
 
 @app.route("/docs/openapi.yaml")
@@ -6207,6 +6216,33 @@ def get_bereik():
     conn = get_db()
     res = bereik.compute_bereik(conn, include_voorgesteld=preview)
     conn.close()
+    return jsonify(res)
+
+
+@app.route("/api/partijen")
+def get_partijen():
+    """Partijnetwerk (partijen.py): per partij het aantal verbonden personen per
+    positieklasse ('alle' en 'nu') + de organisaties waar mensen uit twee of meer partijen
+    een positie hebben. Beschrijvend, telt nergens mee; alleen goedgekeurde verbanden."""
+    conn = get_db()
+    try:
+        res = partijen.compute_overzicht(conn)
+    finally:
+        conn.close()
+    return jsonify(res)
+
+
+@app.route("/api/partijen/<int:partij_id>")
+def get_partij(partij_id):
+    """Eén partij in detail: per persoon de band met de partij, de posities en de overige
+    relaties, plus de banden van de partij zelf. 404 als het geen goedgekeurde partij is."""
+    conn = get_db()
+    try:
+        res = partijen.compute_partij(conn, partij_id)
+    finally:
+        conn.close()
+    if res is None:
+        return jsonify({"error": "Geen goedgekeurde partij met dit id."}), 404
     return jsonify(res)
 
 
