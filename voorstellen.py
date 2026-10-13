@@ -684,6 +684,10 @@ def _voer_samenvoegen_uit(conn, payload, voorstel_id) -> dict:
                              (str(nieuw_id), aid))
             verplaatst["padclaims"] += 1
 
+    if et == "entiteit":
+        # Identiteit, geen bewijs (2026-10-09): externe id's (de registers koppelen er voortaan
+        # aan), rollen en registergegevens gaan mee naar de opvolger; wat die al heeft, blijft
+        verplaatst["externe_ids"] = _verhuis_identiteit(conn, oud_ids, nieuw_id)
     for oud in oud_ids:
         conn.execute(f"UPDATE {TABEL[et]} SET vervangen = 1 WHERE id = ?", (oud,))
         conn.execute("""INSERT INTO lineage (soort, element_type, oud_id, nieuw_id,
@@ -693,6 +697,36 @@ def _voer_samenvoegen_uit(conn, payload, voorstel_id) -> dict:
     achtergebleven = sum(len(v) for v in aanhangsels_meervoudig(conn, et, oud_ids).values())
     return {"element_type": et, "nieuw_id": nieuw_id, "vervangen": oud_ids,
             "verplaatst": verplaatst, "achtergebleven": achtergebleven}
+
+
+def _verhuis_identiteit(conn, oud_ids, nieuw_id) -> int:
+    """Externe id's, rollen, bestuurslaag en ontbrekende metadata van de oude entiteiten naar
+    de opvolger. → aantal verhuisde externe id's."""
+    plaats = ",".join("?" * len(oud_ids))
+    n = conn.execute(f"UPDATE externe_ids SET entity_id = ? WHERE entity_id IN ({plaats})",
+                     [nieuw_id, *oud_ids]).rowcount
+    nieuw = conn.execute("SELECT primary_role_id, bestuurslaag, metadata FROM entities WHERE id = ?",
+                         (nieuw_id,)).fetchone()
+    try:
+        meta = json.loads(nieuw["metadata"]) if nieuw["metadata"] else {}
+    except (TypeError, ValueError):
+        meta = {}
+    laag = nieuw["bestuurslaag"]
+    for oud in conn.execute(f"SELECT * FROM entities WHERE id IN ({plaats})", oud_ids).fetchall():
+        rollen = {oud["primary_role_id"]} | {r[0] for r in conn.execute(
+            "SELECT role_id FROM entity_roles WHERE entity_id = ?", (oud["id"],))}
+        for rid in rollen - {None, nieuw["primary_role_id"]}:
+            conn.execute("INSERT OR IGNORE INTO entity_roles (entity_id, role_id) VALUES (?, ?)",
+                         (nieuw_id, rid))
+        laag = laag or oud["bestuurslaag"]
+        try:
+            oud_meta = json.loads(oud["metadata"]) if oud["metadata"] else {}
+        except (TypeError, ValueError):
+            oud_meta = {}
+        meta.update({k: v for k, v in oud_meta.items() if k not in meta})
+    conn.execute("UPDATE entities SET bestuurslaag = ?, metadata = ? WHERE id = ?",
+                 (laag, json.dumps(meta, ensure_ascii=False) if meta else None, nieuw_id))
+    return n
 
 
 def aanhangsels_meervoudig(conn, element_type, oud_ids) -> dict:

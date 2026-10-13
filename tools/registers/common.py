@@ -95,7 +95,9 @@ RANGEN = {"vice-admiraal", "luitenant-admiraal", "schout-bij-nacht", "admiraal",
           "lkol", "luitenant-kolonel", "commandeur", "majoor", "kapitein", "commodore"}
 TITELS = {"mr", "dr", "drs", "ir", "ing", "prof", "bc", "ds", "lic", "em", "dra"}
 ACHTER = {"msc", "ma", "ba", "mba", "llm", "mpa", "med", "phd", "ra", "mphil", "bsc", "mdr",
-          "aa", "emba", "llb", "msc.", "cpa", "rc", "emoc"}
+          "aa", "emba", "llb", "msc.", "cpa", "rc", "emoc",
+          # 2026-10-09: "Erik Akerboom MPM" werd een tweede knoop naast "Erik Akerboom"
+          "mpm", "mpp", "mcm", "mres", "dba", "bba", "mlitt", "mjur", "mmc"}
 TUSSEN = {"van", "de", "der", "den", "het", "ten", "ter", "te", "in", "'t", "‘t", "’t", "op",
           "d'", "du", "la", "le", "von", "zu", "di", "da", "del", "dos", "el", "al", "uit"}
 _INITIAAL = re.compile(r"^(?:[A-ZÀ-Ý][a-z]{0,2}\.)+[A-ZÀ-Ý]?\.?$|^[A-ZÀ-Ý]{1,3}\.(?:[A-ZÀ-Ý][a-z]?\.)*$")
@@ -157,7 +159,9 @@ def ontleed_naam(ruw: str | None) -> dict:
             tokens.pop(0)
         else:
             break
-    while tokens and tokens[-1].lower().strip(".,") in ACHTER:
+    # Een titel achter de naam ("MSc", "MPM"), maar nooit de achternaam zelf ("A. van Ma")
+    while (len(tokens) > 2 and tokens[-1].lower().strip(".,") in ACHTER
+           and tokens[-2].lower() not in TUSSEN):
         tokens.pop()
     voorletters = ""
     while tokens and _INITIAAL.match(tokens[0]):

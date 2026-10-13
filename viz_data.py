@@ -57,7 +57,9 @@ def export_data(conn):
     # viz het goedgekeurde model tonen. Vervangen (M2.6) blijft altijd buiten beeld.
     cur.execute("""
         SELECT e.id, e.name, e.type, e.description, e.status,
-               e.active_from, e.active_until, e.active, e.bestuurslaag,
+               e.active_from, e.active_until, CASE WHEN e.active_until IS NOT NULL
+                     AND e.active_until < substr(date('now'), 1, length(e.active_until))
+                    THEN 0 ELSE e.active END AS active, e.bestuurslaag,
                r.name as role_name, r.category as filter_category
         FROM entities e
         LEFT JOIN roles r ON e.primary_role_id = r.id
@@ -84,7 +86,11 @@ def export_data(conn):
         SELECT r.id, r.source_id, r.target_id, r.relation_type,
                r.certainty, r.influence, r.bidirectional,
                r.description, r.mechanism_id, r.status, r.functie,
-               r.active_from, r.active_until, r.active,
+               r.active_from, r.active_until,
+               -- een afgelopen verband is niet meer actief, ook als de vlag het niet weet
+               CASE WHEN r.active_until IS NOT NULL
+                     AND r.active_until < substr(date('now'), 1, length(r.active_until))
+                    THEN 0 ELSE r.active END AS active,
                e1.name as source_name, e2.name as target_name,
                m.name as mechanism_name, m.filter as mechanism_filter,
                COALESCE(m.aard, 'direct') as aard

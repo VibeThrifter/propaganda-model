@@ -1273,6 +1273,169 @@ def main():
         eis("Eén feit per bewering" in bz.OPDRACHT and "neutrale eigen woorden" in bz.OPDRACHT
             and "BEIDE partijen" in bz.OPDRACHT, "de opdracht noemt de drie regels")
 
+        print("25. Opschonen: dubbele bronnen en verbanden, registerrollen, samenvoegen")
+        import opschonen
+        import voorstellen as vs
+        import viz_data
+        # Dezelfde pagina onder een andere titel is dezelfde bron
+        st, j1 = api("post", "/api/sources", "nieuws-scout",
+                     {"title": "Pagina A", "source_type": "website",
+                      "location": {"type": "url", "value": "https://www.dubbel.test/stuk/?utm_source=x"}})
+        st2, j2 = api("post", "/api/sources", "nieuws-scout",
+                      {"title": "Pagina A (andere titel)", "source_type": "website",
+                       "location": {"type": "url", "value": "http://dubbel.test/stuk"}})
+        eis(st == 201 and st2 == 200 and j2.get("hergebruikt") and j2["id"] == j1["id"],
+            "POST /api/sources hergebruikt een bron met dezelfde url")
+        # Twee bronnen die al dubbel staan (van vóór die regel): de jongste gaat op in de oudste
+        c = sqlite3.connect(db)
+        c.row_factory = sqlite3.Row
+        oud_bron, jong_bron = j1["id"], c.execute(
+            "INSERT INTO sources (title, source_type, cluster_key) VALUES ('Pagina A kopie', "
+            "'website', 'ander-cluster')").lastrowid
+        c.execute("INSERT INTO source_locations (source_id, location_type, location) VALUES "
+                  "(?, 'url', 'https://dubbel.test/stuk/')", (jong_bron,))
+        c.commit()
+        c.close()
+        dubbel_rel = relatie(partij, persoon, "lidmaatschap")
+        arg_jong = argument(dubbel_rel, "nieuws-scout", citations=[
+            {"source_id": jong_bron, "quote": "Anouk Verbeek is lid."}])
+        st, j = api("get", f"/api/beoordeling/bron_dubbel/{jong_bron}", "merge-service")
+        eis(j.get("toegestaan") and j.get("blijft") == oud_bron, "droogloop: de jongste bron is dubbel")
+        st, j = api("post", f"/api/beoordeling/bron_dubbel/{jong_bron}", "merge-service")
+        c = sqlite3.connect(db)
+        eis(st == 200 and j["citaties"] == 1
+            and c.execute("SELECT source_id FROM citations WHERE argument_id = ?",
+                          (arg_jong,)).fetchone()[0] == oud_bron
+            and c.execute("SELECT 1 FROM sources WHERE id = ?", (jong_bron,)).fetchone() is None
+            and c.execute("SELECT 1 FROM edit_log WHERE table_name = 'sources' AND record_id = ? "
+                          "AND action = 'deleted'", (jong_bron,)).fetchone(),
+            "de citatie verhuist, de dubbele bron verdwijnt (oude rij in edit_log)")
+        c.close()
+        st, j = api("post", f"/api/beoordeling/bron_dubbel/{oud_bron}", "merge-service")
+        eis(st == 409, "de oudste bron blijft")
+
+        # Dubbele verbanden: twee keer hetzelfde feit
+        def gedragen_verband(src, tgt, rtype, **velden):
+            rid = relatie(src, tgt, rtype)
+            arg = argument(rid, "nieuws-scout")
+            a1(arg)
+            merge(arg)
+            c = sqlite3.connect(db)
+            # gemerged, ook als A7 voor dit type ook A2 vraagt (dat toetsen stap 3–5)
+            c.execute("UPDATE arguments SET status = 'ongecontroleerd' WHERE id = ? AND status = "
+                      "'voorgesteld'", (arg,))
+            c.execute("UPDATE relations SET status = 'goedgekeurd'"
+                      + "".join(f", {k} = ?" for k in velden) + " WHERE id = ?",
+                      (*velden.values(), rid))
+            c.commit()
+            c.close()
+            return rid
+
+        eerste = gedragen_verband(denktank, medium, "alliantie")
+        tweede = gedragen_verband(denktank, medium, "alliantie", active_from="2020-01-01")
+        st, j = api("get", f"/api/beoordeling/dubbel/{eerste}", "merge-service")
+        eis(not j["toegestaan"], "het oudste van twee gelijke verbanden blijft")
+        st, j = api("post", f"/api/beoordeling/dubbel/{tweede}", "merge-service")
+        c = sqlite3.connect(db)
+        c.row_factory = sqlite3.Row
+        eis(st == 200 and j["blijft"] == eerste and status("relations", tweede) == "afgewezen"
+            and c.execute("SELECT active_from FROM relations WHERE id = ?",
+                          (eerste,)).fetchone()[0] == "2020-01-01"
+            and c.execute("SELECT COUNT(*) FROM arguments WHERE relation_id = ? AND status <> "
+                          "'verworpen'", (tweede,)).fetchone()[0] == 0,
+            "het jongste wordt afgewezen (boom mee), de begindatum gaat naar het blijvende")
+        c.close()
+        # In beide richtingen dezelfde tweezijdige band: één blijft
+        heen = gedragen_verband(persoon, denktank, "adviseur")
+        terug = gedragen_verband(denktank, persoon, "adviseur")
+        oordelen = [api("get", f"/api/beoordeling/dubbel/{r}", "merge-service")[1]["toegestaan"]
+                    for r in (heen, terug)]
+        eis(sorted(oordelen) == [False, True], "beide richtingen: precies één is dubbel")
+        # Een ambt naast een band met een ánder mechanisme is een ander feit
+        ander_mech = sqlite3.connect(db).execute(
+            "SELECT id FROM mechanisms WHERE NOT vervangen AND id <> ? ORDER BY id LIMIT 1",
+            (MECH,)).fetchone()[0]
+        ambt = gedragen_verband(persoon, medium, "ambt")
+        band = gedragen_verband(persoon, medium, "bestuurder", mechanism_id=ander_mech)
+        eis(not api("get", f"/api/beoordeling/dubbel/{band}", "merge-service")[1]["toegestaan"],
+            "een band met een ander mechanisme naast een ambt blijft")
+        c = sqlite3.connect(db)
+        c.execute("UPDATE relations SET mechanism_id = ? WHERE id = ?", (MECH, band))
+        c.commit()
+        c.close()
+        eis(api("get", f"/api/beoordeling/dubbel/{band}", "merge-service")[1]["toegestaan"]
+            and not api("get", f"/api/beoordeling/dubbel/{ambt}", "merge-service")[1]["toegestaan"],
+            "met hetzelfde mechanisme wint het ambt")
+        # Wat alleen een mens goedkeurde, blijft staan
+        door_mens = relatie(medium, partij, "alliantie")
+        arg = argument(door_mens, "nieuws-scout")
+        a1(arg)
+        merge(arg)
+        c = sqlite3.connect(db)
+        c.execute("UPDATE arguments SET status = 'ongecontroleerd' WHERE id = ?", (arg,))
+        c.commit()
+        c.close()
+        goedkeuren("relations", door_mens)
+        kopie = gedragen_verband(medium, partij, "alliantie")
+        eis(not api("get", f"/api/beoordeling/dubbel/{door_mens}", "merge-service")[1]["toegestaan"]
+            and api("get", f"/api/beoordeling/dubbel/{kopie}", "merge-service")[1]["toegestaan"],
+            "een besluit van een mens blijft; de kopie zonder mens gaat")
+
+        # Registerrollen: een gekoppelde organisatie krijgt de rol die het register geeft
+        c = sqlite3.connect(db)
+        c.row_factory = sqlite3.Row
+        tokens["register-import"] = auth.new_token()
+        c.execute("INSERT OR IGNORE INTO users (username, kind, role, provenance, token_hash) "
+                  "VALUES ('register-import', 'agent', 'bijdrager', 'test', ?)",
+                  (auth.hash_token(tokens["register-import"]),))
+        c.execute("UPDATE users SET token_hash = ? WHERE username = 'register-import'",
+                  (auth.hash_token(tokens["register-import"]),))
+        rol = c.execute("SELECT name FROM roles WHERE NOT vervangen ORDER BY id LIMIT 1").fetchone()[0]
+        c.commit()
+        c.close()
+        kop["register-import"] = {"Authorization": f"Bearer {tokens['register-import']}"}
+        ministerie = entiteit("Ministerie van Voorbeeldzaken", "overheidsinstelling")
+        st, j = api("post", f"/api/entities/{ministerie}/register", "register-import",
+                    {"rollen": [rol], "externe_ids": [{"stelsel": "oo", "waarde": "123"}]})
+        st2, j2 = api("post", f"/api/entities/{ministerie}/register", "register-import",
+                      {"rollen": [rol]})
+        st3, _ = api("post", f"/api/entities/{ministerie}/register", "register-import",
+                     {"rollen": ["bestaat_niet"]})
+        c = sqlite3.connect(db)
+        eis(st == 200 and j["gewijzigd"].get("primaire_rol") == rol and not j2["gewijzigd"]
+            and st3 == 400
+            and c.execute("SELECT 1 FROM instantiations WHERE entity_id = ? AND role_id IS NOT "
+                          "NULL", (ministerie,)).fetchone(),
+            "registerrol: aanvullen, nooit overschrijven, onbekende rol geweigerd")
+        c.close()
+
+        # Samenvoegen van entiteiten neemt externe id's en rollen mee
+        dubbel_min = entiteit("Ministerie van Voorbeeldzaken (register)", "overheidsinstelling")
+        c = sqlite3.connect(db)
+        c.row_factory = sqlite3.Row
+        c.execute("UPDATE externe_ids SET entity_id = ? WHERE entity_id = ?", (dubbel_min, ministerie))
+        vid = c.execute("INSERT INTO voorstellen (soort, titel, payload, ingediend_door) VALUES "
+                        "('samenvoegen', 't', '{}', 'assistent')").lastrowid
+        uit = vs.voer_uit(c, "samenvoegen", {"element_type": "entiteit", "oud_ids": [dubbel_min],
+                                             "doel": {"bestaand_id": ministerie},
+                                             "herbevestigd": {}, "motivatie": "test"}, vid)
+        eis(uit["verplaatst"]["externe_ids"] == 1
+            and c.execute("SELECT entity_id FROM externe_ids WHERE stelsel = 'oo' AND waarde = '123'"
+                          ).fetchone()[0] == ministerie,
+            "samenvoegen: de externe id gaat naar de opvolger")
+        c.rollback()
+        c.close()
+
+        # De viz: een verband met een verstreken einddatum is niet meer actief
+        c = sqlite3.connect(db)
+        c.execute("UPDATE relations SET active_until = '2001-01-01' WHERE id = ?", (eerste,))
+        c.commit()
+        rel = next(r for r in viz_data.export_data(c)["relations"] if r["id"] == eerste)
+        c.close()
+        eis(not rel["active"], "viz: een afgelopen verband is niet actief")
+        eis(opschonen.url_sleutel("https://WWW.Voorbeeld.nl/a/?b=1&utm_medium=x#z")
+            == "voorbeeld.nl/a?b=1", "url-sleutel: host, www, slash, tracking en fragment")
+
         print("\nALLE TESTS VAN DE AUTOMATISCHE BEOORDELING GESLAAGD")
 
 

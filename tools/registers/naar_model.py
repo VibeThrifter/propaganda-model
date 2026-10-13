@@ -20,9 +20,12 @@ Diepte (eigenaarsbesluit "Rijk + alle bestuurders"):
 Koppelen (nooit op naam alleen):
   - organisaties: eerst externe_ids (oo/tooi), dan koppelingen.json (ingecheckt, met de hand
     nagelopen), anders nieuw;
+  - organisaties die al bestonden krijgen ook de rol die de registersoort geeft (een ministerie
+    → departement), naast wat ze al waren;
   - personen: een volledige naam die exact gelijk is aan een bestaande persoon met een
-    passende rol wordt gekoppeld; anders een nieuwe knoop. Een naam met alleen voorletters
-    krijgt altijd een toevoeging ("B.C.M. Vostermans (burgemeester Peel en Maas)").
+    passende rol, of met al een verband met dezelfde organisatie, wordt gekoppeld; anders een
+    nieuwe knoop. Een titel achter de naam ("MPM", "MSc") telt niet mee. Een naam met alleen
+    voorletters krijgt altijd een toevoeging ("B.C.M. Vostermans (burgemeester Peel en Maas)").
 
 Gebruik:
     python3 tools/registers/naar_model.py                    # droogloop: plan + aantallen
@@ -141,6 +144,14 @@ class Plan:
             self.pm_personen.setdefault(sleutel(n), []).append((i, n, rol, beschr or ""))
         self.alle_namen = {sleutel(n) for (n,) in conn.execute(
             "SELECT name FROM entities WHERE NOT vervangen")}
+        # Een volledige naam koppelt ook als die persoon al een levend verband met dezelfde
+        # organisatie heeft (2026-10-09: "Laura van Geest" bij de AFM werd anders een tweede knoop)
+        self.org_ext = {w: i for w, i in conn.execute(
+            "SELECT waarde, entity_id FROM externe_ids WHERE stelsel = 'oo'")}
+        self.banden: set[tuple[int, int]] = set()
+        for a, b in conn.execute("""SELECT source_id, target_id FROM relations
+                                    WHERE NOT vervangen AND status <> 'afgewezen'"""):
+            self.banden.update(((a, b), (b, a)))
         self.orgs: dict[str, dict] = {}      # oo_id → organisatie-plan
         self.personen_plan: dict[str, dict] = {}  # persoon-sleutel → persoon-plan
         self.relaties: list[dict] = []
@@ -392,8 +403,10 @@ class Plan:
             if bestaand:
                 pass
             elif naam["volledig"]:
+                org_eid = self.org_ext.get(org["oo_id"]) or org.get("bestaand")
                 for i, n, prol, beschr in self.pm_personen.get(sleutel(weergave), []):
-                    if prol in PASSENDE_ROLLEN or plaats.lower() in beschr.lower():
+                    if (prol in PASSENDE_ROLLEN or plaats.lower() in beschr.lower()
+                            or (org_eid and (i, org_eid) in self.banden)):
                         bestaand = i
                         break
                 else:
@@ -533,7 +546,10 @@ class Indiener:
             if eid:
                 status, res = self.rest("POST", f"/api/entities/{eid}/register", {
                     "externe_ids": ids, "bestuurslaag": o["bestuurslaag"],
-                    "metadata": {"oo_type": o["oo_type"]}})
+                    "metadata": {"oo_type": o["oo_type"]},
+                    # de rol die de registersoort geeft (een ministerie → departement), naast
+                    # wat de organisatie al was; de server vult alleen aan
+                    "rollen": [o["rol"]]})
                 self.tel["org gekoppeld" if status == 200 else f"org koppelen {status}"] += 1
                 if status == 409:
                     self.log(f"  ! externe id al bezet: {o['naam']}: {res}")

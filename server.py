@@ -34,6 +34,7 @@ import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_vi
 import paginas  # programmatic-SEO: server-gerenderde pagina per element (B4)
 import subprocess  # herlaad de launchd-agents na een schema-wijziging (C1, macOS)
 import agent_schedule  # canonieke agent-lijst + schema (gedeeld met de launchd-generator)
+import opschonen  # dubbele verbanden en bronnen (2026-10-09), gedeeld met de ronde
 try:
     import dedup  # A6: semantische (paraphrase-)dedup bovenop difflib; aparte stdlib-module
 except ImportError:  # de module wordt parallel gebouwd — val terug op alleen difflib
@@ -2677,6 +2678,12 @@ def create_source():
     conn = get_db()
     bestaand = conn.execute("SELECT id, title, author, source_type, reliability "
                             "FROM sources WHERE title = ?", (title,)).fetchone()
+    if not bestaand and loc_type == "url" and loc_value:
+        # Dezelfde pagina onder een andere titel is dezelfde bron (2026-10-09, M1.2)
+        zelfde = opschonen.bron_met_url(conn, loc_value)
+        if zelfde:
+            bestaand = conn.execute("SELECT id, title, author, source_type, reliability "
+                                    "FROM sources WHERE id = ?", (zelfde,)).fetchone()
     if bestaand:
         conn.close()
         return jsonify({**dict(bestaand), "hergebruikt": True}), 200
@@ -3048,20 +3055,32 @@ def api_externe_ids():
 @require_user()
 def api_entity_register(eid):
     """Registergegevens aan een BESTAANDE entiteit hangen (Uitbreiding C): externe id's,
-    bestuurslaag en registersoort (metadata). Vult alleen wat leeg is — overschrijft nooit —
-    zodat een registerkoppeling geen inhoud kan wijzigen. Alleen REGISTER_ACCOUNTS of een
-    maintainer; elke wijziging staat in edit_log."""
+    bestuurslaag, registersoort (metadata) en de rol die de registersoort geeft (``rollen``,
+    namen; bv. een ministerie → departement, 2026-10-09). Vult alleen aan — overschrijft nooit,
+    een bestaande rol of primaire rol blijft — zodat een registerkoppeling geen inhoud kan
+    wijzigen. Alleen REGISTER_ACCOUNTS of een maintainer; elke wijziging staat in edit_log."""
     data = request.json or {}
     conn = get_db()
     if g.user["username"] not in REGISTER_ACCOUNTS and not heeft_rol(conn, g.user, "maintainer"):
         conn.close()
         return jsonify({"error": "alleen de registerpijplijn of een maintainer"}), 403
-    rij = conn.execute("SELECT id, bestuurslaag, metadata FROM entities WHERE id = ?",
-                       (eid,)).fetchone()
+    rij = conn.execute("SELECT id, bestuurslaag, metadata, primary_role_id FROM entities "
+                       "WHERE id = ?", (eid,)).fetchone()
     if not rij:
         conn.close()
         return jsonify({"error": "entiteit niet gevonden"}), 404
     ext, fout = _externe_ids_uit(data.get("externe_ids"))
+    rollen = data.get("rollen") or []
+    rol_ids = []
+    if not fout and (not isinstance(rollen, list) or not all(isinstance(r, str) for r in rollen)):
+        fout = "rollen moet een lijst rolnamen zijn"
+    for naam in ([] if fout else rollen):
+        r = conn.execute("SELECT id FROM roles WHERE name = ? AND NOT vervangen",
+                         (naam,)).fetchone()
+        if r is None:
+            fout = f"onbekende rol: {naam}"
+            break
+        rol_ids.append((naam, r["id"]))
     laag = (data.get("bestuurslaag") or "").strip() or None
     meta_in = data.get("metadata") or {}
     if not fout and laag is not None and laag not in BESTUURSLAGEN:
@@ -3084,6 +3103,20 @@ def api_entity_register(eid):
     if laag and not rij["bestuurslaag"]:
         conn.execute("UPDATE entities SET bestuurslaag = ? WHERE id = ?", (laag, eid))
         gewijzigd["bestuurslaag"] = laag
+    primair = rij["primary_role_id"]
+    if rol_ids and not primair:
+        primair = rol_ids[0][1]
+        conn.execute("UPDATE entities SET primary_role_id = ? WHERE id = ?", (primair, eid))
+        gewijzigd["primaire_rol"] = rol_ids[0][0]
+    for naam, rid in rol_ids:
+        # Een extra rol (entity_roles) plus de praktijk→theorie-koppeling, zoals bij een nieuwe
+        # entiteit
+        if rid != primair and conn.execute(
+                "INSERT OR IGNORE INTO entity_roles (entity_id, role_id) VALUES (?, ?)",
+                (eid, rid)).rowcount:
+            gewijzigd.setdefault("rollen", []).append(naam)
+        conn.execute("INSERT OR IGNORE INTO instantiations (role_id, entity_id) VALUES (?, ?)",
+                     (rid, eid))
     try:
         meta = json.loads(rij["metadata"]) if rij["metadata"] else {}
     except (TypeError, ValueError):
@@ -8305,22 +8338,9 @@ def _bronzoeker_pogingen():
 
 
 def _gedragen_door(conn, rid):
-    """Het id van een levend steunend argument met een echte bron dat het verband draagt
-    (gemerged, niet verworpen of verouderd, en het nieuwste A1-oordeel is niet 'klopt-niet'),
-    of None."""
-    rij = conn.execute("""
-        SELECT a.id FROM arguments a
-        WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
-          AND a.stance = 'supporting' AND COALESCE(a.property, 'existence') = 'existence'
-          AND a.status IN ('ongecontroleerd', 'geverifieerd', 'betwist')
-          AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id AND (
-                TRIM(COALESCE(c.quote, '')) <> ''
-                OR EXISTS (SELECT 1 FROM source_locations sl WHERE sl.source_id = c.source_id)))
-          AND COALESCE((SELECT o.verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
-                          AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
-                          LIMIT 1), '') <> 'klopt-niet'
-        ORDER BY a.id LIMIT 1""", (rid,)).fetchone()
-    return rij["id"] if rij else None
+    """Het id van een levend steunend argument met een echte bron dat het verband draagt, of
+    None (opschonen.gedragen_door, gedeeld met de opschoonregels)."""
+    return opschonen.gedragen_door(conn, rid)
 
 
 def zonder_bron_besluit(conn, rid, pogingen=None, inhoud=False):
@@ -8414,13 +8434,22 @@ def beoordeling_zonder_bron(rid):
     if not ok:
         conn.close()
         return jsonify({"afgewezen": False, "redenen": redenen}), 409
+    n = _goedgekeurd_verband_afwijzen(conn, rid, motivatie)
+    conn.commit()
+    conn.close()
+    return jsonify({"afgewezen": True, "id": rid, "argumenten_mee_afgewezen": n,
+                    "motivatie": motivatie}), 200
+
+
+def _goedgekeurd_verband_afwijzen(conn, rid, motivatie):
+    """Een goedgekeurd verband afwijzen namens de ingelogde agent; zoals bij elke afwijzing
+    gaat de discussie(sub)boom mee (verworpen, terug te halen). → aantal argumenten."""
     conn.execute("UPDATE relations SET status = 'afgewezen' WHERE id = ?", (rid,))
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
         VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
     """, (rid, g.user["username"], json.dumps({"status": "goedgekeurd"}),
           json.dumps({"status": "afgewezen"}), motivatie))
-    # Zoals bij elke afwijzing: de discussie(sub)boom gaat mee (verworpen, terug te halen)
     boom = conn.execute("""
         WITH RECURSIVE boom(id) AS (
           SELECT id FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL
@@ -8436,10 +8465,101 @@ def beoordeling_zonder_bron(rid):
                         VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)""",
                      (ar["id"], g.user["username"], json.dumps({"status": ar["status"]}),
                       json.dumps({"status": "verworpen"}), f"mee-afgewezen met relations #{rid}"))
+    return len(boom)
+
+
+# ── Dubbel werk (2026-10-09, eigenaarsakkoord "data opschonen"): opschonen.py beslist ──
+# Een goedgekeurd verband dat hetzelfde feit draagt als een ander, gedragen verband, wordt
+# afgewezen (zijn boom gaat mee); een bron met dezelfde url als een oudere bron gaat in die
+# bron op (één pagina is één bewijslijn, M1.2). merge-service via de automatische beoordeling;
+# GET = droogloop. Kill-switch → 503, dagplafond → 429, niet toegestaan → 409 + redenen.
+DUBBEL_PLAFOND_DEFAULT = 100
+
+
+def _dubbel_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_DUBBEL_PLAFOND", DUBBEL_PLAFOND_DEFAULT)))
+    except ValueError:
+        return DUBBEL_PLAFOND_DEFAULT
+
+
+def _opschoon_vandaag(conn, tabel, prefix):
+    return conn.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name = ? AND reason LIKE ?
+                           AND date(created_at, 'localtime') = date('now', 'localtime')""",
+                        (tabel, prefix + "%")).fetchone()[0]
+
+
+@app.route("/api/beoordeling/dubbel/<int:rid>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_dubbel(rid):
+    """Een goedgekeurd verband afwijzen omdat een ander, gedragen verband hetzelfde feit draagt
+    (opschonen.dubbel_besluit). Een begindatum die het blijvende verband mist, neemt het over."""
+    conn = get_db()
+    ok, redenen, motivatie, blijvend = opschonen.dubbel_besluit(conn, rid)
+    if redenen == ["niet gevonden"]:
+        conn.close()
+        return jsonify({"error": "Relatie niet gevonden"}), 404
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"id": rid, "toegestaan": ok, "redenen": redenen, "motivatie": motivatie,
+                        "blijft": blijvend["id"] if blijvend else None})
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        conn.close()
+        return jsonify({"afgewezen": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    if _opschoon_vandaag(conn, "relations", opschonen.DUBBEL_REDEN) >= _dubbel_plafond():
+        conn.close()
+        return jsonify({"afgewezen": False, "error": "dagplafond bereikt"}), 429
+    if not ok:
+        conn.close()
+        return jsonify({"afgewezen": False, "redenen": redenen}), 409
+    rel = conn.execute("SELECT active_from FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rel["active_from"] and not blijvend["active_from"]:
+        conn.execute("UPDATE relations SET active_from = ? WHERE id = ?",
+                     (rel["active_from"], blijvend["id"]))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+        """, (blijvend["id"], g.user["username"], json.dumps({"active_from": None}),
+              json.dumps({"active_from": rel["active_from"]}),
+              f"{opschonen.DUBBEL_REDEN}: begindatum overgenomen van het dubbele verband #{rid}"))
+    n = _goedgekeurd_verband_afwijzen(conn, rid, motivatie)
     conn.commit()
     conn.close()
-    return jsonify({"afgewezen": True, "id": rid, "argumenten_mee_afgewezen": len(boom),
-                    "motivatie": motivatie}), 200
+    return jsonify({"afgewezen": True, "id": rid, "blijft": blijvend["id"],
+                    "argumenten_mee_afgewezen": n, "motivatie": motivatie}), 200
+
+
+@app.route("/api/beoordeling/bron_dubbel/<int:sid>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_bron_dubbel(sid):
+    """Een bron met dezelfde url als een oudere bron gaat daarin op: citaties, vermeldingen,
+    locaties en oordelen verhuizen, de dubbele bron verdwijnt (de oude rij staat in edit_log)."""
+    conn = get_db()
+    ok, redenen, blijvend = opschonen.bron_dubbel_besluit(conn, sid)
+    if redenen == ["niet gevonden"]:
+        conn.close()
+        return jsonify({"error": "Bron niet gevonden"}), 404
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"id": sid, "toegestaan": ok, "redenen": redenen, "blijft": blijvend})
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        conn.close()
+        return jsonify({"samengevoegd": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    if not ok:
+        conn.close()
+        return jsonify({"samengevoegd": False, "redenen": redenen}), 409
+    uit = opschonen.voeg_bron_samen(conn, sid, blijvend)
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('sources', ?, 'deleted', ?, ?, ?, ?)
+    """, (sid, g.user["username"], json.dumps(uit["oud"], ensure_ascii=False),
+          json.dumps({"opgegaan_in": blijvend, **uit["verhuisd"]}),
+          f"{opschonen.BRON_REDEN}: dezelfde url als bron #{blijvend}"))
+    conn.commit()
+    conn.close()
+    return jsonify({"samengevoegd": True, "id": sid, "blijft": blijvend, **uit["verhuisd"]}), 200
 
 
 # ── Mechanisme voor een kandidaat-verband (2026-10-06: agents doen alles) ──

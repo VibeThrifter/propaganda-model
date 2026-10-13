@@ -36,6 +36,10 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
 7. **Mechanismen** (scripts/mechanisme_toewijzer.py): een kandidaat-verband krijgt een
    mechanisme, of wordt afgewezen als het buiten het model valt.
 8. **RfC's** (scripts/rfc_beoordeling.py): twee agents reviewen, de beoordeling beslist.
+8b. **Ontdubbelen** (opschonen.py, ``--max-ontdubbel``): een bron met dezelfde url als een
+   oudere gaat daarin op (één pagina is één bewijslijn), en een goedgekeurd verband dat hetzelfde
+   feit draagt als een ander, gedragen verband wordt afgewezen. Deterministisch; de server
+   beslist.
 9. **Bronklassen** (scripts/bronklasse.py): twee onafhankelijke oordelen over de
    betrouwbaarheid en het onderwerp van een bron; bij verschil de voorzichtigste.
 10. **Goedkeuren**: relaties en entiteiten met gecontroleerd bewijs gaan de graaf in.
@@ -83,10 +87,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(1, str(ROOT))
 import bronchecker  # noqa: E402
 import bronklasse  # noqa: E402
 import bronzoeker  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
+import opschonen  # noqa: E402  dubbel werk (repo-root, gedeeld met de server)
 import registercheck  # noqa: E402
 import rfc_beoordeling  # noqa: E402
 import smaadtoets  # noqa: E402
@@ -480,6 +486,35 @@ def stap_rfc(token, args, meld) -> dict:
             tel["open"] += 1
     meld(f"RfC's: {tel['aangenomen']} aangenomen, {tel['afgewezen']} afgewezen, "
          f"{tel['open']} wachten nog")
+    return tel
+
+
+def stap_ontdubbelen(token, args, meld) -> dict:
+    """Dubbel werk (opschonen.py): bronnen met dezelfde url gaan op in de oudste, en dubbele
+    goedgekeurde verbanden worden afgewezen. Alleen wat de regels lokaal toelaten gaat naar de
+    server, die zelf opnieuw beslist (droog: GET)."""
+    tel = {"bronnen": 0, "verbanden": 0}
+    if args.max_ontdubbel <= 0:
+        return tel
+    conn = db()
+    try:
+        bronnen = [sid for ids in opschonen.bronnen_per_url(conn).values() for sid in ids[1:]]
+        verbanden = [rid for rid in opschonen.dubbele_verbanden(conn)
+                     if opschonen.dubbel_besluit(conn, rid)[0]]
+    finally:
+        conn.close()
+    methode = "GET" if args.droog else "POST"
+    for soort, pad, ids, klaar in (("bronnen", "bron_dubbel", bronnen, "samengevoegd"),
+                                   ("verbanden", "dubbel", verbanden, "afgewezen")):
+        for eid in ids[:args.max_ontdubbel]:
+            status, antwoord = req(methode, f"/api/beoordeling/{pad}/{eid}", token)
+            if status in (429, 503):
+                meld(f"Ontdubbelen ({soort}) gestopt: {antwoord.get('error')}")
+                break
+            if (args.droog and antwoord.get("toegestaan")) or antwoord.get(klaar):
+                tel[soort] += 1
+    meld(f"Ontdubbeld: {tel['bronnen']} bron(nen) opgegaan in een oudere met dezelfde url, "
+         f"{tel['verbanden']} dubbel(e) verband(en) afgewezen{' (droog)' if args.droog else ''}")
     return tel
 
 
@@ -1136,6 +1171,7 @@ def ronde(args, meld=print) -> dict:
     uitkomst["verificatie"] = stap_verifieren(token, args, meld)
     uitkomst["mechanismen"] = stap_mechanismen(args, meld)
     uitkomst["rfc"] = stap_rfc(token, args, meld)
+    uitkomst["ontdubbeld"] = stap_ontdubbelen(token, args, meld)
     uitkomst["bronklassen"] = stap_bronklassen(token, args, meld)
     uitkomst["goedgekeurd"] = stap_goedkeuren(token, args, meld)
     # 10b. Niet-neutrale beschrijvingen (seed- en agentwerk) neutraal maken
@@ -1194,6 +1230,8 @@ def main():
                     help="hooguit zoveel kandidaat-verbanden per ronde (0 = uit)")
     ap.add_argument("--max-rfc", type=int, default=3,
                     help="hooguit zoveel open RfC's per ronde laten reviewen (0 = uit)")
+    ap.add_argument("--max-ontdubbel", type=int, default=100,
+                    help="hooguit zoveel dubbele bronnen en verbanden per ronde (0 = uit)")
     ap.add_argument("--max-bronklasse", type=int, default=160,
                     help="hooguit zoveel bronnen per ronde classificeren (0 = uit)")
     ap.add_argument("--max-archief", type=int, default=10,
