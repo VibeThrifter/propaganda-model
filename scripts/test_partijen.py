@@ -4,7 +4,10 @@
 Dekt de positie-indeling (klasse), de tellingen per partij ('alle' en 'nu'), de tijdtoets
 (een positie buiten de periode van de partijband telt niet), de gedeelde organisaties, de
 ontdubbeling en titels in het detail, en dat alleen goedgekeurde, niet-vervangen verbanden
-meetellen. Zelfstandig — bouwt een minimale in-memory DB (zelfde aanpak als test_bereik.py).
+meetellen. Sinds 2026-10-13 ook: het bestaan van een partij begrenst haar banden (een
+ongedateerd lidmaatschap van een opgeheven partij loopt niet meer) en fusies ('opgegaan_in')
+vouwen een voorganger in bij de kolom van haar opvolger. Zelfstandig — bouwt een minimale
+in-memory DB (zelfde aanpak als test_bereik.py).
 """
 import sqlite3
 import sys
@@ -50,7 +53,8 @@ def _db():
     conn = sqlite3.connect(":memory:")
     conn.executescript("""
         CREATE TABLE entities (id INTEGER PRIMARY KEY, name TEXT, type TEXT, bestuurslaag TEXT,
-            description TEXT, status TEXT DEFAULT 'goedgekeurd', vervangen INT DEFAULT 0);
+            description TEXT, status TEXT DEFAULT 'goedgekeurd', vervangen INT DEFAULT 0,
+            active_from TEXT, active_until TEXT);
         CREATE TABLE mechanisms (id INTEGER PRIMARY KEY, name TEXT);
         CREATE TABLE relations (id INTEGER PRIMARY KEY, source_id INT, target_id INT,
             relation_type TEXT, functie TEXT, active_from TEXT, active_until TEXT,
@@ -117,6 +121,52 @@ def test_overzicht():
     print("  overzicht: OK")
 
 
+def test_bestaan_en_fusie():
+    """Partij C (2000–2020-06-01) ging op in Partij A. Fien is ongedateerd lid van C en was
+    in 2010 bestuurder bij ING: met fusies telt ze bij A ('alle', niet 'nu'), zonder fusies
+    staat C apart met 'opgegaan_in'. Haar band eindigt effectief op het einde van C."""
+    conn = _db()
+    conn.executescript("""
+        CREATE TABLE arguments (id INTEGER PRIMARY KEY, entity_id INT, relation_id INT,
+            parent_argument_id INT, property TEXT, property_value TEXT, stance TEXT,
+            status TEXT, vervangen INT DEFAULT 0);
+        INSERT INTO entities (id, name, type, active_from, active_until)
+            VALUES (3, 'Partij C', 'partij', '2000', '2020-06-01'), (15, 'Fien', 'persoon', NULL, NULL);
+        INSERT INTO relations (id, source_id, target_id, relation_type, active_from, active_until, mechanism_id)
+            VALUES (110, 15, 3, 'lidmaatschap', NULL, NULL, 92),
+                   (210, 15, 22, 'bestuurder', '2010', '2012', NULL);
+        INSERT INTO arguments (id, entity_id, property, property_value, stance, status)
+            VALUES (1, 3, 'opgegaan_in', '1', 'supporting', 'ongecontroleerd'),
+                   (2, 3, 'opgegaan_in', '2', 'supporting', 'voorgesteld');  -- telt niet
+    """)
+    o = partijen.compute_overzicht(conn, peiljaar=PEILJAAR)
+    per = {p["naam"]: p for p in o["partijen"]}
+    assert "Partij C" not in per, per.keys()                       # opgevouwen in A
+    a = per["Partij A"]
+    assert a["voorgangers"] == [{"id": 3, "naam": "Partij C", "looptijd": "2000–2020"}], a
+    assert a["n_personen"] == [3, 1], a["n_personen"]              # Anna, Bert, Fien; nu: Anna
+    assert a["telling"]["bedrijfsleven"] == [2, 1], a["telling"]   # Anna (nu) + Fien (2010)
+    los = {p["naam"]: p for p in partijen.compute_overzicht(conn, peiljaar=PEILJAAR, fusies=False)["partijen"]}
+    assert los["Partij C"]["n_personen"] == [1, 0], los["Partij C"]   # band afgelopen met C
+    assert los["Partij C"]["opgegaan_in"][0]["naam"] == "Partij A", los["Partij C"]
+    assert los["Partij A"]["n_personen"] == [2, 1], los["Partij A"]
+    d = partijen.compute_partij(conn, 1, peiljaar=PEILJAAR)
+    fien = {p["naam"]: p for p in d["personen"]}["Fien"]
+    assert fien["band"][0]["partij"]["naam"] == "Partij C" and fien["band"][0]["afgelopen"], fien
+    assert fien["band"][0]["looptijd"] == "tot 2020", fien["band"][0]
+    assert fien["band"][0]["einde_door"]["naam"] == "Partij C", fien["band"][0]
+    assert d["partij"]["voorgangers"][0]["naam"] == "Partij C", d["partij"]
+    assert {p["naam"] for p in partijen.compute_partij(conn, 1, peiljaar=PEILJAAR, fusies=False)["personen"]} \
+        == {"Anna", "Bert"}
+    # Op de dag: in 2020 zelf liep C nog (jaarprecisie), vandaag (na 2020-06-01) niet meer.
+    assert partijen.compute_overzicht(conn, peiljaar=2020, fusies=False)["partijen"][-1] is not None
+    c2020 = {p["naam"]: p for p in partijen.compute_overzicht(conn, peiljaar=2020, fusies=False)["partijen"]}
+    assert c2020["Partij C"]["n_personen"] == [1, 1], c2020["Partij C"]
+    vandaag = {p["naam"]: p for p in partijen.compute_overzicht(conn, fusies=False)["partijen"]}
+    assert vandaag["Partij C"]["n_personen"] == [1, 0], vandaag["Partij C"]
+    print("  bestaan en fusie: OK")
+
+
 def test_partij_detail():
     conn = _db()
     d = partijen.compute_partij(conn, 1, peiljaar=PEILJAAR)
@@ -151,4 +201,5 @@ if __name__ == "__main__":
     test_klasse()
     test_overzicht()
     test_partij_detail()
+    test_bestaan_en_fusie()
     print("test_partijen: alles OK")

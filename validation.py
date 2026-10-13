@@ -812,6 +812,99 @@ def check_looptijd(conn):
         "uitgezocht (looptijd_onderzoek).")]
 
 
+def check_bestaan(conn):
+    """Eigenaarsbesluit 2026-10-13 ("zorg goed dat alle tijdsintervallen worden gehandhaafd"): een
+    verband loopt nooit buiten het bestaan van zijn eindpunten (looptijd.py).
+
+    LOOPTIJD-BUITEN-BESTAAN (fout, geratchet): een goedgekeurd verband met een eigen datum buiten
+    het bestaan van een organisatie, met een begin na het einde, of met een datum die geen datum
+    is. Een open grens is geen fout, want de effectieve looptijd kapt die al af. Nieuwe gevallen
+    houdt de goedkeurpoort tegen (server.bestaan_reden). Wat er nog staat is meestal een
+    ontbrekende voorganger: een VARA-band op BNNVARA, een NTS-band op de NOS.
+    OPVOLGING-ONGELDIG (fout): een gemergede fusie ('opgegaan_in') naar iets dat geen
+    goedgekeurde organisatie is, een kring, of een opvolger die pas na de opheffing ontstond.
+    OPVOLGING-ZONDER-EINDE (waarschuwing): een organisatie met een opvolger maar zonder einddatum
+    begrenst haar banden nog niet.
+    PERSOON-LOOPTIJD (waarschuwing): een persoon wiens active_from/active_until een functieperiode
+    lijkt in plaats van zijn leven, omdat eigen verbanden erbuiten vallen. Daarom begrenzen
+    personen (nog) niet."""
+    import looptijd   # repo-root, stdlib (lazy zoals de rest van deze checks)
+
+    ents = {r["id"]: dict(r) for r in conn.execute(
+        "SELECT id, name, type, active_from, active_until FROM entities "
+        "WHERE status = 'goedgekeurd' AND NOT vervangen")}
+    opv = looptijd.opvolgingen(conn)
+    opv_ids = {k: [x["opvolger"] for x in v] for k, v in opv.items()}
+    namen = {i: e["name"] for i, e in ents.items()}
+    buiten, persoon = [], {}
+    for r in conn.execute("""SELECT id, source_id, target_id, relation_type, active_from, active_until
+                             FROM relations WHERE status = 'goedgekeurd' AND NOT vervangen
+                             ORDER BY id"""):
+        b, d = ents.get(r["source_id"]), ents.get(r["target_id"])
+        if b is None or d is None:
+            continue
+        rel = dict(r)
+        redenen = looptijd.conflicten(rel, b, d, opv_ids, namen)
+        if redenen:
+            buiten.append(f"relatie #{r['id']}: {b['name']} — {r['relation_type']} — {d['name']}: "
+                          + "; ".join(redenen))
+        van, tot = rel["active_from"], rel["active_until"]
+        for p in (b, d):
+            p_van, p_tot = p["active_from"], p["active_until"]
+            if p["type"] != "persoon" or not (p_van or p_tot):
+                continue
+            if (looptijd.voor(van or tot, p_van) or looptijd.voor(tot, p_van)
+                    or looptijd.voor(p_tot, van or tot) or looptijd.voor(p_tot, tot)):
+                persoon.setdefault(p["id"], []).append(r["id"])
+
+    ongeldig, zonder_einde = [], []
+    for vg, lijst in opv.items():
+        e = ents.get(vg)
+        for x in lijst:
+            o = ents.get(x["opvolger"])
+            naam = f"argument #{x['argument_id']}: {namen.get(vg, f'#{vg}')} → {namen.get(x['opvolger'], '#' + str(x['opvolger']))}"
+            if e is None or o is None:
+                ongeldig.append(f"{naam}: geen goedgekeurde entiteit")
+            elif "persoon" in (e["type"], o["type"]):
+                ongeldig.append(f"{naam}: een persoon gaat nergens in op")
+            elif looptijd.kring({k: v for k, v in opv.items() if k != vg}, vg, x["opvolger"]):
+                ongeldig.append(f"{naam}: kring")
+            elif o["active_from"] and e["active_until"] and looptijd.voor(e["active_until"], o["active_from"]):
+                ongeldig.append(f"{naam}: de opvolger ontstond ({o['active_from']}) na de opheffing "
+                                f"({e['active_until']})")
+        if e is not None and not e["active_until"]:
+            zonder_einde.append(f"entiteit #{vg} {e['name']}: opgegaan in "
+                                + ", ".join(namen.get(x["opvolger"], "?") for x in lijst)
+                                + ", maar zonder einddatum")
+    return [
+        _bevinding(
+            "LOOPTIJD-BUITEN-BESTAAN", "Verbanden met een datum buiten het bestaan van een eindpunt",
+            "fout", buiten,
+            "Een verband loopt nooit buiten het bestaan van zijn eindpunten (looptijd.py). Koppel "
+            "een band van vóór een fusie aan de voorganger (met 'opgegaan_in' naar de opvolger), "
+            "een band van ná een opheffing aan de opvolger, of corrigeer de datum van het verband "
+            "of van de organisatie."),
+        _bevinding(
+            "OPVOLGING-ONGELDIG", "Fusies ('opgegaan_in') die niet kunnen", "fout", ongeldig,
+            "Een opvolger is een goedgekeurde organisatie die al bestond toen de voorganger ophield, "
+            "zonder kring."),
+        _bevinding(
+            "OPVOLGING-ZONDER-EINDE", "Opgeheven organisaties zonder einddatum", "waarschuwing",
+            zonder_einde,
+            "Zonder active_until begrenst de opheffing haar banden nog niet: dien een "
+            "active_until-argument in (stap 10c zet het)."),
+        _bevinding(
+            "PERSOON-LOOPTIJD", "Personen met een functieperiode als looptijd", "waarschuwing",
+            [f"persoon #{pid} {namen.get(pid)} ({ents[pid]['active_from'] or '…'}–"
+             f"{ents[pid]['active_until'] or ''}): eigen verbanden erbuiten "
+             f"({', '.join('#' + str(x) for x in rids[:5])}{'…' if len(rids) > 5 else ''})"
+             for pid, rids in sorted(persoon.items())],
+            "De looptijd van een persoon is zijn leven, geen functie: die hoort op het verband. "
+            "Zolang dit gemengd is, begrenzen personen hun verbanden niet en verbergt de tijdbalk "
+            "ze buiten die periode."),
+    ]
+
+
 # ── Schema-pariteit (Z9) ─────────────────────────────────────
 
 def _strip_sql_commentaar(sql):
@@ -1309,6 +1402,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_neutraliteit(conn)
     bevindingen += check_eigen_stem(conn)
     bevindingen += check_looptijd(conn)
+    bevindingen += check_bestaan(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)

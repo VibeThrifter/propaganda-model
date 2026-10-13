@@ -211,11 +211,14 @@ CREATE TABLE entities (
     )),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
+    -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend. Bij een organisatie
+    -- het bestaan (oprichting – opheffing/fusie): dat begrenst elk verband ermee (looptijd.py,
+    -- 2026-10-13). Een persoon draagt hier geen functieperiode; de functie staat op het verband.
     active_from TEXT,
     active_until TEXT,
     active BOOLEAN DEFAULT TRUE,
-    -- M2.6: vervangen door opvolger(s); zie `lineage`.
+    -- M2.6: vervangen door opvolger(s); zie `lineage`. Een fusie in de wereld is geen
+    -- vervanging: zie de aspect-property 'opgegaan_in' (looptijd.py).
     vervangen BOOLEAN NOT NULL DEFAULT FALSE,
     -- Moderatiewachtrij: een admin-creatie staat meteen 'goedgekeurd'; een
     -- bijdrage van iemand anders is 'voorgesteld' (onzichtbaar in viz/scores)
@@ -492,12 +495,16 @@ CREATE TABLE arguments (
                              -- zekerheidsbalans (ASPECT_PROPERTIES). property_value = 'welstand:<klasse>'
                              -- (klasse ∈ A/B1/B2/C/D, hoog→laag) of 'welstand:meting:<-1..1>' (NOM/NMO-
                              -- bereikindex). Voedt de afgeleide welstandsmeter (doelgroep.py).
-        'bereik'             -- publieksbereik van een media-entiteit per jaar (kijkcijfers/oplage/
+        'bereik',            -- publieksbereik van een media-entiteit per jaar (kijkcijfers/oplage/
                              -- maandbereik/invullers); bron VERPLICHT (gated als 'doelgroepklasse'),
                              -- telt NIET in de zekerheidsbalans (ASPECT_PROPERTIES). property_value =
                              -- '<maat>:<aantal>:<jaar>', maat ∈ bereik.MATEN (kijkers/luisteraars/
                              -- oplage/bereik_totaal/online/invullers/volgers). Voedt de bereikmeter
                              -- (bereik.py) en de tijdlijn-gekoppelde node-grootte in de viz.
+        'opgegaan_in'        -- fusie/opheffing: deze (opgeheven) organisatie ging op in de entiteit
+                             -- wier id in property_value staat (2026-10-13). Bron VERPLICHT, telt NIET
+                             -- in de zekerheidsbalans (ASPECT_PROPERTIES). De banden van de voorganger
+                             -- blijven van de voorganger; de stamboom wordt afgeleid (looptijd.py).
     )),
     property_value TEXT,     -- voorgestelde waarde (bijv. '2019' voor active_from)
     stance TEXT NOT NULL CHECK(stance IN (

@@ -242,7 +242,11 @@ python3 scripts/scout_indienen.py data/scout/nieuws-<sleutel>.json --indienen \
   negatieve persoonsclaim toch tegen; dien hem dus niet in.
 - Certainty/influence niet zetten (0,05-vloer). De looptijd wél: `active_from` (en
   `active_until` als het voorbij is) is verplicht, uit de bron (zie § Looptijd); geen jaartal
-  gevonden → `zonder_jaar` met waar je zocht, nooit een gok.
+  gevonden → `zonder_jaar` met waar je zocht, nooit een gok. De looptijd hoort op het
+  **verband**, niet op de persoon: geef een nieuwe persoon geen `active_from` ("sinds 2020
+  hoofdredacteur" is een verband). Een verband valt binnen het bestaan van de organisatie: na een
+  fusie verbind je met de opvolger (PvdA/GroenLinks → PRO per 1 juli 2026; zie
+  missies/README.md § Looptijd).
 - **Sourcing-/invloedsverbanden** (iemand levert als expert aan media, lobbyt bij, …)
   alleen met een **gedocumenteerd patroon** (meerdere bronnen, niet één optreden); die
   blijven altijd mensenwerk (de autokeur raakt ze niet).

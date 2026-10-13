@@ -29,6 +29,7 @@ import tegenmacht  # machtsvalentie: tegenmacht als gerichte edge-valentie (geen
 import doelgroep  # welstandsmeter: getargette marketing-/welstandsklasse per outlet
 import bereik  # bereikmeter: gesourcet publieksbereik (kijkers/lezers/invullers) per jaar
 import partijen  # partijnetwerk: wie aan welke partij verbonden is en welke posities die mensen bekleden
+import looptijd  # tijdsvakken: een verband loopt niet buiten het bestaan van zijn eindpunten; fusies
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
@@ -1360,6 +1361,19 @@ def create_argument():
                                      + ", ".join(bereik.MATEN) + "}, aantal een positief "
                                      "geheel getal en jaar 4 cijfers (het jaar waarop het "
                                      f"cijfer slaat). Probleem: {e}"}), 400
+    # Fusie/opheffing (2026-10-13): deze organisatie ging op in de entiteit met id
+    # property_value. Een opvolging, geen samenvoeging: de banden van de voorganger blijven van
+    # de voorganger, de stamboom wordt afgeleid (looptijd.py). Bron verplicht (zie evidentieel);
+    # telt in niets mee (ASPECT_PROPERTIES). Het moment staat in active_until van de voorganger.
+    if prop == looptijd.OPVOLGING_PROPERTY:
+        if not entity_id:
+            return jsonify({"error": "property 'opgegaan_in' hoort bij een entiteit (entity_id): "
+                                     "de opgeheven organisatie"}), 400
+        if not str(prop_value or "").strip().isdigit():
+            return jsonify({"error": "property_value voor 'opgegaan_in' is het id van de "
+                                     "opvolger (rename-vast)"}), 400
+        if int(str(prop_value).strip()) == int(entity_id):
+            return jsonify({"error": "een organisatie gaat niet in zichzelf op"}), 400
     if prop and parent_id is not None:
         return jsonify({"error": "Een reactie draagt geen property: aspect-argumenten "
                                  "richten zich als root-argument op het doel zelf"}), 400
@@ -1443,7 +1457,7 @@ def create_argument():
     #   (property='filter'/'mechanism'), compositie- en padclaims ('compositie'/'indirecte_invloed_op'),
     #   contextual-roots, en replies/ondergravingen ('logica klopt niet' — parent_id gezet).
     evidentieel = prop in (None, "influence", "politieke_positie", "inkomensaandeel",
-                           "doelgroepklasse", "bereik")
+                           "doelgroepklasse", "bereik", looptijd.OPVOLGING_PROPERTY)
     heeft_echte_bron = any(
         bool((c.get("quote") or "").strip()) or conn.execute(
             "SELECT 1 FROM source_locations WHERE source_id = ?", (c["source_id"],)).fetchone()
@@ -1462,6 +1476,19 @@ def create_argument():
         conn.close()
         return jsonify({"error": f"property_value voor '{prop}' moet JJJJ, JJJJ-MM of "
                                  "JJJJ-MM-DD zijn"}), 400
+    if prop == looptijd.OPVOLGING_PROPERTY:
+        paar = {r["id"]: r for r in conn.execute(
+            "SELECT id, name, type, vervangen FROM entities WHERE id IN (?, ?)",
+            (entity_id, int(str(prop_value).strip())))}
+        opv = paar.get(int(str(prop_value).strip()))
+        fout = None
+        if opv is None or opv["vervangen"]:
+            fout = f"opvolger #{prop_value} bestaat niet (of is vervangen)"
+        elif any(r["type"] == "persoon" for r in paar.values()):
+            fout = "'opgegaan_in' gaat over organisaties; een persoon gaat nergens in op"
+        if fout:
+            conn.close()
+            return jsonify({"error": fout}), 400
 
     # Classificatie-aspect 'mechanism': de voorgestelde mechanisme-ID moet bestaan.
     if prop == "mechanism" and not conn.execute(
@@ -3157,6 +3184,17 @@ def api_entity_register(eid):
 DATUM_RE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
 
 
+def _looptijd_fout(van, tot):
+    """Vorm van een looptijd (2026-10-13): JJJJ, JJJJ-MM of JJJJ-MM-DD, en geen begin na het
+    einde. Bij aanmaken en bewerken van entiteiten en verbanden. → fout of None."""
+    for naam, w in (("active_from", van), ("active_until", tot)):
+        if w and not DATUM_RE.match(str(w)):
+            return f"{naam} moet JJJJ, JJJJ-MM of JJJJ-MM-DD zijn (niet '{w}')"
+    if van and tot and looptijd.voor(tot, van):
+        return f"het begin ({van}) ligt na het einde ({tot})"
+    return None
+
+
 @app.route("/api/relations/<int:rid>/looptijd", methods=["POST"])
 @require_user()
 def api_relation_looptijd(rid):
@@ -3242,6 +3280,9 @@ def create_entity():
     description = (data.get("description") or "").strip() or None
     active_from = (data.get("active_from") or "").strip() or None
     active_until = (data.get("active_until") or "").strip() or None
+    fout = _looptijd_fout(active_from, active_until)
+    if fout:
+        return jsonify({"error": fout}), 400
     contributed_by = g.user["username"]
     # Uitbreiding C (besluitvorming, 2026-10-07): bestuurslaag, registersoort (metadata) en
     # externe id's (tooi/oo/tk_persoon/wikidata/ep_mep) — zie _externe_ids_uit.
@@ -3339,6 +3380,9 @@ def create_relation():
     bidirectional = 1 if data.get("bidirectional") else 0
     active_from = (data.get("active_from") or "").strip() or None
     active_until = (data.get("active_until") or "").strip() or None
+    fout = _looptijd_fout(active_from, active_until)
+    if fout:
+        return jsonify({"error": fout}), 400
     contributed_by = g.user["username"]
 
     def clamp01(v):
@@ -4326,8 +4370,8 @@ def _maintainer_patch(element_type):
     # Temporele velden (active_from/active_until) mag een maintainer (her)zetten op
     # elementen die ze dragen (entiteit/relatie/rol/mechanisme). Zonder dit pad is er
     # géén manier om een bestaande band te dateren — terwijl de timeline-/tijdbewuste
-    # kleur dat juist nodig heeft. NULL/"" = datum wissen; vrije tekst (jaar of datum),
-    # consistent met de bestaande seed-data.
+    # kleur dat juist nodig heeft. NULL/"" = datum wissen; anders JJJJ[-MM[-DD]] en geen begin
+    # na het einde (2026-10-13; de opgeslagen data is al zo).
     if element_type in ("entiteit", "relatie", "rol", "mechanisme"):
         for kol in ("active_from", "active_until"):
             if kol in d:
@@ -4335,6 +4379,13 @@ def _maintainer_patch(element_type):
                 nieuw = None if raw in (None, "", 0, "0") else str(raw).strip()
                 if nieuw != (rij[kol] if rij[kol] not in ("",) else None):
                     diff[kol] = {"oud": rij[kol], "nieuw": nieuw}
+        if "active_from" in diff or "active_until" in diff:
+            fout = _looptijd_fout(
+                diff["active_from"]["nieuw"] if "active_from" in diff else rij["active_from"],
+                diff["active_until"]["nieuw"] if "active_until" in diff else rij["active_until"])
+            if fout:
+                conn.close()
+                return jsonify({"error": fout}), 400
     if not diff:
         conn.close()
         velden_hint = toegestaan + (["primary_role_id"] if element_type == "entiteit" else []) \
@@ -4446,6 +4497,11 @@ def _auteur_entiteit_patch(conn, eid, ent):
             nieuw = None if raw in (None, "", 0, "0") else str(raw).strip()
             if nieuw != (ent[kol] if ent[kol] not in ("",) else None):
                 diff[kol] = nieuw
+    fout = _looptijd_fout(diff.get("active_from", ent["active_from"]),
+                          diff.get("active_until", ent["active_until"]))
+    if fout and ("active_from" in diff or "active_until" in diff):
+        conn.close()
+        return jsonify({"error": fout}), 400
     if not diff:
         conn.close()
         return jsonify({"error": "geen gewijzigd veld (toegestaan: name, type, description, "
@@ -6251,10 +6307,11 @@ def get_bereik():
 def get_partijen():
     """Partijnetwerk (partijen.py): per partij het aantal verbonden personen per
     positieklasse ('alle' en 'nu') + de organisaties waar mensen uit twee of meer partijen
-    een positie hebben. Beschrijvend, telt nergens mee; alleen goedgekeurde verbanden."""
+    een positie hebben. Beschrijvend, telt nergens mee; alleen goedgekeurde verbanden.
+    ?fusies=0: elke partij apart, ook als ze in een andere opging (standaard: stamboom)."""
     conn = get_db()
     try:
-        res = partijen.compute_overzicht(conn)
+        res = partijen.compute_overzicht(conn, fusies=request.args.get("fusies") != "0")
     finally:
         conn.close()
     return jsonify(res)
@@ -6263,10 +6320,11 @@ def get_partijen():
 @app.route("/api/partijen/<int:partij_id>")
 def get_partij(partij_id):
     """Eén partij in detail: per persoon de band met de partij, de posities en de overige
-    relaties, plus de banden van de partij zelf. 404 als het geen goedgekeurde partij is."""
+    relaties, plus de banden van de partij zelf. 404 als het geen goedgekeurde partij is.
+    ?fusies=0: zonder de partijen die erin opgingen."""
     conn = get_db()
     try:
-        res = partijen.compute_partij(conn, partij_id)
+        res = partijen.compute_partij(conn, partij_id, fusies=request.args.get("fusies") != "0")
     finally:
         conn.close()
     if res is None:
@@ -7585,9 +7643,12 @@ def _bewijs_relatie_redenen(conn, rid):
     """, (rid,)).fetchone()[0]
     if n_tegen:
         redenen.append("er ligt een gemerged tegenargument op deze relatie")
-    looptijd = looptijd_reden(conn, rid)
-    if looptijd:
-        redenen.append(looptijd)
+    zonder_jaar = looptijd_reden(conn, rid)
+    if zonder_jaar:
+        redenen.append(zonder_jaar)
+    buiten = bestaan_reden(conn, rid)
+    if buiten:
+        redenen.append(buiten)
     return redenen
 
 
@@ -7618,6 +7679,31 @@ def looptijd_reden(conn, rid):
         return None
     return ("nog geen looptijd: het begin (active_from) ontbreekt — de datumzoeker zoekt het; "
             "zonder jaartal geen verband")
+
+
+def bestaan_reden(conn, rid):
+    """Eigenaarsbesluit 2026-10-13 ("zorg goed dat alle tijdsintervallen worden gehandhaafd"): een
+    verband wordt niet goedgekeurd met een datum buiten het bestaan van een eindpunt. Een
+    PvdA-band die na 1 juli 2026 begint, hoort bij PRO; een VARA-band uit 1986 hoort niet bij
+    BNNVARA (2014). Ook een begin na het einde wordt geweigerd, en een datum die geen datum is.
+    Personen begrenzen (nog) niet (looptijd.begrenst). Registerfeiten zijn uitgezonderd: het
+    register is de bron van zijn datum, en de controle LOOPTIJD-BUITEN-BESTAAN wijst ze aan.
+    Kill-switch PROPAGANDA_LOOPTIJD_POORT=0 (dezelfde als de looptijdpoort). → reden of None."""
+    if not _looptijd_poort_aan():
+        return None
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rel is None or _registerelement(conn, "relations", rid):
+        return None
+    ents = {r["id"]: dict(r) for r in conn.execute(
+        "SELECT id, name, type, active_from, active_until FROM entities WHERE id IN (?, ?)",
+        (rel["source_id"], rel["target_id"]))}
+    opv = {k: [x["opvolger"] for x in v] for k, v in looptijd.opvolgingen(conn).items()}
+    namen = {r["id"]: r["name"] for r in conn.execute(
+        f"SELECT id, name FROM entities WHERE id IN ({','.join('?' * len({o for v in opv.values() for o in v}))})",  # noqa: S608
+        tuple({o for v in opv.values() for o in v}))} if opv else {}
+    redenen = looptijd.conflicten(dict(rel), ents.get(rel["source_id"]), ents.get(rel["target_id"]),
+                                  opv, namen)
+    return ("buiten het bestaan: " + "; ".join(redenen)) if redenen else None
 
 
 def _bewijs_entiteit_redenen(conn, eid):
@@ -8729,28 +8815,46 @@ def _jaar(waarde):
     return m.group(1) if m else None
 
 
+def _namen_in_tekst(naam, tekst):
+    """Noemt de tekst deze naam? Ook de korte vorm tussen haakjes telt ('Progressief Nederland
+    (PRO)' → 'Progressief Nederland' of 'PRO')."""
+    tekst = (tekst or "").lower()
+    vormen = {naam or ""}
+    m = re.match(r"^(.*?)\s*\(([^)]+)\)\s*$", naam or "")
+    if m:
+        vormen |= {m.group(1), m.group(2)}
+    return any(v.strip() and v.strip().lower() in tekst for v in vormen)
+
+
 def looptijd_besluit(conn, arg_id):
-    """Mag de automatische beoordeling de datum uit dit aspect-argument op zijn verband zetten?
-    → (ok, redenen, {veld, waarde, relation_id})."""
+    """Mag de automatische beoordeling dit aspect-argument toepassen? Drie soorten (stap 10c):
+    een datum op een verband, een datum op een organisatie (oprichting/opheffing, 2026-10-13) en
+    een fusie ('opgegaan_in' → de opvolger). → (ok, redenen, {veld, waarde, relation_id|entity_id})."""
     arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
     if arg is None:
         return False, ["niet gevonden"], {}
-    veld, waarde, rid = arg["property"], (arg["property_value"] or "").strip(), arg["relation_id"]
+    veld, waarde = arg["property"], (arg["property_value"] or "").strip()
+    rid, eid = arg["relation_id"], arg["entity_id"]
     info = {"veld": veld, "waarde": waarde, "relation_id": rid}
+    if eid and not rid:
+        info = {"veld": veld, "waarde": waarde, "entity_id": eid}
     redenen = []
-    if veld not in LOOPTIJD_VELDEN or arg["parent_argument_id"] is not None or not rid:
-        return False, ["geen looptijd-argument (root op een verband met property "
-                       "active_from/active_until)"], info
+    is_datum = veld in LOOPTIJD_VELDEN and (rid or eid)
+    is_fusie = veld == looptijd.OPVOLGING_PROPERTY and eid
+    if not (is_datum or is_fusie) or arg["parent_argument_id"] is not None:
+        return False, ["geen looptijd-argument (root op een verband of organisatie met property "
+                       "active_from/active_until, of op een organisatie met 'opgegaan_in')"], info
     if arg["status"] != "voorgesteld" or arg["vervangen"]:
         redenen.append(f"status is '{arg['status']}'{' (vervangen)' if arg['vervangen'] else ''}, "
                        "niet 'voorgesteld'")
     if arg["stance"] != "supporting":
-        redenen.append("alleen een steunend argument zet een datum")
-    if not DATUM_RE.match(waarde):
+        redenen.append("alleen een steunend argument zet een datum of een opvolger")
+    if is_datum and not DATUM_RE.match(waarde):
         redenen.append("property_value moet JJJJ, JJJJ-MM of JJJJ-MM-DD zijn")
-    else:
+    elif is_datum:
         jaar = int(waarde[:4])
-        if not 1800 <= jaar <= datetime.datetime.now().year or waarde > datetime.datetime.now().date().isoformat()[:len(waarde)]:
+        ondergrens = 1800 if rid else 1000   # organisaties kunnen eeuwen oud zijn
+        if not ondergrens <= jaar <= datetime.datetime.now().year or waarde > datetime.datetime.now().date().isoformat()[:len(waarde)]:
             redenen.append(f"onmogelijke datum {waarde}")
         if waarde[:4] not in (arg["claim"] or ""):
             redenen.append(f"de bewering noemt het jaar {waarde[:4]} niet")
@@ -8773,17 +8877,60 @@ def looptijd_besluit(conn, arg_id):
             redenen.append("wacht op de stemtoets")
         elif stem["verdict"] != "neutraal":
             redenen.append("stemtoets: niet neutraal")
-    rel = conn.execute("SELECT status, vervangen, active_from, active_until FROM relations WHERE id = ?",
-                       (rid,)).fetchone()
-    if rel is None or rel["vervangen"] or rel["status"] not in ("goedgekeurd", "voorgesteld"):
-        redenen.append("het verband is er niet (meer)")
-    elif (rel[veld] or "").strip():
-        redenen.append(f"het verband heeft al {veld} = {rel[veld]} (nooit overschrijven)")
-    elif DATUM_RE.match(waarde):
-        van = waarde if veld == "active_from" else (rel["active_from"] or "")
-        tot = waarde if veld == "active_until" else (rel["active_until"] or "")
-        if van and tot and van[:len(tot)] > tot[:len(van)]:
-            redenen.append(f"het begin ({van}) ligt na het einde ({tot})")
+    if rid:
+        rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+        if rel is None or rel["vervangen"] or rel["status"] not in ("goedgekeurd", "voorgesteld"):
+            redenen.append("het verband is er niet (meer)")
+        elif (rel[veld] or "").strip():
+            redenen.append(f"het verband heeft al {veld} = {rel[veld]} (nooit overschrijven)")
+        elif DATUM_RE.match(waarde):
+            van = waarde if veld == "active_from" else (rel["active_from"] or "")
+            tot = waarde if veld == "active_until" else (rel["active_until"] or "")
+            if van and tot and van[:len(tot)] > tot[:len(van)]:
+                redenen.append(f"het begin ({van}) ligt na het einde ({tot})")
+            else:
+                # 2026-10-13: de datum moet binnen het bestaan van bron en doel vallen
+                ents = {r["id"]: dict(r) for r in conn.execute(
+                    "SELECT id, name, type, active_from, active_until FROM entities WHERE id IN (?, ?)",
+                    (rel["source_id"], rel["target_id"]))}
+                oud, nieuw = dict(rel), dict(rel, **{veld: waarde})
+                b, d = ents.get(rel["source_id"]), ents.get(rel["target_id"])
+                voor_al = set(looptijd.conflicten(oud, b, d))
+                redenen += [c for c in looptijd.conflicten(nieuw, b, d) if c not in voor_al]
+        return not redenen, redenen, info
+    ent = conn.execute("SELECT * FROM entities WHERE id = ?", (eid,)).fetchone()
+    if ent is None or ent["vervangen"] or ent["status"] not in ("goedgekeurd", "voorgesteld"):
+        redenen.append("de entiteit is er niet (meer)")
+        return False, redenen, info
+    if ent["type"] == "persoon":
+        redenen.append("een persoon draagt geen looptijd of opvolger: een functie of periode hoort "
+                       "op het verband met de organisatie")
+    if is_datum:
+        if (ent[veld] or "").strip():
+            redenen.append(f"de entiteit heeft al {veld} = {ent[veld]} (nooit overschrijven)")
+        elif DATUM_RE.match(waarde):
+            van = waarde if veld == "active_from" else (ent["active_from"] or "")
+            tot = waarde if veld == "active_until" else (ent["active_until"] or "")
+            if van and tot and looptijd.voor(tot, van):
+                redenen.append(f"het begin ({van}) ligt na het einde ({tot})")
+        return not redenen, redenen, info
+    # Fusie: de opvolger bestaat, is geen persoon, maakt geen kring en bestond al op het moment
+    # dat de voorganger ophield.
+    opv_id = int(waarde) if waarde.isdigit() else None
+    opv = conn.execute("SELECT * FROM entities WHERE id = ?", (opv_id,)).fetchone() if opv_id else None
+    if opv is None or opv["vervangen"] or opv["status"] != "goedgekeurd" or opv_id == eid:
+        redenen.append(f"opvolger #{waarde} bestaat niet als goedgekeurde entiteit")
+        return False, redenen, info
+    info["opvolger"] = opv["name"]
+    if opv["type"] == "persoon":
+        redenen.append("de opvolger is een persoon")
+    if not _namen_in_tekst(opv["name"], arg["claim"]):
+        redenen.append(f"de bewering noemt de opvolger ({opv['name']}) niet")
+    if looptijd.kring({k: v for k, v in looptijd.opvolgingen(conn).items()}, eid, opv_id):
+        redenen.append("de opvolging maakt een kring")
+    if opv["active_from"] and ent["active_until"] and looptijd.voor(ent["active_until"], opv["active_from"]):
+        redenen.append(f"{opv['name']} bestond nog niet toen {ent['name']} ophield "
+                       f"({opv['active_from']} na {ent['active_until']})")
     return not redenen, redenen, info
 
 
@@ -8813,7 +8960,7 @@ def beoordeling_looptijd(arg_id):
         conn.close()
         return jsonify({"gezet": False, "error": "automatische beoordeling uitgeschakeld "
                         "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
-    vandaag = conn.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name = 'relations'
+    vandaag = conn.execute("""SELECT COUNT(*) FROM edit_log WHERE table_name IN ('relations', 'entities')
                               AND reason LIKE ?
                               AND date(created_at, 'localtime') = date('now', 'localtime')""",
                            (LOOPTIJD_REDEN_PREFIX + "%",)).fetchone()[0]
@@ -8824,14 +8971,30 @@ def beoordeling_looptijd(arg_id):
     if not ok:
         conn.close()
         return jsonify({"gezet": False, "redenen": redenen}), 409
-    veld, waarde, rid = info["veld"], info["waarde"], info["relation_id"]
+    veld, waarde = info["veld"], info["waarde"]
+    rid, eid = info.get("relation_id"), info.get("entity_id")
+    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
+    if eid:
+        # Een organisatie: haar bestaan (datum) of haar opvolger (fusie, 2026-10-13). De opvolging
+        # zelf is het gemergede argument (looptijd.opvolgingen); edit_log houdt het spoor.
+        if veld in LOOPTIJD_VELDEN:
+            conn.execute(f"UPDATE entities SET {veld} = ? WHERE id = ?", (waarde, eid))  # noqa: S608 - veld uit LOOPTIJD_VELDEN
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('entities', ?, 'updated', ?, ?, ?, ?)
+        """, (eid, g.user["username"], json.dumps({veld: None}), json.dumps({veld: waarde}),
+              f"{LOOPTIJD_REDEN_PREFIX} uit argument #{arg_id} (A1 klopt)"))
+        _merge_core(conn, arg, g.user["username"],
+                    reason=f"{LOOPTIJD_REDEN_PREFIX}: {veld} = {waarde} op entiteit #{eid}")
+        conn.commit()
+        conn.close()
+        return jsonify({"gezet": True, "entity_id": eid, "veld": veld, "waarde": waarde}), 200
     conn.execute(f"UPDATE relations SET {veld} = ? WHERE id = ?", (waarde, rid))  # noqa: S608 - veld uit LOOPTIJD_VELDEN
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
         VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
     """, (rid, g.user["username"], json.dumps({veld: None}), json.dumps({veld: waarde}),
           f"{LOOPTIJD_REDEN_PREFIX} uit argument #{arg_id} (A1 klopt)"))
-    arg = conn.execute("SELECT * FROM arguments WHERE id = ?", (arg_id,)).fetchone()
     _merge_core(conn, arg, g.user["username"],
                 reason=f"{LOOPTIJD_REDEN_PREFIX}: {veld} = {waarde} op verband #{rid}")
     if veld == "active_from":

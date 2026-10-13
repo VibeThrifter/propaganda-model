@@ -91,7 +91,9 @@ het model in komt.
      `primary_role_id` dan leeg, benoem in `description` welke rol ontbreekt, en log het.
      Je rol-suggestie is net als de rest een **voorstel**: een maintainer bevestigt of
      corrigeert haar bij de review (PATCH `/api/entities/<id>`, `primary_role_id`).
-   - optioneel `active_from`/`active_until` als de speler aantoonbaar tijdgebonden is.
+   - optioneel `active_from`/`active_until` als de speler aantoonbaar tijdgebonden is: bij een
+     organisatie haar oprichting en opheffing of fusie (zie missies/README.md § Looptijd),
+     bij een persoon niets: een functieperiode hoort op het verband.
    - **Granulariteit — kies het niveau waarop het mechanisme grijpt**, niet het niveau
      waarop de werkelijkheid administratief is onderverdeeld. Een subeenheid (opleiding,
      afdeling, redactie-binnen-een-concern) wordt alleen een eigen knoop als een

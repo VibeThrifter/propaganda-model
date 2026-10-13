@@ -125,6 +125,20 @@ verband zonder begin staat altijd en overal "aan".
   bronchecker toetst het; de automatische beoordeling zet de datum alleen in een leeg veld.
 - **Registers** geven hun datums zelf (`scripts/registers_looptijd.py`): noemt een register geen
   begin, dan staat dat vastgelegd en wordt er niets verzonnen.
+- **Binnen het bestaan (2026-10-13)**: een verband loopt nooit buiten het bestaan van zijn
+  eindpunten. Een band van vóór de oprichting of van ná de opheffing van een organisatie hoort bij
+  haar voorganger of opvolger: geen VARA-band uit 1986 op BNNVARA (2014), geen PvdA-band die na
+  1 juli 2026 begint (dan PRO). De goedkeurpoort (`bestaan_reden`) houdt zo'n verband tegen en
+  noemt de opvolger. Ontbreekt de voorganger, dien die dan in als eigen entiteit.
+- **Bestaan van een organisatie**: `active_from` = oprichting, `active_until` = opheffing of fusie.
+  Het aspect-argument staat op de entiteit (`entity_id`, `property` `active_from`/`active_until`) en
+  stap 10c zet het in een leeg veld. **Een persoon draagt geen functieperiode als looptijd**: "sinds
+  2020 CEO" hoort op het verband met het bedrijf, niet in `active_from` van de persoon.
+- **Fusie of opheffing**: twee aspect-argumenten op de opgeheven organisatie, elk met een letterlijk
+  citaat. (1) `active_until` met de datum. (2) `property` `opgegaan_in` met als `property_value` het
+  id van de opvolger; de bewering noemt de opvolger bij naam. Nooit samenvoegen (M2.6): de banden van
+  de voorganger blijven van haar. De viz en `/partijen` tonen de stamboom zelf. Een lid gaat alleen
+  over naar de opvolger als een bron dat voor die persoon zegt.
 
 ## Accounts
 

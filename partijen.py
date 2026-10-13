@@ -8,6 +8,16 @@ medewerker, woordvoerder, draaideur) en hun posities — een ambt in het openbaa
 organisatie daarbuiten (bedrijf, media, lobby, denktank, ngo, onderwijs, elite-netwerk).
 Daarnaast: welke organisaties mensen uit meerdere partijen delen.
 
+Tijd (looptijd.py, 2026-10-13): een band loopt nooit buiten het bestaan van partij of
+organisatie, dus een ongedateerd PvdA-lidmaatschap eindigt op 1 juli 2026. 'Lopend' wordt
+op de dag bepaald, niet op het jaar.
+
+Fusies: een partij die opging in een andere (aspect 'opgegaan_in') blijft haar eigen banden
+houden. Met fusies=True (standaard) telt de opvolger ze mee als zijn stamboom: PRO toont ook
+de mensen van PvdA en GroenLinks, elk met de partij en de periode van hun band. 'Nu' telt
+alleen wat vandaag loopt. Een band met een opgeheven partij loopt niet meer, en een lid gaat
+alleen over als een bron dat voor die persoon zegt.
+
 Leest alléén goedgekeurde, niet-vervangen relaties tussen goedgekeurde entiteiten. Telt in
 NIETS mee (scoring/influence/viz_data lezen dit niet) en beweert niets over invloed of
 afstemming: het zegt wie welke positie bekleedt volgens de gesourcete verbanden. Dat is de
@@ -20,6 +30,8 @@ pagina /partijen en de partij-sectie in het viz-detailpaneel.
 from __future__ import annotations
 
 import datetime
+
+import looptijd
 
 # Band persoon ↔ partij (beide richtingen; het register schrijft partij → persoon).
 PARTIJBAND_TYPES = ("lidmaatschap", "bestuurder", "adviseur", "personeel",
@@ -120,31 +132,50 @@ def _jaar(v):
         return None
 
 
-def _afgelopen(r, peiljaar):
-    """Zelfde regel als de viz (isAfgelopen): inactief, of het eindjaar ligt vóór dit jaar."""
-    if r.get("active") in (0, False):
-        return True
-    u = _jaar(r.get("active_until"))
-    return u is not None and u < peiljaar
+def _peil(peiljaar):
+    """Peildatum: vandaag (op de dag), of een opgegeven jaar (op jaarbasis)."""
+    return str(peiljaar) if peiljaar else datetime.date.today().isoformat()
 
 
-def _overlapt(a, b):
-    """Overlappen twee looptijden (op jaarbasis)? Een open grens overlapt altijd —
-    de meeste partijbanden zijn ongedateerd en tellen dus gewoon mee."""
-    af, au = _jaar(a.get("active_from")), _jaar(a.get("active_until"))
-    bf, bu = _jaar(b.get("active_from")), _jaar(b.get("active_until"))
-    return (au is None or bf is None or bf <= au) and (bu is None or af is None or bu >= af)
+class _Tijd:
+    """De looptijd van verbanden binnen het bestaan van hun eindpunten (looptijd.py)."""
 
+    def __init__(self, ents, peil):
+        self.ents, self.peil = ents, peil
 
-def _looptijd(r):
-    f, u = _jaar(r.get("active_from")), _jaar(r.get("active_until"))
-    if f and u:
-        return f"{f}–{u}"
-    if f:
-        return f"sinds {f}"
-    if u:
-        return f"tot {u}"
-    return ""
+    def eindpunten(self, r):
+        return self.ents.get(r["source_id"]), self.ents.get(r["target_id"])
+
+    def effectief(self, r):
+        return looptijd.effectief(r, *self.eindpunten(r))
+
+    def afgelopen(self, r):
+        return looptijd.afgelopen(r, *self.eindpunten(r), peil=self.peil)
+
+    def overlapt(self, a, b):
+        av, at, _ = self.effectief(a)
+        bv, bt, _ = self.effectief(b)
+        return looptijd.overlapt(av, at, bv, bt)
+
+    def label(self, r):
+        """'1990–2026', 'sinds 2019', 'tot 2026': het eigen begin, het effectieve einde (een
+        opgeheven partij of organisatie kapt een open band af)."""
+        f = _jaar(r.get("active_from"))
+        u = _jaar(self.effectief(r)[1])
+        if f and u:
+            return f"{f}–{u}"
+        if f:
+            return f"sinds {f}"
+        if u:
+            return f"tot {u}"
+        return ""
+
+    def einde_door(self, r):
+        door = self.effectief(r)[2]
+        if door is None:
+            return None
+        e = self.ents[door]
+        return {"id": door, "naam": e["name"], "einde": e.get("active_until")}
 
 
 def _laad(conn):
@@ -155,8 +186,8 @@ def _laad(conn):
         return [dict(zip(cols, r)) for r in cur.fetchall()]
 
     ents = {e["id"]: e for e in rijen(
-        "SELECT id, name, type, bestuurslaag, description FROM entities "
-        "WHERE status = 'goedgekeurd' AND NOT vervangen")}
+        "SELECT id, name, type, bestuurslaag, description, active_from, active_until "
+        "FROM entities WHERE status = 'goedgekeurd' AND NOT vervangen")}
     rels = [r for r in rijen(
         "SELECT r.id, r.source_id, r.target_id, r.relation_type, r.functie, "
         "       r.active_from, r.active_until, r.active, m.name AS mechanism_name "
@@ -170,19 +201,28 @@ def _ander(r, eid):
     return r["target_id"] if r["source_id"] == eid else r["source_id"]
 
 
-def _bouw(conn, peiljaar=None):
-    """Kern: per partij de personen met hun banden en posities.
+def _stamboom(conn, ents):
+    """Fusies tussen partijen: (hoofd, voorgangers, opvolgers) — zie looptijd.stamboom."""
+    opv = {}
+    for vg, lijst in looptijd.opvolgingen(conn).items():
+        if ents.get(vg, {}).get("type") != "partij":
+            continue
+        lijst = [x for x in lijst if ents.get(x["opvolger"], {}).get("type") == "partij"]
+        if lijst:
+            opv[vg] = lijst
+    hoofd, voorgangers = looptijd.stamboom(opv)
+    return hoofd, voorgangers, {k: [x["opvolger"] for x in v] for k, v in opv.items()}
 
-    Geeft (ents, partijen, rels) met partijen = {partij_id: {persoon_id: {...}}}; per
-    persoon 'banden' (met de partij) en 'posities' (elk met klasse, afgelopen en of hij
-    in de tijd met een band overlapt — een positie van vóór of ná het lidmaatschap
-    telt niet mee voor die partij, maar blijft zichtbaar)."""
-    peiljaar = peiljaar or datetime.date.today().year
+
+def _bouw(conn, peiljaar=None):
+    """Kern: per partij (zonder samenvoegen) de banden per persoon, en per partijpersoon zijn
+    posities. Samenvoegen langs fusies en de tijdtoets per groep doet _groep."""
     ents, rels = _laad(conn)
+    tijd = _Tijd(ents, _peil(peiljaar))
     is_partij = lambda i: ents[i]["type"] == "partij"      # noqa: E731
     is_persoon = lambda i: ents[i]["type"] == "persoon"    # noqa: E731
 
-    partijen = {i: {} for i, e in ents.items() if e["type"] == "partij"}
+    per_partij = {i: {} for i, e in ents.items() if e["type"] == "partij"}
     for r in rels:
         if r["relation_type"] not in PARTIJBAND_TYPES:
             continue
@@ -193,10 +233,9 @@ def _bouw(conn, peiljaar=None):
             p, pers = t, s
         else:
             continue
-        slot = partijen[p].setdefault(pers, {"banden": [], "posities": []})
-        slot["banden"].append(r)
+        per_partij[p].setdefault(pers, []).append(dict(r, partij_id=p))
 
-    leden = {pers for pp in partijen.values() for pers in pp}
+    leden = {pers for pp in per_partij.values() for pers in pp}
     posities = {}   # persoon_id -> [positie-dict]
     for r in rels:
         if r["relation_type"] not in POSITIE_TYPES:
@@ -210,21 +249,30 @@ def _bouw(conn, peiljaar=None):
             posities.setdefault(pers, []).append({
                 "rel": r, "org": org,
                 "klasse": klasse(r["relation_type"], r.get("functie"), org),
-                "afgelopen": _afgelopen(r, peiljaar),
+                "afgelopen": tijd.afgelopen(r),
             })
+    return ents, per_partij, posities, rels, tijd
 
-    for pp in partijen.values():
-        for pers, slot in pp.items():
-            slot["band_afgelopen"] = all(_afgelopen(b, peiljaar) for b in slot["banden"])
-            actieve_banden = [b for b in slot["banden"] if not _afgelopen(b, peiljaar)]
-            for pos in posities.get(pers, []):
-                binnen = any(_overlapt(b, pos["rel"]) for b in slot["banden"])
-                slot["posities"].append(dict(
-                    pos, binnen_band=binnen,
-                    # 'nu': de band met de partij én de positie lopen allebei nog.
-                    nu=bool(binnen and actieve_banden and not pos["afgelopen"]),
-                ))
-    return ents, partijen, rels, peiljaar
+
+def _groep(partij_ids, per_partij, posities, tijd):
+    """De personen van een groep partijen (een partij plus haar voorgangers) met hun banden en
+    posities. Een positie telt voor de groep als ze in de tijd met een band overlapt: een
+    positie van vóór of ná de band blijft zichtbaar maar telt niet. 'Nu' betekent dat een band
+    met de groep én de positie vandaag lopen."""
+    slots = {}
+    for p in partij_ids:
+        for pers, banden in per_partij.get(p, {}).items():
+            slots.setdefault(pers, {"banden": [], "posities": []})["banden"] += banden
+    for pers, slot in slots.items():
+        slot["band_afgelopen"] = all(tijd.afgelopen(b) for b in slot["banden"])
+        actieve_banden = [b for b in slot["banden"] if not tijd.afgelopen(b)]
+        for pos in posities.get(pers, []):
+            binnen = any(tijd.overlapt(b, pos["rel"]) for b in slot["banden"])
+            slot["posities"].append(dict(
+                pos, binnen_band=binnen,
+                nu=bool(binnen and actieve_banden and not pos["afgelopen"]),
+            ))
+    return slots
 
 
 def _klassen_lijst():
@@ -240,13 +288,36 @@ def _hoofdklasse(posities):
     return None
 
 
-def compute_overzicht(conn, peiljaar=None) -> dict:
+def _bestaan_label(e):
+    f, u = _jaar(e.get("active_from")), _jaar(e.get("active_until"))
+    if f and u:
+        return f"{f}–{u}"
+    if f:
+        return f"sinds {f}"
+    return f"tot {u}" if u else ""
+
+
+def _partij_kort(ents, pid):
+    e = ents[pid]
+    return {"id": pid, "naam": e["name"], "looptijd": _bestaan_label(e)}
+
+
+def _groep_ids(pid, voorgangers, fusies):
+    return {pid} | (set(voorgangers.get(pid, ())) if fusies else set())
+
+
+def compute_overzicht(conn, peiljaar=None, fusies=True) -> dict:
     """Alle partijen: tellingen per positieklasse (personen, 'alle' en 'nu') + de
-    organisaties waar mensen uit twee of meer partijen een positie hebben."""
-    ents, partijen, _, peiljaar = _bouw(conn, peiljaar)
+    organisaties waar mensen uit twee of meer partijen een positie hebben. Met fusies=True is
+    een opgeheven partij een deel van de kolom van haar opvolger (stamboom)."""
+    ents, per_partij, posities, _, tijd = _bouw(conn, peiljaar)
+    hoofd, voorgangers, opvolgers = _stamboom(conn, ents)
+    kolommen = [p for p in per_partij if not (fusies and p in hoofd)]
     uit = []
-    gedeeld = {}   # org_id -> {partij_id: {"alle": set, "nu": set}}
-    for pid, pp in partijen.items():
+    gedeeld = {}   # org_id -> {kolom_id: {"alle": set, "nu": set}}
+    for pid in kolommen:
+        groep = _groep_ids(pid, voorgangers, fusies)
+        pp = _groep(groep, per_partij, posities, tijd)
         if not pp:
             continue
         telling = {}
@@ -270,29 +341,36 @@ def compute_overzicht(conn, peiljaar=None) -> dict:
                 telling.setdefault(k, [0, 0])[0] += 1
             for k in nu_k:
                 telling[k][1] += 1
-        uit.append({"id": pid, "naam": ents[pid]["name"],
-                    "n_personen": [len(pp), n_nu], "telling": telling})
+        kol = {"id": pid, "naam": ents[pid]["name"], "looptijd": _bestaan_label(ents[pid]),
+               "n_personen": [len(pp), n_nu], "telling": telling}
+        if fusies and voorgangers.get(pid):
+            kol["voorgangers"] = sorted((_partij_kort(ents, v) for v in voorgangers[pid]),
+                                        key=lambda v: (v["looptijd"], v["naam"]))
+        if opvolgers.get(pid):
+            kol["opgegaan_in"] = [_partij_kort(ents, o) for o in opvolgers[pid]]
+        uit.append(kol)
     uit.sort(key=lambda p: (-p["n_personen"][0], p["naam"].lower()))
 
     orgs = []
-    for oid, per_partij in gedeeld.items():
-        if len(per_partij) < 2:
+    for oid, per_kolom in gedeeld.items():
+        if len(per_kolom) < 2:
             continue
         o = ents[oid]
         orgs.append({
             "id": oid, "naam": o["name"], "type": o["type"], "laag": o.get("bestuurslaag"),
             "overheid": o["type"] in OVERHEID_TYPES,
             "partijen": {str(pid): {"alle": len(v["alle"]), "nu": len(v["nu"])}
-                         for pid, v in per_partij.items()},
+                         for pid, v in per_kolom.items()},
         })
     orgs.sort(key=lambda o: (-len(o["partijen"]),
                              -sum(v["alle"] for v in o["partijen"].values()),
                              o["naam"].lower()))
-    return {"peiljaar": peiljaar, "klassen": _klassen_lijst(), "partijen": uit,
+    return {"peiljaar": int(_peil(peiljaar)[:4]), "peildatum": _peil(peiljaar),
+            "fusies": bool(fusies), "klassen": _klassen_lijst(), "partijen": uit,
             "gedeelde_organisaties": orgs}
 
 
-def _rel_uit(r, eid, ents, peiljaar):
+def _rel_uit(r, eid, ents, tijd):
     """Eén relatie vanuit het perspectief van entiteit eid (voor 'overige banden')."""
     ander = ents[_ander(r, eid)]
     return {
@@ -300,7 +378,7 @@ def _rel_uit(r, eid, ents, peiljaar):
         "richting": "uit" if r["source_id"] == eid else "in",
         "ander": {"id": ander["id"], "naam": ander["name"], "type": ander["type"]},
         "mechanisme": r.get("mechanism_name"), "functie": r.get("functie"),
-        "looptijd": _looptijd(r), "afgelopen": _afgelopen(r, peiljaar),
+        "looptijd": tijd.label(r), "afgelopen": tijd.afgelopen(r),
     }
 
 
@@ -324,13 +402,16 @@ def _label(pos):
     return POSITIE_LABELS[r["relation_type"]]
 
 
-def compute_partij(conn, partij_id: int, peiljaar=None):
+def compute_partij(conn, partij_id: int, peiljaar=None, fusies=True):
     """Eén partij in detail: per persoon de band(en), posities en overige relaties, plus
-    de banden van de partij zelf met organisaties. None als het geen (goedgekeurde) partij is."""
-    ents, partijen, rels, peiljaar = _bouw(conn, peiljaar)
-    if partij_id not in partijen:
+    de banden van de partij zelf met organisaties. Met fusies=True horen de partijen die erin
+    opgingen erbij (elke band noemt zijn partij). None als het geen (goedgekeurde) partij is."""
+    ents, per_partij, posities, rels, tijd = _bouw(conn, peiljaar)
+    if partij_id not in per_partij:
         return None
-    pp = partijen[partij_id]
+    hoofd, voorgangers, opvolgers = _stamboom(conn, ents)
+    groep = _groep_ids(partij_id, voorgangers, fusies)
+    pp = _groep(groep, per_partij, posities, tijd)
 
     # Overige relaties per persoon: alles wat geen band met een partij en geen positie is.
     overig = {}
@@ -341,16 +422,17 @@ def compute_partij(conn, partij_id: int, peiljaar=None):
             ander = ents[_ander(r, pers)]
             if r["relation_type"] in POSITIE_TYPES and ander["type"] != "persoon":
                 continue   # band met een partij of positie: staat al elders
-            overig.setdefault(pers, []).append(_rel_uit(r, pers, ents, peiljaar))
+            overig.setdefault(pers, []).append(_rel_uit(r, pers, ents, tijd))
 
     andere_partijen = {}
-    for pid, leden in partijen.items():
-        if pid == partij_id:
+    for pid, leden in per_partij.items():
+        if pid in groep:
             continue
-        for pers, slot in leden.items():
+        for pers, banden in leden.items():
             if pers in pp:
                 andere_partijen.setdefault(pers, []).append({
-                    "id": pid, "naam": ents[pid]["name"], "afgelopen": slot["band_afgelopen"]})
+                    "id": pid, "naam": ents[pid]["name"],
+                    "afgelopen": all(tijd.afgelopen(b) for b in banden)})
 
     personen = []
     telling = {}
@@ -358,17 +440,20 @@ def compute_partij(conn, partij_id: int, peiljaar=None):
         # Tellen op alle posities (zelfde getallen als het overzicht); tonen ontdubbeld.
         alle_k = {p["klasse"] for p in slot["posities"] if p["binnen_band"]}
         nu_k = {p["klasse"] for p in slot["posities"] if p["nu"]}
-        posities = sorted(_ontdubbel(slot["posities"]), key=lambda p: (
+        posities_p = sorted(_ontdubbel(slot["posities"]), key=lambda p: (
             not p["binnen_band"], p["afgelopen"], RANG[p["klasse"]], p["org"]["name"].lower()))
         for k in alle_k:
             telling.setdefault(k, [0, 0])[0] += 1
         for k in nu_k:
             telling[k][1] += 1
+        banden = sorted(slot["banden"], key=lambda b: (tijd.afgelopen(b), -(_jaar(b.get("active_from")) or 0)))
         personen.append({
             "id": pers, "naam": ents[pers]["name"],
             "band": [{"relation_id": b["id"], "type": b["relation_type"],
-                      "label": BAND_LABELS[b["relation_type"]], "looptijd": _looptijd(b),
-                      "afgelopen": _afgelopen(b, peiljaar)} for b in slot["banden"]],
+                      "label": BAND_LABELS[b["relation_type"]], "looptijd": tijd.label(b),
+                      "afgelopen": tijd.afgelopen(b), "einde_door": tijd.einde_door(b),
+                      "partij": {"id": b["partij_id"], "naam": ents[b["partij_id"]]["name"]}}
+                     for b in banden],
             "band_afgelopen": slot["band_afgelopen"],
             "hoofdklasse": _hoofdklasse(slot["posities"]),
             "posities": [{
@@ -377,9 +462,9 @@ def compute_partij(conn, partij_id: int, peiljaar=None):
                 "type": p["rel"]["relation_type"],
                 "org": {"id": p["org"]["id"], "naam": p["org"]["name"],
                         "type": p["org"]["type"], "laag": p["org"].get("bestuurslaag")},
-                "looptijd": _looptijd(p["rel"]), "afgelopen": p["afgelopen"],
+                "looptijd": tijd.label(p["rel"]), "afgelopen": p["afgelopen"],
                 "binnen_band": p["binnen_band"], "nu": p["nu"],
-            } for p in posities],
+            } for p in posities_p],
             "overig": sorted(overig.get(pers, []), key=lambda o: (o["afgelopen"], o["type"])),
             "andere_partijen": andere_partijen.get(pers, []),
         })
@@ -390,18 +475,33 @@ def compute_partij(conn, partij_id: int, peiljaar=None):
 
     organisaties = []
     for r in rels:
-        if partij_id not in (r["source_id"], r["target_id"]):
+        via = next((p for p in groep if p in (r["source_id"], r["target_id"])), None)
+        if via is None:
             continue
-        ander = ents[_ander(r, partij_id)]
+        ander = ents[_ander(r, via)]
+        if ander["id"] in groep:
+            continue   # band tussen partijen van dezelfde stamboom
         if ander["id"] in pp and r["relation_type"] in PARTIJBAND_TYPES:
             continue   # persoonsband: staat onder 'personen'
-        organisaties.append(_rel_uit(r, partij_id, ents, peiljaar))
+        o = _rel_uit(r, via, ents, tijd)
+        if via != partij_id:
+            o["via"] = {"id": via, "naam": ents[via]["name"]}
+        organisaties.append(o)
     organisaties.sort(key=lambda o: (o["afgelopen"], o["type"], o["ander"]["naam"].lower()))
 
     e = ents[partij_id]
-    return {
-        "peiljaar": peiljaar, "klassen": _klassen_lijst(),
-        "partij": {"id": partij_id, "naam": e["name"], "beschrijving": e.get("description")},
+    uit = {
+        "peiljaar": int(_peil(peiljaar)[:4]), "peildatum": _peil(peiljaar), "fusies": bool(fusies),
+        "klassen": _klassen_lijst(),
+        "partij": {"id": partij_id, "naam": e["name"], "beschrijving": e.get("description"),
+                   "looptijd": _bestaan_label(e)},
         "n_personen": [len(pp), sum(1 for s in pp.values() if not s["band_afgelopen"])],
         "telling": telling, "personen": personen, "organisaties": organisaties,
     }
+    if fusies and voorgangers.get(partij_id):
+        uit["partij"]["voorgangers"] = sorted(
+            (_partij_kort(ents, v) for v in voorgangers[partij_id]),
+            key=lambda v: (v["looptijd"], v["naam"]))
+    if opvolgers.get(partij_id):
+        uit["partij"]["opgegaan_in"] = [_partij_kort(ents, o) for o in opvolgers[partij_id]]
+    return uit

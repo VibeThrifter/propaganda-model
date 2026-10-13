@@ -204,8 +204,9 @@ def a2_wachtrij(conn) -> list[dict]:
         if (a["parent_argument_id"] is not None and a["stance"] == "contradicting"
                 and (a["reasoning"] or "").strip()):
             continue  # ondergraving: eigen route
-        if a["parent_argument_id"] is None and a["property"] in ("active_from", "active_until"):
-            continue  # looptijd: een datum uit een bron, A1 volstaat (stap 10c zet hem)
+        if a["parent_argument_id"] is None and a["property"] in ("active_from", "active_until",
+                                                                 "opgegaan_in"):
+            continue  # looptijd of fusie: een feit uit een bron, A1 volstaat (stap 10c past het toe)
         personen, rtype = smaadtoets.personen_van(conn, a)
         if (a["parent_argument_id"] is None and a["stance"] == "supporting"
                 and rtype in STRUCTUURTYPES
@@ -348,14 +349,17 @@ def stap_datumzoeken(args, meld) -> dict:
 
 
 def stap_looptijd(token, args, meld) -> dict:
-    """Stap 10c: de datum van elk looptijd-argument dat A1 'klopt' gaf (en de stemtoets
-    neutraal) op zijn verband zetten; de server beslist (looptijd_besluit) en logt oud/nieuw."""
+    """Stap 10c: elk looptijd-argument dat A1 'klopt' gaf (en de stemtoets neutraal) toepassen:
+    de datum op zijn verband of organisatie (oprichting/opheffing), of de opvolger van een
+    organisatie (fusie, 'opgegaan_in'). De server beslist (looptijd_besluit) en logt oud/nieuw."""
     conn = db()
     try:
         ids = [r["id"] for r in conn.execute("""
             SELECT a.id FROM arguments a
             WHERE a.status = 'voorgesteld' AND NOT a.vervangen AND a.parent_argument_id IS NULL
-              AND a.property IN ('active_from', 'active_until') AND a.relation_id IS NOT NULL
+              AND ((a.property IN ('active_from', 'active_until')
+                    AND (a.relation_id IS NOT NULL OR a.entity_id IS NOT NULL))
+                   OR (a.property = 'opgegaan_in' AND a.entity_id IS NOT NULL))
               AND (SELECT verdict FROM immuun_oordelen o WHERE o.argument_id = a.id
                      AND o.fase = 'herverificatie' ORDER BY o.created_at DESC, o.id DESC
                      LIMIT 1) = 'klopt'
@@ -373,7 +377,7 @@ def stap_looptijd(token, args, meld) -> dict:
             tel["gezet"] += 1
         else:
             tel["blijft"] += 1
-    meld(f"Looptijd: {tel['gezet']} datum(s) op een verband gezet{' (droog)' if args.droog else ''}"
+    meld(f"Looptijd: {tel['gezet']} datum(s) of opvolger(s) gezet{' (droog)' if args.droog else ''}"
          f", {tel['blijft']} wachten (stemtoets) of mogen niet (veld al gevuld)")
     return tel
 

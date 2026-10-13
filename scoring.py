@@ -142,7 +142,8 @@ ZONDER_BRON_CLUSTER = "_zonder_bron"
 # geconsumeerd; ze leggen het debat vast (ik stel voor, jij beslist).
 ASPECT_PROPERTIES = ("influence", "indirecte_invloed_op", "compositie",
                      "mechanism", "filter", "politieke_positie", "inkomensaandeel",
-                     "machtsvalentie", "doelgroepklasse", "bereik")
+                     "machtsvalentie", "doelgroepklasse", "bereik",
+                     "opgegaan_in")  # fusie/opheffing → stamboom (looptijd.py), geen bestaansbewijs
 
 
 # ── Laag A: basiskracht τ per argument ───────────────────────

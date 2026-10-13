@@ -18,6 +18,7 @@ import politiek  # politieke kleurmeter
 import tegenmacht  # machtsvalentie: tegenmacht als gerichte edge-valentie
 import doelgroep  # welstandsmeter: getargette marketing-/welstandsklasse per outlet
 import bereik as bereik_mod  # bereikmeter: publieksbereik (kijkers/lezers) per jaar
+import looptijd  # bestaan begrenst verbanden; fusies (opgegaan_in → stamboom)
 
 ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "propaganda_model.db"
@@ -115,6 +116,28 @@ def export_data(conn):
     if len(relations) != _voor:
         print(f"  {_voor - len(relations)} relatie(s) met een eindpunt buiten beeld weggelaten "
               "(entiteit afgewezen/verborgen)")
+
+    # Bestaan begrenst (2026-10-13, looptijd.py): een verband met een opgeheven organisatie loopt
+    # niet door na haar einde. Een ongedateerd PvdA-lidmaatschap eindigt dus effectief op
+    # 1 juli 2026. Niets wordt opgeslagen: 'active_until_eff' (+ 'einde_door', de entiteit die
+    # afkapt) staat alleen in de export, en alleen als het eigen einde later ligt of ontbreekt.
+    ent_by_id = {e['id']: e for e in entities}
+    vandaag = looptijd.vandaag()
+    for r in relations:
+        _, tot, door = looptijd.effectief(r, ent_by_id[r['source_id']], ent_by_id[r['target_id']])
+        if door is not None:
+            r['active_until_eff'], r['einde_door'] = tot, door
+            if looptijd.voor(tot, vandaag):
+                r['active'] = 0
+    # Fusies: wie ging waarin op (gemergede 'opgegaan_in'-argumenten), voor het detailpaneel en
+    # het partijnetwerk. Directe schakels; de viz loopt de keten zelf af.
+    for vg, lijst in looptijd.opvolgingen(conn).items():
+        if vg not in ent_by_id:
+            continue
+        ent_by_id[vg]['opgegaan_in'] = [x['opvolger'] for x in lijst if x['opvolger'] in ent_by_id]
+        for x in lijst:
+            if x['opvolger'] in ent_by_id:
+                ent_by_id[x['opvolger']].setdefault('voortgekomen_uit', []).append(vg)
 
     # Roles (+ temporele velden: ook de theorielaag is historisch contingent)
     cur.execute("SELECT id, name, category, description, active_from, active_until "

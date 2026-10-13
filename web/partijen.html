@@ -40,6 +40,7 @@ table.matrix {
 }
 .matrix thead th.partij a:hover { color: var(--text); text-decoration: none; }
 .matrix thead th.partij.actief a { color: var(--accent); }
+.matrix thead th.partij .vg { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
 .matrix .actief-kol { background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .matrix td a {
   display: block; min-width: 40px; margin: 2px; padding: 5px 4px; border-radius: 6px;
@@ -60,6 +61,8 @@ table.matrix {
 .partij-kop { display: flex; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; margin-bottom: 4px; }
 .partij-kop h2 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .partij-kop .meta a { color: var(--accent); }
+.stamboom { font-size: 12.5px; color: var(--text-dim); margin: 2px 0 0; }
+.stamboom a { color: var(--accent); }
 .filterbalk { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
 .filterbalk .tabs { flex: 1 1 520px; }
 .filterbalk .tab { font-size: 12px; padding: 4px 10px; }
@@ -77,6 +80,7 @@ input.zoek { width: 260px; max-width: 100%; }
 .p-graaf:hover { color: var(--accent); text-decoration: none; }
 .p-band { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
 .p-band .oud { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+.p-band .via { color: var(--text-dim); }
 .posities { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; }
 .pos {
   font-size: 12px; line-height: 1.45; color: var(--text-dim);
@@ -146,7 +150,13 @@ Dekking: Kabinet, Tweede en Eerste Kamer, Europees Parlement, burgemeesters en w
       <button type="button" class="tab actief" data-tijd="nu" role="tab">Lopend</button>
       <button type="button" class="tab" data-tijd="alle" role="tab">Ook afgelopen</button>
     </div>
-    <span class="hint">Lopend = de band met de partij én de positie zijn niet beëindigd; banden zonder einddatum tellen als lopend.</span>
+    <div class="tabs" id="fusieTabs" role="tablist" aria-label="Fusies">
+      <button type="button" class="tab actief" data-fusies="1" role="tab">Fusies samen</button>
+      <button type="button" class="tab" data-fusies="0" role="tab">Elke partij apart</button>
+    </div>
+    <button type="button" class="uitleg" aria-label="Uitleg over fusies"
+            data-uitleg="Een partij die in een andere opging (PvdA en GroenLinks per 1 juli 2026 in PRO, de KVP in 1980 in het CDA) houdt haar eigen banden: een PvdA-lidmaatschap uit 1990 blijft een PvdA-lidmaatschap. Met 'Fusies samen' telt de opvolger de mensen van zijn voorgangers mee als stamboom, en bij elke band staat bij welke partij die hoorde. 'Lopend' telt alleen wat vandaag loopt: een band met een opgeheven partij loopt niet meer, ook als er geen einddatum bij staat. Een lid gaat alleen over naar de opvolger als een bron dat voor die persoon zegt.">ⓘ</button>
+    <span class="hint">Lopend = de band met de partij én de positie lopen vandaag. Een band zonder einddatum loopt tot de partij of organisatie zelf ophield te bestaan.</span>
   </div>
 
   <section id="matrixSectie">
@@ -161,6 +171,7 @@ Dekking: Kabinet, Tweede en Eerste Kamer, Europees Parlement, burgemeesters en w
       <h2 id="partijNaam"></h2>
       <div class="meta" id="partijMeta"></div>
     </div>
+    <p class="stamboom" id="partijStamboom" hidden></p>
     <div class="filterbalk">
       <div class="tabs" id="klasseTabs"></div>
       <input class="veld zoek" id="zoek" type="search" placeholder="Zoek op naam of organisatie…" aria-label="Zoek op naam of organisatie">
@@ -187,9 +198,11 @@ Dekking: Kabinet, Tweede en Eerste Kamer, Europees Parlement, burgemeesters en w
 // Data: GET /api/partijen (overzicht) en GET /api/partijen/<id> (detail), beide uit partijen.py.
 // Stand in de URL: #partij-<id> of #partij-<id>/<klasse>.
 const st = {
-  tijd: 'nu', overzicht: null, detail: null, partijId: null, klasse: null,
+  tijd: 'nu', fusies: true, overzicht: null, detail: null, partijId: null, klasse: null,
   zoek: '', sector: 'buiten', open: new Set(),
 };
+try { st.fusies = localStorage.getItem('partijen.fusies') !== '0'; } catch (e) { /* geen opslag */ }
+const fusieParam = () => st.fusies ? '' : '?fusies=0';
 const esc = hsEsc;
 const GROEP_LIMIET = 15;   // langere groepen klappen in tot "Toon alle N"
 const KORT = {
@@ -224,8 +237,9 @@ function renderMatrix() {
   const ps = zichtbarePartijen();
   const kls = st.overzicht.klassen.filter(k => ps.some(p => p.telling[k.key] && n(p.telling[k.key])));
   const kolKlasse = p => p.id === st.partijId ? ' actief-kol' : '';
+  const vgTitel = p => p.voorgangers ? ` — incl. ${p.voorgangers.map(v => `${v.naam} (${v.looptijd})`).join(', ')}` : '';
   let h = '<thead><tr><th class="rij">Positie ↓ · partij →</th>' + ps.map(p =>
-    `<th class="partij${p.id === st.partijId ? ' actief' : ''}${kolKlasse(p)}"><a href="#partij-${p.id}" title="${esc(p.naam)}">${esc(kort(p.naam))}</a></th>`
+    `<th class="partij${p.id === st.partijId ? ' actief' : ''}${kolKlasse(p)}"><a href="#partij-${p.id}" title="${esc(p.naam + vgTitel(p))}">${esc(kort(p.naam))}${p.voorgangers ? `<span class="vg">+ ${esc(p.voorgangers.map(v => kort(v.naam)).join(', '))}</span>` : ''}</a></th>`
   ).join('') + '</tr></thead><tbody>';
   h += '<tr class="totaal"><th class="rij">Verbonden personen</th>' + ps.map(p =>
     `<td class="${kolKlasse(p)}"><a href="#partij-${p.id}">${n(p.n_personen)}</a></td>`).join('') + '</tr>';
@@ -275,7 +289,11 @@ function posChip(x) {
   return `<span class="${cls.join(' ')}"${tip ? ` title="${tip}"` : ''}><a class="lab" href="/relatie/${x.relation_id}" title="Onderbouwing van deze band">${esc(x.label)}</a> · <a href="${pagina(x.org.id, x.org.type)}">${esc(x.org.naam)}</a>${x.looptijd ? ` <span class="lt">${esc(x.looptijd)}</span>` : ''}</span>`;
 }
 function persoonRij(p) {
-  const band = p.band.map(b => `<span class="${b.afgelopen ? 'oud' : ''}">${esc(b.label)}${b.looptijd ? ' ' + esc(b.looptijd) : ''}</span>`).join(', ');
+  const band = p.band.map(b => {
+    const andere = b.partij && b.partij.id !== st.detail.partij.id;
+    const tip = b.einde_door ? ` title="${esc(b.einde_door.naam)} hield op te bestaan (${esc(b.einde_door.einde || '')})"` : '';
+    return `<span class="${b.afgelopen ? 'oud' : ''}"${tip}>${esc(b.label)}${andere ? ` <span class="via">${esc(kort(b.partij.naam))}</span>` : ''}${b.looptijd ? ' ' + esc(b.looptijd) : ''}</span>`;
+  }).join(', ');
   const ook = p.andere_partijen.length
     ? ` · ook ${p.andere_partijen.map(a => `<a href="#partij-${a.id}">${esc(kort(a.naam))}</a>${a.afgelopen ? ' (afgelopen)' : ''}`).join(', ')}` : '';
   const posities = p.posities.length ? p.posities.map(posChip).join('')
@@ -338,7 +356,7 @@ function renderPartijBanden() {
   document.getElementById('partijBandenLijst').innerHTML = d.organisaties.map(o =>
     `<div class="pband-rij${o.afgelopen ? ' afg' : ''}"><a href="/relatie/${o.relation_id}">${esc(relLabel(o.type))}</a>
       ${o.richting === 'uit' ? '→' : '←'} <a href="${pagina(o.ander.id, o.ander.type)}">${esc(o.ander.naam)}</a>
-      <span class="hint">${esc(weergaveNaam(o.ander.type))}${o.mechanisme ? ' · ' + esc(weergaveNaam(o.mechanisme)) : ''}${o.looptijd ? ' · ' + esc(o.looptijd) : ''}</span></div>`).join('');
+      <span class="hint">${esc(weergaveNaam(o.ander.type))}${o.mechanisme ? ' · ' + esc(weergaveNaam(o.mechanisme)) : ''}${o.looptijd ? ' · ' + esc(o.looptijd) : ''}${o.via ? ' · via ' + esc(o.via.naam) : ''}</span></div>`).join('');
 }
 function renderDetail() {
   const d = st.detail;
@@ -347,8 +365,17 @@ function renderDetail() {
   const nn = n(d.n_personen);
   document.getElementById('partijMeta').innerHTML =
     `<span>${nn} verbonden ${nn === 1 ? 'persoon' : 'personen'}${st.tijd === 'nu' ? ' (lopend)' : ''}</span>
+     ${d.partij.looptijd ? `<span>${esc(d.partij.looptijd)}</span>` : ''}
      <a href="/#sel=entity:${d.partij.id}">↗ in het netwerk</a>
      <a href="/entiteit/${d.partij.id}">↗ pagina van ${esc(d.partij.naam)}</a>`;
+  const partijLink = v => `<a href="#partij-${v.id}">${esc(v.naam)}</a>${v.looptijd ? ` (${esc(v.looptijd)})` : ''}`;
+  const stam = [];
+  const enLijst = xs => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} en ${xs[xs.length - 1]}`;
+  if (d.partij.voorgangers) stam.push(`Voortgekomen uit ${enLijst(d.partij.voorgangers.map(partijLink))}: hun banden staan hieronder met hun eigen partij en periode.`);
+  if (d.partij.opgegaan_in) stam.push(`Opgegaan in ${enLijst(d.partij.opgegaan_in.map(partijLink))}; haar banden lopen niet verder dan haar einde.`);
+  const sb = document.getElementById('partijStamboom');
+  sb.hidden = !stam.length;
+  sb.innerHTML = stam.join(' ');
   renderKlasseTabs();
   renderPersonen();
   renderPartijBanden();
@@ -431,7 +458,7 @@ async function volgHash() {
   if (nieuwePartij) {
     st.partijId = pid; st.open.clear(); st.zoek = '';
     document.getElementById('zoek').value = '';
-    try { st.detail = await haal(`/api/partijen/${pid}`); }
+    try { st.detail = await haal(`/api/partijen/${pid}${fusieParam()}`); }
     catch (e) { melding('Kon deze partij niet laden.', 'fout'); return; }
   }
   renderMatrix();
@@ -445,6 +472,22 @@ document.getElementById('tijdTabs').querySelectorAll('.tab').forEach(b => b.addE
   document.querySelectorAll('#tijdTabs .tab').forEach(x => x.classList.toggle('actief', x === b));
   renderMatrix(); renderDetail(); renderGedeeld();
 }));
+function zetFusieTabs() {
+  document.querySelectorAll('#fusieTabs .tab').forEach(x =>
+    x.classList.toggle('actief', (x.dataset.fusies === '1') === st.fusies));
+}
+document.getElementById('fusieTabs').querySelectorAll('.tab').forEach(b => b.addEventListener('click', async () => {
+  const fusies = b.dataset.fusies === '1';
+  if (fusies === st.fusies) return;
+  st.fusies = fusies;
+  try { localStorage.setItem('partijen.fusies', fusies ? '1' : '0'); } catch (e) { /* geen opslag */ }
+  zetFusieTabs();
+  try {
+    st.overzicht = await haal(`/api/partijen${fusieParam()}`);
+    if (st.partijId) st.detail = await haal(`/api/partijen/${st.partijId}${fusieParam()}`);
+  } catch (e) { melding('Kon het overzicht niet opnieuw laden.', 'fout'); return; }
+  renderMatrix(); if (st.detail) renderDetail(); renderGedeeld();
+}));
 let zoekTimer = null;
 document.getElementById('zoek').addEventListener('input', e => {
   clearTimeout(zoekTimer);
@@ -453,7 +496,8 @@ document.getElementById('zoek').addEventListener('input', e => {
 window.addEventListener('hashchange', volgHash);
 
 (async () => {
-  try { st.overzicht = await haal('/api/partijen'); }
+  zetFusieTabs();
+  try { st.overzicht = await haal(`/api/partijen${fusieParam()}`); }
   catch (e) {
     document.getElementById('matrix').innerHTML = '<tbody><tr><td class="leeg">Het overzicht kon niet worden geladen. Ververs de pagina om het opnieuw te proberen.</td></tr></tbody>';
     return;
