@@ -62,9 +62,6 @@ MECHANISME_FILTERS = ("eigendom", "advertentie", "sourcing", "flak", "ideologie"
 ROL_CATEGORIEEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
                    "systeemactor", "tegenmacht", "overig",
                    "formele_macht", "belangen", "kennis_advies", "polder", "werving")
-VELD_CATEGORIEEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
-                    "systeemactor", "overig",
-                    "formele_macht", "belangen", "kennis_advies", "polder", "werving")
 AARD_KEUZES = ("direct", "veld_eigenschap")  # de twee levende waarden (zie CLAUDE.md)
 
 

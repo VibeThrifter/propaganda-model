@@ -4,7 +4,7 @@
 (entiteiten, relaties, theorielaag, discussiebomen, afgeleide scores, kleurmeter,
 inkomstensamenstelling). Gedeeld door:
   - server.py  → GET /api/graph_data (live; de pagina op / haalt dit bij het laden)
-  - scripts/generate_viz.py → statische export (bakt dezelfde data in web/index.html)
+  - scripts/generate_viz.py → statische export (bakt dezelfde data in data/viz_export.html)
 
 Puur stdlib + de bestaande repo-root modules (scoring, politiek), zoals scoring.py.
 """
@@ -52,7 +52,7 @@ def export_data(conn):
 
     # Entities with role info + temporal data.
     # Vervangen elementen (M2.6) blijven overal buiten beeld: de viz toont het
-    # levende model; opvolging is opvraagbaar via /api/lineage.
+    # levende model; opvolging staat in de tabel lineage.
     # 'voorgesteld' wordt méégegeven (getagd met status) zodat de viz het als
     # gestippelde 'in review'-ghost kan tonen achter een toggle; default blijft de
     # viz het goedgekeurde model tonen. Vervangen (M2.6) blijft altijd buiten beeld.

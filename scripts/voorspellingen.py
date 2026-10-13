@@ -52,8 +52,8 @@ def main():
     conn.row_factory = sqlite3.Row
     if not conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' "
                         "AND name = 'predictions'").fetchone():
-        raise SystemExit("FOUT: geen predictions-tabel — draai eerst "
-                         "scripts/migrate_fase3_voorspellingen.py")
+        raise SystemExit("FOUT: geen predictions-tabel — bouw de DB met scripts/init_db.py "
+                         "(schema.sql)")
     rows = [dict(r) for r in conn.execute(
         "SELECT * FROM predictions ORDER BY deadline, id")]
     conn.close()

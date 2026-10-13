@@ -188,9 +188,9 @@ log.
 
 ## Cadans (onbewaakt, C1)
 
-Deze missie draait onbewaakt en frequent — **dagelijks**, meebewegend met de instroom in
-de wachtrij — via de scheduler (`scripts/agent_runner.py`;
-`deploy/systemd/agent-aanklager.{service,timer}` en `deploy/crontab`). De runner start
+Deze missie draait onbewaakt, meebewegend met de instroom in de wachtrij: de uurronde
+`scripts/automatische_beoordeling.py` start haar (via `scripts/agent_runner.py`) alleen als
+er werk is. De runner start
 één headless `claude`-sessie onder `aanklager-agent`, injecteert de voorregel (eerst
 `GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
 `missies/logs/`.

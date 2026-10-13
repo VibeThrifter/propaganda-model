@@ -22,6 +22,9 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import viz_data
+# Leesbare namen (W2.3): één Python-bron, gelijk aan web/shared_vocab.js (bewaakt door
+# validation.check_woordenschat).
+from vocab import filter_label, relatie_label, weergave_naam
 
 ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "propaganda_model.db"
@@ -30,85 +33,6 @@ RELEASES_DIR = ROOT / "releases"
 WEB_DIR = ROOT / "web"
 
 MERK = "Wie bezit de Nederlandse media"
-
-# ── Leesbare namen (W2.3) — Python-poort van web/shared_vocab.js ──────────────
-# TWEELINGBRON: deze twee maps spiegelen NAAM_WEERGAVE / FILTER_LABELS in
-# web/shared_vocab.js (:31 / :18). Houd ze in sync — de sleutels blijven in de DB
-# snake_case; dit is puur een weergavelaag (zoals weergaveNaam() in de JS).
-NAAM_WEERGAVE = {
-    # Rollen
-    "mediaeigenaar": "Media-eigenaar",
-    "raad_van_commissarissen": "Raad van commissarissen (RvC)",
-    "columnist_opiniemaker": "Columnist / opiniemaker",
-    "elite_forum": "Elite-forum",
-    "vakbond_media": "Vakbond (media)",
-    # Mechanismen — spelling (trema's, koppeltekens, afkortingen)
-    "commerciele_afhankelijkheid": "Commerciële afhankelijkheid",
-    "continuiteitsborging": "Continuïteitsborging",
-    "gecoordineerde_voorlichting": "Gecoördineerde voorlichting",
-    "inlichtingen_cooptatie": "Inlichtingen-coöptatie",
-    "pr_inhuur": "PR-inhuur",
-    "pr_subsidie": "PR-subsidie",
-    "woo_obstructie": "Woo-obstructie",
-    "stak_stemzeggenschap": "STAK-stemzeggenschap",
-    "cross_media_eigendom": "Cross-media-eigendom",
-    "media_agendering": "Media-agendering",
-    "intermedia_agendering": "Intermedia-agendering",
-    "journalist_bronrelatie": "Journalist-bronrelatie",
-    # Mechanismen — elite-netwerkfamilie
-    "belang_elite_netwerk": "Belanghebbende in elite-netwerk",
-    "mediaeigenaar_elite_netwerk": "Media-eigenaar in elite-netwerk",
-    "politicus_elite_netwerk": "Politicus in elite-netwerk",
-    "elite_media_netwerk": "Elite-medianetwerk",
-    "elite_kennisnetwerk": "Elite-kennisnetwerk",
-    # Mechanismen — richting
-    "draaideur_journalistiek_politiek": "Draaideur journalistiek ↔ politiek",
-    "draaideur_journalistiek_voorlichting": "Draaideur journalistiek ↔ voorlichting",
-    "draaideur_politiek_bedrijfsleven": "Draaideur politiek ↔ bedrijfsleven",
-    "draaideur_politiek_institutie": "Draaideur politiek ↔ institutie",
-    "draaideur_politiek_lobby": "Draaideur politiek ↔ lobby",
-    "draaideur_politiek_media": "Draaideur politiek ↔ media",
-    "denktank_naar_persbureau": "Denktank → persbureau",
-    "denktank_naar_politiek": "Denktank → politiek",
-    "lobbyist_naar_journalist": "Lobbyist → journalist",
-    "lobbyist_naar_politicus": "Lobbyist → politicus",
-    # Mechanismen — variant tussen haakjes
-    "academische_socialisatie_hoofdredacteur": "Academische socialisatie (hoofdredacteur)",
-    "academische_socialisatie_politiek": "Academische socialisatie (politiek)",
-    "academische_orthodoxie_denktank": "Academische orthodoxie (denktank)",
-    "academische_orthodoxie_instituut": "Academische orthodoxie (instituut)",
-    # Entiteitstypen
-    "pr_bureau": "PR-bureau",
-    "ngo": "NGO",
-    "elite_netwerk": "Elite-netwerk",
-}
-
-# Spiegelt FILTER_LABELS in web/shared_vocab.js (:18).
-FILTER_LABELS = {
-    "eigendom": "1. Eigendom", "advertentie": "2. Advertentie",
-    "sourcing": "3. Sourcing", "flak": "4. Flak", "ideologie": "5. Ideologie",
-    "systeemactor": "Systeemactor", "tegenmacht": "Tegenmacht",
-    "cross_filter": "Cross-filter", "overig": "Overig",
-    # Uitbreiding C (besluitvorming, 2026-10-07)
-    "formele_macht": "Formele macht", "belangen": "Belangen",
-    "kennis_advies": "Kennis & advies", "polder": "Polder", "werving": "Werving",
-}
-
-
-def weergave_naam(naam):
-    """Python-poort van weergaveNaam() (web/shared_vocab.js:78)."""
-    if naam is None or naam == "":
-        return ""
-    s = str(naam)
-    if s in NAAM_WEERGAVE:
-        return NAAM_WEERGAVE[s]
-    vlak = s.replace("_", " ").strip()
-    return vlak[:1].upper() + vlak[1:] if vlak else ""
-
-
-def filter_label(cat):
-    return FILTER_LABELS.get(cat, weergave_naam(cat))
-
 
 # ── Slug-schema (id-geprefixt: canoniek is de int, tekst is decoratief) ───────
 
@@ -233,7 +157,7 @@ def _relatie_rij(idx, r, kant):
         "pad": f"/relatie/{r['id']}",
         "richting": "→" if kant == "uit" else "←",
         "ander": link,
-        "relatie_type": weergave_naam(r.get("relation_type")),
+        "relatie_type": relatie_label(r.get("relation_type")),
         "mechanisme": ({"id": mech["id"], "naam": weergave_naam(mech["name"]),
                         "pad": f"/mechanisme/{maak_slug(mech['id'], mech['name'])}"}
                        if mech else None),
@@ -512,7 +436,7 @@ def bouw_relatie(idx, r):
     if not bron or not doel:
         return None
     mech = idx["mechanisms"].get(r.get("mechanism_id"))
-    rel_type = weergave_naam(r.get("relation_type"))
+    rel_type = relatie_label(r.get("relation_type"))
     naam = f"{bron['name']} {rel_type or 'relatie'} {doel['name']}"
     canonical = f"/relatie/{r['id']}"
 

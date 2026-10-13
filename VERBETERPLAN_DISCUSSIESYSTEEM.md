@@ -1,7 +1,7 @@
 # Verbeterplan: discussieboom & scoringsketen
 
 **Status: in uitvoering — Fase 0 gebouwd en geverifieerd op 12 juni 2026 (alleen het
-M0.4-slotcriterium wacht op de 6 theorie-kandidaten uit `BACKFILL_REVIEW.md`).
+M0.4-slotcriterium wacht op de 6 theorie-kandidaten uit `docs/archief/BACKFILL_REVIEW.md`).
 Fase 1 (scoring v2) is op 12 juni 2026 gebouwd en geverifieerd: M1.1–M1.7 volledig
 (zie §9), M1.8/M1.9 hebben hun infrastructuur (accounts, briefs, `objection_type`,
 logging-conventies in `missies/`) maar de eerste rondes + menselijke review staan open.
@@ -9,7 +9,7 @@ Fase 2 (openstellen) is op 12 juni 2026 gebouwd en end-to-end geverifieerd
 (`scripts/test_fase2.py`): M2.1–M2.6 volledig; de vier theorie-RfC's uit de
 M0.4-restlijst staan open (voorstellen #1–#4) en wachten — net als bridging-activatie
 (M2.5) en de heraudit van `self_merged` — per ontwerp op een tweede menselijke
-reviewer (§6.6). Open eigenaarsacties: clusterreview (`BRONCLUSTER_REVIEW.md`),
+reviewer (§6.6). Open eigenaarsacties: clusterreview (`docs/archief/BRONCLUSTER_REVIEW.md`),
 monitor-ronde 1, eerste scout-missie, reviewers werven (§6.5).
 Fase 3 (levend & falsifieerbaar) is op 12 juni 2026 gebouwd en geverifieerd
 (`scripts/test_fase3.py`): release-infrastructuur + live release v0.1.0 (M3.1),
@@ -660,9 +660,9 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
   - [x] Per relatie een bestaand mechanisme koppelen; de restgroep wordt de
         kandidatenlijst voor nieuwe mechanismen (input voor M2.3-RfC's)
         *(108 gekoppeld via `migrate_backfill_koppelingen.py`; 6 kandidaten +
-        motiveringen + richting-mismatches in `BACKFILL_REVIEW.md`)*
+        motiveringen + richting-mismatches in `docs/archief/BACKFILL_REVIEW.md`)*
   - [x] Instantiaties en entiteit-rollen aanvullen (migratie met CONTRIB-tag
-        `backfill-M0.4`, exemplariteit 0,8; eigenaar reviewt via BACKFILL_REVIEW.md)
+        `backfill-M0.4`, exemplariteit 0,8; eigenaar reviewt via docs/archief/BACKFILL_REVIEW.md)
   - [ ] **Klaar wanneer:** M0.1 meldt 0 ontbrekende koppelingen — *6 relaties blijven
         bewust open (kandidaten voor nieuwe theorie-elementen, M2.3; twee daarvan zijn
         verwijder-adviezen). Dit vakje sluit pas na de eerste theorie-RfC's of review.*
@@ -728,7 +728,7 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
         *(`migrate_scoring_v2.py`; `register_source.py` leidt het cluster voortaan af)*
   - [ ] Clustertoekenning voor de bestaande 69 bronnen: initieel toegekend (9
         meervoudige clusters) — **handmatige review door de eigenaar staat open:
-        `BRONCLUSTER_REVIEW.md`**
+        `docs/archief/BRONCLUSTER_REVIEW.md`**
   - [x] `scoring.py`: binnen een cluster telt het sterkste argument, combineren over
         clusters; bronloze voor/tegen-argumenten delen per doel één pseudocluster;
         SPOF-vlag ("drijft op één cluster") in de output
@@ -876,7 +876,7 @@ dogfood-regel (inhoud via het bijdragepad, migraties alleen voor schema/structuu
         kapitaalketen, institutionele gezagsketen, academische doorlichting,
         belanghebbende als adviseur — open tot er een tweede menselijke reviewer
         is; de twee verwijder-adviezen (#327/#328) blijven eigenaarsbesluit in
-        `BACKFILL_REVIEW.md`)*
+        `docs/archief/BACKFILL_REVIEW.md`)*
   - [x] **Klaar wanneer:** een nieuw theorie-element kan alleen nog via een RfC
         ontstaan *(12 juni 2026)*
 

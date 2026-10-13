@@ -88,8 +88,6 @@ def noemt(tekst: str, naam: str) -> bool:
 # ── Namen uit het register ontleden ─────────────────────────────────────────
 # Registernamen zijn vrij: "dhr. drs. A.C.C. (Christiaan) Rebergen", "Mw. A. van Dam",
 # "Vice-admiraal Ad van de Sande", "Drs. Johannes Hermanus Roedolph Pierik", "Dhr. Fortuin".
-AANHEF = {"dhr", "dhr.", "mw", "mw.", "mevr", "mevr.", "mevrouw", "de", "heer", "heer.", "hr",
-          "hr.", "jhr", "jhr.", "jkvr", "jkvr.", "jonkheer", "jonkvrouw"}
 RANGEN = {"vice-admiraal", "luitenant-admiraal", "schout-bij-nacht", "admiraal", "generaal",
           "luitenant-generaal", "generaal-majoor", "brigade-generaal", "bgen", "kolonel",
           "lkol", "luitenant-kolonel", "commandeur", "majoor", "kapitein", "commodore"}
@@ -195,14 +193,6 @@ def ontleed_naam(ruw: str | None) -> dict:
         "volledig": bool(roepnaam or voornamen),
         "alleen_achternaam": not (roepnaam or voornamen or voorletters),
     }
-
-
-def eerste_letter(naam: dict) -> str | None:
-    """Eerste voorletter (uit voorletters, roepnaam of voornaam), hoofdletter."""
-    for veld in ("voorletters", "roepnaam", "voornamen"):
-        if naam.get(veld):
-            return naam[veld][0].upper()
-    return None
 
 
 # Partijnamen uit het register → partij-entiteit (op naam). Lokale partijen: geen knoop.

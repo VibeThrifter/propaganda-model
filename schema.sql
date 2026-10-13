@@ -1,6 +1,9 @@
 -- Propaganda Model: Nederlandse Politiek & Media
 -- Twee lagen: abstract theoretisch model + concrete instanties
 -- Academische bronstructuur: argumenten → citaties → bronnen → locaties
+--
+-- Commentaar hieronder dat naar een scripts/migrate_*.py verwijst die niet meer in scripts/
+-- staat: eenmalige migraties: zie git-geschiedenis (vóór 2026-10-13).
 
 --------------------------------------------------------------
 -- LAAG 1: THEORETISCH MODEL (Chomsky-achtig, generiek)

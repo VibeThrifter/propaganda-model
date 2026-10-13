@@ -24,7 +24,6 @@ URL = PAGINA
 MAP = DATA / BRON
 TITEL = "Tweede Kamer der Staten-Generaal, lobbyistenregister (vaste toegangspassen), bijgewerkt {uitgave}"
 UITGEVER = "Tweede Kamer der Staten-Generaal"
-KOLOMMEN = ("Naam", "Werkzaam bij / voor", "Behartigt belangen voor")
 
 
 class FormaatFout(Exception):

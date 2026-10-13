@@ -19,13 +19,32 @@ zet het als doel in deze wachtrij en meldt de lezer "wordt uitgezocht".
 > een brede zoektocht op één persbericht blijft rusten, is óók een uitkomst.
 
 **Lees eerst volledig:**
-- `missies/documentalist_brief.md`: het anti-overfit-protocol, verplicht. Neutrale
-  zoekvraag, gelogde queries, tweezijdige oogst, negatieve resultaten alleen in het log.
 - `missies/monitor_brief.md`: het verschil tussen **ondergraving** en **weerlegging**.
 - De agent-contract-sectie van `CLAUDE.md`: stance volgt het effect op de claim, elke
   supporting/contradicting root heeft een echte citatie, geen Wikipedia als bron.
 
-Alles daaruit geldt onverkort. Deze brief voegt alleen de wachtrij en de afbakening toe.
+Alles daaruit geldt onverkort, net als het protocol hieronder. Deze brief voegt verder
+alleen de wachtrij en de afbakening toe.
+
+### Het anti-overfit-protocol (verplicht)
+
+Overgenomen uit de documentalist-brief (die missie is opgeheven; zie
+`missies/archief/documentalist_brief.md`).
+
+1. **Neutrale zoekvraag.** Formuleer de zoekvraag zónder de modelclaim: *"hoe bracht NOS
+   de klimaatverkenningen van het PBL?"*, nooit *"zoek bewijs dat NOS PBL napraat"*.
+2. **Gelogde queries.** Élke zoekopdracht letterlijk in het missielog (`missies/logs/`,
+   conventies in `missies/README.md`).
+3. **Tweezijdige oogst.** Elke ronde levert kandidaat-bewijs voor *beide* stances, of een
+   expliciet **afwezigheidsrapport** ("geen tegenbewijs gevonden; gezocht via X, Y, Z").
+   Dat rapport hoort **alleen in het missielog**, niet als bijdrage in het model: een
+   AI-bewering "ik zocht en vond niets" is onfalsifieerbaar, beweegt de score niet en wekt
+   valse geruststelling; in het log toont ze wél dát breed is gezocht.
+4. **Negatieve resultaten.** Zoektochten die niets opleverden komen in het log; zo wordt
+   herhaald cherry-picken zichtbaar.
+5. **Stance-balans in het log.** Noteer hoeveel je vóór en tegen vond, en hoeveel nieuwe
+   bronclusters (tegenover hercitaties). Een ronde die alleen bevestiging binnenbrengt is
+   meetbaar kapot.
 
 ## De ronde
 

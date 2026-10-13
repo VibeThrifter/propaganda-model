@@ -43,7 +43,8 @@
   --knop-groen:   #1f7a44;   /* akkoord/vóór-acties */
   --knop-rood:    #7a2f2f;   /* afwijzen/tegen-acties */
   --knop-context: #4a4a66;   /* neutrale duiding */
-  /* — de vijf filters + rest (zelfde waarden als shared_vocab.js) — */
+  /* — de vijf filters, de rest en de vijf besluitvormingscategorieën
+       (zelfde waarden als FILTER_COLORS in shared_vocab.js) — */
   --c-eigendom:    #e74c3c;
   --c-advertentie: #f0a030;
   --c-sourcing:    #3498db;
@@ -53,6 +54,11 @@
   --c-cross_filter:#fd79a8;
   --c-tegenmacht:  #1abc9c;
   --c-overig:      #7f8c9a;
+  --c-formele_macht:#5468ff;
+  --c-belangen:    #c4d630;
+  --c-kennis_advies:#e15ef2;
+  --c-polder:      #c08552;
+  --c-werving:     #22d3ee;
   /* — maatvoering — */
   --radius:       12px;
   --radius-k:     8px;

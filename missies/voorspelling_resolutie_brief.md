@@ -54,8 +54,7 @@ Brier-*rekensom* wél, maar die volgt pas ná het oordeel). Daarom:
 
 Gitignored, adviserend, telt **nergens** mee — spiegel van `data/review_advies.json`.
 Geen API-schrijfactie, geen migratie: gewoon een JSON-bestand dat de eigenaar leest
-(en dat een optioneel `GET /api/predictions/resolutie_voorstellen`-endpoint kan
-serveren). Sleutel = `pred:<id>`, exact het voorspelling-id.
+(geen endpoint serveert het). Sleutel = `pred:<id>`, exact het voorspelling-id.
 
 ```json
 {
@@ -102,8 +101,8 @@ secrets in het log.
 ## Cadans
 
 Laagfrequent en meebewegend met de deadlines — maandelijks volstaat (de meeste
-voorspellingen hebben deadlines op maand-/kwartaalschaal). Zie
-`deploy/systemd/agent-resolutie.{service,timer}` /
-`deploy/crontab`. De zuster-regeneratie `python3 scripts/voorspellingen.py`
-(leest alleen, herbouwt `data/voorspellingen_kalibratie.json` voor de Brier op
-`/api/health`) draait als eigen, dogfood-neutrale timer — niet via deze agent.
+voorspellingen hebben deadlines op maand-/kwartaalschaal). De planner is launchd via
+`agent_schedule.py` (label `voorspelling-resolutie`, uit tot de eerste deadline). De
+zuster-regeneratie `python3 scripts/voorspellingen.py` (leest alleen, herbouwt
+`data/voorspellingen_kalibratie.json` voor de Brier op `/api/health`) is een eigen,
+dogfood-neutrale job (`voorspellingen-regen`) — niet via deze agent.

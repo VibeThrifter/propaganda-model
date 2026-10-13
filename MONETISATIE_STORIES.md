@@ -1,8 +1,8 @@
 # Monetisatie-stories — van plan naar afvinkbare uitvoering
 
-**Status:** ontwerp — *implementatie nog niet begonnen* (juli 2026). Dit document zet `MONETISATIE_PLAN.md` om in uitvoerbare user stories met technische implementatie in afvinkbare taken. Bouwen begint pas op expliciet verzoek van de eigenaar, per fase.
+**Status:** ontwerp — *implementatie nog niet begonnen* (juli 2026). Dit document zet `docs/archief/MONETISATIE_PLAN.md` om in uitvoerbare user stories met technische implementatie in afvinkbare taken. Bouwen begint pas op expliciet verzoek van de eigenaar, per fase.
 
-**Herkomst:** uitwerking van `MONETISATIE_PLAN.md` (het strategische, zelfstandig leesbare plan — lees dát voor de *waarom* en de afwegingen). Dit document is de *hoe*: één story per plan-item (A1…A8 / B1…B6 / C1…C4 / D1–D2 / E1–E2 / J1–J4), elk met een user-story-kop, code-gegronde implementatiestappen, definition of done, verificatie en afhankelijkheden.
+**Herkomst:** uitwerking van `docs/archief/MONETISATIE_PLAN.md` (het strategische, zelfstandig leesbare plan — lees dát voor de *waarom* en de afwegingen). Dit document is de *hoe*: één story per plan-item (A1…A8 / B1…B6 / C1…C4 / D1–D2 / E1–E2 / J1–J4), elk met een user-story-kop, code-gegronde implementatiestappen, definition of done, verificatie en afhankelijkheden.
 
 **Drie vaste besluiten (niet heropenen):** (1) gefaseerd, portal eerst; (2) alles publiek, maximale dekking, uitgevoerd als de meest verdedigbare journalistiek/onderzoek-versie; (3) auto-merge aan, met een geverifieerde poort en de mens op de uitzonderingen.
 
@@ -769,7 +769,7 @@ B1 (deploy) ──┬─> B2 (rebrand) ──┐
 
 Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien op een schema onder eigen tokens (C1), een achtergrondservice merget de wachtrij automatisch achter de A7-immuunpoort (C2), Wayback-archivering wordt dragend zodat elke bron een onveranderlijke kopie krijgt (C3), en de eigenaarsrol verschuift van doorvoer (2.449 handmatige merges, wachtrij ~640) naar kalibratie-toezicht op de meta-laag (C4). A7 (het poort-*predikaat*) hoort in Deel A; C2 is de draaiende *service* die dat predikaat uitvoert — hieronder scherp gescheiden en kruisverwezen. Besluiten vast: portal-eerst, alles-publiek, auto-merge aan.
 
-> **Scheduler-keuze (geldt voor C1 én C3, één keer beslissen).** Er is nu géén scheduling-infra in de repo (grep op `schedule`/`crontab`/`systemd`/`APScheduler` = leeg), en `schedule`/`apscheduler` zijn niet geïnstalleerd — de projectregel is "geen nieuwe dependencies, geen build step" (`WEBAPP_STORIES.md` §5). **Aanbeveling: OS-native timers** — `systemd`-timers op de productie-VPS (sluit aan op B1's "`gunicorn` + `systemd`-unit"), met `cron` als frictieloze dev-/fallback-variant. Vermijd een in-proces Python-scheduler (`schedule`/apscheduler = nieuwe dep, sterft met het proces, overleeft geen herstart). Wél nieuw en dep-vrij: een dunne stdlib-wrapper `scripts/agent_runner.py` die de timer *aanroept* (token laden, logbestandsnaam, exit-code/duur vangen). Dit blijft een open beslissing (systemd vs cron vs stdlib-loop) — zie de open vragen onderaan.
+> **Scheduler-keuze (geldt voor C1 én C3, één keer beslissen).** Er is nu géén scheduling-infra in de repo (grep op `schedule`/`crontab`/`systemd`/`APScheduler` = leeg), en `schedule`/`apscheduler` zijn niet geïnstalleerd — de projectregel is "geen nieuwe dependencies, geen build step" (`docs/archief/WEBAPP_STORIES.md` §5). **Aanbeveling: OS-native timers** — `systemd`-timers op de productie-VPS (sluit aan op B1's "`gunicorn` + `systemd`-unit"), met `cron` als frictieloze dev-/fallback-variant. Vermijd een in-proces Python-scheduler (`schedule`/apscheduler = nieuwe dep, sterft met het proces, overleeft geen herstart). Wél nieuw en dep-vrij: een dunne stdlib-wrapper `scripts/agent_runner.py` die de timer *aanroept* (token laden, logbestandsnaam, exit-code/duur vangen). Dit blijft een open beslissing (systemd vs cron vs stdlib-loop) — zie de open vragen onderaan.
 
 ---
 
@@ -934,7 +934,7 @@ Deel C maakt van de handmatige machine een onbewaakte: de missie-agents draaien 
 
 **Kernonderscheid dat dit hele deel draagt:** weg met de multi-mens *governance* (consensus, onderhandeling, moderatie-arbeid, twee-akkoorden-RfC's, de review-queue-als-sociale-ruimte) — maar de *bijdrage-intake blijft wagenwijd open*. Deel A ontpersoonlijkt het vertrouwen (bron-herverificatie + verplichte tegenspraak i.p.v. "wie is het eens"), dus je kunt de voordeur juist *wijder* openzetten omdat je de deur niet meer vertrouwt: elke inzending — agent of vreemde — moet dezelfde loopgraaf door. **D1** ruimt de governance op; **D2** bouwt de misbruikbestendige, niet-interactieve publieke intake als vervanger. Alles blijft **eenrichting**: geen enkel *gesprek* met de indiener. De neutraliteitsregel (gesourcete feiten + geattribueerde meningen, nooit een eigen beschuldiging) blijft de harde productregel — ze is de scharnier van de smaad-firewall (D2.3).
 
-> **Geverifieerde code-correcties op MONETISATIE_PLAN.md** (gebruikt in de stories hieronder): `voorstellen.py` = **789 regels** (het plan noemt ~1080); `create_argument` staat op **`server.py:829`** (plan: 827); `merge_argument` op **`server.py:1510`** (plan: 1508); de rating-endpoints heten **`/api/arguments/<id>/ratings`** (`server.py:4311/4326/4371`), niet `/api/ratings`; de user-beheer-endpoints staan op **`server.py:336–499`** (plan: 337–503); `RATE_LIMITS`/`_rate_limit_ok` op **`server.py:79`/`:88`** (klopt). Belangrijke bevinding: **de pagina-routes (`/overleg` `:227`, `/beheer` `:211`, `/werkbank` `:219`, `/login` `:201`, `/account` `:206`) hebben nú géén `require_user`-gate** — ze serveren `send_file` onbewaakt; alléén de API eronder is gepoort. B3/D1 moet de gate dus op de *pagina-routes zelf* zetten. De validator-aggregator is **`validation.run_all(conn, schema_path, network)`** (`validation.py:838`). Het per-account rate-limit is gesleuteld op `user["id"]` — er is **nog geen per-IP-limiet** (`request.remote_addr` wordt nergens gelezen); Laag 0 heeft dat nieuw nodig.
+> **Geverifieerde code-correcties op docs/archief/MONETISATIE_PLAN.md** (gebruikt in de stories hieronder): `voorstellen.py` = **789 regels** (het plan noemt ~1080); `create_argument` staat op **`server.py:829`** (plan: 827); `merge_argument` op **`server.py:1510`** (plan: 1508); de rating-endpoints heten **`/api/arguments/<id>/ratings`** (`server.py:4311/4326/4371`), niet `/api/ratings`; de user-beheer-endpoints staan op **`server.py:336–499`** (plan: 337–503); `RATE_LIMITS`/`_rate_limit_ok` op **`server.py:79`/`:88`** (klopt). Belangrijke bevinding: **de pagina-routes (`/overleg` `:227`, `/beheer` `:211`, `/werkbank` `:219`, `/login` `:201`, `/account` `:206`) hebben nú géén `require_user`-gate** — ze serveren `send_file` onbewaakt; alléén de API eronder is gepoort. B3/D1 moet de gate dus op de *pagina-routes zelf* zetten. De validator-aggregator is **`validation.run_all(conn, schema_path, network)`** (`validation.py:838`). Het per-account rate-limit is gesleuteld op `user["id"]` — er is **nog geen per-IP-limiet** (`request.remote_addr` wordt nergens gelezen); Laag 0 heeft dat nieuw nodig.
 
 ---
 
@@ -1305,7 +1305,7 @@ Geen afzwakking van de dekking ("alles publiek, maximale dekking") — wél de c
 
 **Verificatie**
 - [ ] `curl -s localhost:5000/methode | grep -i "redactionele verantwoording\|art. 43\|neutraliteit"` → alle drie aanwezig.
-- [ ] Headless-Chrome-screenshot desktop 1680×1050 + mobiel 390×844 van `/methode` en van de voettekst op `/` (huisstijl-lat: simpel/strak/leesbaar; DoD uit WEBAPP_STORIES).
+- [ ] Headless-Chrome-screenshot desktop 1680×1050 + mobiel 390×844 van `/methode` en van de voettekst op `/` (huisstijl-lat: simpel/strak/leesbaar; DoD uit docs/archief/WEBAPP_STORIES.md).
 - [ ] Nul console-errors op `/methode`.
 
 **Afhankelijk van.** B2 (rebrand — de methodologie-voordeur) · B3 (publiek/privé-split — bepaalt welke pagina's de voettekst dragen). · **Blokkeert.** J2 (de voettekst draagt ook de rectificatie-link).
@@ -1418,7 +1418,7 @@ Voor de concrete deploy-invulling (`gunicorn` + `systemd`/`Dockerfile` achter Ca
 
 ## Open beslissingen (samengebracht uit de code-uitwerking)
 
-Het gronden van de stories in de echte code bracht implementatie-keuzes boven die het strategische plan nog openliet. Elk punt heeft waar mogelijk een aanbevolen default (⭐, van de uitwerkende agent); géén ervan blokkeert dit document, wél de bouw van de betreffende story. Beslis per fase, vlak vóór je de story pakt. Dit vult de strategische *"Open beslissingen (voor later)"* onderaan `MONETISATIE_PLAN.md` aan.
+Het gronden van de stories in de echte code bracht implementatie-keuzes boven die het strategische plan nog openliet. Elk punt heeft waar mogelijk een aanbevolen default (⭐, van de uitwerkende agent); géén ervan blokkeert dit document, wél de bouw van de betreffende story. Beslis per fase, vlak vóór je de story pakt. Dit vult de strategische *"Open beslissingen (voor later)"* onderaan `docs/archief/MONETISATIE_PLAN.md` aan.
 
 ### Overkoepelende code-correcties (al in de stories verwerkt)
 

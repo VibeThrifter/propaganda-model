@@ -9,16 +9,15 @@ naar een door mensen controleerbare bron, nooit directe statuswijzigingen.
 
 ## Een missie starten — onbewaakt, op cadans (C1)
 
-De missies draaien **onbewaakt op een vaste cadans**, niet met de hand. Een
-systemd-timer (of cron-entry) roept de wrapper `scripts/agent_runner.py` aan; die
+De missies draaien **onbewaakt op een vaste cadans**, niet met de hand. launchd roept
+de wrapper `scripts/agent_runner.py` aan; die
 laadt het agent-token, bouwt de missie-prompt (verwijzing naar de brief + het account
 + de vaste voorregel hieronder) en start **één headless `claude -p`-sessie** per ronde,
 die naar `missies/logs/` tee't. De agent *is* een Claude Code-sessie, dus "schedulen"
 = per ronde één headless invocatie plannen — geen aparte daemon.
 
 - **Cadans & installatie:** `agent_schedule.py` is de enige lijst van wat er draait (op
-  deze Mac via launchd: `deploy/launchd/genereer_launchd.py --geen-server --laden`; op een
-  VPS `deploy/systemd/`). Sinds 2026-10-07 draaien alleen de automatische beoordeling (elk
+  deze Mac via launchd: `deploy/launchd/genereer_launchd.py --geen-server --laden`). Sinds 2026-10-07 draaien alleen de automatische beoordeling (elk
   uur; zij start de aanklager zelf), `nieuws-scout` en `nieuws-bewijs`. LinkedIn-scrapen heeft geen eigen timer; onbewaakt gebruik (alleen
   door de `nieuws-scout`) loopt uitsluitend achter de snelheidsrem
   `tools/linkedin/snelheidsrem.py` (beleid J4, gewijzigd 2026-09-30).
@@ -76,7 +75,7 @@ Per missie één logbestand: `missies/logs/YYYY-MM-DD_<agent>_<ronde>.md` met:
   het log dient ze het enige doel waarvoor ze deugt: aantonen dát breed is gezocht
   (anti-cherry-pick).
 - **Stance-balans van de ronde**: n steun / n tegen / n context (tweezijdige
-  oogstplicht; een documentalist die alleen bevestiging binnenbrengt is meetbaar kapot).
+  oogstplicht; een agent die alleen bevestiging binnenbrengt is meetbaar kapot).
 
 De logs zijn werkmateriaal en worden ingecheckt (géén tokens of secrets erin).
 
@@ -151,12 +150,9 @@ verband zonder begin staat altijd en overal "aan".
 | Account | Rol | Brief | Mag niet |
 |---|---|---|---|
 | `monitor-agent` | bijdrager | `monitor_brief.md` | statussen zetten; alleen bevindingen indienen |
-| `documentalist-agent` | bijdrager | `documentalist_brief.md` | rechtstreeks de score in; alles wacht op review |
 | `criticus-agent` | bijdrager | `criticus_brief.md` | stromannen; statussen zetten; alles wacht op review |
 | `scout-agent` | bijdrager | `scout_brief.md` (+ `linkedin_scout_brief.md`) | theorielaag schrijven; verbanden zonder bron; statussen zetten |
-| `verificatie-agent` | bijdrager | `verificatie_agent_brief.md` | eigen werk her-verifiëren (403); statussen zetten/mergen; het verdict telt nergens in de score |
 | `aanklager-agent` | bijdrager | `aanklager_brief.md` | eigen claim certificeren (403); twee keer op dezelfde parent reageren (409); statussen zetten |
-| `lead-corroboratie-agent` | bijdrager | `lead_corroboratie_brief.md` | statussen zetten buiten de lead-baan; mergen/classificeren/verwijderen; een lead-tekst als bron gebruiken; een argument indienen zonder verbatim-geverifieerde bron |
 | `nieuws-scout` | bijdrager | `nieuws_scout_brief.md` (Epic 12) | privépersonen onderzoeken; LinkedIn buiten de snelheidsrem; modelstatussen zetten (alleen de status van zijn eigen wachtrij-doel); meer dan 3 doelen per ronde |
 | `nieuws-bewijs` | bijdrager | `nieuws_bewijs_brief.md` (nieuws-aggregator Story 14.13) | knopen of verbanden aanmaken; modelstatussen zetten (alleen de status van zijn eigen bewijsdoel); namen claimen; meer dan 2 doelen per ronde; negatieve resultaten als modelbijdrage |
 | `bronchecker` | bijdrager | — (script `scripts/bronchecker.py`, automatische beoordeling 2026-10-06) | iets indienen in het model; alleen A1-oordelen (`/herverificatie`) schrijven; nooit eigen werk |
@@ -164,32 +160,26 @@ verband zonder begin staat altijd en overal "aan".
 | `rfc-toetser` | bijdrager | — (script `scripts/rfc_beoordeling.py`, Opus) | iets anders dan RfC-reviews schrijven; een RfC zonder concrete, controleerbare motivatie beoordelen |
 | `rfc-criticus` | bijdrager | — (script `scripts/rfc_beoordeling.py`, Sonnet) | idem; wijst alleen af met een concrete reden |
 | `bronzoeker` | bijdrager | — (script `scripts/bronzoeker.py`, agents doen alles 2026-10-06) | iets anders schrijven dan bronnen en revisies; een citaat dat het script niet letterlijk in de bron terugvindt; Wikipedia/sociale media/dit model als bron; een herformulering zonder de partijen zelf; statussen zetten |
-| _(geen account)_ | — (alleen-lezen) | `reviewbeoordelaar_brief.md` | iets schrijven in het model; deze agent levert alléén een admin-rapport |
 | _(geen account)_ | — (alleen-lezen) | `voorspelling_resolutie_brief.md` | een voorspelling scoren (`PATCH …/uitkomst` = reviewer+ én mensenwerk); levert alléén resolutie-*voorstellen* in `data/voorspelling_voorstellen.json` |
 
-**Het immuunsysteem (A1/A2, Deel A).** De `verificatie-agent` her-verifieert elke
-`voorgesteld` supporting/contradicting-root onafhankelijk tegen de echte bron
-(+ archiefkopie) — quote verbatim, dekt de bron de claim — en schrijft een
-`klopt/twijfel/klopt-niet`-verdict via `POST /api/arguments/<id>/herverificatie`. De
-`aanklager-agent` is de gedecorreleerde tegenstander: hij zoekt een tegenbron
-(weerlegging-root), valt de inferentie aan (ondergraving-reply), of certificeert dat de
-claim de aanval `overleefde` via `POST /api/arguments/<id>/tegenspraak`. Beide oordelen
-leven in de procestabel `immuun_oordelen`, tellen **nergens** in de score, en voeden
-alléén de auto-merge-poort (A7). Vertrouwen komt hier niet uit consensus maar uit
-**onafhankelijkheid**: indiener, A1 en aanklager draaien elk onder een ander account
-(decorrelatie). Sinds 2026-10-06 doet het script `scripts/bronchecker.py` (account
-`bronchecker`) de A1 in de automatische beoordeling, en start die ronde de aanklager zelf
-als er werk voor hem is; de `verificatie-agent`-missie draait niet meer.
+**Het immuunsysteem (A1/A2, Deel A).** Elke `voorgesteld` supporting/contradicting-root
+wordt onafhankelijk her-verifieerd tegen de echte bron (+ archiefkopie): quote verbatim,
+dekt de bron de claim. Dat doet het script `scripts/bronchecker.py` (account `bronchecker`)
+in de automatische beoordeling; het schrijft een `klopt/twijfel/klopt-niet`-verdict via
+`POST /api/arguments/<id>/herverificatie`. De `aanklager-agent` is de gedecorreleerde
+tegenstander: hij zoekt een tegenbron (weerlegging-root), valt de inferentie aan
+(ondergraving-reply), of certificeert dat de claim de aanval `overleefde` via
+`POST /api/arguments/<id>/tegenspraak`; de ronde start hem zelf als er werk voor hem is.
+Beide oordelen leven in de procestabel `immuun_oordelen`, tellen **nergens** in de score,
+en voeden alléén de auto-merge-poort (A7). Vertrouwen komt hier niet uit consensus maar uit
+**onafhankelijkheid**: indiener, A1 en aanklager draaien elk onder een eigen account, met
+een eigen prompt, en de bron wordt opnieuw opgehaald (decorrelatie).
 
-**De publieke lead-intake (Deel D2).** De `lead-corroboratie-agent`
-(`lead_corroboratie_brief.md`, D2.2) werkt de publieke lead-quarantaine (`GET /api/leads`,
-D2.1) af: hij behandelt elke inzending als een **tip, geen claim**, doet z'n eigen
-A1-sourcing (bron ophalen, quote verbatim, archief eerst) en maakt **pas bij een
-`klopt`-verdict mét teruggevonden verbatim span** het echte `voorgesteld` argument onder
-z'n eigen token — anders wijst hij de lead af, zonder modelbijdrage. Hij zet leads
-uitsluitend in hun eigen baan (`in_corroboratie`/`gecorroboreerd`/`afgewezen`), nooit een
-`arguments`-status. **Het account `lead-corroboratie-agent` moet nog worden aangemaakt**
-door de coördinator (eigen provenance, decorrelatie t.o.v. de indienende agents).
+**Opgeheven missies.** De briefs van de `verificatie-agent` (→ `bronchecker` in de ronde),
+de `documentalist-agent` (→ `bronzoeker`; het anti-overfit-protocol staat nu in
+`nieuws_bewijs_brief.md`), de alleen-lezen reviewbeoordelaar (→ de ronde beslist zelf) en
+de nooit aangemaakte `lead-corroboratie-agent` (publieke lead-intake, D2.2) staan in
+`archief/`. Ze draaien niet meer.
 
 ## LinkedIn-scrape als scout-optie
 

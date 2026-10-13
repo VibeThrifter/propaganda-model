@@ -186,8 +186,7 @@ verder. Een datum bij een bestaand verband: een aspect-argument (`property` `act
 ## Cadans (onbewaakt, C1)
 
 Deze overlay draait onbewaakt op een lage cadans — **maandelijks** — via de scheduler
-(`scripts/agent_runner.py --agent assistent --label ideoloog`; timer
-`deploy/systemd/agent-ideoloog.{service,timer}` en `deploy/crontab`). Ze draait onder
+(`scripts/agent_runner.py --agent assistent --label ideoloog`; launchd via `agent_schedule.py`, standaard uit en aan te zetten op `/beheer`). Ze draait onder
 het staande account `assistent` (label `ideoloog` in de logbestandsnaam), injecteert de
 voorregel (eerst `GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde
 naar `missies/logs/`.

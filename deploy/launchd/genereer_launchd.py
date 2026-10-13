@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""macOS-scheduling voor de onbewaakte missie-agents (C1) — launchd i.p.v. systemd.
+"""macOS-scheduling voor de onbewaakte missie-agents (C1) via launchd.
 
 De agent-missies *zijn* Claude Code-sessies (`claude -p`, via
-`scripts/agent_runner.py`). Op Linux plant een systemd-timer die rondes
-(`deploy/systemd/`); op macOS is het OS-native equivalent **launchd**. Deze
+`scripts/agent_runner.py`). launchd is de enige planner (de oude systemd-timers en
+crontab zijn weg, zie git-geschiedenis vóór 2026-10-13). Deze
 generator schrijft één LaunchAgent-plist per agent naar `~/Library/LaunchAgents/`,
 plus een KeepAlive-plist voor de Flask-server (de agents POSTen ernaar, dus die moet
 draaien).

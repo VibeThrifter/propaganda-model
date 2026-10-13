@@ -3,11 +3,11 @@
 
 De agent-missies *zijn* Claude Code-sessies (zie missies/README.md); "schedulen"
 betekent dus: per ronde één non-interactieve `claude -p "<prompt>"`-invocatie
-plannen. Deze wrapper (stdlib-only, geen nieuwe dependency) is wat een systemd-timer
-of cron-entry aanroept:
+plannen. Deze wrapper (stdlib-only, geen nieuwe dependency) is wat launchd aanroept
+(plists uit deploy/launchd/genereer_launchd.py, schema in agent_schedule.py):
 
   * laadt het Bearer-token uit data/tokens/<account>.token (behalve tokenloze,
-    alleen-lezen missies zoals de reviewbeoordelaar/voorspelling-resolutie);
+    alleen-lezen missies zoals de voorspelling-resolutie);
   * bouwt de missie-prompt (verwijzing naar de brief + het account + de vaste
     voorregel: eerst GET /api/agent/reeds_gereageerd en die id's overslaan);
   * roept één `claude -p`-sessie aan en tee't stdout/stderr naar
@@ -23,7 +23,8 @@ of cron-entry aanroept:
   * `--alleen-bij-open-doelen` (nieuws-scout): start alleen als de wachtrij
     `nieuws_doelen` open werk heeft (open, of 'bezig' met een claim > 3 uur) — anders
     exit 0 zonder claude en zonder logbestand; `--max-rondes-per-dag N` en
-    `--actieve-uren 8-22` begrenzen het verbruik (Epic 12: max 4 rondes/dag, 08–22 uur).
+    `--actieve-uren 8-22` begrenzen het verbruik (nieuws-scout max 6 rondes/dag,
+    nieuws-bewijs max 3, beide 08–22 uur).
     `--doel-soort relatie` telt de bewijsdoelen (missie `nieuws-bewijs`) in plaats van
     de namen (persoon/organisatie) van de nieuws-scout.
 
@@ -35,8 +36,8 @@ Gebruik:
   python3 scripts/agent_runner.py --agent monitor-agent --brief missies/monitor_brief.md
   python3 scripts/agent_runner.py --agent monitor-agent --brief missies/monitor_brief.md --dry-run
   python3 scripts/agent_runner.py --agent assistent --label ideoloog --brief missies/ideoloog_brief.md
-  python3 scripts/agent_runner.py --label reviewbeoordelaar --geen-token \\
-      --brief missies/reviewbeoordelaar_brief.md
+  python3 scripts/agent_runner.py --label voorspelling-resolutie --geen-token \\
+      --brief missies/voorspelling_resolutie_brief.md
   python3 scripts/agent_runner.py --agent nieuws-scout --label nieuws-scout \\
       --brief missies/nieuws_scout_brief.md --alleen-bij-open-doelen --dry-run
   python3 scripts/agent_runner.py --agent nieuws-bewijs --label nieuws-bewijs \\
@@ -223,9 +224,10 @@ def bouw_prompt(account, brief, label, ronde, datum, bhash, geen_token) -> str:
         regels += [
             f"Authenticeer elke schrijfactie met het Bearer-token uit "
             f"data/tokens/{account}.token (GET-endpoints zijn open). Alles wat je "
-            "indient landt 'voorgesteld' en telt in niets tot een mens het merget; "
-            "je zet NOOIT statussen, merget niets, classificeert geen bronnen en "
-            "verwijdert niets — dat is reviewer+/maintainer én mensenwerk.",
+            "indient landt 'voorgesteld' en telt in niets tot de automatische "
+            "beoordeling (de uurronde: broncheck, smaadtoets, aanklager, immuunpoort) "
+            "het goedkeurt; je zet NOOIT statussen, merget niets, classificeert geen "
+            "bronnen en verwijdert niets — dat doet die ronde, niet jij.",
             "VOORREGEL (verplicht, vóór je iets indient): haal GET "
             "/api/agent/reeds_gereageerd op met je token en sla elk argument-id "
             "daaruit over — reageer nooit twee keer op hetzelfde argument (de server "
@@ -286,7 +288,7 @@ def main():
                          "API-poorten (alles landt 'voorgesteld', het agent-token kan niet "
                          "mergen) begrenzen de blast radius.")
     ap.add_argument("--timeout", type=int, default=0,
-                    help="Harde timeout in seconden (0 = geen; systemd doet dit meestal).")
+                    help="Harde timeout in seconden (0 = geen; de launchd-plist geeft die uit agent_schedule.py mee).")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print het exacte claude-commando + tokenpad, draai niets.")
     ap.add_argument("--alleen-bij-open-doelen", action="store_true",

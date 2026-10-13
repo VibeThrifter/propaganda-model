@@ -75,6 +75,13 @@ systemctl status propaganda          # groen?
 De unit herstart automatisch na crash (`Restart=always`) en na reboot
 (`WantedBy=multi-user.target`).
 
+### Achtergrond-agents
+Deze unit draait alleen de webserver. De agents (de uurronde `automatische-beoordeling`,
+`nieuws-scout`, `nieuws-bewijs`, `registers-sync`) plant op de Mac launchd, met
+`agent_schedule.py` als enige lijst (`deploy/launchd/README.md`). De oude systemd-timers
+en `deploy/crontab` plantten agents die niet meer bestaan en zijn weg (zie
+git-geschiedenis vóór 2026-10-13); voor een VPS moet je die vier jobs zelf plannen.
+
 ## 5. DNS (OWNER-ACTION)
 Zet een A- (en AAAA-)record van je domein naar het VPS-IP **vóór** je Caddy start —
 anders faalt de automatische certificaat-uitgifte.

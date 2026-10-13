@@ -32,7 +32,7 @@ een tweede menselijke reviewer (de helft van de checks is een oordeel, geen meti
       Beslislog bijwerken (wie herclassificeerde, waarom).
 - [ ] Clustertoekenning (`cluster_key`) nasteken: nieuwe bronnen van dezelfde
       auteur/uitgever/dataset in hetzelfde cluster? (validator CLUSTER-BRON;
-      precedent-werklijst: `BRONCLUSTER_REVIEW.md`).
+      precedent-werklijst: `docs/archief/BRONCLUSTER_REVIEW.md`).
 - [ ] Linkrot: `python3 scripts/validate_model.py --network`; ontbrekende
       `archive_url`-locaties aanvullen.
 - [ ] `eigen_synthese`-regel intact: geen projectmateriaal dat als bewijs telt.

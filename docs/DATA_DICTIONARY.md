@@ -22,12 +22,12 @@ afbakening op precies één plek zit.
 
 Twee lagen worden **mechanisch** uit elke export en uit de feed-doc gefilterd:
 
-1. **De politieke-positie-laag** — `politiek.py` / `GET /api/kleurmeter` /
+1. **De politieke-positie-laag** — `politiek.py` / `kleurmeter` in `GET /api/graph_data` /
    `arguments.property='politieke_positie'`. Dit is **art. 9-AVG-data** (politieke
    opvattingen per natuurlijk persoon): het gevoeligste onderdeel en commercieel een
    last. Zit in geen enkele verkochte kolom of rij.
 2. **`machtsvalentie`** — de contra-hegemonie-as (`tegenmacht.py` /
-   `GET /api/machtsvalentie` / `property='machtsvalentie'`). Deels politiek geframed →
+   `machtsvalentie` in `GET /api/graph_data` / `property='machtsvalentie'`). Deels politiek geframed →
    grensgeval → **standaard uitgesloten** uit de betaalde feed.
 
 Daarnaast is de vrije-tekst `description` van entiteiten en relaties **niet**

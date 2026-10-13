@@ -375,7 +375,8 @@ let actiefFilter = null;  // null = alle | filterkey
 let alleenOpen = false;   // alleen threads met open (voorgestelde) argumenten
 const openGroepen = new Set();  // uitgeklapte accordions, key = "groep:filter"
 
-// Vierde veld = subgroepeer per filter (de ruggengraat van het model: 1→5 + tegenmacht).
+// Vierde veld = subgroepeer per filter (de ruggengraat van het model: de vijf filters,
+// de rest en de vijf besluitvormingscategorieën).
 const GROEPEN = [
   ['relaties', 'Relaties', 'relation_id', true],
   ['entiteiten', 'Entiteiten', 'entity_id', false],
@@ -389,6 +390,7 @@ const GROEPEN = [
 const FILTER_KLEUR = { ...FILTER_COLORS, '': '#5a5a70' };
 const FILTER_LABEL = { ...FILTER_LABELS, '': 'Zonder mechanisme' };
 const FILTER_VOLGORDE = ['eigendom', 'advertentie', 'sourcing', 'flak', 'ideologie',
+  'formele_macht', 'belangen', 'kennis_advies', 'polder', 'werving',
   'tegenmacht', 'cross_filter', 'systeemactor', 'overig', ''];
 const STANCE = { supporting: ['+', '#3ddc84'], contradicting: ['−', '#e0635f'], contextual: ['~', '#8888a0'] };
 
@@ -1409,7 +1411,7 @@ const METAVELDEN = [
   ['element_type', 'type', 'Soort theorie-element: een rol (functie), een mechanisme (proces) of een emergent veld (groepseffect).'],
   ['naam', 'naam', 'Voorgestelde interne naam van het nieuwe element.'],
   ['nieuwe_naam', 'nieuwe naam', 'Voorgestelde nieuwe naam bij een hernoeming.'],
-  ['filter', 'filter', 'Onder welk van de vijf propagandafilters (of tegenmacht/overig) dit element primair valt.'],
+  ['filter', 'filter', 'Onder welk van de vijf propagandafilters, de vijf besluitvormingscategorieën (formele macht, belangen, kennis & advies, polder, werving) of tegenmacht/overig dit element primair valt.'],
   ['aard', 'aard', 'Hoe "echt" de verbinding is — bepaalt of ze als pijl, halo of goud veld in de graaf wordt getekend (zie de freeze-test hieronder).'],
   ['mechanisme_type', 'mechanisme-type', 'Subtype van het mechanisme.'],
   ['categorie', 'categorie', 'Categorie/cluster waar het element bij hoort.'],

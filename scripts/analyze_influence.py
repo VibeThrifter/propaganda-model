@@ -51,7 +51,7 @@ def print_rankings(conn, names, types, top):
     # een diffuse fan-out (bv. hegemonische naturalisatie) als één bijdrage i.p.v. N losse duwen,
     # en een veld-eigenschap (zelfcensuur) niet als uitgaande invloed. Zo geen kunstmatige inflatie.
     inf = influence.compute_influence(conn, field_mode="collapse")
-    print("\n(invloed-wiskunde: veld-effecten gedempt — zie mechanisms.aard / migrate_add_mechanism_aard.py)")
+    print("\n(invloed-wiskunde: veld-effecten gedempt — zie mechanisms.aard)")
 
     print(f"\n== TOP {top} — INVLOED OP HET PUBLIEK (eindstation: kranten/omroepen/platforms) ==")
     print("   De kernvraag: wiens invloed komt uiteindelijk bij de nieuwsconsument terecht?")

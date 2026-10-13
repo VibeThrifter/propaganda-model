@@ -14,8 +14,8 @@ info:
 
     (2) FEED (/api/feed/*) — de licentieerbare, gemeterde slice achter een
     API-key. Bewust UITGESLOTEN uit deze feed-doc en uit elke export: de
-    politieke-positie-laag (/api/kleurmeter, art. 9-AVG) en machtsvalentie
-    (/api/machtsvalentie). Zie docs/DATA_DICTIONARY.md en docs/LICENSE-DATA.md.
+    politieke-positie-laag (kleurmeter, art. 9-AVG) en machtsvalentie; beide
+    zitten alleen in /api/graph_data. Zie docs/DATA_DICTIONARY.md en docs/LICENSE-DATA.md.
 
     Scores zijn afgeleid, geen meting: elke relatie draagt twee onafhankelijke
     assen — certainty ("bestaat de relatie?") en influence ("hoe sterk stuurt ze

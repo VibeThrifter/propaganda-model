@@ -32,6 +32,8 @@ import partijen  # partijnetwerk: wie aan welke partij verbonden is en welke pos
 import looptijd  # tijdsvakken: een verband loopt niet buiten het bestaan van zijn eindpunten; fusies
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
+from broncluster import cluster_key_voor  # broncluster-afleiding (M1.2)
+import vocab  # woordenschat: filters, leesbare namen, relatielabels
 import viz_data  # graafdata voor de viz (W5.1), gedeeld met scripts/generate_viz.py
 import paginas  # programmatic-SEO: server-gerenderde pagina per element (B4)
 import subprocess  # herlaad de launchd-agents na een schema-wijziging (C1, macOS)
@@ -53,7 +55,6 @@ WEB_PATH = Path(os.environ.get("PROPAGANDA_WEB_PATH", str(ROOT / "web")))
 SECRET_KEY_PATH = Path(os.environ.get("PROPAGANDA_SECRET_KEY_PATH", str(DATA_DIR / "secret_key")))
 REVIEW_ADVIES_PATH = DATA_DIR / "review_advies.json"
 BRON_SUGGESTIES_PATH = DATA_DIR / "bron_suggesties.json"
-VOORSPELLING_VOORSTELLEN_PATH = DATA_DIR / "voorspelling_voorstellen.json"
 AUTO_MERGE_LOG_PATH = DATA_DIR / "auto_merge_log.json"
 AGENT_RUNS_PATH = DATA_DIR / "agent_runs.jsonl"
 RELEASES_PATH = ROOT / "releases"
@@ -181,7 +182,7 @@ RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur",
 # (nieuws-agent/nieuws-scout/maintainer). Idem de voorrang uit het nieuws (2026-10-06).
 # Idem een stemtoets (2026-10-08): procesmetadata over de eigen stem, poort = niet de auteur.
 RATE_LIMIT_VRIJE_ENDPOINTS = {"nieuws_doelen_upsert", "nieuws_doelen_claim_volgende",
-                              "nieuws_doelen_claim", "nieuws_doelen_patch", "nieuws_voorrang",
+                              "nieuws_doelen_patch", "nieuws_voorrang",
                               "stemtoets_vastleggen", "looptijd_onderzoek_vastleggen"}
 
 
@@ -424,7 +425,7 @@ def partijen_page():
 @app.route("/docs/openapi.yaml")
 def openapi_spec():
     """OpenAPI-beschrijving van de PUBLIEKE + VERKOCHTE GET-vormen van de data-feed
-    (E1). Bevat bewust NIET /api/kleurmeter of /api/machtsvalentie (uitgesloten laag)."""
+    (E1). Bevat bewust NIET de kleurmeter of de machtsvalentie (uitgesloten laag)."""
     return send_file(ROOT / "docs" / "openapi.yaml", mimetype="application/yaml")
 
 
@@ -747,9 +748,8 @@ def api_users_filterrol(uid):
 def index():
     # Dunne pagina (W5.1): web/template.html zelf, mét de "%%DATA%%"-sentinel er
     # nog in — de boot-loader in de pagina haalt de graafdata live via
-    # GET /api/graph_data. De statische export (scripts/generate_viz.py →
-    # web/index.html) hangt hier niet meer onder; die blijft bereikbaar als
-    # /static/index.html. No-cache komt uit _no_cache_html.
+    # GET /api/graph_data. De optionele statische export (scripts/generate_viz.py →
+    # data/viz_export.html) serveert de app niet. No-cache komt uit _no_cache_html.
     return send_file(WEB_PATH / "template.html")
 
 
@@ -777,7 +777,7 @@ def _graph_cache_key():
 def graph_data():
     """Volledige viz-datastructuur (entiteiten, relaties, theorielaag, discussiebomen,
     afgeleide scores, kleurmeter, inkomsten) — identiek aan wat de statische export
-    in web/index.html bakt (zelfde bouw: viz_data.export_data)."""
+    in data/viz_export.html bakt (zelfde bouw: viz_data.export_data)."""
     sleutel = _graph_cache_key()
     entry = _graph_cache.get("entry")
     if entry is None or entry[0] != sleutel:
@@ -1125,11 +1125,9 @@ def discussion_index():
 
 
 # Filter-enum voor classificatie-aspect 'filter' (unie van de roles- en
-# mechanisms-CHECK in schema.sql); property_value moet hier een van zijn.
-FILTERS = {"eigendom", "advertentie", "sourcing", "flak", "ideologie",
-           "cross_filter", "systeemactor", "tegenmacht", "overig",
-           # Uitbreiding C (besluitvorming, eigenaarsbesluit 2026-10-07): zelfde netwerk
-           "formele_macht", "belangen", "kennis_advies", "polder", "werving"}
+# mechanisms-CHECK in schema.sql); property_value moet hier een van zijn. Eén bron:
+# vocab.py (de vijf filters, de rest en de vijf besluitvormingscategorieën).
+FILTERS = vocab.FILTERS
 
 # Provenance-methode-tier (A5): de toegestane methode-waarden op een citatie.
 METHODES = tuple(scoring.METHODE_FACTOR)
@@ -1873,35 +1871,6 @@ def update_argument_status(arg_id):
     conn.commit()
     conn.close()
     return jsonify({"id": arg_id, "status": new_status})
-
-
-@app.route("/api/arguments/<int:arg_id>/smaad_vrijgeven", methods=["POST"])
-@require_user("maintainer")
-def smaad_vrijgeven(arg_id):
-    """Smaad-firewall opheffen (D2.3): alleen de eigenaar (maintainer, mens) heft de
-    smaad_hold-vlag op een argument op → het argument mag weer publiek renderen. Een
-    agent/reviewer kan dit niet (403 via de maintainer-poort). Menselijk eindoordeel op
-    de hoogste-inzet-categorie; geaudit in edit_log."""
-    conn = get_db()
-    arg = conn.execute("SELECT id, smaad_hold FROM arguments WHERE id = ?",
-                       (arg_id,)).fetchone()
-    if not arg:
-        conn.close()
-        return jsonify({"error": "Argument niet gevonden"}), 404
-    if not arg["smaad_hold"]:
-        conn.close()
-        return jsonify({"id": arg_id, "smaad_hold": 0,
-                        "opmerking": "Argument stond niet op smaad_hold"}), 200
-    conn.execute("UPDATE arguments SET smaad_hold = 0 WHERE id = ?", (arg_id,))
-    conn.execute("""
-        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
-        VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
-    """, (arg_id, g.user["username"], json.dumps({"smaad_hold": 1}),
-          json.dumps({"smaad_hold": 0}),
-          "smaad-firewall vrijgegeven door eigenaar (maintainer)"))
-    conn.commit()
-    conn.close()
-    return jsonify({"id": arg_id, "smaad_hold": 0}), 200
 
 
 @app.route("/api/arguments/<int:arg_id>/bezwaar", methods=["PATCH"])
@@ -2692,11 +2661,6 @@ def create_source():
     date_published = (data.get("date_published") or "").strip() or None
     cluster_key = (data.get("cluster_key") or "").strip() or None
     if cluster_key is None:
-        import sys as _sys
-        scripts_dir = str(Path(__file__).parent / "scripts")
-        if scripts_dir not in _sys.path:
-            _sys.path.insert(0, scripts_dir)
-        from migrate_scoring_v2 import cluster_key_voor
         cluster_key = cluster_key_voor(author, publisher)
 
     loc = data.get("location") or {}
@@ -2955,80 +2919,6 @@ def create_citation():
     except sqlite3.IntegrityError as e:
         conn.close()
         return jsonify({"error": str(e)}), 400
-
-
-@app.route("/api/citations/<int:cid>", methods=["PATCH"])
-@require_user()
-def patch_citation(cid):
-    """Quote/pagina/sectie/context van een bestaande citatie bijwerken.
-
-    Laat een eerder zonder verbatim ingevoerde citatie alsnog een quote krijgen
-    (zonder een duplicaat-citatie aan te maken). Heft, net als create_citation, een
-    'bronvermelding_nodig'-status op zodra de citatie daarmee 'echt' wordt."""
-    data = request.json or {}
-    velden = {k: data[k] for k in ("quote", "page", "section", "context", "methode") if k in data}
-    if not velden:
-        return jsonify({"error": "Niets om te wijzigen (quote/page/section/context/methode)"}), 400
-    conn = get_db()
-    row = conn.execute("SELECT id, argument_id, source_id, quote, methode FROM citations WHERE id = ?",
-                       (cid,)).fetchone()
-    if not row:
-        conn.close()
-        return jsonify({"error": "Citatie niet gevonden"}), 404
-    # A5: valideer de (effectieve) methode tegen de (effectieve) quote — de verbatim-regel
-    # geldt ook als je alleen de quote leegmaakt of alleen de methode zet.
-    eff_methode = velden.get("methode", row["methode"])
-    eff_quote = velden.get("quote", row["quote"])
-    fout = _methode_fout(eff_methode, eff_quote)
-    if fout:
-        conn.close()
-        return jsonify({"error": fout}), 400
-    sets = ", ".join(f"{k} = ?" for k in velden)
-    conn.execute(f"UPDATE citations SET {sets} WHERE id = ?", (*velden.values(), cid))
-
-    # Citatiepoort: een nu-echte citatie (quote óf vindplaats) heft bronvermelding_nodig op.
-    arg = conn.execute("SELECT id, status FROM arguments WHERE id = ?",
-                       (row["argument_id"],)).fetchone()
-    echt = bool((velden.get("quote") or "").strip()) or conn.execute(
-        "SELECT 1 FROM source_locations WHERE source_id = ?", (row["source_id"],)).fetchone() is not None
-    nieuwe_status = None
-    if arg and arg["status"] == "bronvermelding_nodig" and echt:
-        nieuwe_status = "ongecontroleerd"
-        conn.execute("UPDATE arguments SET status = ? WHERE id = ?", (nieuwe_status, arg["id"]))
-    conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
-                    VALUES ('citations', ?, 'updated', ?, ?, ?)""",
-                 (cid, g.user["username"], json.dumps(list(velden.keys())),
-                  "Citatie bijgewerkt (quote/vindplaats)"))
-    conn.commit()
-    conn.close()
-    return jsonify({"id": cid, "argument_status": nieuwe_status}), 200
-
-
-@app.route("/api/citations/<int:cid>", methods=["DELETE"])
-@require_user()
-def delete_citation(cid):
-    """Hard delete van een citatie — maintainer-only (consistent met de overige
-    hard-deletes van afgewezen/foutieve content). Schrijft een 'deleted'-regel in
-    edit_log. Bedoeld voor o.a. een verkeerd aan een argument gehangen citatie."""
-    conn = get_db()
-    if not heeft_rol(conn, g.user, "maintainer"):
-        conn.close()
-        return jsonify({"error": "Verwijderen vereist maintainer"}), 403
-    row = conn.execute("SELECT id, argument_id, source_id, quote FROM citations WHERE id = ?",
-                       (cid,)).fetchone()
-    if not row:
-        conn.close()
-        return jsonify({"error": "Citatie niet gevonden"}), 404
-    conn.execute("DELETE FROM citations WHERE id = ?", (cid,))
-    conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
-                    VALUES ('citations', ?, 'deleted', ?, ?, ?)""",
-                 (cid, g.user["username"],
-                  json.dumps({"argument_id": row["argument_id"], "source_id": row["source_id"],
-                              "quote": row["quote"]}, ensure_ascii=False),
-                  "Citatie verwijderd (maintainer)"))
-    conn.commit()
-    conn.close()
-    return jsonify({"id": cid, "deleted": True}), 200
 
 
 # ── Entiteiten & relaties API ────────────────────────────────
@@ -3653,8 +3543,8 @@ def _maintainer_mag_direct(conn, tabel, rid):
 def _modereer_kern(conn, tabel, rid, nieuw, gebruikersnaam, motivatie):
     """Gedeelde moderatie-kern (refactor Epic 12, gedrag ongewijzigd): keur een
     'voorgesteld' node/edge goed of af namens ``gebruikersnaam``. Hergebruikt door
-    ``_modereer`` (menselijke reviewer, PATCH …/status) én de nieuws-autokeur
-    (``POST /api/nieuws/autokeur/<tabel>/<id>``). Alle poorten zitten HIER, in dezelfde
+    ``_modereer`` (menselijke reviewer, PATCH …/status) én de automatische beoordeling
+    (``POST /api/beoordeling/autokeur/<tabel>/<id>``). Alle poorten zitten HIER, in dezelfde
     volgorde als voorheen: statuswaarde (400) → bestaan (404) → reviewer+ (403) →
     alleen 'voorgesteld' (400) → niemand keurt eigen werk goed (403, M2.1) → orphan-poort
     (400) → bronplicht voor relaties (400). Daarna: statuswissel + instantiatie-backstop
@@ -4595,18 +4485,6 @@ def _maintainer_patch(element_type):
         return jsonify({"error": str(e)}), 400
 
 
-@app.route("/api/roles/<int:rid>", methods=["PATCH"])
-@require_user()
-def patch_role(rid):
-    return _maintainer_patch("rol")
-
-
-@app.route("/api/mechanisms/<int:mid>", methods=["PATCH"])
-@require_user()
-def patch_mechanism(mid):
-    return _maintainer_patch("mechanisme")
-
-
 def _auteur_entiteit_patch(conn, eid, ent):
     """Auteur-pad: de bijdrager (incl. agent) die deze entiteit aanmaakte mag haar
     voorstelvelden — incl. de rol-suggestie `primary_role_id` — bijschaven zolang ze
@@ -4995,24 +4873,6 @@ def herzien_voorstel(vid):
     uit = _voorstel_dict(conn, rij)
     conn.close()
     return jsonify(uit), 201
-
-
-@app.route("/api/voorstellen")
-@require_user("reviewer")
-def list_voorstellen():
-    """Openstaande (of alle, ?status=alle) voorstellen met reviewstand.
-
-    Reviewer+ only (zie review_queue): de voorstellenlijst is moderatie-werkruimte."""
-    status = request.args.get("status", "open")
-    conn = get_db()
-    if status == "alle":
-        rows = conn.execute("SELECT * FROM voorstellen ORDER BY id DESC").fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM voorstellen WHERE status = ? ORDER BY id DESC",
-                            (status,)).fetchall()
-    uit = [_voorstel_dict(conn, r) for r in rows]
-    conn.close()
-    return jsonify(uit)
 
 
 @app.route("/api/voorstellen/<int:vid>")
@@ -5416,7 +5276,7 @@ def review_advies():
     UI rechts van elk wachtrij-item verschijnt. Bewust BUITEN het model — een los
     JSON-bestand dat de agent schrijft (geen discussieboom-bijdrage, telt nergens
     mee, mirrors data/gevoeligheid.json). Reviewer+ only: intern werkmateriaal voor
-    wie merget. Leeg als de agent nog geen ronde draaide (missies/reviewbeoordelaar_brief.md)."""
+    wie merget. Leeg als de agent nog geen ronde draaide (missies/archief/reviewbeoordelaar_brief.md)."""
     if not REVIEW_ADVIES_PATH.exists():
         return jsonify({"gegenereerd": None, "ronde": None, "items": {}})
     try:
@@ -5433,29 +5293,13 @@ def bron_suggesties():
     met een `check`-verdict van de reviewbeoordelaar (bestaat de bron, dekt hij de claim?).
     Read-only beslissteun BUITEN het model — een los JSON-bestand dat de agents schrijven
     (geen discussieboom-bijdrage, telt nergens mee, mirrors review_advies.json). Reviewer+
-    only. Leeg tot de documentalist een ronde draaide (missies/documentalist_brief.md)."""
+    only. Leeg tot de documentalist een ronde draaide (missies/archief/documentalist_brief.md)."""
     if not BRON_SUGGESTIES_PATH.exists():
         return jsonify({"gegenereerd": None, "agent": None, "items": {}})
     try:
         return jsonify(json.loads(BRON_SUGGESTIES_PATH.read_text(encoding="utf-8")))
     except (json.JSONDecodeError, OSError) as e:
         return jsonify({"error": f"Bron-suggestiebestand onleesbaar: {e}", "items": {}}), 500
-
-
-@app.route("/api/predictions/resolutie_voorstellen")
-@require_user("reviewer")
-def resolutie_voorstellen():
-    """A4 — resolutievoorstellen van de voorspelling-resolutie-agent: per verlopen open
-    voorspelling een voorgestelde uitkomst + status + bron. Read-only beslissteun BUITEN
-    het model (adviserend, telt nergens mee, mirrors review_advies.json). De agent kan
-    NIET scoren (geen reviewer-rol); de eigenaar bevestigt via PATCH …/uitkomst. Reviewer+
-    only. Leeg tot de agent een ronde draaide (missies/voorspelling_resolutie_brief.md)."""
-    if not VOORSPELLING_VOORSTELLEN_PATH.exists():
-        return jsonify({"gegenereerd": None, "agent": None, "items": []})
-    try:
-        return jsonify(json.loads(VOORSPELLING_VOORSTELLEN_PATH.read_text(encoding="utf-8")))
-    except (json.JSONDecodeError, OSError) as e:
-        return jsonify({"error": f"Resolutie-voorstelbestand onleesbaar: {e}", "items": []}), 500
 
 
 @app.route("/api/auto_merge_log")
@@ -6057,47 +5901,16 @@ def mijn_herbeoordelen():
                     "entiteiten": entiteiten, "relaties": relaties})
 
 
-# ── Recent changes & watchlists (M2.4) ───────────────────────
+# ── Recent changes (M2.4) ────────────────────────────────────
 
 @app.route("/api/recent_changes")
 def recent_changes():
-    """Recent-changes-feed op edit_log. ?watchlist=1 filtert op de eigen volglijst
-    (vereist login); een gevolgde relatie/entiteit/rol/… vangt ook de argumenten
-    die erop ingediend worden."""
+    """Recent-changes-feed op edit_log (open). De persoonlijke volglijst (?watchlist=1 en
+    /api/watchlist) is weg sinds 2026-10-13: niets vulde haar nog."""
     limit = min(request.args.get("limit", 50, type=int), 200)
     conn = get_db()
-
-    watch_filter = None
-    if request.args.get("watchlist") == "1":
-        user = _zoek_user(conn)
-        if user is None:
-            conn.close()
-            return jsonify({"error": "Inloggen vereist voor de watchlist-weergave"}), 401
-        direct = {(r["table_name"], r["record_id"]) for r in conn.execute(
-            "SELECT table_name, record_id FROM watchlists WHERE user_id = ?",
-            (user["id"],))}
-        arg_ids = {rid for (tn, rid) in direct if tn == "arguments"}
-        kolommen = {"relations": "relation_id", "entities": "entity_id", "roles": "role_id",
-                    "mechanisms": "mechanism_id", "emergent_effects": "emergent_effect_id"}
-        for tn, kolom in kolommen.items():
-            ids = [rid for (t, rid) in direct if t == tn]
-            if ids:
-                qs = ",".join("?" * len(ids))
-                arg_ids |= {r[0] for r in conn.execute(
-                    f"SELECT id FROM arguments WHERE {kolom} IN ({qs})", ids)}
-        watch_filter = (direct, arg_ids)
-
-    uit = []
-    for r in conn.execute("SELECT * FROM edit_log ORDER BY id DESC LIMIT ?",
-                          (limit * 10 if watch_filter else limit,)):
-        if watch_filter:
-            direct, arg_ids = watch_filter
-            if ((r["table_name"], r["record_id"]) not in direct
-                    and not (r["table_name"] == "arguments" and r["record_id"] in arg_ids)):
-                continue
-        uit.append(dict(r))
-        if len(uit) >= limit:
-            break
+    uit = [dict(r) for r in conn.execute("SELECT * FROM edit_log ORDER BY id DESC LIMIT ?",
+                                         (limit,))]
 
     # Verrijking voor de startkaart op /overleg (W3.1): argument-regels krijgen de
     # claim + het thread-anker (param/id, via de wortel — reacties dragen zelf geen
@@ -6121,74 +5934,6 @@ def recent_changes():
 
     conn.close()
     return jsonify(uit)
-
-
-@app.route("/api/watchlist", methods=["GET", "POST", "DELETE"])
-@require_user()
-def watchlist():
-    conn = get_db()
-    if request.method == "GET":
-        rows = [dict(r) for r in conn.execute(
-            "SELECT table_name, record_id, created_at FROM watchlists WHERE user_id = ? "
-            "ORDER BY created_at DESC", (g.user["id"],))]
-        conn.close()
-        return jsonify(rows)
-
-    data = request.json or {}
-    table_name, record_id = data.get("table_name"), data.get("record_id")
-    geldige = ("relations", "entities", "roles", "mechanisms", "emergent_effects", "arguments")
-    if table_name not in geldige or not isinstance(record_id, int):
-        conn.close()
-        return jsonify({"error": f"table_name moet een van {geldige} zijn, "
-                                 "record_id een integer"}), 400
-    if request.method == "POST":
-        if not conn.execute(f"SELECT 1 FROM {table_name} WHERE id = ?",
-                            (record_id,)).fetchone():
-            conn.close()
-            return jsonify({"error": f"{table_name} #{record_id} bestaat niet"}), 404
-        conn.execute("INSERT OR IGNORE INTO watchlists (user_id, table_name, record_id) "
-                     "VALUES (?, ?, ?)", (g.user["id"], table_name, record_id))
-        conn.commit()
-        conn.close()
-        return jsonify({"watching": True, "table_name": table_name,
-                        "record_id": record_id}), 201
-    conn.execute("DELETE FROM watchlists WHERE user_id = ? AND table_name = ? "
-                 "AND record_id = ?", (g.user["id"], table_name, record_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"watching": False, "table_name": table_name, "record_id": record_id})
-
-
-# ── Lineage (M2.6): oude id's blijven herleidbaar ────────────
-
-@app.route("/api/lineage/<element_type>/<int:element_id>")
-def get_lineage(element_type, element_id):
-    """Opvolging van een element: is het vervangen, en door wie? Oude id's
-    beantwoorden met een verwijzing naar de opvolger(s)."""
-    if element_type not in voorstellen.TABEL:
-        return jsonify({"error": f"element_type moet een van "
-                                 f"{tuple(voorstellen.TABEL)} zijn"}), 400
-    conn = get_db()
-    tabel = voorstellen.TABEL[element_type]
-    rij = conn.execute(f"SELECT id, name, vervangen FROM {tabel} WHERE id = ?",
-                       (element_id,)).fetchone()
-    if not rij:
-        conn.close()
-        return jsonify({"error": f"{element_type} #{element_id} bestaat niet"}), 404
-    opvolgers = [dict(r) for r in conn.execute(f"""
-        SELECT l.soort, l.nieuw_id AS id, t.name AS naam, l.voorstel_id, l.reden
-        FROM lineage l JOIN {tabel} t ON t.id = l.nieuw_id
-        WHERE l.element_type = ? AND l.oud_id = ? AND l.nieuw_id != l.oud_id
-        ORDER BY l.id""", (element_type, element_id))]
-    herkomst = [dict(r) for r in conn.execute(f"""
-        SELECT l.soort, l.oud_id AS id, t.name AS naam, l.voorstel_id, l.reden
-        FROM lineage l JOIN {tabel} t ON t.id = l.oud_id
-        WHERE l.element_type = ? AND l.nieuw_id = ? AND l.nieuw_id != l.oud_id
-        ORDER BY l.id""", (element_type, element_id))]
-    conn.close()
-    return jsonify({"element_type": element_type, "id": element_id, "naam": rij["name"],
-                    "vervangen": bool(rij["vervangen"]),
-                    "opvolgers": opvolgers, "herkomst": herkomst})
 
 
 # ── Voorspellingsregister (M3.4) ─────────────────────────────
@@ -6260,7 +6005,7 @@ def create_prediction():
                 fouten.append(f"{veld} #{ankers[veld]} bestaat niet")
             elif rij["vervangen"]:
                 fouten.append(f"{veld} #{ankers[veld]} is vervangen (M2.6) — "
-                              "veranker aan de opvolger (zie /api/lineage)")
+                              "veranker aan de opvolger (zie de tabel lineage)")
     if fouten:
         conn.close()
         return jsonify({"error": "Voorspelling onvolledig", "fouten": fouten}), 400
@@ -6405,32 +6150,6 @@ def get_inkomsten():
     preview = request.args.get("preview") in ("1", "true", "ja")
     conn = get_db()
     res = scoring.compute_income_composition(conn, include_voorgesteld=preview)
-    conn.close()
-    return jsonify(res)
-
-
-@app.route("/api/kleurmeter")
-def get_kleurmeter():
-    """Afgeleide politieke kleurmeter (politiek.py): per persoon een 2-assige
-    ideologische positie uit GESOURCETE 'politieke_positie'-signalen, per organisatie
-    geaggregeerd uit haar bestuurders/leden. ?preview=1 telt nog-`voorgesteld` signalen
-    voorlopig mee (vóór menselijke review); standaard alleen gemergde signalen."""
-    preview = request.args.get("preview") in ("1", "true", "ja")
-    conn = get_db()
-    res = politiek.compute_kleurmeter(conn, include_voorgesteld=preview)
-    conn.close()
-    return jsonify(res)
-
-
-@app.route("/api/machtsvalentie")
-def get_machtsvalentie():
-    """Afgeleide machtsvalentie (tegenmacht.py): tegenmacht als GERICHTE edge-valentie.
-    Per actor de contra-hegemonische valentie per as (opent/sluit de consensus, Hallin)
-    én welke filter-machtsconcentraties ze verantwoordt, uit 'machtsvalentie'-aspect-
-    argumenten op edges. ?preview=1 telt nog-`voorgesteld` annotaties voorlopig mee."""
-    preview = request.args.get("preview") in ("1", "true", "ja")
-    conn = get_db()
-    res = tegenmacht.compute_machtsvalentie(conn, include_voorgesteld=preview)
     conn.close()
     return jsonify(res)
 
@@ -6837,19 +6556,15 @@ def patch_lead(lead_id):
 # het netwerk uit dit model. Ontbreekt een naam of heeft hij < 3 goedgekeurde verbanden,
 # dan zet de nieuws-backend (account 'nieuws-agent') een onderzoeksdoel in de wachtrij
 # `nieuws_doelen`; de missie-agent 'nieuws-scout' (missies/nieuws_scout_brief.md) claimt
-# en werkt die af via het GEWONE bijdragepad (alles 'voorgesteld'). Daarna mag een
-# deterministische, gepoorte service (account 'nieuws-autokeur', reviewer-tier) veilige
-# structuurfeiten goedkeuren — een BEWUSTE, geaudite uitzondering op "AI stelt voor, mens
-# beslist" (expliciet eigenaarsbesluit 2026-09-30): alleen neutrale structuur-relatietypes
-# mét mechanisme en bron-URL, argumenten worden NIET gemerged, eerlijk edit_log,
-# kill-switch, dagplafond, intrekken door een maintainer.
+# en werkt die af via het GEWONE bijdragepad (alles 'voorgesteld'). Goedkeuren doet de
+# automatische beoordeling (elk uur, ná een onafhankelijke broncheck); tot 2026-10-07
+# deed een aparte service dat (account 'nieuws-autokeur', zie hieronder wat er van over is).
 #
 # Bewijsdoelen (soort 'relatie', nieuws-aggregator Story 14.13): een verband dat lezers
 # in het nieuws zien en dat dun onderbouwd is (één bron, een bron die de claim niet
 # draagt, niets gecontroleerd), sleutel 'relatie:<id>'. Die doelen claimt alléén de
 # missie-agent 'nieuws-bewijs' (missies/nieuws_bewijs_brief.md): bewijs vóór én tegen,
-# alles 'voorgesteld' — invloeds-/sourcingclaims blijven mensenwerk, de autokeur raakt
-# ze nooit. De nieuws-scout claimt alleen personen en organisaties.
+# alles 'voorgesteld'. De nieuws-scout claimt alleen personen en organisaties.
 
 NIEUWS_AGENT = "nieuws-agent"
 NIEUWS_SCOUT = "nieuws-scout"
@@ -7232,43 +6947,6 @@ def nieuws_doelen_claim_volgende():
     return jsonify({"doelen": doelen})
 
 
-@app.route("/api/nieuws/doelen/<int:did>/claim", methods=["POST"])
-@require_user()
-def nieuws_doelen_claim(did):
-    """Claim één doel: 'open' → 'bezig', anders 409. Het account van de soort
-    ('nieuws-scout' voor namen, 'nieuws-bewijs' voor relaties) of een maintainer."""
-    conn = get_db()
-    nu = _nu_iso()
-    conn.isolation_level = None
-    conn.execute("BEGIN IMMEDIATE")
-    rij = conn.execute("SELECT * FROM nieuws_doelen WHERE id = ?", (did,)).fetchone()
-    if rij is None:
-        conn.execute("ROLLBACK")
-        conn.close()
-        return jsonify({"error": "Doel niet gevonden"}), 404
-    werker = _nieuws_werker(rij["soort"])
-    if not _mag_nieuws(conn, werker):
-        conn.execute("ROLLBACK")
-        conn.close()
-        return jsonify({"error": f"Alleen het account '{werker}' of een maintainer "
-                                 "claimt dit nieuws-doel"}), 403
-    if rij["status"] != "open":
-        conn.execute("ROLLBACK")
-        doel = _nieuws_doel_dict(rij)
-        conn.close()
-        return jsonify({"error": f"Alleen een 'open' doel is te claimen (status "
-                                 f"'{rij['status']}')", "doel": doel}), 409
-    conn.execute("""UPDATE nieuws_doelen SET status = 'bezig', geclaimd_door = ?,
-                    geclaimd_op = ?, pogingen = pogingen + 1, bijgewerkt = ? WHERE id = ?""",
-                 (g.user["username"], nu, nu, did))
-    _nieuws_log(conn, did, "updated", {"status": "open"}, {"status": "bezig"},
-                "nieuws-doel geclaimd")
-    conn.execute("COMMIT")
-    doel = _nieuws_doel(conn, did)
-    conn.close()
-    return jsonify({"doel": doel})
-
-
 @app.route("/api/nieuws/doelen/<int:did>", methods=["PATCH"])
 @require_user()
 def nieuws_doelen_patch(did):
@@ -7362,17 +7040,13 @@ def nieuws_doelen_patch(did):
     return jsonify({"doel": doel})
 
 
-# ── Nieuws-autokeur: automatisch goedkeuren (eigenaarsbesluit 2026-09-30) ──────────
-# Deterministisch predikaat (spiegel van auto_merge_toegestaan) + endpoint dat het
-# predikaat ZELF checkt (defense-in-depth) en goedkeurt via _modereer_kern, zodat élke
-# bestaande moderatiepoort (eigen-werk, orphan, bronplicht, instantiaties, edit_log) ook
-# hier geldt. Alleen ENTITEITEN en RELATIES; argumenten worden nooit gemerged — de score
-# blijft op de 0,05-vloer tot een mens merget.
+# ── Nieuws-autokeur: wat er van over is (eigenaarsbesluit 2026-09-30) ──────────────
+# De autokeur keurde structuurfeiten van de nieuws-scout goed. Sinds 2026-10-07 doet de
+# automatische beoordeling dat (zie hieronder); de service en haar endpoint zijn weg
+# (opgeruimd 2026-10-13). Wat blijft: het account 'nieuws-autokeur' (de nieuws-app leest
+# zijn goedkeuringen uit edit_log), het log, het intrekken van een automatische
+# goedkeuring en de hulpfuncties die de automatische beoordeling deelt.
 
-NIEUWS_AUTOKEUR_RELATIETYPES = ("personeel", "dienstverband", "bestuurder", "adviseur",
-                                "woordvoerder_van", "lidmaatschap", "eigendom",
-                                "ambt", "zeggenschap", "controle", "geschenk")
-NIEUWS_AUTOKEUR_MOTIVATIE = "auto-keur nieuws-pijplijn (eigenaarsbesluit 2026-09-30)"
 NIEUWS_AUTOKEUR_REDEN_PREFIX = "auto-keur nieuws-pijplijn"
 NIEUWS_INTREK_REDEN_PREFIX = "intrekken auto-keur nieuws-pijplijn"
 NIEUWS_AUTOKEUR_PLAFOND_DEFAULT = 60
@@ -7395,25 +7069,6 @@ def _nieuws_autokeur_vandaag(conn):
         WHERE action = 'updated' AND table_name IN ('entities', 'relations')
           AND reason LIKE ? AND date(created_at, 'localtime') = date('now', 'localtime')
     """, (NIEUWS_AUTOKEUR_REDEN_PREFIX + "%",)).fetchone()[0]
-
-
-def _nieuws_klaar_ids(conn):
-    """{'entity_ids': set, 'relation_ids': set} uit het resultaat van alle 'klaar'-doelen
-    van de nieuws-scout (namen). Bewijsdoelen (soort 'relatie') tellen nooit mee: wat
-    'nieuws-bewijs' vindt, blijft mensenwerk."""
-    uit = {"entity_ids": set(), "relation_ids": set()}
-    for r in conn.execute("SELECT resultaat FROM nieuws_doelen WHERE status = 'klaar' "
-                          "AND resultaat IS NOT NULL "
-                          "AND soort IN ('persoon', 'organisatie')"):
-        try:
-            res = json.loads(r["resultaat"])
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(res, dict):
-            continue
-        for k in uit:
-            uit[k].update(x for x in (res.get(k) or []) if isinstance(x, int))
-    return uit
 
 
 def _naam_sleutel(naam):
@@ -7451,211 +7106,8 @@ def _smaad_in_boom(conn, kolom, rid):
           AND COALESCE(smaad_hold, 0) = 1""", (rid,)).fetchone()[0] > 0
 
 
-def _nieuws_autokeur_basis(conn, tabel, rid, klaar_ids):
-    """De INTRINSIEKE voorwaarden van één element (zonder de koppel-voorwaarden tussen
-    entiteit en relatie). Lege lijst = in orde."""
-    rij = conn.execute(f"SELECT * FROM {tabel} WHERE id = ?", (rid,)).fetchone()
-    if rij is None:
-        return ["niet gevonden"]
-    redenen = []
-    if rij["status"] != "voorgesteld":
-        redenen.append(f"status is '{rij['status']}', niet 'voorgesteld'")
-    if rij["vervangen"]:
-        redenen.append("vervangen (M2.6)")
-    maker = _creator_van(conn, tabel, rid)
-    if maker != NIEUWS_SCOUT:
-        redenen.append(f"aangemaakt door '{maker}', niet door '{NIEUWS_SCOUT}'")
-    lijst = "entity_ids" if tabel == "entities" else "relation_ids"
-    if rid not in klaar_ids[lijst]:
-        redenen.append("staat niet in het resultaat van een nieuws-doel met status 'klaar'")
-    if conn.execute("SELECT 1 FROM edit_log WHERE table_name = ? AND record_id = ? "
-                    "AND reason LIKE ? LIMIT 1",
-                    (tabel, rid, NIEUWS_INTREK_REDEN_PREFIX + "%")).fetchone():
-        redenen.append("eerder door een maintainer ingetrokken — nooit opnieuw automatisch")
-    kolom = "entity_id" if tabel == "entities" else "relation_id"
-    if _smaad_in_boom(conn, kolom, rid):
-        redenen.append("smaad_hold op een argument (smaad-firewall) — mensenwerk")
-
-    if tabel == "relations":
-        if rij["relation_type"] not in NIEUWS_AUTOKEUR_RELATIETYPES:
-            redenen.append(f"relatietype '{rij['relation_type']}' valt buiten de neutrale "
-                           f"structuurtypes {NIEUWS_AUTOKEUR_RELATIETYPES} — mensenwerk")
-        if rij["mechanism_id"] is None:
-            redenen.append("geen mechanisme (kandidaat) — niet goedkeurbaar")
-        n_steun = conn.execute("""
-            SELECT COUNT(*) FROM arguments a
-            WHERE a.relation_id = ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
-              AND a.stance = 'supporting' AND a.property IS NULL
-              AND a.status <> 'verworpen' AND a.contributed_by = ?
-              AND EXISTS (SELECT 1 FROM citations c
-                          JOIN source_locations sl ON sl.source_id = c.source_id
-                          WHERE c.argument_id = a.id AND sl.location_type = 'url'
-                            AND TRIM(COALESCE(sl.location, '')) <> '')
-        """, (rid, NIEUWS_SCOUT)).fetchone()[0]
-        if not n_steun:
-            redenen.append(f"geen supporting root-argument van '{NIEUWS_SCOUT}' met een "
-                           "citatie naar een bron met URL-vindplaats")
-        n_tegen = conn.execute("""
-            SELECT COUNT(*) FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL
-              AND NOT vervangen AND stance = 'contradicting' AND status <> 'verworpen'
-        """, (rid,)).fetchone()[0]
-        if n_tegen:
-            redenen.append("er ligt een tegenargument op deze relatie — mensenwerk")
-    else:
-        if not (rij["type"] or "").strip():
-            redenen.append("geen entiteittype")
-        if rij["primary_role_id"] is None:
-            redenen.append("geen rol-suggestie (primary_role_id)")
-        sleutel = _naam_sleutel(rij["name"])
-        for ander in conn.execute("""SELECT id, name FROM entities
-                                     WHERE status = 'goedgekeurd' AND NOT vervangen
-                                       AND id <> ?""", (rid,)):
-            if _naam_sleutel(ander["name"]) == sleutel:
-                gelijk = 1.0
-            elif dedup is not None:
-                gelijk = dedup.gelijkenis(rij["name"], ander["name"])
-            else:
-                gelijk = difflib.SequenceMatcher(None, rij["name"].lower(),
-                                                 ander["name"].lower()).ratio()
-            if gelijk >= NIEUWS_NAAM_DREMPEL:
-                redenen.append(f"lijkt op bestaande entiteit #{ander['id']} "
-                               f"'{ander['name']}' (gelijkenis {gelijk:.2f}) — "
-                               "mogelijk duplicaat, mensenwerk")
-                break
-    return redenen
-
-
-def _eindpunt_ok(conn, eid, klaar_ids, *, behalve=None):
-    """Is dit eindpunt goedgekeurd, of in dezelfde ronde automatisch goedkeurbaar?
-    Geeft None als ok, anders een reden."""
-    if behalve is not None and eid == behalve:
-        return None
-    e = conn.execute("SELECT status, vervangen FROM entities WHERE id = ?", (eid,)).fetchone()
-    if e is None:
-        return f"entiteit #{eid} bestaat niet"
-    if e["status"] == "goedgekeurd" and not e["vervangen"]:
-        return None
-    if e["status"] == "voorgesteld":
-        sub = _nieuws_autokeur_basis(conn, "entities", eid, klaar_ids)
-        if not sub:
-            return None
-        return (f"entiteit #{eid} is niet goedgekeurd en niet automatisch goedkeurbaar "
-                f"({'; '.join(sub)})")
-    return f"entiteit #{eid} heeft status '{e['status']}'"
-
-
-def nieuws_autokeur_toegestaan(conn, tabel, rid, strikt=False):
-    """Mag de nieuws-autokeur dit element goedkeuren? → (ok, redenen).
-
-    Gemeenschappelijk: status 'voorgesteld' en niet vervangen; aangemaakt door
-    'nieuws-scout'; vermeld in het `resultaat` van een nieuws-doel met status 'klaar';
-    nooit eerder door een maintainer ingetrokken; geen smaad_hold in de boom.
-    Relaties: type ∈ NIEUWS_AUTOKEUR_RELATIETYPES, mechanism_id gezet, ≥1 supporting
-    evidentiële root (niet vervangen/verworpen) van 'nieuws-scout' met een citatie naar
-    een bron met URL-vindplaats, geen tegenargument, en beide eindpunten goedgekeurd of
-    in dezelfde ronde goedkeurbaar (de service keurt entiteiten eerst).
-    Entiteiten: type + rol-suggestie gezet, gekoppeld aan ≥1 relatie die (in dezelfde
-    ronde) goedkeurbaar is, en geen bijna-duplicaat van een goedgekeurde entiteitnaam
-    (gelijkenis ≥ 0,9 of hoofdletter-/diakriet-ongevoelig gelijk) → anders parkeren.
-    ``strikt=True`` (het goedkeur-endpoint zelf): een relatie mag pas als beide eindpunten
-    NU al goedgekeurd zijn — zo kan geen relatie vóór haar entiteit de graaf in (geen
-    bungelende edge), ook niet bij een verkeerde aanroepvolgorde. De alleen-lezen check
-    (GET, droogloop) gebruikt de ronde-brede lezing."""
-    if tabel not in ("entities", "relations"):
-        return (False, [f"onbekende tabel '{tabel}' (entities | relations)"])
-    klaar = _nieuws_klaar_ids(conn)
-    redenen = _nieuws_autokeur_basis(conn, tabel, rid, klaar)
-    if redenen == ["niet gevonden"]:
-        return (False, redenen)
-    if tabel == "relations":
-        rel = conn.execute("SELECT source_id, target_id FROM relations WHERE id = ?",
-                           (rid,)).fetchone()
-        for kant, eid in (("bron", rel["source_id"]), ("doel", rel["target_id"])):
-            fout = _eindpunt_ok(conn, eid, klaar)
-            if fout:
-                redenen.append(f"{kant}-eindpunt: {fout}")
-            elif strikt and conn.execute("SELECT status FROM entities WHERE id = ?",
-                                         (eid,)).fetchone()["status"] != "goedgekeurd":
-                redenen.append(f"{kant}-eindpunt #{eid} is nog niet goedgekeurd — volgorde: "
-                               "de autokeur keurt eerst de entiteiten goed, dan de relaties")
-    else:
-        gekoppeld = False
-        for r in conn.execute("""SELECT id, source_id, target_id FROM relations
-                                 WHERE (source_id = ? OR target_id = ?)
-                                   AND status = 'voorgesteld' AND NOT vervangen""",
-                              (rid, rid)).fetchall():
-            if _nieuws_autokeur_basis(conn, "relations", r["id"], klaar):
-                continue
-            ander = r["target_id"] if r["source_id"] == rid else r["source_id"]
-            if _eindpunt_ok(conn, ander, klaar, behalve=rid) is None:
-                gekoppeld = True
-                break
-        if not gekoppeld:
-            redenen.append("niet gekoppeld aan een relatie die (in dezelfde ronde) "
-                           "automatisch goedkeurbaar is")
-    return (not redenen, redenen)
-
-
 def _nieuws_autokeur_tabel(tabel):
     return tabel in ("entities", "relations")
-
-
-@app.route("/api/nieuws/autokeur/<tabel>/<int:rid>", methods=["GET"])
-@require_user("reviewer")
-def nieuws_autokeur_check(tabel, rid):
-    """Alleen-lezen predikaat-check (reviewer): {tabel, id, status, toegestaan, redenen}.
-    Voor de droogloop van scripts/nieuws_autokeur_service.py; wijzigt niets en telt niet
-    mee in het dagplafond."""
-    if not _nieuws_autokeur_tabel(tabel):
-        return jsonify({"error": "tabel moet 'entities' of 'relations' zijn"}), 400
-    conn = get_db()
-    rij = conn.execute(f"SELECT status FROM {tabel} WHERE id = ?", (rid,)).fetchone()
-    if rij is None:
-        conn.close()
-        return jsonify({"error": "Niet gevonden"}), 404
-    ok, redenen = nieuws_autokeur_toegestaan(conn, tabel, rid)
-    conn.close()
-    return jsonify({"tabel": tabel, "id": rid, "status": rij["status"],
-                    "toegestaan": ok, "redenen": redenen})
-
-
-@app.route("/api/nieuws/autokeur/<tabel>/<int:rid>", methods=["POST"])
-@require_user("reviewer")
-def nieuws_autokeur(tabel, rid):
-    """Automatisch goedkeuren via de nieuws-pijplijn (reviewer-tier; bedoeld voor het
-    machine-account 'nieuws-autokeur'). Kill-switch PROPAGANDA_NIEUWS_AUTOKEUR=0 → 503;
-    boven het dagplafond (PROPAGANDA_NIEUWS_AUTOKEUR_PLAFOND, standaard 60) → 429;
-    predikaat niet ok → 409 {goedgekeurd: false, redenen}. Anders keurt _modereer_kern
-    goed met motivatie 'auto-keur nieuws-pijplijn (eigenaarsbesluit 2026-09-30)' →
-    200 {goedgekeurd: true}. Het predikaat wordt hier ALTIJD zelf gecheckt."""
-    if os.environ.get("PROPAGANDA_NIEUWS_AUTOKEUR", "1") == "0":
-        return jsonify({"goedgekeurd": False,
-                        "error": "nieuws-autokeur uitgeschakeld (PROPAGANDA_NIEUWS_AUTOKEUR=0)"}), 503
-    if not _nieuws_autokeur_tabel(tabel):
-        return jsonify({"error": "tabel moet 'entities' of 'relations' zijn"}), 400
-    conn = get_db()
-    if conn.execute(f"SELECT 1 FROM {tabel} WHERE id = ?", (rid,)).fetchone() is None:
-        conn.close()
-        return jsonify({"error": "Niet gevonden"}), 404
-    plafond = _nieuws_autokeur_plafond()
-    vandaag = _nieuws_autokeur_vandaag(conn)
-    if vandaag >= plafond:
-        conn.close()
-        return jsonify({"goedgekeurd": False, "plafond": plafond, "vandaag": vandaag,
-                        "error": f"dagplafond bereikt ({vandaag}/{plafond} automatische "
-                                 "goedkeuringen vandaag) — rest blijft voor de mens"}), 429
-    ok, redenen = nieuws_autokeur_toegestaan(conn, tabel, rid, strikt=True)
-    if not ok:
-        conn.close()
-        return jsonify({"goedgekeurd": False, "redenen": redenen}), 409
-    ok, fout, code, _extra = _modereer_kern(conn, tabel, rid, "goedgekeurd",
-                                            g.user["username"], NIEUWS_AUTOKEUR_MOTIVATIE)
-    if not ok:
-        conn.close()
-        return jsonify({"goedgekeurd": False, "redenen": [fout], "kern_http": code}), 409
-    conn.commit()
-    conn.close()
-    return jsonify({"goedgekeurd": True, "tabel": tabel, "id": rid}), 200
 
 
 # ── Automatische beoordeling: relaties en entiteiten (eigenaarsbesluit 2026-10-06) ──

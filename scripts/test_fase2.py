@@ -7,7 +7,7 @@ Dekt de klaar-wanneer-criteria:
   M2.2  een voorstel telt pas mee na merge; score-diff-preview vooraf
   M2.3  een nieuw theorie-element ontstaat alleen via een RfC (2 menselijke reviewers;
         agent-oordeel telt nooit)
-  M2.4  duplicaat gesignaleerd bij indienen; recent-changes-feed + watchlist; rate limit
+  M2.4  duplicaat gesignaleerd bij indienen; recent-changes-feed; rate limit
   M2.5  vervallen — de 👍/👎-ratinglaag (bridging) is bij de solo+agents-kanteling geschrapt (A3)
   M2.6  één samenvoeging en één splitsing end-to-end via het voorstelpad, met lege
         hertriage-restlijst, werkende oude id's (lineage) en herberekende scores
@@ -156,14 +156,11 @@ def main():
     # bij n=1 was die mens-diversiteit-laag inert. De endpoints /api/arguments/<id>/ratings
     # en /api/bridging bestaan niet meer; de tabel argument_ratings blijft bevroren (audit).
 
-    print("5. M2.4 — watchlist + recent-changes-feed")
-    r = c.post("/api/watchlist", headers=kop["r2"],
-               json={"table_name": "relations", "record_id": 1})
-    eis(r.status_code == 201, "relatie 1 op de watchlist")
-    feed = c.get("/api/recent_changes?watchlist=1", headers=kop["r2"]).get_json()
-    eis(any(f["table_name"] == "arguments" and f["record_id"] == arg1 for f in feed),
-        "watchlist-feed vangt argumenten op het gevolgde doel")
-    eis(c.get("/api/recent_changes").status_code == 200, "feed is open leesbaar")
+    print("5. M2.4 — recent-changes-feed (de watchlist is weg sinds 2026-10-13)")
+    r = c.get("/api/recent_changes")
+    eis(r.status_code == 200, "feed is open leesbaar")
+    eis(any(f["table_name"] == "arguments" and f["record_id"] == arg1 for f in r.get_json()),
+        "feed toont het ingediende argument")
 
     print("6. M2.3 — theory-RfC: sjabloon + reviewers; maintainer-poort (opbouwfase)")
     # Directe theorie-POST: dicht voor niet-maintainers ...
@@ -330,13 +327,6 @@ def main():
     eis(conn.execute("SELECT description FROM roles WHERE id = ?", (rol_id,)).fetchone()[0]
         == "Aangescherpte definitie.", "beschrijving is via het voorstelpad gewijzigd")
     conn.close()
-    r = c.patch(f"/api/roles/{rol_id}", headers=kop["bij"], json={"definitie": "x"})
-    eis(r.status_code == 403, "bijdrager mag niet direct bewerken (PATCH)")
-    r = c.patch(f"/api/roles/{rol_id}", headers=kop["baas"],
-                json={"definitie": "Direct bijgewerkt door maintainer.", "motivatie": "typo"})
-    eis(r.status_code == 200 and r.get_json().get("direct_bewerkt")
-        and r.get_json()["gewijzigd"] == ["description"],
-        "maintainer mag titel/beschrijving direct bewerken (gevlagd)")
 
     # 6d. Moderatiewachtrij: admin-creatie meteen zichtbaar, andere bijdragen
     #     'voorgesteld' tot een reviewer (niet de maker) ze goedkeurt.
@@ -391,9 +381,6 @@ def main():
                      "AND nieuw_id = ?", (fusie_id,)).fetchone()[0] == 2,
         "lineage: twee opvolgingsrijen")
     conn.close()
-    r = c.get("/api/lineage/mechanisme/1").get_json()
-    eis(r["vervangen"] and r["opvolgers"][0]["id"] == fusie_id,
-        "oud id #1 verwijst naar de opvolger (API)")
     s = c.get("/api/scores").get_json()
     eis(str(fusie_id) in {str(k) for k in s["mechanisms"]}
         and "1" not in {str(k) for k in s["mechanisms"]},

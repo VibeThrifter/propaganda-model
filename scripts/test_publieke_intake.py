@@ -14,7 +14,7 @@ Scenario's:
   4. Sock-puppet-collapse: 50 identieke leads → 1 binnengekomen + 49 duplicaat.
   5. "Telt in niets": scoring/influence-snapshot byte-identiek met/zonder 100 leads.
   6. Smaad-firewall: negatieve persoonsclaim → smaad_hold=1, niet in graph_data; org-claim
-     → geen smaad_hold; maintainer heft op → zichtbaar; agent-poging → 403.
+     → geen smaad_hold; agent-poging tot opheffen → 403; opgeheven → zichtbaar.
   7. Anomalie-check (D2.4): burst over één betreft → 'waarschuwing'.
 
 Gebruik: python3 scripts/test_publieke_intake.py   (exit-code 0 = alles groen)
@@ -66,19 +66,15 @@ def main():
     server._rate_emmers.clear()
     server._lead_emmers.clear()
 
-    # Testaccounts: een agent (leest/patcht de wachtrij, maakt de smaad-arg), een
-    # maintainer (heft smaad_hold op).
+    # Testaccount: een agent (leest/patcht de wachtrij, maakt de smaad-arg).
     conn = sqlite3.connect(tmp)
     agent_token = auth.new_token()
-    maint_token = auth.new_token()
-    conn.executemany(
+    conn.execute(
         "INSERT INTO users (username, kind, role, token_hash, provenance) VALUES (?, ?, ?, ?, ?)",
-        [("intake-agent", "agent", "bijdrager", auth.hash_token(agent_token), "claude-test-1"),
-         ("intake-baas", "mens", "maintainer", auth.hash_token(maint_token), None)])
+        ("intake-agent", "agent", "bijdrager", auth.hash_token(agent_token), "claude-test-1"))
     conn.commit()
     conn.close()
     kop_agent = {"Authorization": f"Bearer {agent_token}"}
-    kop_maint = {"Authorization": f"Bearer {maint_token}"}
     c = server.app.test_client()
 
     print("1. Welgevormde inzending → 201, leads-rij, 0 argumenten")
@@ -207,11 +203,15 @@ def main():
     gd = c.get("/api/graph_data").get_json()
     eis(org_arg in {a["id"] for a in gd["arguments"]}, "org-claim staat wél in graph_data")
 
-    # (c) agent/reviewer kan smaad_hold niet opheffen (403), alleen de maintainer wel
-    r = c.post(f"/api/arguments/{persoon_arg}/smaad_vrijgeven", headers=kop_agent)
+    # (c) een agent kan smaad_hold niet opheffen (403); dat doet alleen de automatische
+    # beoordeling (reviewer-tier, na smaadtoets + A1, test_automatische_beoordeling.py).
+    # Hier heffen we hem direct in de testkopie op en kijken of het argument verschijnt.
+    r = c.post(f"/api/beoordeling/smaad_vrijgeven/{persoon_arg}", headers=kop_agent)
     eis(r.status_code == 403, f"agent mag smaad_hold niet opheffen → 403 ({r.status_code})")
-    r = c.post(f"/api/arguments/{persoon_arg}/smaad_vrijgeven", headers=kop_maint)
-    eis(r.status_code == 200, f"maintainer heft smaad_hold op → 200 ({r.status_code})")
+    conn = sqlite3.connect(tmp)
+    conn.execute("UPDATE arguments SET smaad_hold = 0 WHERE id = ?", (persoon_arg,))
+    conn.commit()
+    conn.close()
     server._graph_cache.clear()
     gd = c.get("/api/graph_data").get_json()
     eis(persoon_arg in {a["id"] for a in gd["arguments"]},

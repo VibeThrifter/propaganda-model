@@ -93,7 +93,7 @@ verder. Een datum bij een bestaand verband: een aspect-argument (`property` `act
 
 Deze missie draait onbewaakt op een vaste cadans — **per kwartaal** (8 jan/apr/jul/okt),
 of na een modelrelease (M3.1) — via de scheduler (`scripts/agent_runner.py`;
-`deploy/systemd/agent-criticus.{service,timer}` en `deploy/crontab`). De runner start
+launchd via `agent_schedule.py`, standaard uit en aan te zetten op `/beheer`). De runner start
 één headless `claude`-sessie onder `criticus-agent`, injecteert de voorregel (eerst
 `GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
 `missies/logs/`.

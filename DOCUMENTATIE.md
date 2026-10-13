@@ -120,7 +120,7 @@ De zeven thema's:
 
 > Een thema *Systemisch* bestond eerder, maar was dubbelop: een staande systeemtoestand is al een
 > `veld_eigenschap` (halo) en een groepseigenschap een `emergent_effects`-hyperedge — de aard-laag
-> codeert systemisch-zijn, een thema-as ernaast voegt niets toe (zie `migrate_thema_opschoning.py`).
+> codeert systemisch-zijn, een thema-as ernaast voegt niets toe (eenmalige migratie; zie git-geschiedenis, vóór 2026-10-13).
 
 ### Uitbreiding B: Tegenmacht — een gerichte valentie, geen universele categorie
 Het model is niet deterministisch: het modelleert óók de krachten die het filtersysteem begrenzen of doorbreken. Maar "tegenmacht" is **geen eigenschap van een actor** en zelfs niet van een losse edge zonder meer: het is een **tweeplaatsig predicaat**, `tegenmacht(X, doel)`. In een veld van meerdere machtsblokken dient het tegenwerken van het ene blok vaak het andere; dezelfde actor kan dus tegenmacht zijn op de ene as en promacht op de andere. Een universeel "tegenmacht"-stempel (op een knoop, of als kleur van een entiteit) is daarom een categoriefout — de valentie hangt altijd aan een **edge relatief aan een benoemd doel** (zie [Deel B: machtsvalentie](#machtsvalentie--tegenmacht-als-edge-valentie)).
@@ -143,7 +143,7 @@ De contra-hegemonische valentie leeft — net als de politieke kleurmeter — in
 - `filter:<eigendom|advertentie|sourcing|flak|ideologie>` — **verantwoording**: deze edge checkt die filter-machtsconcentratie.
 - `as:<economisch|cultureel|establishment>:<opent|sluit>` — **contra-hegemonie**: `opent` duwt het onderwerp van consensus → legitieme controverse (contra-hegemoniaal), `sluit` verstrakt de consensus (pro-hegemoniaal). Eén edge draagt max. één annotatie per as.
 
-`tegenmacht.py` leidt hieruit per actor (de bron-entiteit van de relatie) een valentie-per-as af — `Σ(gewicht·teken)/(Σgewicht+K)`, zelfde weging als de kleurmeter — plus welke filter-concentraties ze verantwoordt; bereikbaar via `GET /api/machtsvalentie` (`?preview=1` telt nog-`voorgesteld` annotaties voorlopig mee). Zo toont de viz *"FvD: opent op establishment, neutraal/sluit op economisch"* in plaats van één misleidende `tegenmacht`-kleur. Een platform is tegelijk consensusvloer-versterkend (eigendom/advertentie) én betwiste-as-versterkend (engagement blaast factie-insurgentie op) — alleen per-as-valentie kan dat zonder tegenspraak naast elkaar zetten.
+`tegenmacht.py` leidt hieruit per actor (de bron-entiteit van de relatie) een valentie-per-as af — `Σ(gewicht·teken)/(Σgewicht+K)`, zelfde weging als de kleurmeter — plus welke filter-concentraties ze verantwoordt; bereikbaar als `machtsvalentie` in `GET /api/graph_data` (het losse endpoint `/api/machtsvalentie` is weg sinds 2026-10-13). Zo toont de viz *"FvD: opent op establishment, neutraal/sluit op economisch"* in plaats van één misleidende `tegenmacht`-kleur. Een platform is tegelijk consensusvloer-versterkend (eigendom/advertentie) én betwiste-as-versterkend (engagement blaast factie-insurgentie op) — alleen per-as-valentie kan dat zonder tegenspraak naast elkaar zetten.
 
 De `borgingsstichting` (onafhankelijkheidsstichting met prioriteitsaandeel/vetorecht, bv. Stichting Democratie en Media bij DPG) is de tegenpool van het STAK-controlevehikel uit Filter 1: ze biedt een structurele rem op eigenaarsinvloed, maar geen ijzeren garantie (een minderheidsbelang naast de winstgedreven meerderheid). Ze grijpt aan op beide eigenaarshefbomen op de inhoud: de benoeming van de hoofdredacteur (`onafhankelijkheidsborging`, tegenpool van `benoemingspolitiek`) én — via het redactiestatuut — de onafhankelijkheid van de hele redactie (`redactiestatuut_borging`, tegenpool van `redactioneel_budgetcontrole`), én de continuïteit van de titel zelf (`continuiteitsborging`, veto op verkoop/opheffing). Naast die zeggenschapsrol is ze ook **financier**: uit haar beleggingsrendement (niet uit het dividendloze DPG-belang) betaalt ze onderzoeksjournalistiek die het rendementsregime anders wegbezuinigt (`projectfinanciering_journalistiek`, tegenpool van `redactioneel_budgetcontrole`; ook dedicated persfondsen als SVDJ/FBJP/Journalismfund vervullen deze rol). De `toezichthouder` (ACM/CvdM) reguleert intussen niet de eigenaar-als-persoon maar de **concentratie/overname** op het holdingniveau (`toezichthouder_interventie`/`toezicht_tandeloosheid` → `overnamevehikel`); een ACM-interventie kan zo'n borgingsstichting zelfs afdwingen als overnamevoorwaarde (`afgedwongen_borging`, DPG-RTL-voorwaarden).
 
@@ -264,7 +264,7 @@ Zie "Scores: van discussieboom naar theorie".
 > 3. **Verhangen.** Stap 10d hangt een verband dat helemaal binnen het bestaan van de voorganger (of opvolger) valt aan die organisatie, als het bewijs haar noemt. Een voorganger zonder eigen verbanden komt binnen via haar fusie. Een verband dat over de fusie heen loopt, blijft staan: dat zijn eigenlijk twee banden.
 > 4. **Invullen.** De datumzoeker zoekt het bestaan van organisaties met verbanden maar zonder oprichting, binnen een eigen dagplafond. De meter heet `ORGANISATIE-ZONDER-BESTAAN`.
 
-> **Tijdsdimensie.** Ook de theorielaag is historisch contingent: mechanismen ontstaan (kijkcijferdisciplinering vereist een kijkmeterpanel — 1987; algoritmische_filtering een algoritmische feed — 2006) en kunnen verdwijnen. `roles`, `mechanisms` en `emergent_effects` dragen daarom dezelfde optionele `active_from`/`active_until` als de praktijklaag; NULL = onbegrensd voor zover bekend. Alleen invullen bij evident technologie- of bestelgebonden elementen — zie `scripts/migrate_tijdsdimensie_theorielaag.py` voor de zes gedateerde mechanismen plus rationale. De **tijdbalk** in de visualisatie werkt in beide modellen: op het gekozen jaar verdwijnen mechanismen, rollen en emergente velden (en in het praktijkmodel relaties/entiteiten) die toen niet actief waren; de stand "Alle jaren" toont alles. De looptijd is per mechanisme en rol bespreekbaar in het detailpaneel (via de discussieboom, net als bij relaties). `scoring.py` en `influence.py` blijven tijdloos: bewijs telt ongeacht datum even zwaar; tijdsweging van argumenten (ouder bewijs telt lichter) is een bewust uitgestelde, aparte modelkeuze.
+> **Tijdsdimensie.** Ook de theorielaag is historisch contingent: mechanismen ontstaan (kijkcijferdisciplinering vereist een kijkmeterpanel — 1987; algoritmische_filtering een algoritmische feed — 2006) en kunnen verdwijnen. `roles`, `mechanisms` en `emergent_effects` dragen daarom dezelfde optionele `active_from`/`active_until` als de praktijklaag; NULL = onbegrensd voor zover bekend. Alleen invullen bij evident technologie- of bestelgebonden elementen — de zes gedateerde mechanismen plus rationale kwamen via een eenmalige migratie (zie git-geschiedenis, vóór 2026-10-13). De **tijdbalk** in de visualisatie werkt in beide modellen: op het gekozen jaar verdwijnen mechanismen, rollen en emergente velden (en in het praktijkmodel relaties/entiteiten) die toen niet actief waren; de stand "Alle jaren" toont alles. De looptijd is per mechanisme en rol bespreekbaar in het detailpaneel (via de discussieboom, net als bij relaties). `scoring.py` en `influence.py` blijven tijdloos: bewijs telt ongeacht datum even zwaar; tijdsweging van argumenten (ouder bewijs telt lichter) is een bewust uitgestelde, aparte modelkeuze.
 
 ### Instantiemodel
 
@@ -435,7 +435,7 @@ reviseren of opnieuw in te dienen.
 minuut voor bijdrager/reviewer/maintainer); duplicaatdetectie bij indienen
 (stdlib-tekstgelijkenis tegen bestaande claims op hetzelfde doel; 409 met
 kandidaten, override via `negeer_duplicaten`); recent-changes-feed
-(`/api/recent_changes`, open) + persoonlijke watchlist (`/api/watchlist`).
+(`/api/recent_changes`, open). De persoonlijke watchlist is weg sinds 2026-10-13 (niets vulde haar).
 
 **Ratings & bridging (M2.5, review-verdict v2).** Het verdict op een argument is
 **"Argument klopt"** (een lichte endorsement, `nuttig`-rating — telt niet als bewijs)
@@ -455,8 +455,8 @@ naarmate de pool groeit.
 daarom via voorstellen (soorten `splitsen`/`samenvoegen`/`hernoemen`). Twee
 kernregels: (1) **niets wissen** — het oude element krijgt `vervangen = TRUE` plus
 `lineage`-rijen naar de opvolger(s); scoring, influence en viz slaan vervangen
-elementen over en `GET /api/lineage/<type>/<id>` beantwoordt oude id's met de
-opvolging; (2) **bewijs verhuist nooit automatisch** — bij samenvoegen verhuist
+elementen over en de tabel `lineage` legt de opvolging van oude id's vast
+(het endpoint `GET /api/lineage` is weg sinds 2026-10-13); (2) **bewijs verhuist nooit automatisch** — bij samenvoegen verhuist
 alleen wat in `herbevestigd` staat (de rest blijft achter en telt nergens meer in
 mee), bij splitsen moet de hertriage-restlijst (argumenten, relaties,
 instantiaties, padclaims) leeg zijn vóór uitvoering; één-op-veel = dupliceren.
@@ -528,7 +528,7 @@ Elke relatie heeft twee onafhankelijke scores:
 
 Een relatie kan zeker bestaan maar weinig impact hebben (Vanguard→Shell: feit, maar passief). Of onzeker zijn maar potentieel groot effect hebben (zelfcensuur op redacties: moeilijk te bewijzen, maar systemisch).
 
-Beide assen zijn **schuldig tot bewezen**: de handmatige kolom blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). Een prior zonder onderbouwing wordt naar een lage vloer (0,05) gezet en dient alleen als fallback — voor `certainty` via `migrate_unsourced_certainty.py`, voor `influence` via `migrate_unsourced_influence.py`. `influence` wordt vervolgens net als `certainty` uit bewijs opgetild: `property='influence'`-argumenten (M1.7) verschuiven hem, anders blijft hij op de vloer. Zo is er geen enkele *initiële willekeurige score*: de validator (`INVLOED-PRIOR`, een fout) bewaakt dat een invloed boven de vloer altijd onderbouwd is. De vloer is bewust 0,05 en niet 0, zodat de invloedsgraaf (`influence.py`) de *topologie* (positie) blijft meten terwijl de *magnitude* eerlijk minimaal blijft tot ze is bewezen.
+Beide assen zijn **schuldig tot bewezen**: de handmatige kolom blijft als **prior** bestaan, maar de score die het model gebruikt wordt afgeleid uit de bewijslast (zie hieronder). Een prior zonder onderbouwing wordt naar een lage vloer (0,05) gezet en dient alleen als fallback — voor `certainty` via een eenmalige migratie (zie git-geschiedenis, vóór 2026-10-13), voor `influence` via `migrate_unsourced_influence.py` (herhaalbaar). `influence` wordt vervolgens net als `certainty` uit bewijs opgetild: `property='influence'`-argumenten (M1.7) verschuiven hem, anders blijft hij op de vloer. Zo is er geen enkele *initiële willekeurige score*: de validator (`INVLOED-PRIOR`, een fout) bewaakt dat een invloed boven de vloer altijd onderbouwd is. De vloer is bewust 0,05 en niet 0, zodat de invloedsgraaf (`influence.py`) de *topologie* (positie) blijft meten terwijl de *magnitude* eerlijk minimaal blijft tot ze is bewezen.
 
 ### Aard: direct & systemisch
 
@@ -715,7 +715,7 @@ argument niet eeuwig bevriest). Het effect is omkeerbaar: lost de auteur het op,
 naar haar onaangevochten basiskracht. De 👍/👎-duim als losse score-laag bestaat niet meer — "Argument
 klopt" is een lichte endorsement (voedt hooguit bridging), "Argument klopt niet" is deze ondergraving.
 Een ondergraving mag een `objection_type` dragen — sinds juli 2026 een **vrij tekstveld** (de
-CHECK-enum verviel via `migrate_objection_type_vrijtekst.py`: elke sluitende categorielijst bleek te
+CHECK-enum verviel via een eenmalige migratie (zie git-geschiedenis, vóór 2026-10-13): elke sluitende categorielijst bleek te
 kort en een volledige eindeloos; de oude drogreden-taxonomie blijft het aanbevolen vocabulaire).
 
 **Admin-veto (juli 2026).** Een ondergraving van een **maintainer** (admin) weegt niet mee als gewone
@@ -907,7 +907,7 @@ De volledige toegestane lijst staat in de `CHECK`-constraint van `entities` in `
 > `columnist`, `academicus`, `mediaeigenaar`, `toezichthouder_persoon`, `advocaat`,
 > `klokkenluider`, `adverteerder`) blijven in de `CHECK` toegestaan zodat seed-/enrich-scripts
 > hun ruwe extractie kunnen invoeren, maar worden in de live DB samengevouwen tot hun
-> structurele vorm door `scripts/migrate_clean_entity_types.py`. Gebruik voor nieuwe data
+> structurele vorm door een eenmalige migratie (zie git-geschiedenis, vóór 2026-10-13). Gebruik voor nieuwe data
 > alleen de structurele types hierboven.
 
 ## Relatietypes
@@ -935,6 +935,8 @@ propaganda-model/
 ├── schema.sql                          # Databaseschema (alle tabellen)
 ├── DOCUMENTATIE.md                     # Dit bestand
 ├── server.py                           # Flask: discussieboom-API + visualisatie op /
+├── vocab.py                            # Woordenschat (filters, leesbare namen, relatielabels)
+├── broncluster.py                      # Broncluster-afleiding (sources.cluster_key, M1.2)
 ├── .gitignore                          # Negeert data/*.db, __pycache__, etc.
 │
 ├── data/
@@ -945,26 +947,24 @@ propaganda-model/
 │   └── model-vX.Y.Z.md                 #   changelog met score-diff t.o.v. de vorige
 │
 ├── missies/                            # Agent-missies: briefs + logs (M1.8/M1.9/M3.3)
-│   ├── monitor_brief.md / scout_brief.md / redteam_brief.md
+│   ├── nieuws_scout_brief.md / nieuws_bewijs_brief.md / aanklager_brief.md / …
 │   ├── audit_checklist.md              # M3.5: jaarlijkse audit (volgende: juni 2027)
+│   ├── archief/                        # briefs van opgeheven missies (draaien niet meer)
 │   └── logs/                           # rondelogs (queries, oogst, stance-balans)
 │
 ├── web/
 │   ├── template.html                   # BRON van de D3-visualisatie; / serveert dit direct,
 │   │                                   #   data komt live via GET /api/graph_data (W5.1)
-│   └── index.html                      # OPTIONELE statische export (generate_viz.py; veroudert,
-│                                       #   bereikbaar als /static/index.html — niet bewerken)
+│   └── shared_vocab.js                 # Woordenschat van de browser (gelijk aan vocab.py)
 │
 ├── scripts/
 │   ├── init_db.py                      # Database aanmaken vanuit schema.sql
 │   ├── seed_theoretical_model.py       # Basis: rollen + mechanismen (laag 1)
 │   ├── seed_from_ai_source.py          # Basis: entiteiten + relaties (laag 2)
 │   ├── seed_instantiations.py          # Vult instantiations uit de impliciete koppelingen (laag 1↔2)
-│   ├── seed_draaideur_relaties.py      # Extra draaideur-relaties
-│   ├── enrich_*.py                     # Verrijken van een bestaande DB (theorie + instanties)
-│   ├── migrate_*.py                    # Schema-/datamigraties (backup-then-migrate)
-│   ├── set_temporal_data.py            # Vult active_from/active_until op entiteiten/relaties
-│   ├── generate_viz.py                 # Optionele statische export (web/index.html) uit de DB
+│   ├── migrate_*.py                    # Recente schema-/datamigraties (backup-then-migrate);
+│   │                                   #   eenmalige migraties: zie git-geschiedenis (vóór 2026-10-13)
+│   ├── generate_viz.py                 # Optionele statische export (data/viz_export.html) uit de DB
 │   └── register_source.py              # Registreer een academische bron via CLI
 │
 └── sources/                            # Bronmateriaal (teksten, transcripts)
@@ -976,7 +976,7 @@ propaganda-model/
     └── interviews/                     # Interview-transcripts
 ```
 
-> De `seed_*`-scripts leggen de basis; de huidige DB-inhoud is daarna uitgebreid via de `enrich_*`- en `migrate_*`-scripts. Een volledige reconstructie draait dus seed → enrich → migrate (de migratiescripts maken telkens een backup `data/propaganda_model_backup_<timestamp>.db`).
+> De `seed_*`-scripts leggen de basis; de huidige DB-inhoud is daarna uitgebreid via `enrich_*`- en `migrate_*`-scripts en sinds juni 2026 via het bijdragepad (de REST-API). De oude `enrich_*`-scripts en de eenmalige migraties staan niet meer in `scripts/` (zie git-geschiedenis, vóór 2026-10-13); de live DB is de bron, een verse build (`init_db` + seeds) is de testbasis. De migratiescripts maken telkens een backup `data/propaganda_model_backup_<timestamp>.db`.
 
 ---
 
@@ -999,8 +999,8 @@ python3 scripts/seed_from_ai_source.py
 python3 scripts/seed_instantiations.py
 ```
 
-> Bestaande database (met data) upgraden naar de scoringslaag: `python3 scripts/migrate_add_scoring_layer.py`
-> (maakt eerst een backup, voegt `instantiations` toe en geeft `arguments` theorie-doelen).
+> De scoringslaag (`instantiations`, theorie-doelen op `arguments`) zit in `schema.sql`; de
+> eenmalige upgrade van een oude DB staat in de git-geschiedenis (vóór 2026-10-13).
 
 ### Bronnen registreren
 

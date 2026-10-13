@@ -84,8 +84,7 @@ verder. Een datum bij een bestaand verband: een aspect-argument (`property` `act
 ## Cadans (onbewaakt, C1)
 
 Deze missie draait onbewaakt op een vaste cadans — **wekelijks** — via de scheduler
-(`scripts/agent_runner.py`, aangeroepen door een systemd-timer/cron;
-`deploy/systemd/agent-monitor.{service,timer}` en `deploy/crontab`). De runner start
+(`scripts/agent_runner.py`, aangeroepen door launchd via `agent_schedule.py`, standaard uit en aan te zetten op `/beheer`). De runner start
 één headless `claude`-sessie onder `monitor-agent`, injecteert de voorregel (eerst
 `GET /api/agent/reeds_gereageerd`, sla die argument-id's over) en tee't de ronde naar
 `missies/logs/`.

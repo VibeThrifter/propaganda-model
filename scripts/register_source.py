@@ -22,10 +22,10 @@ def register_source(title: str, source_type: str, author: str = None,
         return
 
     # Broncluster (M1.2): zelfde auteur/uitgever/onderliggende data = zelfde cluster.
-    # Zonder expliciete --cluster wordt de afleidregel van de migratie gebruikt.
+    # Zonder expliciete --cluster geldt de afleidregel uit broncluster.py.
     if cluster is None:
-        sys.path.insert(0, str(Path(__file__).parent))
-        from migrate_scoring_v2 import cluster_key_voor
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from broncluster import cluster_key_voor
         cluster = cluster_key_voor(author, publisher)
 
     conn = sqlite3.connect(DB_PATH)

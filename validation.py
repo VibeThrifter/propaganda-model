@@ -20,23 +20,22 @@ SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 MAX_VOORBEELDEN = 8
 
 # DDL-verschillen (CHECK-teksten, commentaar) die bewust bestaan en dus geen drift zijn.
-# Kolom-/FK-/indexpariteit blijft ook voor deze tabellen de strenge eis.
+# Kolom-/FK-/indexpariteit blijft ook voor deze tabellen de strenge eis. De eenmalige
+# migraties die hier vroeger bij naam stonden: zie git-geschiedenis (vóór 2026-10-13).
 BEKENDE_DDL_VERSCHILLEN = {
     "entities": "schema.sql staat LEGACY-types toe voor seed-replay; live is opgeschoond "
-                "(migrate_clean_entity_types.py). Ook de status-CHECK leeft alleen in "
-                "schema.sql; live kolom kwam via ALTER TABLE (migrate_moderatie_wachtrij.py). "
-                "bestuurslaag kwam via ALTER TABLE (migrate_add_besluitvorming.py)",
+                "(eenmalige migratie). Ook de status-CHECK leeft alleen in schema.sql; live "
+                "kolom kwam via ALTER TABLE (moderatiewachtrij). bestuurslaag kwam via ALTER "
+                "TABLE (migrate_add_besluitvorming.py)",
     "mechanisms": "aard-CHECK leeft alleen in schema.sql; live kolom kwam via ALTER TABLE "
                   "(zie CLAUDE.md)",
     "relations": "status-CHECK (moderatiewachtrij) leeft alleen in schema.sql; live kolom "
-                 "kwam via ALTER TABLE (migrate_moderatie_wachtrij.py); functie kwam via ALTER "
-                 "TABLE (migrate_add_besluitvorming.py)",
+                 "kwam via ALTER TABLE; functie kwam via ALTER TABLE "
+                 "(migrate_add_besluitvorming.py)",
     "sources": "CHECK op reliability_voorgesteld/onderwerp_voorgesteld leeft alleen in "
-               "schema.sql; live kolommen kwamen via ALTER TABLE "
-               "(migrate_classificatie_voorstel.py)",
+               "schema.sql; live kolommen kwamen via ALTER TABLE (classificatievoorstel)",
     "arguments": "property-CHECK kreeg 'politieke_positie' + 'machtsvalentie' via tabel-"
-                 "rebuild (migrate_politieke_positie_property.py, migrate_machtsvalentie_"
-                 "property.py); de enum-waarden zijn gelijk, "
+                 "rebuild (eenmalige migraties); de enum-waarden zijn gelijk, "
                  "alleen het CHECK-commentaar verschilt van schema.sql",
 }
 
@@ -1282,6 +1281,20 @@ def check_machtsvalentie(conn):
     return out
 
 
+def check_woordenschat():
+    """WOORDENSCHAT (waarschuwing): de filterlabels, leesbare namen en relatielabels in
+    vocab.py (Python-pagina's, server-enum) wijken niet af van de JS-kopieën in
+    web/shared_vocab.js en web/template.html. Leest alleen bestanden, geen DB."""
+    import vocab
+    verschil = vocab.verschillen()
+    if not verschil:
+        return []
+    return [_bevinding(
+        "WOORDENSCHAT", "vocab.py en de JS-woordenschat lopen uiteen", "waarschuwing", verschil,
+        "Pas vocab.py en web/shared_vocab.js (of RELATION_LABELS in web/template.html) "
+        "samen aan, zodat de pagina's en de viz dezelfde woorden tonen.")]
+
+
 def check_methode(conn):
     """METHODE-CONSISTENTIE (A5, fout): citaties die 'verbatim_quote' claimen zonder
     een niet-lege quote. De methode stuurt de bronfactor (scoring.source_factor), dus
@@ -1423,6 +1436,7 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_padclaims(conn)
     bevindingen += check_machtsvalentie(conn)
     bevindingen += check_methode(conn)
+    bevindingen += check_woordenschat()
     bevindingen += check_immuunsysteem(conn)
     bevindingen += check_neutraliteit(conn)
     bevindingen += check_eigen_stem(conn)

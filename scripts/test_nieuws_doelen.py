@@ -2,7 +2,7 @@
 """
 End-to-end-test van de nieuws-wachtrij `nieuws_doelen` (Epic 12 "Wie is dit?", story 12.1):
 de migratie (idempotent, DDL == schema.sql), de REST-endpoints (upsert/409/opnieuw,
-lijst + filters, claim_volgende atomair + verlopen claim, claim, PATCH-validatie), de
+lijst + filters, claim_volgende atomair + verlopen claim, PATCH-validatie), de
 poorten per account (nieuws-agent / nieuws-scout / maintainer / overige) en de
 rate-limit-vrijstelling van de wachtrij-endpoints. Plus de bewijsdoelen (soort 'relatie',
 nieuws-aggregator Story 14.13): de herbouw-migratie scripts/migrate_nieuws_doelen_relatie.py,
@@ -385,24 +385,6 @@ def main():
             and doelen[0]["resultaat"]["relation_ids"] == [1],
             "vervolgdoel: bezig, vervolg blijft 'linkedin', eerder resultaat blijft")
 
-        print("10. Enkel claimen")
-        conn = sqlite3.connect(db)
-        conn.execute("""INSERT INTO nieuws_doelen (sleutel, naam, soort, prioriteit, status,
-                        aangemaakt, bijgewerkt) VALUES ('person:los', 'Los', 'persoon', 1,
-                        'open', '2026-09-30T10:00:00', '2026-09-30T10:00:00')""")
-        los = conn.execute("SELECT id FROM nieuws_doelen WHERE sleutel = 'person:los'").fetchone()[0]
-        conn.commit()
-        conn.close()
-        r = client.post(f"/api/nieuws/doelen/{los}/claim", headers=kop["t-ander"])
-        eis(r.status_code == 403, f"ander account mag niet claimen ({r.status_code})")
-        r = client.post(f"/api/nieuws/doelen/{los}/claim", headers=kop["nieuws-scout"])
-        eis(r.status_code == 200 and r.get_json()["doel"]["status"] == "bezig",
-            "open → bezig (200)")
-        r = client.post(f"/api/nieuws/doelen/{los}/claim", headers=kop["nieuws-scout"])
-        eis(r.status_code == 409, f"al bezig → 409 ({r.status_code})")
-        r = client.post("/api/nieuws/doelen/999999/claim", headers=kop["nieuws-scout"])
-        eis(r.status_code == 404, "onbekend doel → 404")
-
         print("11. PATCH — poort + validatie")
         r = client.patch(f"/api/nieuws/doelen/{anouk}", json={"status": "klaar"},
                          headers=kop["nieuws-agent"])
@@ -519,10 +501,6 @@ def main():
         r = client.post("/api/nieuws/doelen/claim_volgende?soort=persoon,relatie",
                         headers=kop["nieuws-bewijs"])
         eis(r.status_code == 400, f"namen en relaties in één claim → 400 ({r.status_code})")
-        r = client.post(f"/api/nieuws/doelen/{bewijs}/claim", headers=kop["nieuws-scout"])
-        eis(r.status_code == 403, f"enkel claimen: nieuws-scout niet ({r.status_code})")
-        r = client.post(f"/api/nieuws/doelen/{los}/claim", headers=kop["nieuws-bewijs"])
-        eis(r.status_code == 403, f"enkel claimen: nieuws-bewijs geen naam ({r.status_code})")
         r = client.post("/api/nieuws/doelen/claim_volgende?soort=relatie&limit=2",
                         headers=kop["nieuws-bewijs"])
         doelen = r.get_json()["doelen"]
@@ -545,12 +523,6 @@ def main():
         r = client.patch(f"/api/nieuws/doelen/{anouk}", json={"verslag": "x"},
                          headers=kop["nieuws-bewijs"])
         eis(r.status_code == 403, f"nieuws-bewijs mag een naam-doel niet patchen ({r.status_code})")
-        with server.app.test_request_context():
-            conn = server.get_db()
-            klaar = server._nieuws_klaar_ids(conn)
-            conn.close()
-        eis(rel not in klaar["relation_ids"],
-            "de autokeur kijkt nooit naar de resultaten van een bewijsdoel")
 
         print("\nALLE NIEUWS-DOELEN-TESTS GESLAAGD")
 

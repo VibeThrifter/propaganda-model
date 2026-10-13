@@ -78,7 +78,6 @@ import difflib
 import fcntl
 import http.client
 import json
-import os
 import re
 import shutil
 import sqlite3

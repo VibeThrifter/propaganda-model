@@ -44,22 +44,23 @@ EXCLUDED_TYPES = frozenset()
 
 # Aard van het mechanisme (kolom mechanisms.aard; relaties erven 'm). Bepaalt of een instantie
 # een echt dyadisch kanaal is of een emergente systeemeigenschap — en daarmee hoe ze in de
-# invloed-wiskunde telt. Zie migrate_add_mechanism_aard.py voor de driedeling.
+# invloed-wiskunde telt. De driedeling kwam via een eenmalige migratie (zie git-geschiedenis,
+# vóór 2026-10-13: migrate_add_mechanism_aard.py).
 FIELD_INSTANTIATION = "veld_instantiatie"  # niveau 1: dyade = steekproef uit een veld-regelmaat
 FIELD_PROPERTY = "veld_eigenschap"         # niveau 2: geen echte bron; eigenschap ván de node
 # 'indirect' is GEEN veld-effect: het is een echt gericht, maar gemedieerd kanaal (A→B via
 # tussen-nodes). Het telt hier daarom als gewone gerichte edge — de demping zit al in de
 # (lagere) influence-waarde van de relatie. Geen aparte behandeling in build_adjacency nodig;
 # het valt vanzelf in de 'else' (niet FIELD_PROPERTY, niet FIELD_INSTANTIATION). Alleen de viz
-# tekent het anders (gestippelde achtergrondpijl mét punt). Zie migrate_add_indirect_aard.py.
+# tekent het anders (gestippelde achtergrondpijl mét punt). Zie git-geschiedenis (vóór
+# 2026-10-13): migrate_add_indirect_aard.py.
 
-# Hoe veld-effecten meetellen in de centraliteit:
+# Hoe veld-effecten meetellen in de centraliteit (de veldmodi, argument ``field_mode``):
 #   'full'     — alles op volle sterkte (legacy/pad-tracering; negeert aard).
 #   'collapse' — eerlijk "met veld": veld-eigenschap (niveau 2) telt niet als uitgaande invloed;
 #                een veld-instantiatie (niveau 1) telt als ÉÉN gedempte bijdrage per bron — de
 #                fan-out wordt door k gedeeld i.p.v. N losse duwen op te tellen.
 #   'exclude'  — schone dyadische graaf: niveau 1 én 2 volledig weggelaten.
-FIELD_MODES = ("full", "collapse", "exclude")
 
 # Publieksgerichte eindstations (instantiemodel): de uitlaten die de nieuwsconsument direct
 # bereiken. Persbureaus (ANP) staan hier NIET tussen — die voeden uitlaten, het publiek leest
@@ -113,7 +114,7 @@ def build_adjacency(relations, field_mode: str = "full"):
     (ontbreken → 'direct'). Niets wordt uitgesloten (ook tegenmacht/oppositie telt mee);
     symmetrische types krijgen een edge in beide richtingen.
 
-    ``field_mode`` (zie ``FIELD_MODES``) bepaalt hoe emergente veld-effecten meetellen:
+    ``field_mode`` (zie de veldmodi bovenaan) bepaalt hoe emergente veld-effecten meetellen:
       - 'full'     : aard genegeerd, alles op volle sterkte.
       - 'collapse' : veld-eigenschap (niveau 2) telt niet als uitgaande invloed; een
                      veld-instantiatie (niveau 1) telt als één gedempte bijdrage — het gewicht
@@ -283,7 +284,7 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
 
     Gerichte gewogen graaf bron→doel met gewicht = relatie-``influence`` en de richtingsregels
     uit ``build_adjacency``. ``field_mode`` regelt hoe emergente veld-effecten meetellen (zie
-    ``FIELD_MODES``); standaard 'collapse' = eerlijk met veld, fan-out gedempt. Geïsoleerde
+    de veldmodi bovenaan); standaard 'collapse' = eerlijk met veld, fan-out gedempt. Geïsoleerde
     entiteiten krijgen nullen.
     """
     # Vervangen elementen (M2.6, splitsen/samenvoegen) doen niet meer mee in de graaf.

@@ -1,7 +1,7 @@
 # Memeonderzoek: framework & pijplijn (ontwerp)
 
 > **Status: ontwerp, 11 juni 2026 — er is hiervan níéts gebouwd.** Dit document beschrijft een
-> tweede onderzoeksprogramma naast `VERBETERPLAN_DISCUSSIESYSTEEM.md`. Dat plan maakt de
+> tweede onderzoeksprogramma naast `../../VERBETERPLAN_DISCUSSIESYSTEEM.md`. Dat plan maakt de
 > *structuur* van het model robuust (de buizen); dit framework ontwerpt het volgen van *inhoud*
 > die door die structuur stroomt (het water): memes, frames en memecomplexen. Bouwen gebeurt pas
 > op expliciete opdracht, per stap uit de checklist in §10. Schemawijzigingen volgen dan het

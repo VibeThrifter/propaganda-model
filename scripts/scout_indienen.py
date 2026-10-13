@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Scout-orkestratie (generiek) — bronnen, entiteiten, relaties én argumenten indienen.
 
-Generalisatie van scout_personen.py: waar dat script alleen persoon→org-affiliaties
-aankan, draait dit script een volledig manifest (elk entiteitstype, elke relatie,
+Generalisatie van scout_personen.py (verwijderd, zie git-geschiedenis vóór 2026-10-13):
+waar dat script alleen persoon→org-affiliaties aankan, draait dit script een volledig
+manifest (elk entiteitstype, elke relatie,
 losse argumenten op bestaande doelen). Het bevat GEEN inhoud; de inhoud staat in een
 JSON-manifest (bv. data/scout/sterkste-routes-r1.json) dat uit geverifieerd
 webonderzoek is opgebouwd. De flow per vondst is die van een menselijke scout:

@@ -73,7 +73,7 @@ SKO, NLO, jaarverslagen en mediakits.
 
 Deze overlay (welstand + bereik) draait onbewaakt op een lage cadans — **maandelijks** —
 via de scheduler (`scripts/agent_runner.py --agent assistent --label doelgroep`; timer
-`deploy/systemd/agent-doelgroep.{service,timer}` en `deploy/crontab`), onder het staande
+launchd via `agent_schedule.py`, standaard uit en aan te zetten op `/beheer`), onder het staande
 account `assistent`. De runner injecteert de voorregel (eerst
 `GET /api/agent/reeds_gereageerd`, sla die id's over) en tee't de ronde naar
 `missies/logs/`.

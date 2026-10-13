@@ -1,6 +1,7 @@
 # Onbewaakte agent-cadans op macOS — launchd (C1)
 
-Het macOS-equivalent van de systemd-timers in `../systemd/`. Maakt van de handmatig
+De enige planner van de achtergrond-agents (de oude systemd-timers en crontab zijn weg,
+zie git-geschiedenis vóór 2026-10-13). Maakt van de handmatig
 gestarte missie-agents een **zelfdraaiende machine op je Mac**, zonder VPS: elke agent
 draait op een vast schema onder zijn eigen token, als een headless `claude -p`-sessie
 (de missies *zijn* Claude Code-sessies — zie `missies/README.md`).
@@ -10,8 +11,8 @@ gebruikt alleen stdlib `plistlib` + `launchctl`.
 
 ## Wat het installeert
 
-Eén LaunchAgent-plist per agent in `~/Library/LaunchAgents/`, met dezelfde cadans als
-de systemd-set, plus een **KeepAlive-plist voor de Flask-server** (de agents POSTen
+Eén LaunchAgent-plist per agent in `~/Library/LaunchAgents/`, met de cadans uit
+`agent_schedule.py`, plus een **KeepAlive-plist voor de Flask-server** (de agents POSTen
 ernaar, dus die moet draaien).
 
 | Label | Cadans | Wat |
@@ -40,7 +41,7 @@ ontwaken.
 Let op: LaunchAgents draaien in het **GUI-domein** en vuren alleen als je bent
 **ingelogd** (niet op het inlogscherm). Voor een altijd-aan machine is dat het juiste
 model voor een persoonlijke Mac; wil je echt 24/7 zonder ingelogde sessie, dan hoort
-het op de VPS (`../systemd/`).
+het op een VPS (daar bestaat nog geen planner voor de agents; zie `../README.md`).
 
 ## Installeren
 
