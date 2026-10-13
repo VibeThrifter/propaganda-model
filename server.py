@@ -3881,6 +3881,12 @@ def _delete_arguments(conn, arg_ids):
         return
     placeholders = ",".join("?" * len(arg_ids))
     conn.execute(f"DELETE FROM citations WHERE argument_id IN ({placeholders})", arg_ids)
+    # Procesgegevens over deze argumenten (A1/A2-oordelen, smaadtoets, ratings) verwijzen er met
+    # een foreign key naar; zonder dit faalde elke harde delete van beoordeeld werk (2026-10-13).
+    for tabel in ("immuun_oordelen", "smaad_toetsen", "argument_ratings"):
+        conn.execute(f"DELETE FROM {tabel} WHERE argument_id IN ({placeholders})", arg_ids)  # noqa: S608 - vaste namen
+    conn.execute(f"UPDATE arguments SET reviseert_id = NULL WHERE reviseert_id IN ({placeholders})",  # noqa: S608
+                 arg_ids)
     # Een reactie heeft altijd een hoger id dan zijn parent (later aangemaakt),
     # dus aflopend verwijderen respecteert de foreign key naar parent_argument_id.
     for aid in sorted(arg_ids, reverse=True):
