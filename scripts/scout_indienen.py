@@ -18,10 +18,11 @@ Manifest-schema:
     {
       "bronnen":    [{"key", "titel", "type", "author", "publisher", "datum",
                       "url", "onderwerp", "betrouwbaarheid"}],
-      "entiteiten": [{"key", "naam", "type", "rol_id", "beschrijving",
+      "entiteiten": [{"key", "naam", "type", "rol_id", "beschrijving", "bestuurslaag",
                       "active_from", "active_until"}],
       "relaties":   [{"source", "target",          # int = bestaand DB-id, str = manifest-key
                       "relation_type", "mechanisme_id", "beschrijving",
+                      "functie",                       # titel zoals de bron hem noemt (ambt e.d.)
                       "active_from", "active_until",   # VERPLICHT: begin (en eind als voorbij)
                       "zonder_jaar",                   # alleen als de bron echt geen begin geeft:
                                                        # waar je zocht (komt in de log; de
@@ -230,6 +231,8 @@ class Indiener:
                 body["primary_role_id"] = e["rol_id"]
             if e.get("beschrijving"):
                 body["description"] = e["beschrijving"]
+            if e.get("bestuurslaag"):
+                body["bestuurslaag"] = e["bestuurslaag"]
             for veld in ("active_from", "active_until"):
                 if e.get(veld):
                     body[veld] = e[veld]
@@ -300,6 +303,8 @@ class Indiener:
                 body["mechanism_id"] = r["mechanisme_id"]
             if r.get("beschrijving"):
                 body["description"] = r["beschrijving"]
+            if r.get("functie"):
+                body["functie"] = r["functie"]
             for veld in ("active_from", "active_until"):
                 if r.get(veld):
                     body[veld] = r[veld]

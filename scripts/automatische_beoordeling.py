@@ -8,6 +8,10 @@ Elk stuk werk eindigt in een eindtoestand, met de reden in edit_log; een mens ka
 terugdraaien (heropenen, intrekken), maar niemand hoeft iets te doen. Per ronde, in deze
 volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
 
+0. **Publieke tips** (scripts/lead_triage.py, zonder model): schiften (twee partijen, minstens
+   één in het model, geen bestaand verband, geen duplicaat, reputatie per IP-hash) en hooguit
+   ``--max-leads`` tips als doel 'tip:<id>' voor de nieuws-scout klaarzetten, onder het plafond
+   op AI-werk dat de server afdwingt (PROPAGANDA_LEAD_*, kill-switch PROPAGANDA_LEADS=0).
 1. **Bronzoeker** (scripts/bronzoeker.py): een bron waar die ontbreekt of niet volstaat — een
    vervangend voorstel voor een voorgesteld argument met 'twijfel'/'klopt-niet', een steunend
    argument voor een verband zonder argument, een revisie van gemerged werk.
@@ -95,6 +99,7 @@ import bronchecker  # noqa: E402
 import bronklasse  # noqa: E402
 import bronzoeker  # noqa: E402
 import datumzoeker  # noqa: E402
+import lead_triage  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
 import opschonen  # noqa: E402  dubbel werk (repo-root, gedeeld met de server)
 import looptijd  # noqa: E402  bestaan, fusies en verhangen (repo-root, gedeeld met de server)
@@ -321,6 +326,15 @@ def stap_mergen(token, args, meld) -> dict:
         tijdelijk.replace(AUTO_MERGE_LOG)
     meld(f"A7: {tel['gemerged']} argument(en) gemerged")
     return tel
+
+
+def stap_leads(args, meld) -> dict:
+    """Publieke tips (2026-10-14): uitkomst van afgeronde tip-doelen terugschrijven, schiften
+    zonder model, en hooguit --max-leads tips als doel voor de nieuws-scout klaarzetten (onder
+    het plafond op AI-werk dat de server afdwingt)."""
+    if args.max_leads <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    return lead_triage.draai(max_leads=args.max_leads, droog=args.droog, meld=meld)
 
 
 def stap_bronzoeken(args, meld) -> dict:
@@ -1218,6 +1232,8 @@ def ronde(args, meld=print) -> dict:
     t0 = time.monotonic()
     uitkomst = {"start": datetime.datetime.now().isoformat(timespec="seconds"),
                 "droog": bool(args.droog)}
+    # 0. Publieke tips: schiften en hooguit een paar als doel voor de nieuws-scout klaarzetten
+    uitkomst["leads"] = stap_leads(args, meld)
     # 1. Repareren: een bron waar die ontbreekt of niet volstaat (wat de bronzoeker indient,
     #    controleert stap 2 nog in dezelfde ronde)
     uitkomst["bronzoeker"] = stap_bronzoeken(args, meld)
@@ -1337,6 +1353,8 @@ def main():
                     help="hooguit zoveel dubbele bronnen en verbanden per ronde (0 = uit)")
     ap.add_argument("--max-bronklasse", type=int, default=160,
                     help="hooguit zoveel bronnen per ronde classificeren (0 = uit)")
+    ap.add_argument("--max-leads", type=int, default=3,
+                    help="hooguit zoveel publieke tips per ronde als doel klaarzetten (0 = uit)")
     ap.add_argument("--max-archief", type=int, default=10,
                     help="hooguit zoveel bronnen per ronde archiveren (0 = uit)")
     ap.add_argument("--archief-timeout", type=int, default=900)

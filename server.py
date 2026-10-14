@@ -6418,15 +6418,39 @@ def get_bereik():
     return jsonify(res)
 
 
+def _partijen_jaar():
+    """?jaar=JJJJ voor /api/partijen: (jaar of None, foutantwoord of None)."""
+    ruw = request.args.get("jaar")
+    if not ruw:
+        return None, None
+    try:
+        jaar = int(ruw)
+    except ValueError:
+        return None, (jsonify({"error": "'jaar' moet een jaartal zijn"}), 400)
+    if not 1900 <= jaar <= datetime.date.today().year:
+        return None, (jsonify({"error": f"'jaar' moet tussen 1900 en {datetime.date.today().year} liggen"}), 400)
+    return jaar, None
+
+
+def _terugblik(jaar):
+    """Een eerder jaar: tel alleen verbanden waarvan het begin bekend is (partijen.py)."""
+    return bool(jaar) and jaar < datetime.date.today().year
+
+
 @app.route("/api/partijen")
 def get_partijen():
     """Partijnetwerk (partijen.py): per partij het aantal verbonden personen per
     positieklasse ('alle' en 'nu') + de organisaties waar mensen uit twee of meer partijen
     een positie hebben. Beschrijvend, telt nergens mee; alleen goedgekeurde verbanden.
-    ?fusies=0: elke partij apart, ook als ze in een andere opging (standaard: stamboom)."""
+    ?fusies=0: elke partij apart, ook als ze in een andere opging (standaard: stamboom).
+    ?jaar=JJJJ: de stand in dat jaar (wat toen liep) in plaats van vandaag."""
+    jaar, fout = _partijen_jaar()
+    if fout:
+        return fout
     conn = get_db()
     try:
-        res = partijen.compute_overzicht(conn, fusies=request.args.get("fusies") != "0")
+        res = partijen.compute_overzicht(conn, peiljaar=jaar, fusies=request.args.get("fusies") != "0",
+                                         gedateerd=_terugblik(jaar))
     finally:
         conn.close()
     return jsonify(res)
@@ -6436,10 +6460,14 @@ def get_partijen():
 def get_partij(partij_id):
     """Eén partij in detail: per persoon de band met de partij, de posities en de overige
     relaties, plus de banden van de partij zelf. 404 als het geen goedgekeurde partij is.
-    ?fusies=0: zonder de partijen die erin opgingen."""
+    ?fusies=0: zonder de partijen die erin opgingen. ?jaar=JJJJ: de stand in dat jaar."""
+    jaar, fout = _partijen_jaar()
+    if fout:
+        return fout
     conn = get_db()
     try:
-        res = partijen.compute_partij(conn, partij_id, fusies=request.args.get("fusies") != "0")
+        res = partijen.compute_partij(conn, partij_id, peiljaar=jaar,
+                                      fusies=request.args.get("fusies") != "0", gedateerd=_terugblik(jaar))
     finally:
         conn.close()
     if res is None:
@@ -6535,6 +6563,48 @@ SPAM_DOMEINEN = {
     "bit.ly", "tinyurl.com", "t.me", "spam.example", "casino.example",
     "buy-now.example", "viagra.example", "cheap-pills.example",
 }
+# Gestructureerde tip (2026-10-14): het soort verband komt uit vocab.LEAD_SOORTEN_VERBAND
+# (een onbekende waarde wordt 'anders').
+LEAD_SOORTEN_VERBAND = vocab.LEAD_SOORTEN_VERBAND
+# Hard plafond op het AI-werk dat publieke tips kosten (eigenaar 2026-10-14: "ook een maximale cap
+# voor totale AI opdrachten van deze aard"). Afgedwongen bij het aanmaken van een doel 'tip:<id>'
+# in nieuws_doelen, dus ook als scripts/lead_triage.py een fout bevat. Env-overrides; kill-switch
+# PROPAGANDA_LEADS=0 zet geen enkel tip-doel meer klaar (de intake zelf blijft open).
+LEAD_DOEL_DAGPLAFOND = 5      # nieuwe tip-doelen per kalenderdag
+LEAD_DOEL_MAANDPLAFOND = 60   # nieuwe tip-doelen per 30 dagen
+LEAD_DOEL_MAX_OPEN = 5        # tip-doelen tegelijk open of bezig
+
+
+def _lead_plafonds():
+    def getal(naam, standaard):
+        try:
+            return max(0, int(os.environ.get(naam, standaard)))
+        except ValueError:
+            return standaard
+    return (getal("PROPAGANDA_LEAD_DAGPLAFOND", LEAD_DOEL_DAGPLAFOND),
+            getal("PROPAGANDA_LEAD_MAANDPLAFOND", LEAD_DOEL_MAANDPLAFOND),
+            getal("PROPAGANDA_LEAD_MAX_OPEN", LEAD_DOEL_MAX_OPEN))
+
+
+def lead_doel_ruimte(conn):
+    """(ruimte, reden): hoeveel tip-doelen er nu nog bij mogen, en welk plafond bindt als het 0 is.
+    Gedeeld door de poort in nieuws_doelen_upsert en scripts/lead_triage.py."""
+    if os.environ.get("PROPAGANDA_LEADS", "1") == "0":
+        return 0, "kill-switch PROPAGANDA_LEADS=0"
+    dag, maand, max_open = _lead_plafonds()
+    nu = datetime.datetime.now()
+    vandaag = nu.date().isoformat()
+    dertig = (nu - datetime.timedelta(days=30)).isoformat(timespec="seconds")
+    n_dag = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
+                         "AND aangemaakt >= ?", (vandaag,)).fetchone()[0]
+    n_maand = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
+                           "AND aangemaakt >= ?", (dertig,)).fetchone()[0]
+    n_open = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
+                          "AND status IN ('open', 'bezig')").fetchone()[0]
+    ruimtes = ((dag - n_dag, f"dagplafond ({dag})"), (maand - n_maand, f"plafond per 30 dagen ({maand})"),
+               (max_open - n_open, f"maximum tegelijk open ({max_open})"))
+    ruimte, reden = min(ruimtes, key=lambda x: x[0])
+    return max(0, ruimte), (reden if ruimte <= 0 else None)
 
 
 def _client_ip():
@@ -6672,25 +6742,38 @@ def create_lead():
                            LEAD_MAXLENGTHS["bron_url"]) or None
     quote_v = _strip_veld(data.get("quote"), LEAD_MAXLENGTHS["quote"]) or None
     betreft = _strip_veld(data.get("betreft"), LEAD_MAXLENGTHS["betreft"]) or None
+    partij_a = _strip_veld(data.get("partij_a"), LEAD_MAXLENGTHS["betreft"]) or None
+    partij_b = _strip_veld(data.get("partij_b"), LEAD_MAXLENGTHS["betreft"]) or None
+    soort_verband = (data.get("soort_verband") or "").strip().lower() or None
+    if soort_verband is not None and soort_verband not in LEAD_SOORTEN_VERBAND:
+        soort_verband = "anders"
+    jaar = str(data.get("jaar") or "").strip() or None
+    if jaar is not None and not (re.fullmatch(r"\d{4}", jaar)
+                                 and 1800 <= int(jaar) <= datetime.date.today().year + 1):
+        jaar = None    # geen fout: het jaartal is een hint, de scout zoekt het zelf in de bron
 
     conn = get_db()
     # (7) Sock-puppet-collapse (D2.1): near-dup van een bestaande lead → 'duplicaat', zodat
     #     1000 sock-puppets samenvallen tot één te-corroboreren claim (agreement onder
     #     indieners telt nergens; dezelfde regel als "agreement onder agents is nep-bewijs").
-    nieuw_sleutel = (claim + " " + (betreft or "")).lower()
+    def sleutel(c, b, pa, pb):
+        return " ".join(x or "" for x in (c, b, *sorted([(pa or "").lower(), (pb or "").lower()]))
+                        ).lower()
+    nieuw_sleutel = sleutel(claim, betreft, partij_a, partij_b)
     status = "binnengekomen"
-    for rij in conn.execute("SELECT claim, betreft FROM leads"):
-        bestaand = ((rij["claim"] or "") + " " + (rij["betreft"] or "")).lower()
+    for rij in conn.execute("SELECT claim, betreft, partij_a, partij_b FROM leads"):
+        bestaand = sleutel(rij["claim"], rij["betreft"], rij["partij_a"], rij["partij_b"])
         if difflib.SequenceMatcher(None, nieuw_sleutel, bestaand).ratio() >= LEAD_DEDUP_DREMPEL:
             status = "duplicaat"
             break
 
     cur = conn.execute("""
         INSERT INTO leads (herkomst, soort, claim, bron_url, quote, betreft,
-                           ingezonden_ip_hash, render_ts, status)
-        VALUES ('publiek', ?, ?, ?, ?, ?, ?, ?, ?)
+                           ingezonden_ip_hash, render_ts, status,
+                           partij_a, partij_b, soort_verband, jaar)
+        VALUES ('publiek', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (soort, claim, bron_url, quote_v, betreft, _ip_hash(_client_ip()),
-          f"{render_ts:.3f}", status))
+          f"{render_ts:.3f}", status, partij_a, partij_b, soort_verband, jaar))
     lead_id = cur.lastrowid
     conn.execute("""
         INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
@@ -6769,10 +6852,25 @@ def patch_lead(lead_id):
             return jsonify({"error": f"Argument {aid} bestaat niet"}), 400
         velden.append("agent_arg_id = ?")
         waarden.append(aid)
+    if "triage_reden" in data:     # scripts/lead_triage.py: waarom afgewezen of doorgezet
+        reden = data.get("triage_reden")
+        if reden is not None and not isinstance(reden, str):
+            conn.close()
+            return jsonify({"error": "'triage_reden' moet tekst zijn"}), 400
+        velden.append("triage_reden = ?")
+        waarden.append(reden[:500] if reden else None)
+    if "doel_id" in data:
+        did = data.get("doel_id")
+        if did is not None and not conn.execute(
+                "SELECT 1 FROM nieuws_doelen WHERE id = ?", (did,)).fetchone():
+            conn.close()
+            return jsonify({"error": f"Doel {did} bestaat niet"}), 400
+        velden.append("doel_id = ?")
+        waarden.append(did)
     if not velden:
         conn.close()
-        return jsonify({"error": "Niets te wijzigen: geef 'status' en/of "
-                                 "'agent_arg_id'"}), 400
+        return jsonify({"error": "Niets te wijzigen: geef 'status', 'agent_arg_id', "
+                                 "'triage_reden' en/of 'doel_id'"}), 400
     conn.execute(f"UPDATE leads SET {', '.join(velden)} WHERE id = ?",
                  waarden + [lead_id])
     conn.execute("""
@@ -6781,8 +6879,9 @@ def patch_lead(lead_id):
     """, (lead_id, g.user["username"],
           json.dumps({"status": lead["status"], "agent_arg_id": lead["agent_arg_id"]}),
           json.dumps({"status": nieuwe_status if nieuwe_status is not None else lead["status"],
-                      "agent_arg_id": data.get("agent_arg_id", lead["agent_arg_id"])}),
-          "lead-corroboratie: status/agent_arg_id bijgewerkt"))
+                      "agent_arg_id": data.get("agent_arg_id", lead["agent_arg_id"]),
+                      "doel_id": data.get("doel_id", lead["doel_id"])}),
+          data.get("triage_reden") or "lead-corroboratie: status/agent_arg_id bijgewerkt"))
     conn.commit()
     rij = dict(conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone())
     conn.close()
@@ -6811,6 +6910,7 @@ NIEUWS_AUTOKEUR = "nieuws-autokeur"
 NIEUWS_DOEL_STATUSSEN = ("open", "bezig", "klaar", "niets_gevonden", "overgeslagen",
                          "twijfel", "fout")
 NIEUWS_DOEL_ACTIEF = ("open", "bezig")           # de rest = afgerond
+NIEUWS_INTREK_STATUSSEN = ("klaar", "overgeslagen")  # waarmee de aanvrager een open doel intrekt
 NIEUWS_DOEL_SOORTEN = ("persoon", "organisatie", "relatie")
 NIEUWS_NAAM_SOORTEN = ("persoon", "organisatie")  # het werk van de nieuws-scout
 NIEUWS_RELATIE_SLEUTEL = re.compile(r"relatie:(\d+)")
@@ -6985,6 +7085,14 @@ def nieuws_doelen_upsert():
     try:
         rij = conn.execute("SELECT * FROM nieuws_doelen WHERE sleutel = ?",
                            (sleutel,)).fetchone()
+        if rij is None and sleutel.startswith("tip:"):
+            # Publieke tip → AI-werk: hard plafond, ook als het triage-script zich vergist
+            ruimte, plafond = lead_doel_ruimte(conn)
+            if ruimte <= 0:
+                conn.execute("ROLLBACK")
+                conn.close()
+                return jsonify({"error": f"Plafond voor tip-doelen bereikt: {plafond}",
+                                "plafond": plafond}), 429
         if rij is None:
             if soort is None:
                 conn.execute("ROLLBACK")
@@ -7010,6 +7118,11 @@ def nieuws_doelen_upsert():
 
         heropen = False
         if rij["status"] not in NIEUWS_DOEL_ACTIEF:
+            if sleutel.startswith("tip:") and data.get("opnieuw") is True:
+                conn.execute("ROLLBACK")
+                conn.close()
+                return jsonify({"error": "Een tip-doel wordt niet heropend: één poging per "
+                                         "publieke tip"}), 409
             if data.get("opnieuw") is not True:
                 conn.execute("ROLLBACK")
                 doel = _nieuws_doel_dict(rij)
@@ -7199,11 +7312,18 @@ def nieuws_doelen_patch(did):
         conn.close()
         return jsonify({"error": "Doel niet gevonden"}), 404
     werker = _nieuws_werker(rij["soort"])
-    if not _mag_nieuws(conn, werker):
-        conn.close()
-        return jsonify({"error": f"Alleen het account '{werker}' of een maintainer "
-                                 "werkt dit nieuws-doel bij"}), 403
     toegestaan = {"status", "verslag", "resultaat", "entity_id", "vervolg"}
+    if not _mag_nieuws(conn, werker):
+        # de aanvrager trekt een doel in dat nog niemand oppakte en dat hij niet meer nodig
+        # heeft (staat intussen in het model, bv. via de registers, of bleek geen actor)
+        intrekken = (g.user["username"] == NIEUWS_AGENT and rij["status"] == "open"
+                     and data.get("status") in NIEUWS_INTREK_STATUSSEN)
+        if not intrekken:
+            conn.close()
+            return jsonify({"error": f"Alleen het account '{werker}' of een maintainer "
+                                     "werkt dit nieuws-doel bij; de aanvrager trekt alleen "
+                                     "een open doel in"}), 403
+        toegestaan = {"status", "verslag", "entity_id"}
     onbekend = sorted(set(data) - toegestaan)
     if onbekend:
         conn.close()

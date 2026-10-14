@@ -191,3 +191,18 @@ def verschillen(web=WEB):
             if js.get(k) != py.get(k):
                 uit.append(f"{bestand} {naam}.{k}: JS {js.get(k)!r} ≠ vocab.py {py.get(k)!r}")
     return uit
+
+
+# Publieke tip (2026-10-14, web/tip.html → leads.soort_verband): het soort verband dat de inzender
+# kiest. Bewust grof: de nieuws-scout kiest zelf relatietype en mechanisme uit de precedenten; dit
+# label is alleen een hint (scripts/lead_triage.py zet het in de context van het doel).
+LEAD_SOORTEN_VERBAND = {
+    "functie": "werkt of werkte bij, heeft of had een functie bij",
+    "bestuur": "zit of zat in het bestuur of de raad van toezicht van",
+    "eigendom": "is (mede-)eigenaar van",
+    "financiering": "financiert, sponsort of adverteert bij",
+    "lidmaatschap": "is of was lid van",
+    "advies": "adviseert of levert experts of onderzoek aan",
+    "druk": "oefent druk uit op, klaagt aan of dreigt met juridische stappen tegen",
+    "anders": "een ander verband (zie de toelichting)",
+}

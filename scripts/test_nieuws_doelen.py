@@ -389,6 +389,24 @@ def main():
         r = client.patch(f"/api/nieuws/doelen/{anouk}", json={"status": "klaar"},
                          headers=kop["nieuws-agent"])
         eis(r.status_code == 403, f"nieuws-agent mag niet patchen ({r.status_code})")
+        r = client.post("/api/nieuws/doelen", json=doel_body("org:kijk-ook"),
+                        headers=kop["nieuws-agent"])
+        ingetrokken = r.get_json()["doel"]["id"]
+        r = client.patch(f"/api/nieuws/doelen/{ingetrokken}",
+                         json={"status": "klaar", "resultaat": {"entity_ids": [1]}},
+                         headers=kop["nieuws-agent"])
+        eis(r.status_code == 400, f"intrekken: alleen status/verslag/entity_id ({r.status_code})")
+        r = client.patch(f"/api/nieuws/doelen/{ingetrokken}", json={"status": "bezig"},
+                         headers=kop["nieuws-agent"])
+        eis(r.status_code == 403, f"intrekken: alleen naar klaar of overgeslagen ({r.status_code})")
+        r = client.patch(f"/api/nieuws/doelen/{ingetrokken}",
+                         json={"status": "overgeslagen", "verslag": "Geen actor: los woord"},
+                         headers=kop["nieuws-agent"])
+        eis(r.status_code == 200 and r.get_json()["doel"]["status"] == "overgeslagen",
+            f"nieuws-agent trekt een open doel in → 200 ({r.status_code})")
+        r = client.patch(f"/api/nieuws/doelen/{ingetrokken}", json={"status": "klaar"},
+                         headers=kop["nieuws-agent"])
+        eis(r.status_code == 403, f"een afgerond doel trekt de aanvrager niet meer in ({r.status_code})")
         slecht = [
             ({"status": "gedaan"}, "onbekende status"),
             ({"vervolg": "twitter"}, "onbekend vervolg"),

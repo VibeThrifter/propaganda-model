@@ -43,6 +43,9 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
 .dank p { font-size: 13.5px; color: var(--text-dim); line-height: 1.6; margin: 6px 0; }
 .dank .ref { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--text-muted); word-break: break-all; }
 .proces-link { display: inline-block; margin-top: 14px; font-size: 12.5px; }
+.paar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.paar .jaar { max-width: 140px; }
+@media (max-width: 520px) { .paar { grid-template-columns: 1fr; } .paar .jaar { max-width: none; } }
 </style>
 </head>
 <body>
@@ -75,6 +78,43 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
         </label>
       </div>
     </fieldset>
+
+    <div id="verbandVelden">
+      <div class="paar">
+        <div>
+          <label for="partij_a">Partij 1 <span class="tel" id="tel-pa">0 / 200</span></label>
+          <input type="text" id="partij_a" name="partij_a" maxlength="200"
+            placeholder="Persoon of organisatie">
+        </div>
+        <div>
+          <label for="partij_b">Partij 2 <span class="tel" id="tel-pb">0 / 200</span></label>
+          <input type="text" id="partij_b" name="partij_b" maxlength="200"
+            placeholder="Persoon of organisatie">
+        </div>
+      </div>
+      <div class="paar">
+        <div>
+          <label for="soort_verband">Soort verband</label>
+          <select id="soort_verband" name="soort_verband">
+            <option value="functie">Partij 1 werkt(e) bij / had een functie bij partij 2</option>
+            <option value="bestuur">Partij 1 zit/zat in het bestuur of de RvT van partij 2</option>
+            <option value="eigendom">Partij 1 is (mede-)eigenaar van partij 2</option>
+            <option value="financiering">Partij 1 financiert, sponsort of adverteert bij partij 2</option>
+            <option value="lidmaatschap">Partij 1 is/was lid van partij 2</option>
+            <option value="advies">Partij 1 adviseert of levert experts aan partij 2</option>
+            <option value="druk">Partij 1 oefent druk uit op of klaagt partij 2 aan</option>
+            <option value="anders">Anders (licht toe)</option>
+          </select>
+        </div>
+        <div class="jaar">
+          <label for="jaar">Sinds (jaar, optioneel)</label>
+          <input type="text" id="jaar" name="jaar" inputmode="numeric" maxlength="4"
+            pattern="[0-9]{4}" placeholder="JJJJ">
+        </div>
+      </div>
+      <p class="hint">Noem twee partijen bij hun volledige naam; minstens één ervan moet al in het
+      onderzoek staan. Een tip met een bron-link waarop beide namen staan, wordt het snelst nagelopen.</p>
+    </div>
 
     <label for="claim">Je melding <span class="tel" id="tel-claim">0 / 1000</span></label>
     <textarea id="claim" name="claim" maxlength="1000" required rows="4"
@@ -134,6 +174,24 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
   koppelTeller('betreft', 'tel-betreft', 200);
   koppelTeller('bron_url', 'tel-url', 500);
   koppelTeller('quote', 'tel-quote', 2000);
+  koppelTeller('partij_a', 'tel-pa', 200);
+  koppelTeller('partij_b', 'tel-pb', 200);
+
+  // ── Verband-velden alleen bij "Hier is een bron of verband" ─────────
+  var verbandVelden = document.getElementById('verbandVelden');
+  function isTip() {
+    var el = form.querySelector('input[name="soort"]:checked');
+    return !el || el.value === 'tip';
+  }
+  function werkSoortBij() {
+    var tip = isTip();
+    verbandVelden.style.display = tip ? '' : 'none';
+    document.getElementById('partij_a').required = tip;
+    document.getElementById('partij_b').required = tip;
+  }
+  form.querySelectorAll('input[name="soort"]').forEach(function (r) {
+    r.addEventListener('change', werkSoortBij);
+  });
 
   // ── URL-parameters: soort vooraf kiezen, betreft voorvullen ─────────
   var params = new URLSearchParams(window.location.search);
@@ -149,6 +207,8 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
     bv.dispatchEvent(new Event('input'));
   }
 
+  werkSoortBij();
+
   // ── Lead-token ophalen (nodig voor de POST) ─────────────────────────
   fetch('/api/lead_token')
     .then(function (r) { return r.ok ? r.json() : null; })
@@ -162,12 +222,22 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
     var claim = document.getElementById('claim').value.trim();
     if (!claim) { foutEl.textContent = 'Vul eerst je melding in.'; return; }
     var soortEl = form.querySelector('input[name="soort"]:checked');
+    var tip = isTip();
+    var pa = document.getElementById('partij_a').value.trim();
+    var pb = document.getElementById('partij_b').value.trim();
+    var jaar = document.getElementById('jaar').value.trim();
+    if (tip && (!pa || !pb)) { foutEl.textContent = 'Noem beide partijen van het verband.'; return; }
+    if (tip && jaar && !/^[0-9]{4}$/.test(jaar)) { foutEl.textContent = 'Vul het jaar in als JJJJ, of laat het leeg.'; return; }
     var payload = {
       claim: claim,
       soort: soortEl ? soortEl.value : 'tip',
       bron_url: document.getElementById('bron_url').value.trim(),
       quote: document.getElementById('quote').value.trim(),
       betreft: document.getElementById('betreft').value.trim(),
+      partij_a: tip ? pa : '',
+      partij_b: tip ? pb : '',
+      soort_verband: tip ? document.getElementById('soort_verband').value : '',
+      jaar: tip ? jaar : '',
       website: document.getElementById('website').value,   // honeypot
       lead_token: leadToken
     };

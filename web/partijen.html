@@ -4,207 +4,469 @@
 <meta charset="utf-8">
 <title>Partijen &amp; posities — Propagandamodel</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Per politieke partij: wie er in het model aan verbonden is en welke posities die mensen bekleden — in het openbaar bestuur en daarbuiten — plus de organisaties die mensen uit meerdere partijen delen.">
+<meta name="description" content="Per politieke partij: wie er in het model aan verbonden is en welke posities die mensen bekleden — in de politiek, in de benoemde staat, bij de media en daarbuiten — plus wie de benoemde topfuncties bekleedt en de organisaties die mensen uit meerdere partijen delen.">
 <link rel="stylesheet" href="/static/huisstijl.css">
 <script src="/static/huisstijl.js"></script>
 <script src="/static/shared_vocab.js"></script>
 <style>
+:root {
+  /* Domeinen (kleur per wereld) en mandaten (gekozen → benoemd) */
+  --d-kroon: #b07cff;
+  --d-ambtenarij: #22d3ee;
+  --d-rechtsstaat: #1abc9c;
+  --d-toezicht: #4fc3f7;
+  --d-kennis: #e15ef2;
+  --d-uitvoering: #8f9bb3;
+  --d-veiligheid: #f0703a;
+  --d-internationaal: #c08552;
+  --d-media: #fd79a8;
+  --d-markt: #c4d630;
+  --d-belangen: #f0a030;
+  --d-samenleving: #2ecc71;
+  --d-volk: #5468ff;
+  --d-bestuur: #9aa6ff;
+  --b-staat: #22d3ee;
+  --b-buiten: #fd79a8;
+  --b-gekozen: #5468ff;
+  --m-kiezers: #5468ff;
+  --m-afgeleid: #9aa6ff;
+  --m-benoemd: #22d3ee;
+  --m-buiten: #9aa0b4;
+  --m-onbepaald: #5a5a70;
+  --vlak: rgba(255,255,255,0.03);
+}
 body { min-height: 100vh; display: flex; flex-direction: column; }
-main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 20px 8px; }
-h1 { font-size: 24px; letter-spacing: -0.02em; margin: 4px 0 6px; }
-.lead { color: var(--text-dim); max-width: 74ch; line-height: 1.6; margin: 0 0 16px; font-size: 14.5px; }
-.balk { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: 0 0 12px; }
+main { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 24px 20px 8px; }
+h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 4px; }
+.lead { color: var(--text-dim); max-width: 70ch; line-height: 1.55; margin: 0; font-size: 14px; }
 .hint { font-size: 12px; color: var(--text-muted); }
-section { margin-top: 30px; }
-section > h2.sectie { margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
+.n-goud { color: var(--goud); font-variant-numeric: tabular-nums; }
+[hidden] { display: none !important; }
 
-/* ── Matrix: positieklasse × partij ── */
-.tabel-wrap {
-  overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg-card);
+/* ── Kop met schakelaars ── */
+.paginakop { display: flex; gap: 16px 28px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
+.schakels { display: flex; gap: 8px 10px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--bg-inzet); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+.seg button {
+  border: none; background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; padding: 5px 12px;
+  border-radius: 999px; cursor: pointer; white-space: nowrap;
 }
-table.matrix {
-  border-collapse: separate; border-spacing: 0; width: 100%;
-  font-size: 12.5px; font-variant-numeric: tabular-nums;
-}
-.matrix th, .matrix td { padding: 0; text-align: center; border-bottom: 1px solid var(--border-zwak); }
-.matrix th.rij {
-  position: sticky; left: 0; z-index: 1; background: #15151e;
-  text-align: left; padding: 5px 14px; font-weight: 400; color: var(--text-dim); white-space: nowrap;
-}
-.matrix thead th { border-bottom: 1px solid var(--border); vertical-align: bottom; }
-.matrix thead th.rij { color: var(--text-muted); font-size: 11px; }
-.matrix thead th.partij a {
-  display: block; padding: 12px 6px 8px; color: var(--text-dim);
-  font-weight: 600; font-size: 12px; white-space: nowrap;
-}
-.matrix thead th.partij a:hover { color: var(--text); text-decoration: none; }
-.matrix thead th.partij.actief a { color: var(--accent); }
-.matrix thead th.partij .vg { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
-.matrix .actief-kol { background: color-mix(in srgb, var(--accent) 6%, transparent); }
-.matrix td a {
-  display: block; min-width: 40px; margin: 2px; padding: 5px 4px; border-radius: 6px;
-  color: var(--text); text-decoration: none;
-}
-.matrix td a:hover { outline: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); text-decoration: none; }
-.matrix td.nul { color: var(--text-muted); opacity: 0.5; }
-.matrix tr.groep th {
-  position: sticky; left: 0; background: #15151e; text-align: left;
-  font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--text-muted); padding: 12px 14px 4px;
-}
-.matrix tr.totaal th, .matrix tr.totaal td { font-weight: 600; border-bottom: 1px solid var(--border); }
-.matrix tr.totaal th.rij { color: var(--text); }
-.voetnoot { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; line-height: 1.5; }
+.seg button:hover { color: var(--text); filter: none; }
+.seg button.actief { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
 
-/* ── Partij-detail ── */
-.partij-kop { display: flex; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; margin-bottom: 4px; }
-.partij-kop h2 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
-.partij-kop .meta a { color: var(--accent); }
-.stamboom { font-size: 12.5px; color: var(--text-dim); margin: 2px 0 0; }
+/* ── Tijd ── */
+.jaarbalk { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-inzet); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.jaarbalk button { border: none; background: none; color: var(--text-dim); font-size: 16px; cursor: pointer; padding: 0 4px; }
+.jaarbalk button:hover { color: var(--text); filter: none; }
+.jaarbalk input[type=range] { width: 160px; accent-color: var(--accent); }
+.jaarbalk b { font-variant-numeric: tabular-nums; min-width: 38px; text-align: center; color: var(--text); }
+.jaarmelding { border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 8%, transparent); color: var(--text-dim); border-radius: 12px; padding: 9px 14px; font-size: 12.5px; margin: -8px 0 18px; line-height: 1.5; }
+.jaarmelding b { color: var(--text); }
+
+/* ── Hoofdtabs ── */
+.hoofdtabs {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 22px; overflow-x: auto;
+  scrollbar-width: none; position: sticky; top: var(--topbal-h); z-index: 5; background: var(--bg);
+}
+.hoofdtabs::-webkit-scrollbar { display: none; }
+.hoofdtabs button {
+  border: none; background: none; color: var(--text-dim); font: inherit; font-size: 14px; font-weight: 600;
+  padding: 12px 16px 11px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+  display: inline-flex; gap: 8px; align-items: center; border-radius: 0;
+}
+.hoofdtabs button:hover { color: var(--text); filter: none; }
+.hoofdtabs button.actief { color: var(--text); border-bottom-color: var(--accent); }
+.hoofdtabs .tel { font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--vlak); border-radius: 999px; padding: 1px 7px; }
+
+/* ── Partijkiezer ── */
+.kiezer { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 0 -2px 16px; scroll-snap-type: x proximity; }
+.kiezer::-webkit-scrollbar { height: 6px; }
+.kiezer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.pkaart {
+  flex: 0 0 auto; min-width: 104px; scroll-snap-align: start; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); padding: 9px 12px 10px;
+  color: var(--text); font: inherit; display: flex; flex-direction: column; gap: 6px;
+}
+.pkaart:hover { border-color: var(--border-light); filter: none; }
+.pkaart.actief { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg-card)); box-shadow: 0 0 0 1px var(--accent) inset; }
+.pkaart .pk-naam { font-weight: 700; font-size: 13.5px; white-space: nowrap; }
+.pkaart .pk-n { font-size: 11.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.profielbalk { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: var(--border-zwak); gap: 1px; }
+.profielbalk i { display: block; height: 100%; }
+
+/* ── Partijdashboard ── */
+.dash-kop { display: flex; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; }
+.dash-kop h2 { font-size: 24px; margin: 0; letter-spacing: -0.02em; }
+.dash-kop .meta { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim); }
+.dash-kop .meta a { color: var(--accent); }
+.stamboom { font-size: 12.5px; color: var(--text-dim); margin: 4px 0 0; }
 .stamboom a { color: var(--accent); }
-.filterbalk { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
-.filterbalk .tabs { flex: 1 1 520px; }
-.filterbalk .tab { font-size: 12px; padding: 4px 10px; }
-input.zoek { width: 260px; max-width: 100%; }
-.groep { margin-top: 18px; }
-.groep > .groep-kop { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
-.groep-kop .n { color: var(--goud); font-variant-numeric: tabular-nums; }
-.persoon {
-  display: grid; grid-template-columns: minmax(170px, 250px) 1fr; gap: 4px 18px;
-  padding: 9px 0; border-bottom: 1px solid var(--border-zwak);
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0 18px; }
+.kpi {
+  position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 12px 14px 12px 16px;
+  display: flex; flex-direction: column; gap: 2px;
 }
-.p-naam { font-weight: 600; color: var(--text); }
-.p-naam:hover { color: var(--accent); }
-.p-graaf { font-size: 12px; color: var(--text-muted); margin-left: 4px; }
-.p-graaf:hover { color: var(--accent); text-decoration: none; }
-.p-band { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+.kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--k, var(--accent)); }
+.kpi:hover { border-color: var(--border-light); filter: none; }
+.kpi.actief { border-color: var(--k, var(--accent)); }
+.kpi .kl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.kpi .kn { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; color: var(--k, var(--text)); }
+.kpi .ks { font-size: 11.5px; color: var(--text-dim); }
+.subbalk { display: flex; gap: 10px 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0 0 14px; }
+
+/* Blokken in het overzicht */
+.blok { margin-bottom: 20px; }
+.blokkop { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; padding-left: 12px; border-left: 4px solid var(--k); }
+.blokkop h3 { margin: 0; font-size: 15px; }
+.blokkop .n-blok { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--k); }
+.blokkop .hint { flex-basis: 100%; }
+.blok.leegblok .panelen { display: none; }
+/* Verbindingen */
+.kruisen { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.vgrid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 8px; }
+table.vgrid { border-collapse: separate; border-spacing: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.vgrid th { color: var(--text-dim); font-weight: 600; padding: 3px 6px; white-space: nowrap; text-align: right; }
+.vgrid thead th { text-align: center; vertical-align: bottom; writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 2px; font-size: 11px; }
+.vgrid td { min-width: 30px; height: 28px; text-align: center; border-radius: 6px; }
+.vgrid td a { display: block; color: var(--text); text-decoration: none; line-height: 28px; }
+.vgrid td.diag { color: var(--text-muted); }
+.vgrid td.nul { color: var(--text-muted); opacity: 0.4; }
+
+/* Domeinkaarten */
+.panelen { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.dkaart {
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 14px 16px 10px;
+  border-top: 3px solid var(--k); display: flex; flex-direction: column;
+}
+.dk-kop { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dk-kop h3 { margin: 0; font-size: 14.5px; flex: 1; }
+.dk-kop .dk-n {
+  border: none; background: color-mix(in srgb, var(--k) 18%, transparent); color: var(--text); font: inherit;
+  font-weight: 700; font-size: 15px; border-radius: 999px; padding: 2px 11px; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.balkrij {
+  display: grid; grid-template-columns: minmax(120px, 1.3fr) 1fr 36px; gap: 10px; align-items: center;
+  border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  padding: 6px 6px; margin: 0 -6px; border-radius: 8px; font-size: 13px;
+}
+.balkrij:hover { background: var(--bg-hover); filter: none; }
+.balkrij.actief { background: color-mix(in srgb, var(--k) 14%, transparent); }
+.balkrij .bl { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.balkrij .bb { height: 8px; border-radius: 4px; background: var(--border-zwak); overflow: hidden; }
+.balkrij .bb i { display: block; height: 100%; background: var(--k); border-radius: 4px; opacity: 0.85; }
+.balkrij .bn { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Personen als kaarten */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+.perskaart {
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); padding: 11px 14px 12px;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.pk-top { display: flex; gap: 8px; align-items: baseline; }
+.pk-top .pn { font-weight: 700; color: var(--text); }
+.pk-top .pn:hover { color: var(--accent); text-decoration: none; }
+.pk-top .graaf { font-size: 12px; color: var(--text-muted); }
+.pk-top .graaf:hover { color: var(--accent); text-decoration: none; }
+.pk-top .dots { margin-left: auto; display: flex; gap: 4px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--k); display: inline-block; flex: 0 0 auto; }
+.p-band { font-size: 11.5px; color: var(--text-muted); }
 .p-band .oud { text-decoration: line-through; text-decoration-color: var(--text-muted); }
 .p-band .via { color: var(--text-dim); }
-.posities { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .pos {
-  font-size: 12px; line-height: 1.45; color: var(--text-dim);
-  border: 1px solid var(--border); border-radius: 8px; padding: 2px 9px;
-  background: rgba(255,255,255,0.025);
+  font-size: 12px; line-height: 1.45; color: var(--text-dim); border: 1px solid var(--border);
+  border-left: 3px solid var(--k, var(--border)); border-radius: 7px; padding: 2px 9px; background: var(--vlak);
 }
 .pos a.lab { color: var(--text); }
 .pos a.lab:hover { text-decoration: underline dotted; }
 .pos .lt { color: var(--text-muted); }
-.pos.afgelopen { opacity: 0.62; border-style: dashed; }
-.pos.buiten { opacity: 0.45; }
-.pos.uitgelicht { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-.p-overig { grid-column: 2; font-size: 11.5px; color: var(--text-muted); line-height: 1.5; }
+.pos .mtag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-left: 4px; }
+.pos.afgelopen { opacity: 0.6; border-style: dashed; border-left-style: solid; }
+.pos.buiten { opacity: 0.4; }
+.pos.uitgelicht { background: color-mix(in srgb, var(--k, var(--accent)) 14%, transparent); border-color: color-mix(in srgb, var(--k, var(--accent)) 55%, transparent); }
+.p-overig { font-size: 11.5px; color: var(--text-muted); }
 .p-overig a { color: var(--text-dim); }
-.meer { margin: 8px 0 0; font-size: 12px; padding: 5px 12px; }
-.leeg-pos { font-size: 12px; color: var(--text-muted); }
-details.kaart > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
-details.kaart[open] > summary { margin-bottom: 8px; }
-.pband-rij { font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid var(--border-zwak); color: var(--text-dim); }
-.pband-rij:last-child { border-bottom: none; }
-.pband-rij .afg { opacity: 0.6; }
+/* Namenrooster */
+.rooster { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0 14px; }
+.cel { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid var(--border-zwak); min-width: 0; }
+.cel a.cn { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cel .co { color: var(--text-muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.cel .plus { font-size: 10.5px; color: var(--goud); border: 1px solid var(--border); border-radius: 6px; padding: 0 5px; cursor: help; }
+.cel.oud { opacity: 0.6; }
+.groepkop { display: flex; align-items: center; gap: 8px; margin: 18px 0 8px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.groepkop:first-child { margin-top: 0; }
+.groepkop .n { color: var(--goud); }
+.meer { margin: 10px 0 0; font-size: 12px; padding: 6px 14px; }
+.leegvak { border: 1px dashed var(--border); border-radius: 12px; padding: 22px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.leegvak a { color: var(--accent); }
+input.zoek { width: 260px; max-width: 100%; }
+.lijstje { display: flex; flex-direction: column; }
+.lijstje .rij { font-size: 13px; padding: 7px 0; border-bottom: 1px solid var(--border-zwak); color: var(--text-dim); }
+.lijstje .rij.afg { opacity: 0.6; }
 
-/* ── Gedeelde organisaties ── */
-.samen-wrap { overflow-x: auto; margin: 4px 0 14px; }
+/* ── Uitschuifpaneel (lade) ── */
+.lade-achter { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 860; }
+.lade {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100vw); z-index: 861;
+  background: #11111a; border-left: 1px solid var(--border); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; animation: inschuiven .18s ease-out;
+}
+@keyframes inschuiven { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+.lade-kop { padding: 16px 18px 12px; border-bottom: 1px solid var(--border); border-top: 3px solid var(--k, var(--accent)); }
+.lade-kop .lk-rij { display: flex; align-items: center; gap: 10px; }
+.lade-kop h3 { margin: 0; font-size: 17px; flex: 1; }
+.lade-kop .sluit { border: none; background: var(--vlak); color: var(--text); width: 30px; height: 30px; border-radius: 50%; font-size: 18px; cursor: pointer; padding: 0; }
+.lade-kop .lk-sub { font-size: 12.5px; color: var(--text-dim); margin: 4px 0 10px; line-height: 1.5; }
+.lade-kop input.zoek { width: 100%; }
+.lade-inhoud { overflow-y: auto; padding: 14px 18px 24px; flex: 1; }
+.lade-inhoud .pgrid { grid-template-columns: 1fr; }
+
+/* ── Matrix (vergelijken) ── */
+.tabel-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); }
+table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.matrix th, .matrix td { padding: 0; text-align: center; border-bottom: 1px solid var(--border-zwak); }
+.matrix th.rij {
+  position: sticky; left: 0; z-index: 1; background: #15151e; text-align: left; padding: 6px 14px;
+  font-weight: 400; color: var(--text-dim); white-space: nowrap;
+}
+.matrix thead th { border-bottom: 1px solid var(--border); vertical-align: bottom; }
+.matrix thead th.rij { color: var(--text-muted); font-size: 11px; }
+.matrix thead th.partij a { display: block; padding: 12px 6px 8px; color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.matrix thead th.partij a:hover { color: var(--text); text-decoration: none; }
+.matrix thead th.partij.actief a { color: var(--accent); }
+.matrix thead th.partij .vg { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+.matrix .actief-kol { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.matrix td a { display: block; min-width: 40px; margin: 2px; padding: 5px 4px; border-radius: 6px; color: var(--text); text-decoration: none; }
+.matrix td a:hover { outline: 1px solid var(--border-light); text-decoration: none; }
+.matrix td.nul { color: var(--text-muted); opacity: 0.45; }
+.matrix tr.totaal th, .matrix tr.totaal td { font-weight: 700; border-bottom: 1px solid var(--border); }
+.matrix tr.totaal th.rij { color: var(--text); }
+.matrix tr.kruis th.rij { color: var(--goud); font-weight: 600; }
+.matrix tr.kruis td, .matrix tr.kruis th { border-bottom: 1px solid var(--border); }
+.matrix tr.blok th.rij { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); padding-top: 14px; }
+.matrix tr.blok td { padding-top: 8px; font-weight: 600; }
+.matrix tr.kop th.rij { color: var(--text); font-weight: 600; }
+.matrix th.rij .dot { margin-right: 7px; }
+.matrix tr.kop td { font-weight: 600; }
+.matrix tr.sub th.rij { padding-left: 46px; }
+button.klap { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 4px 0 0; font-size: 11px; width: 16px; display: inline-block; transition: transform .15s; }
+button.klap[aria-expanded="false"] { transform: rotate(-90deg); }
+.voetnoot { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; line-height: 1.5; max-width: 90ch; }
+
+/* ── Topfuncties ── */
+.tf-raster { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); gap: 18px; align-items: start; }
+.chiprij { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.fchip {
+  border: 1px solid var(--border); background: var(--vlak); color: var(--text-dim); font: inherit; font-size: 12.5px;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer; display: inline-flex; gap: 7px; align-items: center;
+}
+.fchip:hover { color: var(--text); border-color: var(--border-light); filter: none; }
+.fchip.actief { color: var(--text); border-color: var(--k, var(--accent)); background: color-mix(in srgb, var(--k, var(--accent)) 16%, transparent); }
+.fchip .fn { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 11.5px; }
+.fchip .fn b { color: var(--goud); font-weight: 600; }
+table.tf { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tf th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.tf td { padding: 8px 10px; border-bottom: 1px solid var(--border-zwak); vertical-align: top; }
+.tf tr.cat td { padding: 16px 10px 6px; font-size: 12px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); }
+.tf tr.cat td .dot { margin-right: 7px; }
+.tf td.org a { color: var(--text); font-weight: 600; }
+.tf td.functie { color: var(--text-dim); }
+.tf .houder { display: block; }
+.tf .houder + .houder { margin-top: 3px; }
+.tf .houder a:first-child { color: var(--accent); }
+.tf .houder .lt { color: var(--text-muted); font-size: 11.5px; }
+.tf .houder.oud { opacity: 0.55; }
+.tf .let { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--warn); cursor: help; }
+.tf tr.band td { background: color-mix(in srgb, var(--goud) 6%, transparent); }
+.tf tr.eigen td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.tabelkaart { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 4px 6px 8px; overflow-x: auto; }
+.zijkaart { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 14px 16px; font-size: 12.5px; color: var(--text-dim); line-height: 1.55; position: sticky; top: calc(var(--topbal-h) + 60px); }
+.zijkaart h4 { margin: 0 0 6px; font-size: 13px; color: var(--text); }
+.zijkaart h4 + p { margin-top: 0; }
+.zijkaart .zk-groep { margin: 8px 0 0; }
+.zijkaart .zk-groep b { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; display: block; }
+.zijkaart a { color: var(--text-dim); text-decoration: underline dotted; }
+.pchip { font-size: 11.5px; border: 1px solid var(--border); border-radius: 10px; padding: 0 8px; color: var(--text-dim); white-space: nowrap; }
+.pchip b { color: var(--text); font-weight: 600; margin-left: 3px; }
+.pchip:hover { border-color: var(--border-light); color: var(--text); text-decoration: none; }
+.pchip.actief { border-color: var(--accent); color: var(--text); }
+.pchip.oud { opacity: 0.6; border-style: dashed; }
+
+/* ── Gedeeld ── */
+.gd-raster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 18px; align-items: start; }
+.samen-wrap { overflow-x: auto; }
 table.samen { border-collapse: separate; border-spacing: 2px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .samen th { color: var(--text-dim); font-weight: 600; padding: 3px 6px; white-space: nowrap; }
 .samen th.r { text-align: right; }
-.samen td { min-width: 34px; text-align: center; padding: 4px 3px; border-radius: 5px; color: var(--text); }
+.samen td { min-width: 30px; text-align: center; padding: 4px 3px; border-radius: 5px; color: var(--text); }
 .samen td.diag { color: var(--text-muted); }
-.org-rij {
-  display: grid; grid-template-columns: minmax(200px, 330px) 1fr; gap: 4px 16px; align-items: baseline;
-  padding: 8px 0; border-bottom: 1px solid var(--border-zwak); font-size: 13px;
-}
-.org-rij .tag { margin-left: 6px; }
-.pchips { display: flex; flex-wrap: wrap; gap: 5px; }
-.pchip {
-  font-size: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 1px 9px;
-  color: var(--text-dim);
-}
-.pchip b { color: var(--text); font-weight: 600; margin-left: 3px; }
-.pchip:hover { border-color: var(--border-light); color: var(--text); text-decoration: none; }
-.pchip.actief { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text); }
+.org-rij { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(0, 1.4fr); gap: 4px 14px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border-zwak); font-size: 13px; }
+.pchips { display: flex; flex-wrap: wrap; gap: 4px; }
 .laden { color: var(--text-muted); font-size: 13px; padding: 18px 2px; }
 
-@media (max-width: 700px) {
-  main { padding: 20px 16px 8px; }
-  .persoon, .org-rij { grid-template-columns: 1fr; }
-  .p-overig { grid-column: 1; }
+@media (max-width: 860px) {
+  main { padding: 18px 16px 8px; }
+  .tf-raster, .gd-raster { grid-template-columns: 1fr; }
+  .zijkaart { position: static; }
+  .pgrid { grid-template-columns: 1fr; }
+  .panelen { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi .kn { font-size: 24px; }
   input.zoek { width: 100%; }
+  .org-rij { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
 <header class="topbal" data-actief="partijen"></header>
 <main>
-  <h1>Partijen &amp; posities</h1>
-  <p class="lead">Wie is in het model aan welke partij verbonden — als lid, bestuurder, adviseur,
-  medewerker of woordvoerder — en welke posities bekleden die mensen, in het openbaar bestuur en
-  daarbuiten? Alleen goedgekeurde, gesourcete verbanden.
-  <button type="button" class="uitleg" aria-label="Uitleg over dit overzicht"
-          data-uitleg="Dit overzicht beschrijft wie welke positie bekleedt volgens de verbanden in het model; het zegt niets over invloed, motieven of afstemming. Het geeft de beschrijvende kant van de vraag die de kartelpartij-these (Katz &amp; Mair, 1995) stelt: hoe verweven zijn partijen met de staat en met elkaar? Of dit patroon die these draagt, blijft een vraag voor de discussie, niet voor deze telling.
+  <div class="paginakop">
+    <div>
+      <h1>Partijen &amp; posities</h1>
+      <p class="lead">Wie is aan welke partij verbonden, en waar zitten die mensen: in de politiek,
+      de benoemde staat, de media of daarbuiten? Alleen goedgekeurde, gesourcete verbanden.
+      <button type="button" class="uitleg" aria-label="Uitleg over dit overzicht"
+              data-uitleg="Dit overzicht beschrijft wie welke positie bekleedt volgens de verbanden in het model; het zegt niets over invloed, motieven of afstemming. Het geeft de beschrijvende kant van de vraag die de kartelpartij-these (Katz &amp; Mair, 1995) stelt: hoe verweven zijn partijen met de staat en met elkaar? Of dit patroon die these draagt, blijft een vraag voor de discussie, niet voor deze telling.
 
-Dekking: Kabinet, Tweede en Eerste Kamer, Europees Parlement, burgemeesters en wethouders komen uit openbare registers; nevenfuncties en loopbanen alleen waar ze met een bron zijn vastgelegd. Raadsleden alleen als ze in het nieuws kwamen. Ontbreken is dus geen bewijs van afwezigheid.">ⓘ</button></p>
+Dekking: Kabinet, Tweede en Eerste Kamer, Europees Parlement, burgemeesters en wethouders komen uit openbare registers, net als de leiding van ministeries, zbo's, adviescolleges en inspecties. Nevenfuncties, loopbanen en partijbanden van topambtenaren alleen waar ze met een bron zijn vastgelegd. Raadsleden alleen als ze in het nieuws kwamen. Ontbreken is dus geen bewijs van afwezigheid.
 
-  <div class="balk">
-    <div class="tabs" id="tijdTabs" role="tablist" aria-label="Periode">
-      <button type="button" class="tab actief" data-tijd="nu" role="tab">Lopend</button>
-      <button type="button" class="tab" data-tijd="alle" role="tab">Ook afgelopen</button>
+Lopend = de band met de partij én de positie lopen vandaag. Een band zonder einddatum loopt tot de partij of organisatie zelf ophield te bestaan.">ⓘ</button></p>
     </div>
-    <div class="tabs" id="fusieTabs" role="tablist" aria-label="Fusies">
-      <button type="button" class="tab actief" data-fusies="1" role="tab">Fusies samen</button>
-      <button type="button" class="tab" data-fusies="0" role="tab">Elke partij apart</button>
+    <div class="schakels">
+      <div class="seg" id="tijdSeg" role="group" aria-label="Periode">
+        <button type="button" data-tijd="nu" class="actief" title="Wat vandaag loopt">Nu</button>
+        <button type="button" data-tijd="jaar" title="Wat in een gekozen jaar liep">Per jaar</button>
+        <button type="button" data-tijd="alle" title="Alles, ook afgelopen">Ooit</button>
+      </div>
+      <div class="jaarbalk" id="jaarBalk" hidden>
+        <button type="button" id="jaarMin" aria-label="Jaar eerder">‹</button>
+        <input type="range" id="jaarSchuif" min="1980" max="2026" step="1" aria-label="Jaar">
+        <b id="jaarLabel"></b>
+        <button type="button" id="jaarPlus" aria-label="Jaar later">›</button>
+      </div>
+      <div class="seg" id="fusieSeg" role="group" aria-label="Fusies">
+        <button type="button" data-fusies="1" class="actief">Fusies samen</button>
+        <button type="button" data-fusies="0">Elke partij apart</button>
+      </div>
+      <button type="button" class="uitleg" aria-label="Uitleg over fusies"
+              data-uitleg="Een partij die in een andere opging (PvdA en GroenLinks per 1 juli 2026 in PRO, de KVP in 1980 in het CDA) houdt haar eigen banden: een PvdA-lidmaatschap uit 1990 blijft een PvdA-lidmaatschap. Met 'Fusies samen' telt de opvolger de mensen van zijn voorgangers mee als stamboom, en bij elke band staat bij welke partij die hoorde. Een lid gaat alleen over naar de opvolger als een bron dat voor die persoon zegt.">ⓘ</button>
     </div>
-    <button type="button" class="uitleg" aria-label="Uitleg over fusies"
-            data-uitleg="Een partij die in een andere opging (PvdA en GroenLinks per 1 juli 2026 in PRO, de KVP in 1980 in het CDA) houdt haar eigen banden: een PvdA-lidmaatschap uit 1990 blijft een PvdA-lidmaatschap. Met 'Fusies samen' telt de opvolger de mensen van zijn voorgangers mee als stamboom, en bij elke band staat bij welke partij die hoorde. 'Lopend' telt alleen wat vandaag loopt: een band met een opgeheven partij loopt niet meer, ook als er geen einddatum bij staat. Een lid gaat alleen over naar de opvolger als een bron dat voor die persoon zegt.">ⓘ</button>
-    <span class="hint">Lopend = de band met de partij én de positie lopen vandaag. Een band zonder einddatum loopt tot de partij of organisatie zelf ophield te bestaan.</span>
   </div>
 
-  <section id="matrixSectie">
-    <h2 class="sectie">Posities per partij</h2>
+  <nav class="hoofdtabs" id="hoofdtabs" role="tablist" aria-label="Weergave">
+    <button type="button" role="tab" data-tab="partij">Per partij</button>
+    <button type="button" role="tab" data-tab="vergelijk">Partijen vergelijken</button>
+    <button type="button" role="tab" data-tab="topfuncties">Benoemde topfuncties <span class="tel" id="telTop"></span></button>
+    <button type="button" role="tab" data-tab="gedeeld">Gedeelde organisaties <span class="tel" id="telGedeeld"></span></button>
+  </nav>
+  <div class="jaarmelding" id="jaarMelding" hidden></div>
+
+  <!-- Per partij -->
+  <section id="tab-partij" role="tabpanel">
+    <div class="kiezer" id="kiezer" role="listbox" aria-label="Kies een partij"><div class="laden">Laden…</div></div>
+    <div id="dash" hidden>
+      <div class="dash-kop"><h2 id="partijNaam"></h2><div class="meta" id="partijMeta"></div></div>
+      <p class="stamboom" id="partijStamboom" hidden></p>
+      <div class="kpis" id="kpis"></div>
+      <div class="subbalk">
+        <div class="seg" id="subSeg" role="tablist" aria-label="Onderdeel"></div>
+        <div id="subExtra"></div>
+      </div>
+      <div id="sub"></div>
+    </div>
+  </section>
+
+  <!-- Vergelijken -->
+  <section id="tab-vergelijk" role="tabpanel" hidden>
+    <div class="subbalk">
+      <div class="seg" id="indelingSeg" role="group" aria-label="Indeling">
+        <button type="button" data-indeling="soort">Per domein</button>
+        <button type="button" data-indeling="mandaat">Gekozen of benoemd</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button type="button" class="uitleg" aria-label="Uitleg over gekozen of benoemd"
+                data-uitleg="'Gekozen of benoemd' deelt elke positie in naar hoe ze volgens de wet vervuld wordt. Rechtstreeks gekozen: door kiezers (Tweede Kamer, Europees Parlement, Provinciale Staten, gemeenteraad, algemeen bestuur van een waterschap). Afgeleid van een gekozen orgaan: gekozen of benoemd door een gekozen orgaan, of afhankelijk van zijn vertrouwen (Eerste Kamer, kabinet, wethouders, gedeputeerden, een delegatie uit het parlement). Benoemd: burgemeesters, commissarissen van de Koning, dijkgraven, topambtenaren, rechters, toezichthouders en ambtenaren. Daarnaast: posities buiten het openbaar bestuur. Het zegt hoe iemand een positie kreeg, niet hoeveel invloed die positie heeft. Lokaal is 'rechtstreeks gekozen' onvolledig: raadsleden alleen als ze in het nieuws kwamen.">ⓘ</button>
+        <div class="seg" role="group" aria-label="Rijen">
+          <button type="button" id="allesUit">Alles uitklappen</button>
+          <button type="button" id="allesIn">Inklappen</button>
+        </div>
+      </div>
+    </div>
     <div class="tabel-wrap"><table class="matrix" id="matrix"><tbody><tr><td class="laden">Laden…</td></tr></tbody></table></div>
-    <p class="voetnoot">Elk getal is het aantal personen van die partij met minstens één positie in die categorie
-    (iemand met twee posities telt in beide). Kies een partij of een getal voor de namen.</p>
+    <p class="voetnoot" id="matrixVoetnoot"></p>
   </section>
 
-  <section id="partijSectie" hidden>
-    <div class="partij-kop">
-      <h2 id="partijNaam"></h2>
-      <div class="meta" id="partijMeta"></div>
+  <!-- Topfuncties -->
+  <section id="tab-topfuncties" role="tabpanel" hidden>
+    <div class="kpis" id="tfKpis"></div>
+    <div class="subbalk">
+      <div class="seg" id="tfFilter" role="group" aria-label="Filter op partijband"></div>
+      <button type="button" class="uitleg" aria-label="Uitleg over benoemde topfuncties"
+              data-uitleg="Een topfunctie is een leidinggevende titel zoals het register of de bron hem geeft (secretaris-generaal, directeur-generaal, inspecteur-generaal, voorzitter, president, directeur, korpschef, hoofdredacteur …) bij een ministerie, planbureau, adviesraad, kennisinstituut, toezichthouder, inspectie, uitvoeringsorganisatie, hoog college, rechterlijke instantie, veiligheidsdienst of medium. Plaatsvervangers en gewone leden tellen niet. Een partij staat bij de naam als het model een band (lid, bestuurder, adviseur, medewerker, woordvoerder) met bron kent; staat er niets, dan is er in het model geen band vastgelegd — geen bewijs dat er geen is. Een partijband zegt niets over hoe iemand de functie uitoefent.">ⓘ</button>
     </div>
-    <p class="stamboom" id="partijStamboom" hidden></p>
-    <div class="filterbalk">
-      <div class="tabs" id="klasseTabs"></div>
-      <input class="veld zoek" id="zoek" type="search" placeholder="Zoek op naam of organisatie…" aria-label="Zoek op naam of organisatie">
+    <div class="chiprij" id="tfCats"></div>
+    <div class="tf-raster">
+      <div class="tabelkaart"><table class="tf" id="tfTabel"></table></div>
+      <aside class="zijkaart" id="tfDekking"></aside>
     </div>
-    <div id="personen"></div>
-    <details class="kaart" id="partijBanden" style="margin-top:22px" hidden>
-      <summary>Banden van de partij zelf <span class="hint" id="partijBandenN"></span></summary>
-      <div id="partijBandenLijst"></div>
-    </details>
   </section>
 
-  <section id="gedeeldSectie">
-    <h2 class="sectie">Organisaties met mensen uit meerdere partijen
-      <button type="button" class="uitleg" aria-label="Uitleg over gedeelde organisaties"
-              data-uitleg="Een organisatie staat hier als personen van minstens twee verschillende partijen er een positie hebben (bestuur, lidmaatschap, dienstverband, ambt). De tabel telt per partijpaar in hoeveel van de getoonde organisaties beide partijen iemand hebben. Bij gemeenten is dat in de praktijk het college: burgemeester en wethouders.">ⓘ</button>
-    </h2>
-    <div class="tabs" id="sectorTabs" role="tablist" aria-label="Soort organisatie"></div>
-    <div class="samen-wrap" id="samen"></div>
-    <div id="gedeeldLijst"><div class="laden">Laden…</div></div>
+  <!-- Gedeeld -->
+  <section id="tab-gedeeld" role="tabpanel" hidden>
+    <div class="chiprij" id="sectorChips"></div>
+    <div class="gd-raster">
+      <div>
+        <div class="groepkop">Partijparen <button type="button" class="uitleg" aria-label="Uitleg over gedeelde organisaties"
+                data-uitleg="Een organisatie staat hier als personen van minstens twee verschillende partijen er een positie hebben (bestuur, lidmaatschap, dienstverband, ambt). De tabel telt per partijpaar in hoeveel van de getoonde organisaties beide partijen iemand hebben. Bij gemeenten is dat in de praktijk het college: burgemeester en wethouders.">ⓘ</button></div>
+        <div class="samen-wrap" id="samen"></div>
+      </div>
+      <div><div class="groepkop">Organisaties</div><div id="gedeeldLijst"><div class="laden">Laden…</div></div></div>
+    </div>
   </section>
 </main>
 
+<div class="lade-achter" id="ladeAchter" hidden></div>
+<aside class="lade" id="lade" hidden aria-modal="true" role="dialog" aria-labelledby="ladeTitel">
+  <div class="lade-kop" id="ladeKop">
+    <div class="lk-rij"><h3 id="ladeTitel"></h3><button type="button" class="sluit" id="ladeSluit" aria-label="Sluiten">×</button></div>
+    <div class="lk-sub" id="ladeSub"></div>
+    <input class="veld zoek" id="ladeZoek" type="search" placeholder="Zoek op naam of organisatie…" aria-label="Zoek in deze lijst">
+  </div>
+  <div class="lade-inhoud" id="ladeInhoud"></div>
+</aside>
+
 <script>
-// Data: GET /api/partijen (overzicht) en GET /api/partijen/<id> (detail), beide uit partijen.py.
-// Stand in de URL: #partij-<id> of #partij-<id>/<klasse>.
+// Data: GET /api/partijen (overzicht + sleutelposities) en GET /api/partijen/<id> (detail),
+// beide uit partijen.py. Stand in de URL: #partij-<id>[/<selectie>], #vergelijk,
+// #topfuncties, #gedeeld. Een selectie (opent het uitschuifpaneel met namen) is een klasse
+// ('kabinet'), een domein ('g.media'), een mandaat ('m.kiezers'), een blok ('b.gekozen'),
+// een mandaat binnen een klasse ('kiezers.gemeenteraad'), een domeinblok ('d.staat'), een
+// concrete combinatie ('x.gekozen_staat') of een paar domeinen ('y.media.rechtsstaat').
 const st = {
-  tijd: 'nu', fusies: true, overzicht: null, detail: null, partijId: null, klasse: null,
-  zoek: '', sector: 'buiten', open: new Set(),
+  tab: 'partij', tijd: 'nu', fusies: true, indeling: 'soort', overzicht: null, detail: null,
+  partijId: null, sel: null, sub: 'overzicht', zoek: '', ladeZoek: '', sector: null,
+  tfCat: 'alle', tfFilter: 'alle', open: new Set(), uit: new Set(), jaar: new Date().getFullYear() - 10,
 };
-try { st.fusies = localStorage.getItem('partijen.fusies') !== '0'; } catch (e) { /* geen opslag */ }
-const fusieParam = () => st.fusies ? '' : '?fusies=0';
+const JAAR_NU = new Date().getFullYear();
+try {
+  st.fusies = localStorage.getItem('partijen.fusies') !== '0';
+  st.indeling = localStorage.getItem('partijen.indeling') === 'mandaat' ? 'mandaat' : 'soort';
+  st.uit = new Set(JSON.parse(localStorage.getItem('partijen.uit') || '[]'));
+  const j = +localStorage.getItem('partijen.jaar');
+  if (j >= 1980 && j <= JAAR_NU) st.jaar = j;
+} catch (e) { /* geen opslag */ }
+const bewaar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* geen opslag */ } };
+// Query voor de API: fusies apart en/of de stand in een jaar.
+const qs = () => {
+  const q = new URLSearchParams();
+  if (!st.fusies) q.set('fusies', '0');
+  if (st.tijd === 'jaar') q.set('jaar', st.jaar);
+  const t = q.toString();
+  return t ? '?' + t : '';
+};
 const esc = hsEsc;
-const GROEP_LIMIET = 15;   // langere groepen klappen in tot "Toon alle N"
+const ROOSTER_LIMIET = 80;
 const KORT = {
   'Partij voor de Dieren': 'PvdD', 'Forum voor Democratie': 'FvD', 'ChristenUnie': 'CU',
   'GroenLinks': 'GL', 'Volt Nederland': 'Volt', 'Christelijk Verbond Oldebroek': 'CVO',
@@ -215,80 +477,133 @@ function kort(naam) {
   if (!m) return naam;
   return (m[2].length <= 6 && m[2] === m[2].toUpperCase()) ? m[2] : m[1];
 }
-const n = t => st.tijd === 'nu' ? t[1] : t[0];     // [alle, nu] → getal in de gekozen periode
-const telOrg = v => st.tijd === 'nu' ? v.nu : v.alle;
+const n = t => t ? (st.tijd === 'alle' ? t[0] : t[1]) : 0;   // [alle, nu] → getal in de gekozen periode
+const telOrg = v => st.tijd === 'alle' ? v.alle : v.nu;
+const periodeTekst = () => st.tijd === 'nu' ? 'lopend' : st.tijd === 'jaar' ? `in ${st.jaar}` : 'ooit';
 const normaliseer = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const relLabel = t => (typeof RELATION_LABELS !== 'undefined' && RELATION_LABELS[t]) || weergaveNaam(t);
 const pagina = (id, type) => `/${type === 'persoon' ? 'persoon' : 'entiteit'}/${id}`;
-
+const meervoud = (v, een, veel) => `${v} ${v === 1 ? een : veel}`;
+// Registernamen dragen soms hun functie als achtervoegsel: 'R. Geers (wethouder 's-Hertogenbosch)'.
+const ROL_ACHTERVOEGSEL = /^(.*?)\s+\((?:wethouder|burgemeester|kamerlid|directeur|secretaris|inspecteur|voorzitter|gedeputeerde|statenlid|raadslid|commissaris|europarlementari|dijkgraaf|minister|staatssecretaris|president|korpschef)/i;
+const kaleNaam = naam => { const m = (naam || '').match(ROL_ACHTERVOEGSEL); return m ? m[1] : naam; };
+const uitlegKnop = (label, tekst) => tekst
+  ? ` <button type="button" class="uitleg" aria-label="Uitleg: ${esc(label)}" data-uitleg="${esc(tekst)}">ⓘ</button>` : '';
+const cache = new Map();
 async function haal(url) {
+  if (cache.has(url)) return cache.get(url);
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url}: ${r.status}`);
-  return r.json();
+  const d = await r.json();
+  cache.set(url, d);
+  return d;
 }
 
-// ── Matrix ──────────────────────────────────────────────────────────────
-function zichtbarePartijen() {
-  return st.overzicht.partijen
-    .filter(p => n(p.n_personen) > 0)
-    .sort((a, b) => n(b.n_personen) - n(a.n_personen) || a.naam.localeCompare(b.naam));
+// ── Indeling: klassen, domeinen, mandaten, kleuren ──────────────────────
+const KL = () => Object.fromEntries(st.overzicht.klassen.map(k => [k.key, k]));
+const MANDAAT = () => Object.fromEntries(st.overzicht.mandaten.map(m => [m.key, m]));
+const GROEP = () => Object.fromEntries(st.overzicht.groepen.map(g => [g.key, g]));
+const kleurGroep = g => `var(--d-${g})`;
+const kleurBlok = b => `var(--b-${b})`;
+const GBLOK = () => Object.fromEntries(st.overzicht.groepen.map(g => [g.key, g.blok]));
+const DBLOK = () => Object.fromEntries(st.overzicht.domeinblokken.map(b => [b.key, b]));
+const KRUIS = () => Object.fromEntries(st.overzicht.kruisingen.map(k => [k.key, k]));
+const kleurKlasse = k => kleurGroep((KL()[k] || {}).groep || 'politiek');
+const kleurMandaat = m => `var(--m-${m})`;
+const isAggregaat = sel => /^[gmbxyd]\./.test(sel);
+function selTest(sel) {
+  if (!sel || /^[xy]\./.test(sel)) return () => true;   // x./y. filteren op personen, niet op posities
+  if (sel.startsWith('d.')) { const b = sel.slice(2), K = KL(), GB = GBLOK(); return x => GB[(K[x.klasse] || {}).groep] === b; }
+  if (sel.startsWith('g.')) { const g = sel.slice(2), K = KL(); return x => (K[x.klasse] || {}).groep === g; }
+  if (sel.startsWith('m.')) { const m = sel.slice(2); return x => x.mandaat === m; }
+  if (sel.startsWith('b.')) { const b = sel.slice(2), M = MANDAAT(); return x => (M[x.mandaat] || {}).blok === b; }
+  if (sel.includes('.')) { const [m, k] = sel.split('.'); return x => x.mandaat === m && x.klasse === k; }
+  return x => x.klasse === sel;
 }
-function renderMatrix() {
-  const ps = zichtbarePartijen();
-  const kls = st.overzicht.klassen.filter(k => ps.some(p => p.telling[k.key] && n(p.telling[k.key])));
-  const kolKlasse = p => p.id === st.partijId ? ' actief-kol' : '';
-  const vgTitel = p => p.voorgangers ? ` — incl. ${p.voorgangers.map(v => `${v.naam} (${v.looptijd})`).join(', ')}` : '';
-  let h = '<thead><tr><th class="rij">Positie ↓ · partij →</th>' + ps.map(p =>
-    `<th class="partij${p.id === st.partijId ? ' actief' : ''}${kolKlasse(p)}"><a href="#partij-${p.id}" title="${esc(p.naam + vgTitel(p))}">${esc(kort(p.naam))}${p.voorgangers ? `<span class="vg">+ ${esc(p.voorgangers.map(v => kort(v.naam)).join(', '))}</span>` : ''}</a></th>`
-  ).join('') + '</tr></thead><tbody>';
-  h += '<tr class="totaal"><th class="rij">Verbonden personen</th>' + ps.map(p =>
-    `<td class="${kolKlasse(p)}"><a href="#partij-${p.id}">${n(p.n_personen)}</a></td>`).join('') + '</tr>';
-  let groep = null;
-  kls.forEach(k => {
-    if (k.groep !== groep) {
-      groep = k.groep;
-      h += `<tr class="groep"><th colspan="${ps.length + 1}">${esc(k.groep_label)}</th></tr>`;
-    }
-    const waarden = ps.map(p => p.telling[k.key] ? n(p.telling[k.key]) : 0);
-    const max = Math.max(1, ...waarden);
-    h += `<tr><th class="rij">${esc(k.label)}</th>` + ps.map((p, i) => {
-      const v = waarden[i];
-      if (!v) return `<td class="nul${kolKlasse(p)}">·</td>`;
-      const pct = Math.round(10 + 48 * v / max);
-      return `<td class="${kolKlasse(p)}"><a href="#partij-${p.id}/${k.key}" title="${esc(p.naam)} · ${esc(k.label)}: ${v} ${v === 1 ? 'persoon' : 'personen'}"
-        style="background:color-mix(in srgb, var(--accent) ${pct}%, transparent)">${v}</a></td>`;
-    }).join('') + '</tr>';
-  });
-  h += '</tbody>';
-  document.getElementById('matrix').innerHTML = h;
+function selLabel(sel) {
+  const o = st.overzicht;
+  if (sel.startsWith('x.')) return (KRUIS()[sel.slice(2)] || {}).label || sel;
+  if (sel.startsWith('y.')) { const [a, b] = sel.slice(2).split('.'), G = GROEP(); return `${(G[a] || {}).label || a} én ${(G[b] || {}).label || b}`; }
+  if (sel.startsWith('d.')) return (DBLOK()[sel.slice(2)] || {}).label || sel;
+  if (sel.startsWith('g.')) return (GROEP()[sel.slice(2)] || {}).label || sel;
+  if (sel.startsWith('m.')) return (MANDAAT()[sel.slice(2)] || {}).label || sel;
+  if (sel.startsWith('b.')) return (o.blokken.find(b => b.key === sel.slice(2)) || {}).label || sel;
+  const klabel = k => (KL()[k] || {}).label || k;
+  if (sel.includes('.')) {
+    const [m, k] = sel.split('.');
+    return o.mandaat_rij_labels[`${m}|${k}`] || `${klabel(k)} · ${(MANDAAT()[m] || {}).label || m}`;
+  }
+  return klabel(sel);
 }
+function selKleur(sel) {
+  if (!sel || sel.startsWith('x.')) return 'var(--goud)';
+  if (sel.startsWith('y.')) return kleurGroep(sel.slice(2).split('.')[0]);
+  if (sel.startsWith('d.')) return kleurBlok(sel.slice(2));
+  if (sel.startsWith('g.')) return kleurGroep(sel.slice(2));
+  if (sel.startsWith('m.')) return kleurMandaat(sel.slice(2));
+  if (sel.startsWith('b.')) return sel === 'b.gekozen' ? 'var(--m-kiezers)' : 'var(--m-benoemd)';
+  if (sel.includes('.')) return kleurMandaat(sel.split('.')[0]);
+  return kleurKlasse(sel);
+}
+const selKlasse = sel => (!sel || isAggregaat(sel)) ? null : (sel.includes('.') ? sel.split('.')[1] : sel);
+const isBulk = sel => !!(KL()[selKlasse(sel)] || {}).bulk;
+// Groepen met rijen: per domein → klasse, of gekozen/benoemd → mandaat → klasse.
+function indelingGroepen() {
+  const o = st.overzicht;
+  if (st.indeling === 'mandaat') {
+    return o.mandaten.map(m => ({
+      sel: `m.${m.key}`, label: m.label, blok: m.blok, uitleg: m.uitleg, kleur: kleurMandaat(m.key),
+      dim: ['telling_mandaat', m.key],
+      rijen: o.klassen.map(k => ({
+        sel: `${m.key}.${k.key}`, label: o.mandaat_rij_labels[`${m.key}|${k.key}`] || k.label,
+        dim: ['telling_mk', `${m.key}|${k.key}`], uitleg: k.uitleg })),
+    }));
+  }
+  return o.groepen.map(g => ({
+    sel: `g.${g.key}`, label: g.label, blok: g.blok, kleur: kleurGroep(g.key), dim: ['telling_groep', g.key],
+    rijen: o.klassen.filter(k => k.groep === g.key).map(k => ({
+      sel: k.key, label: k.label, dim: ['telling', k.key], uitleg: k.uitleg })),
+  }));
+}
+const waarde = (obj, dim) => obj[dim[0]] && obj[dim[0]][dim[1]] ? n(obj[dim[0]][dim[1]]) : 0;
 
-// ── Partij-detail ───────────────────────────────────────────────────────
+// ── Personen ────────────────────────────────────────────────────────────
 function telt(pos) { return pos.binnen_band && (st.tijd === 'alle' || pos.nu); }
-function persoonZichtbaar(p) {
-  if (st.tijd === 'nu' && p.band_afgelopen) return false;
-  if (st.klasse && !p.posities.some(x => x.klasse === st.klasse && telt(x))) return false;
-  if (st.zoek) {
+const inPeriode = p => !(st.tijd !== 'alle' && p.band_afgelopen);
+function domeinen(p) {
+  const K = KL();
+  const volg = st.overzicht.groepen.map(g => g.key);
+  return [...new Set(p.posities.filter(telt).map(x => (K[x.klasse] || {}).groep))].filter(Boolean)
+    .sort((a, b) => volg.indexOf(a) - volg.indexOf(b));
+}
+const blokkenVan = p => { const GB = GBLOK(); return [...new Set(domeinen(p).map(g => GB[g]))]; };
+function past(p, sel, zoek) {
+  if (!inPeriode(p)) return false;
+  if (sel && sel.startsWith('x.')) {
+    const k = KRUIS()[sel.slice(2)], bl = blokkenVan(p);
+    if (!k || !k.blokken.every(b => bl.includes(b))) return false;
+  } else if (sel && sel.startsWith('y.')) {
+    const [a, b] = sel.slice(2).split('.'), ds = domeinen(p);
+    if (!ds.includes(a) || !ds.includes(b)) return false;
+  }
+  else if (sel) { const t = selTest(sel); if (!p.posities.some(x => t(x) && telt(x))) return false; }
+  if (zoek) {
     const hooi = normaliseer([p.naam, ...p.posities.map(x => x.org.naam + ' ' + x.label)].join(' '));
-    if (!hooi.includes(st.zoek)) return false;
+    if (!hooi.includes(zoek)) return false;
   }
   return true;
 }
-function groepVan(p) {
-  // Hoofdpositie in de gekozen periode: de hoogst gerangschikte klasse met een tellende positie.
-  const rang = Object.fromEntries(st.detail.klassen.map((k, i) => [k.key, i]));
-  const ks = p.posities.filter(telt).map(x => x.klasse).sort((a, b) => rang[a] - rang[b]);
-  return ks[0] || null;
-}
-function posChip(x) {
+function posChip(x, sel) {
   const cls = ['pos'];
   if (x.afgelopen) cls.push('afgelopen');
   if (!x.binnen_band) cls.push('buiten');
-  if (st.klasse && x.klasse === st.klasse) cls.push('uitgelicht');
+  if (sel && !/^[xy]\./.test(sel) && selTest(sel)(x)) cls.push('uitgelicht');
   const tip = !x.binnen_band ? 'Buiten de periode van de band met deze partij' : (x.afgelopen ? 'Afgelopen' : '');
-  return `<span class="${cls.join(' ')}"${tip ? ` title="${tip}"` : ''}><a class="lab" href="/relatie/${x.relation_id}" title="Onderbouwing van deze band">${esc(x.label)}</a> · <a href="${pagina(x.org.id, x.org.type)}">${esc(x.org.naam)}</a>${x.looptijd ? ` <span class="lt">${esc(x.looptijd)}</span>` : ''}</span>`;
+  const m = MANDAAT()[x.mandaat];
+  const mtag = m && m.kort ? ` <span class="mtag" title="${esc(m.label)}">${esc(m.kort)}</span>` : '';
+  return `<span class="${cls.join(' ')}" style="--k:${kleurKlasse(x.klasse)}"${tip ? ` title="${tip}"` : ''}><a class="lab" href="/relatie/${x.relation_id}" title="Onderbouwing van deze band">${esc(x.label)}</a> · <a href="${pagina(x.org.id, x.org.type)}">${esc(x.org.naam)}</a>${x.looptijd ? ` <span class="lt">${esc(x.looptijd)}</span>` : ''}${mtag}</span>`;
 }
-function persoonRij(p) {
+function bandTekst(p) {
   const band = p.band.map(b => {
     const andere = b.partij && b.partij.id !== st.detail.partij.id;
     const tip = b.einde_door ? ` title="${esc(b.einde_door.naam)} hield op te bestaan (${esc(b.einde_door.einde || '')})"` : '';
@@ -296,96 +611,402 @@ function persoonRij(p) {
   }).join(', ');
   const ook = p.andere_partijen.length
     ? ` · ook ${p.andere_partijen.map(a => `<a href="#partij-${a.id}">${esc(kort(a.naam))}</a>${a.afgelopen ? ' (afgelopen)' : ''}`).join(', ')}` : '';
-  const posities = p.posities.length ? p.posities.map(posChip).join('')
-    : '<span class="leeg-pos">Geen positie in het model</span>';
-  const overig = p.overig.length ? `<div class="p-overig">Overige banden: ${p.overig.map(o =>
-    `<a href="/relatie/${o.relation_id}">${esc(relLabel(o.type))}</a> ${o.richting === 'uit' ? '→' : '←'} <a href="${pagina(o.ander.id, o.ander.type)}">${esc(o.ander.naam)}</a>${o.afgelopen ? ' <span class="lt">(afgelopen)</span>' : ''}`).join(' · ')}</div>` : '';
-  return `<div class="persoon">
-    <div><a class="p-naam" href="/persoon/${p.id}">${esc(p.naam)}</a><a class="p-graaf" href="/#sel=entity:${p.id}" title="Toon in het netwerk">⌖</a>
-      <div class="p-band">${band}${ook}</div></div>
-    <div class="posities">${posities}</div>${overig}
+  return band + ook;
+}
+function persoonKaart(p, sel) {
+  const G = GROEP();
+  const dots = domeinen(p).map(g => `<span class="dot" style="--k:${kleurGroep(g)}" title="${esc(G[g].label)}"></span>`).join('');
+  const t = sel && !/^[xy]\./.test(sel) ? selTest(sel) : null;
+  const posities = [...p.posities].sort((a, b) => (t ? (t(b) ? 1 : 0) - (t(a) ? 1 : 0) : 0));
+  const overig = p.overig.length ? `<div class="p-overig">Overige banden: ${p.overig.slice(0, 6).map(o =>
+    `<a href="/relatie/${o.relation_id}">${esc(relLabel(o.type))}</a> ${o.richting === 'uit' ? '→' : '←'} <a href="${pagina(o.ander.id, o.ander.type)}">${esc(o.ander.naam)}</a>`).join(' · ')}${p.overig.length > 6 ? ` · +${p.overig.length - 6}` : ''}</div>` : '';
+  return `<div class="perskaart">
+    <div class="pk-top"><a class="pn" href="/persoon/${p.id}" title="${esc(p.naam)}">${esc(kaleNaam(p.naam))}</a><a class="graaf" href="/#sel=entity:${p.id}" title="Toon in het netwerk">⌖</a><span class="dots">${dots}</span></div>
+    <div class="p-band">${bandTekst(p)}</div>
+    <div class="chips">${posities.length ? posities.map(x => posChip(x, sel)).join('') : '<span class="hint">Geen positie in het model</span>'}</div>${overig}
   </div>`;
 }
-function renderKlasseTabs() {
-  const d = st.detail;
-  const tot = d.personen.filter(p => !(st.tijd === 'nu' && p.band_afgelopen)).length;
-  const tabs = [`<button type="button" class="tab${st.klasse ? '' : ' actief'}" data-klasse="">Alle <span class="telb">${tot}</span></button>`];
-  d.klassen.forEach(k => {
-    const t = d.telling[k.key];
-    if (!t || !n(t)) return;
-    tabs.push(`<button type="button" class="tab${st.klasse === k.key ? ' actief' : ''}" data-klasse="${k.key}">${esc(k.label)} <span class="telb">${n(t)}</span></button>`);
-  });
-  const box = document.getElementById('klasseTabs');
-  box.innerHTML = tabs.join('');
-  box.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
-    zetHash(st.partijId, b.dataset.klasse || null);
-  }));
+function roosterCel(p, t) {
+  const xs = p.posities.filter(x => telt(x) && t(x));
+  const x = xs.find(y => !y.afgelopen) || xs[0];
+  const org = x ? x.org.naam.replace(/^Gemeente /, '') : '';
+  const rest = p.posities.filter(y => telt(y) && !t(y));
+  const plus = rest.length ? `<span class="plus" title="${esc(rest.map(y => `${y.label} · ${y.org.naam}`).join('\n'))}">+${rest.length}</span>` : '';
+  return `<div class="cel${x && x.afgelopen ? ' oud' : ''}"><a class="cn" href="/persoon/${p.id}" title="${esc(p.naam)}">${esc(kaleNaam(p.naam))}</a><span class="co" title="${esc(x ? `${x.label} · ${x.org.naam}${x.looptijd ? ' ' + x.looptijd : ''}` : '')}">${esc(org)}</span>${plus}</div>`;
 }
-function renderPersonen() {
-  const d = st.detail;
-  const lijst = d.personen.filter(persoonZichtbaar);
-  const groepen = new Map();
-  lijst.forEach(p => {
-    const g = st.klasse || groepVan(p) || '_geen';
-    if (!groepen.has(g)) groepen.set(g, []);
-    groepen.get(g).push(p);
-  });
-  const volgorde = [...d.klassen.map(k => k.key), '_geen'];
-  const label = Object.fromEntries(d.klassen.map(k => [k.key, k.label]));
-  label._geen = 'Zonder positie in deze periode';
-  let h = '';
-  volgorde.filter(g => groepen.has(g)).forEach(g => {
-    const ps = groepen.get(g);
-    const open = st.open.has(g) || st.zoek || ps.length <= GROEP_LIMIET + 5;
-    const zicht = open ? ps : ps.slice(0, GROEP_LIMIET);
-    h += `<div class="groep"><h3 class="groep-kop">${esc(label[g])} <span class="n">${ps.length}</span></h3>
-      ${zicht.map(persoonRij).join('')}
-      ${open ? '' : `<button type="button" class="meer" data-groep="${g}">Toon alle ${ps.length}</button>`}</div>`;
-  });
-  const box = document.getElementById('personen');
-  box.innerHTML = h || '<div class="leeg">Niemand in deze selectie.</div>';
-  box.querySelectorAll('button.meer').forEach(b => b.addEventListener('click', () => {
-    st.open.add(b.dataset.groep); renderPersonen();
-  }));
+// Een lijst personen: grote groepen (wethouders, burgemeesters) als rooster, de rest als kaarten.
+function personenHtml(lijst, sel, sleutelOpen) {
+  if (!lijst.length) return '<div class="leegvak">Niemand in deze selectie.</div>';
+  if (sel && isBulk(sel)) {
+    const t = selTest(sel);
+    const org = p => (p.posities.find(x => telt(x) && t(x)) || { org: { naam: '' } }).org.naam;
+    const gesorteerd = [...lijst].sort((a, b) => org(a).localeCompare(org(b)) || a.naam.localeCompare(b.naam));
+    const open = st.open.has(sleutelOpen) || gesorteerd.length <= ROOSTER_LIMIET + 10;
+    const zicht = open ? gesorteerd : gesorteerd.slice(0, ROOSTER_LIMIET);
+    return `<div class="hint" style="margin-bottom:6px">Op plaats · +N = nog andere posities</div><div class="rooster">${zicht.map(p => roosterCel(p, t)).join('')}</div>`
+      + (open ? '' : `<button type="button" class="meer" data-open="${sleutelOpen}">Toon alle ${gesorteerd.length}</button>`);
+  }
+  const open = st.open.has(sleutelOpen) || lijst.length <= 40;
+  const zicht = open ? lijst : lijst.slice(0, 30);
+  return `<div class="pgrid">${zicht.map(p => persoonKaart(p, sel)).join('')}</div>`
+    + (open ? '' : `<button type="button" class="meer" data-open="${sleutelOpen}">Toon alle ${lijst.length}</button>`);
 }
-function renderPartijBanden() {
-  const d = st.detail;
-  const det = document.getElementById('partijBanden');
-  det.hidden = !d.organisaties.length;
-  document.getElementById('partijBandenN').textContent = d.organisaties.length ? `(${d.organisaties.length})` : '';
-  document.getElementById('partijBandenLijst').innerHTML = d.organisaties.map(o =>
-    `<div class="pband-rij${o.afgelopen ? ' afg' : ''}"><a href="/relatie/${o.relation_id}">${esc(relLabel(o.type))}</a>
-      ${o.richting === 'uit' ? '→' : '←'} <a href="${pagina(o.ander.id, o.ander.type)}">${esc(o.ander.naam)}</a>
-      <span class="hint">${esc(weergaveNaam(o.ander.type))}${o.mechanisme ? ' · ' + esc(weergaveNaam(o.mechanisme)) : ''}${o.looptijd ? ' · ' + esc(o.looptijd) : ''}${o.via ? ' · via ' + esc(o.via.naam) : ''}</span></div>`).join('');
+const sorteerPersonen = lijst => [...lijst].sort((a, b) =>
+  domeinen(b).length - domeinen(a).length || a.naam.localeCompare(b.naam));
+
+// ── Tab: per partij ─────────────────────────────────────────────────────
+function zichtbarePartijen() {
+  return st.overzicht.partijen.filter(p => n(p.n_personen) > 0)
+    .sort((a, b) => n(b.n_personen) - n(a.n_personen) || a.naam.localeCompare(b.naam));
 }
-function renderDetail() {
+function profielBalk(p) {
+  const bs = st.overzicht.domeinblokken.map(b => [b, n((p.telling_dblok || {})[b.key])]);
+  const som = bs.reduce((t, [, v]) => t + v, 0) || 1;
+  return `<div class="profielbalk" title="${esc(bs.map(([b, v]) => `${b.label}: ${v}`).join(' · '))}">${bs.filter(([, v]) => v)
+    .map(([b, v]) => `<i style="width:${100 * v / som}%;background:${kleurBlok(b.key)}"></i>`).join('')}</div>`;
+}
+function renderKiezer() {
+  const box = document.getElementById('kiezer');
+  box.innerHTML = zichtbarePartijen().map(p => `<button type="button" role="option" class="pkaart${p.id === st.partijId ? ' actief' : ''}" data-partij="${p.id}" aria-selected="${p.id === st.partijId}" title="${esc(p.naam)}${p.voorgangers ? ' — incl. ' + esc(p.voorgangers.map(v => v.naam).join(', ')) : ''}">
+      <span class="pk-naam">${esc(kort(p.naam))}</span>
+      <span class="pk-n">${meervoud(n(p.n_personen), 'persoon', 'personen')}</span>${profielBalk(p)}</button>`).join('');
+  const actief = box.querySelector('.pkaart.actief');
+  if (actief) box.scrollLeft = Math.max(0, actief.offsetLeft - box.offsetLeft - 40);
+}
+document.getElementById('kiezer').addEventListener('click', e => {
+  const b = e.target.closest('[data-partij]');
+  if (b) location.hash = `#partij-${b.dataset.partij}`;
+});
+function renderDash() {
   const d = st.detail;
-  document.getElementById('partijSectie').hidden = false;
+  if (!d) return;
+  document.getElementById('dash').hidden = false;
   document.getElementById('partijNaam').textContent = d.partij.naam;
-  const nn = n(d.n_personen);
   document.getElementById('partijMeta').innerHTML =
-    `<span>${nn} verbonden ${nn === 1 ? 'persoon' : 'personen'}${st.tijd === 'nu' ? ' (lopend)' : ''}</span>
-     ${d.partij.looptijd ? `<span>${esc(d.partij.looptijd)}</span>` : ''}
+    `${d.partij.looptijd ? `<span>${esc(d.partij.looptijd)}</span>` : ''}
      <a href="/#sel=entity:${d.partij.id}">↗ in het netwerk</a>
      <a href="/entiteit/${d.partij.id}">↗ pagina van ${esc(d.partij.naam)}</a>`;
   const partijLink = v => `<a href="#partij-${v.id}">${esc(v.naam)}</a>${v.looptijd ? ` (${esc(v.looptijd)})` : ''}`;
-  const stam = [];
   const enLijst = xs => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} en ${xs[xs.length - 1]}`;
-  if (d.partij.voorgangers) stam.push(`Voortgekomen uit ${enLijst(d.partij.voorgangers.map(partijLink))}: hun banden staan hieronder met hun eigen partij en periode.`);
+  const stam = [];
+  if (d.partij.voorgangers) stam.push(`Voortgekomen uit ${enLijst(d.partij.voorgangers.map(partijLink))}: hun banden tellen mee, met hun eigen partij en periode.`);
   if (d.partij.opgegaan_in) stam.push(`Opgegaan in ${enLijst(d.partij.opgegaan_in.map(partijLink))}; haar banden lopen niet verder dan haar einde.`);
   const sb = document.getElementById('partijStamboom');
   sb.hidden = !stam.length;
   sb.innerHTML = stam.join(' ');
-  renderKlasseTabs();
-  renderPersonen();
-  renderPartijBanden();
+
+  // Kerncijfers: elk opent het paneel met de namen
+  const kpi = (label, v, sub, kleur, sel) => `<button type="button" class="kpi${sel && st.sel === sel ? ' actief' : ''}" style="--k:${kleur}" ${sel ? `data-sel="${sel}"` : 'data-sub="alle"'}><span class="kl">${esc(label)}</span><span class="kn">${v}</span><span class="ks">${sub}</span></button>`;
+  const db = d.telling_dblok || {}, kr = d.telling_kruis || {};
+  document.getElementById('kpis').innerHTML = [
+    kpi('Verbonden personen', n(d.n_personen), st.tijd === 'nu' ? 'met een lopende band' : st.tijd === 'jaar' ? `met een band in ${st.jaar}` : 'ooit verbonden', 'var(--accent)', null),
+    kpi('Ongekozen staat', n(db.staat), 'benoemde functies in het openbaar bestuur', 'var(--b-staat)', 'd.staat'),
+    kpi('Netwerken', n(db.buiten), 'media, bedrijfsleven, lobby, maatschappij', 'var(--b-buiten)', 'd.buiten'),
+    kpi('Gekozen', n(db.gekozen), 'volksvertegenwoordiging & politiek bestuur', 'var(--b-gekozen)', 'd.gekozen'),
+    ...st.overzicht.kruisingen.filter(k => k.key !== 'staat_buiten').map(k =>
+      kpi(k.label, n(kr[k.key]), k.key === 'gekozen_staat' ? 'politiek én een benoemde functie' : 'politiek én media, bedrijf of lobby', 'var(--goud)', `x.${k.key}`)),
+  ].join('');
+
+  // Onderdelen
+  const nTop = partijTopfuncties().length;
+  const subs = [['overzicht', 'Overzicht'], ['verbindingen', 'Verbindingen'],
+    ['alle', `Alle personen · ${d.personen.filter(inPeriode).length}`], ['top', `Topfuncties · ${nTop}`],
+    ['banden', `Banden van de partij · ${d.organisaties.length}`]];
+  document.getElementById('subSeg').innerHTML = subs.map(([k, l]) =>
+    `<button type="button" role="tab" data-sub="${k}" class="${st.sub === k ? 'actief' : ''}" aria-selected="${st.sub === k}">${esc(l)}</button>`).join('');
+  const extra = document.getElementById('subExtra');
+  if (st.sub === 'overzicht') {
+    extra.innerHTML = `<div class="seg" role="group" aria-label="Indeling"><button type="button" data-indeling="soort" class="${st.indeling === 'soort' ? 'actief' : ''}">Per domein</button><button type="button" data-indeling="mandaat" class="${st.indeling === 'mandaat' ? 'actief' : ''}">Gekozen of benoemd</button></div>`;
+  } else if (st.sub === 'alle') {
+    extra.innerHTML = `<input class="veld zoek" id="zoek" type="search" placeholder="Zoek op naam of organisatie…" aria-label="Zoek" value="${esc(st.zoek)}">`;
+    const z = document.getElementById('zoek');
+    let timer = null;
+    z.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { st.zoek = normaliseer(z.value.trim()); renderSub(); }, 150); });
+  } else {
+    extra.innerHTML = '';
+  }
+  renderSub();
+}
+function renderSub() {
+  const d = st.detail;
+  const box = document.getElementById('sub');
+  const kaart = G => {
+    const rijen = G.rijen.filter(R => waarde(d, R.dim) > 0);
+    const max = Math.max(1, ...rijen.map(R => waarde(d, R.dim)));
+    return `<div class="dkaart" style="--k:${G.kleur}">
+      <div class="dk-kop"><span class="dot"></span><h3>${esc(G.label)}${uitlegKnop(G.label, G.uitleg)}</h3><button type="button" class="dk-n" data-sel="${G.sel}" title="Toon iedereen">${waarde(d, G.dim)}</button></div>
+      ${rijen.map(R => { const v = waarde(d, R.dim); return `<button type="button" class="balkrij${st.sel === R.sel ? ' actief' : ''}" data-sel="${R.sel}" title="${esc(R.uitleg || R.label)}"><span class="bl">${esc(R.label)}</span><span class="bb"><i style="width:${Math.max(3, Math.round(100 * Math.sqrt(v / max)))}%"></i></span><span class="bn">${v}</span></button>`; }).join('')}
+    </div>`;
+  };
+  if (st.sub === 'overzicht') {
+    const gs = indelingGroepen().filter(G => waarde(d, G.dim) > 0);
+    if (st.indeling === 'mandaat') {
+      box.innerHTML = gs.length ? `<div class="panelen">${gs.map(kaart).join('')}</div>` : '<div class="leegvak">Geen posities in deze periode.</div>';
+      return;
+    }
+    // Per domein, in drie blokken: eerst wat niet uit verkiezingen volgt.
+    box.innerHTML = st.overzicht.domeinblokken.map(B => {
+      const binnen = gs.filter(G => G.blok === B.key);
+      const v = n((d.telling_dblok || {})[B.key]);
+      return `<div class="blok${binnen.length ? '' : ' leegblok'}" style="--k:${kleurBlok(B.key)}">
+        <div class="blokkop"><h3>${esc(B.label)}</h3><button type="button" class="dk-n" style="--k:${kleurBlok(B.key)}" data-sel="d.${B.key}" title="Toon iedereen">${v}</button>
+          <span class="hint">${binnen.length ? esc(B.uitleg) : `Het model kent geen posities van ${esc(d.partij.naam)} in dit blok (${periodeTekst()}).`}</span></div>
+        <div class="panelen">${binnen.map(kaart).join('')}</div></div>`;
+    }).join('');
+  } else if (st.sub === 'verbindingen') {
+    // Concrete combinaties en het rooster domein × domein: wie zit waar tegelijk (of na elkaar)?
+    const kr = d.telling_kruis || {};
+    const kaartjes = st.overzicht.kruisingen.map(k => `<button type="button" class="kpi" style="--k:var(--goud)" data-sel="x.${k.key}"><span class="kl">${esc(k.label)}</span><span class="kn">${n(kr[k.key])}</span><span class="ks">${esc(k.uitleg)}</span></button>`).join('');
+    const personen = d.personen.filter(inPeriode);
+    const doms = st.overzicht.groepen.filter(g => personen.some(p => domeinen(p).includes(g.key)));
+    const paar = (a, b) => personen.filter(p => { const ds = domeinen(p); return ds.includes(a) && ds.includes(b); }).length;
+    const max = Math.max(1, ...doms.flatMap(a => doms.filter(b => b.key !== a.key).map(b => paar(a.key, b.key))));
+    let t = '';
+    if (doms.length >= 2) {
+      t = `<table class="vgrid"><thead><tr><th></th>${doms.map(g => `<th title="${esc(g.label)}"><span class="dot" style="--k:${kleurGroep(g.key)}"></span> ${esc(g.label)}</th>`).join('')}</tr></thead><tbody>`
+        + doms.map(a => `<tr><th><span class="dot" style="--k:${kleurGroep(a.key)}"></span> ${esc(a.label)}</th>${doms.map(b => {
+          if (a.key === b.key) return '<td class="diag">·</td>';
+          const v = paar(a.key, b.key);
+          if (!v) return '<td class="nul">·</td>';
+          return `<td style="background:color-mix(in srgb, ${kleurGroep(a.key)} ${Math.round(14 + 50 * v / max)}%, transparent)"><a href="#partij-${d.partij.id}/y.${a.key}.${b.key}" title="${esc(a.label)} én ${esc(b.label)}: ${meervoud(v, 'persoon', 'personen')}">${v}</a></td>`;
+        }).join('')}</tr>`).join('') + '</tbody></table>';
+    }
+    box.innerHTML = `<div class="kruisen">${kaartjes}</div>
+      <div class="groepkop">Domein × domein <span class="hint">personen van ${esc(d.partij.naam)} met posities in beide (${periodeTekst()}); klik voor de namen</span></div>`
+      + (t ? `<div class="vgrid-wrap">${t}</div>` : '<div class="leegvak">Te weinig domeinen voor verbindingen.</div>');
+  } else if (st.sub === 'alle') {
+    const lijst = sorteerPersonen(d.personen.filter(p => past(p, null, st.zoek)));
+    // Wie alleen burgemeester of wethouder is, staat apart in een rooster; de rest als kaarten.
+    const K = KL();
+    const bulk = st.overzicht.klassen.filter(k => k.bulk);
+    const alleenBulk = p => { const ks = new Set(p.posities.filter(telt).map(x => x.klasse)); return ks.size > 0 && [...ks].every(k => K[k].bulk); };
+    const rest = lijst.filter(p => !alleenBulk(p));
+    let h = `<div class="groepkop">Personen <span class="n">${rest.length}</span></div>` + personenHtml(rest, null, 'alle');
+    bulk.forEach(k => {
+      const ps = lijst.filter(p => alleenBulk(p) && p.posities.some(x => telt(x) && x.klasse === k.key));
+      if (ps.length) h += `<div class="groepkop" style="--k:${kleurKlasse(k.key)}"><span class="dot"></span>${esc(k.label)} <span class="n">${ps.length}</span> <span class="hint">zonder andere positie</span></div>` + personenHtml(ps, k.key, 'alle:' + k.key);
+    });
+    box.innerHTML = h;
+  } else if (st.sub === 'top') {
+    const fs = partijTopfuncties();
+    box.innerHTML = fs.length ? `<div class="tabelkaart"><table class="tf">${tfKop()}${fs.map(tfRij).join('')}</table></div>`
+      : `<div class="leegvak">Het model kent geen benoemde topfunctie met een houder die aan ${esc(d.partij.naam)} verbonden is. Zie <a href="#topfuncties">Benoemde topfuncties</a> voor alle functies en wat nog ontbreekt.</div>`;
+  } else if (st.sub === 'banden') {
+    box.innerHTML = d.organisaties.length ? `<div class="lijstje">${d.organisaties.map(o =>
+      `<div class="rij${o.afgelopen ? ' afg' : ''}"><a href="/relatie/${o.relation_id}">${esc(relLabel(o.type))}</a>
+        ${o.richting === 'uit' ? '→' : '←'} <a href="${pagina(o.ander.id, o.ander.type)}">${esc(o.ander.naam)}</a>
+        <span class="hint">${esc(weergaveNaam(o.ander.type))}${o.mechanisme ? ' · ' + esc(weergaveNaam(o.mechanisme)) : ''}${o.looptijd ? ' · ' + esc(o.looptijd) : ''}${o.via ? ' · via ' + esc(o.via.naam) : ''}</span></div>`).join('')}</div>`
+      : '<div class="leegvak">Geen banden van de partij zelf in het model.</div>';
+  }
+}
+document.getElementById('tab-partij').addEventListener('click', e => {
+  if (e.target.closest('button.uitleg') || e.target.closest('#kiezer')) return;
+  const meer = e.target.closest('[data-open]');
+  if (meer) { st.open.add(meer.dataset.open); renderSub(); return; }
+  const sub = e.target.closest('[data-sub]');
+  if (sub) { st.sub = sub.dataset.sub; st.open.clear(); renderDash(); return; }
+  const ind = e.target.closest('[data-indeling]');
+  if (ind) { zetIndeling(ind.dataset.indeling); return; }
+  const sel = e.target.closest('[data-sel]');
+  if (sel) location.hash = `#partij-${st.partijId}/${sel.dataset.sel}`;
+});
+
+// ── Uitschuifpaneel met namen ───────────────────────────────────────────
+function renderLade() {
+  const lade = document.getElementById('lade'), achter = document.getElementById('ladeAchter');
+  const open = !!(st.tab === 'partij' && st.sel && st.detail);
+  lade.hidden = achter.hidden = !open;
+  document.body.style.overflow = open ? 'hidden' : '';
+  if (!open) return;
+  const d = st.detail;
+  const lijst = sorteerPersonen(d.personen.filter(p => past(p, st.sel, st.ladeZoek)));
+  document.getElementById('ladeKop').style.setProperty('--k', selKleur(st.sel));
+  document.getElementById('ladeTitel').textContent = selLabel(st.sel);
+  const kl = KL()[selKlasse(st.sel)];
+  document.getElementById('ladeSub').innerHTML = `${esc(d.partij.naam)} · ${meervoud(lijst.length, 'persoon', 'personen')}${` (${periodeTekst()})`}${kl && kl.uitleg ? `<br>${esc(kl.uitleg)}` : ''}`;
+  document.getElementById('ladeInhoud').innerHTML = personenHtml(lijst, st.sel, 'lade:' + st.sel);
+}
+function sluitLade() { location.hash = `#partij-${st.partijId}`; }
+document.getElementById('ladeSluit').addEventListener('click', sluitLade);
+document.getElementById('ladeAchter').addEventListener('click', sluitLade);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('lade').hidden && !document.querySelector('.hs-popover')) sluitLade();
+});
+document.getElementById('lade').addEventListener('click', e => {
+  const meer = e.target.closest('[data-open]');
+  if (meer) { st.open.add(meer.dataset.open); renderLade(); }
+});
+let ladeTimer = null;
+document.getElementById('ladeZoek').addEventListener('input', e => {
+  clearTimeout(ladeTimer);
+  ladeTimer = setTimeout(() => { st.ladeZoek = normaliseer(e.target.value.trim()); renderLade(); }, 150);
+});
+
+// ── Tab: vergelijken (matrix) ───────────────────────────────────────────
+const VOETNOOT = {
+  soort: 'Elk getal is het aantal personen van die partij met minstens één positie in die categorie; een domein of blok telt iedereen één keer. De ongekozen staat en de netwerken staan vooraan, het gekozen deel (al openbaar via verkiezingen) apart onderaan. Klap een domein uit met ▾. Klik op een partij of een getal voor de namen.',
+  mandaat: 'Elk getal is het aantal personen van die partij met minstens één positie van die soort. Wie een gekozen én een benoemde positie heeft, telt in beide blokken. Klik op een partij of een getal voor de namen.',
+};
+function renderMatrix() {
+  const ps = zichtbarePartijen();
+  const o = st.overzicht;
+  document.querySelectorAll('#indelingSeg button').forEach(b => b.classList.toggle('actief', b.dataset.indeling === st.indeling));
+  const kolKlasse = p => p.id === st.partijId ? ' actief-kol' : '';
+  const vgTitel = p => p.voorgangers ? ` — incl. ${p.voorgangers.map(v => `${v.naam} (${v.looptijd})`).join(', ')}` : '';
+  const heeft = dim => ps.some(p => waarde(p, dim) > 0);
+  const rij = (label, sel, dim, cls = '', uitleg = '', klap = null, kleur = null) => {
+    const waarden = ps.map(p => waarde(p, dim));
+    const max = Math.max(1, ...waarden);
+    const knop = klap ? `<button type="button" class="klap" data-klap="${klap}" aria-expanded="${st.uit.has(klap)}" aria-label="In- of uitklappen">▾</button>` : '';
+    const dot = kleur ? `<span class="dot" style="--k:${kleur}"></span>` : '';
+    const tint = kleur || 'var(--accent)';
+    return `<tr${cls ? ` class="${cls}"` : ''}><th class="rij">${knop}${dot}${esc(label)}${uitlegKnop(label, uitleg)}</th>` + ps.map((p, i) => {
+      const v = waarden[i];
+      if (!v) return `<td class="nul${kolKlasse(p)}">·</td>`;
+      const pct = Math.round(12 + 50 * v / max);
+      return `<td class="${kolKlasse(p)}"><a href="#partij-${p.id}/${sel}" title="${esc(p.naam)} · ${esc(label)}: ${meervoud(v, 'persoon', 'personen')}"
+        style="background:color-mix(in srgb, ${tint} ${pct}%, transparent)">${v}</a></td>`;
+    }).join('') + '</tr>';
+  };
+  let h = '<thead><tr><th class="rij">Positie ↓ · partij →</th>' + ps.map(p =>
+    `<th class="partij${p.id === st.partijId ? ' actief' : ''}${kolKlasse(p)}"><a href="#partij-${p.id}" title="${esc(p.naam + vgTitel(p))}">${esc(kort(p.naam))}${p.voorgangers ? `<span class="vg">+ ${esc(p.voorgangers.map(v => kort(v.naam)).join(', '))}</span>` : ''}</a></th>`
+  ).join('') + '</tr></thead><tbody>';
+  h += '<tr class="totaal"><th class="rij">Verbonden personen</th>' + ps.map(p =>
+    `<td class="${kolKlasse(p)}"><a href="#partij-${p.id}">${n(p.n_personen)}</a></td>`).join('') + '</tr>';
+  o.kruisingen.forEach(k => { h += rij(k.label, `x.${k.key}`, ['telling_kruis', k.key], 'kruis', k.uitleg, null, 'var(--goud)'); });
+  const groep = G => {
+    if (!heeft(G.dim)) return '';
+    let s = rij(G.label, G.sel, G.dim, 'kop', G.uitleg, G.sel, G.kleur);
+    if (st.uit.has(G.sel)) G.rijen.filter(R => heeft(R.dim)).forEach(R => { s += rij(R.label, R.sel, R.dim, 'sub', R.uitleg); });
+    return s;
+  };
+  const gs = indelingGroepen();
+  if (st.indeling === 'mandaat') {
+    [...o.blokken, { key: null }].forEach(b => {
+      const binnen = gs.filter(G => G.blok === b.key && heeft(G.dim));
+      if (!binnen.length) return;
+      if (b.key) h += rij(b.label, `b.${b.key}`, ['telling_blok', b.key], 'blok');
+      binnen.forEach(G => { h += groep(G); });
+    });
+  } else {
+    // Per domein in drie blokken: de ongekozen staat eerst, het gekozen deel apart.
+    o.domeinblokken.forEach(B => {
+      const binnen = gs.filter(G => G.blok === B.key && heeft(G.dim));
+      if (!binnen.length) return;
+      h += rij(B.label, `d.${B.key}`, ['telling_dblok', B.key], 'blok', B.uitleg, null, kleurBlok(B.key));
+      binnen.forEach(G => { h += groep(G); });
+    });
+  }
+  document.getElementById('matrix').innerHTML = h + '</tbody>';
+  document.getElementById('matrixVoetnoot').textContent = VOETNOOT[st.indeling];
+}
+document.getElementById('matrix').addEventListener('click', e => {
+  const b = e.target.closest('button.klap');
+  if (!b) return;
+  e.preventDefault();
+  const k = b.dataset.klap;
+  if (st.uit.has(k)) st.uit.delete(k); else st.uit.add(k);
+  bewaar('partijen.uit', JSON.stringify([...st.uit]));
+  renderMatrix();
+});
+document.getElementById('allesUit').addEventListener('click', () => {
+  indelingGroepen().forEach(G => st.uit.add(G.sel)); bewaar('partijen.uit', JSON.stringify([...st.uit])); renderMatrix();
+});
+document.getElementById('allesIn').addEventListener('click', () => {
+  st.uit.clear(); bewaar('partijen.uit', '[]'); renderMatrix();
+});
+document.getElementById('indelingSeg').addEventListener('click', e => {
+  const b = e.target.closest('[data-indeling]');
+  if (b) zetIndeling(b.dataset.indeling);
+});
+function zetIndeling(ind) {
+  if (ind === st.indeling) return;
+  st.indeling = ind;
+  bewaar('partijen.indeling', ind);
+  render();
 }
 
-// ── Gedeelde organisaties ───────────────────────────────────────────────
+// ── Tab: benoemde topfuncties ───────────────────────────────────────────
+const houders = f => f.houders.filter(h => st.tijd === 'alle' || !h.afgelopen);
+const bandVan = h => h.partijen.filter(p => st.tijd === 'alle' || !p.afgelopen);
+const metBand = f => houders(f).some(h => bandVan(h).length);
+function eigenPartijIds() {
+  const kol = st.overzicht.partijen.find(p => p.id === st.partijId);
+  return new Set(kol ? [kol.id, ...(kol.voorgangers || []).map(v => v.id)] : []);
+}
+const vanPartij = (f, ids) => houders(f).some(h => h.partijen.some(p => ids.has(p.id)));
+const tfFuncties = () => st.overzicht.sleutelposities.functies.filter(f => houders(f).length);
+const partijTopfuncties = () => { const ids = eigenPartijIds(); return tfFuncties().filter(f => vanPartij(f, ids)); };
+const tfKop = () => '<thead><tr><th>Organisatie</th><th>Functie</th><th>Houder</th></tr></thead>';
+function tfRij(f) {
+  const ids = eigenPartijIds();
+  const nLopend = f.houders.filter(h => !h.afgelopen).length;
+  const hs = houders(f).map(h => {
+    const ps = bandVan(h).map(p => `<a class="pchip${p.afgelopen ? ' oud' : ''}${ids.has(p.id) ? ' actief' : ''}" href="#partij-${p.id}" title="${esc(p.naam)}${p.afgelopen ? ' (band afgelopen)' : ''}">${esc(kort(p.naam))}</a>`).join(' ');
+    return `<span class="houder${h.afgelopen ? ' oud' : ''}"><a href="/persoon/${h.persoon.id}" title="${esc(h.persoon.naam)}">${esc(kaleNaam(h.persoon.naam))}</a>${h.looptijd ? ` <span class="lt">${esc(h.looptijd)}</span>` : ''} ${ps}</span>`;
+  }).join('');
+  const let_ = nLopend > 1 ? `<span class="let" title="Een enkelvoudige functie met meer dan één lopende houder: bij eerdere houders ontbreekt waarschijnlijk de einddatum in het model.">⚠ ${nLopend} houders zonder einddatum</span>` : '';
+  const cls = vanPartij(f, ids) ? 'eigen' : (metBand(f) ? 'band' : '');
+  return `<tr class="${cls}"><td class="org"><a href="/entiteit/${f.org.id}">${esc(f.org.naam)}</a></td><td class="functie">${esc(f.functie)}</td><td>${hs}${let_}</td></tr>`;
+}
+function renderTopfuncties() {
+  const sp = st.overzicht.sleutelposities;
+  const K = KL();
+  const fs = tfFuncties();
+  const nBand = fs.filter(metBand).length;
+  document.getElementById('telTop').textContent = fs.length;
+  if (st.tab !== 'topfuncties') return;
+  const ix = st.tijd === 'alle' ? 0 : 1;
+  const ontbreekt = sp.instituten.filter(i => !i.id);
+  const zonder = sp.instituten.filter(i => i.id && !i.met_functie[ix]);
+  const kpi = (label, v, sub, kleur) => `<div class="kpi" style="--k:${kleur};cursor:default"><span class="kl">${esc(label)}</span><span class="kn">${v}</span><span class="ks">${sub}</span></div>`;
+  document.getElementById('tfKpis').innerHTML = [
+    kpi('Topfuncties', fs.length, 'met een houder in het model', 'var(--b-staat)'),
+    kpi('Met partijband', nBand, `${fs.length ? Math.round(100 * nBand / fs.length) : 0}% van de functies`, 'var(--goud)'),
+    kpi('Niet in het model', ontbreekt.length, 'instituties van belang', 'var(--m-buiten)'),
+    kpi('Zonder leiding', zonder.length, 'in het model, geen leidinggevende functie', 'var(--warn)'),
+  ].join('');
+  document.getElementById('tfFilter').innerHTML = [['alle', 'Alle functies'], ['band', `Met partijband · ${nBand}`]]
+    .map(([k, l]) => `<button type="button" data-f="${k}" class="${st.tfFilter === k ? 'actief' : ''}">${esc(l)}</button>`).join('');
+  const toon = f => st.tfFilter === 'alle' || metBand(f);
+  const cats = st.overzicht.klassen.filter(k => fs.some(f => f.klasse === k.key));
+  if (st.tfCat !== 'alle' && !cats.some(k => k.key === st.tfCat)) st.tfCat = 'alle';
+  const chip = (key, label, v, b, kleur) => `<button type="button" class="fchip${st.tfCat === key ? ' actief' : ''}" data-cat="${key}"${kleur ? ` style="--k:${kleur}"` : ''}>${kleur ? `<span class="dot" style="--k:${kleur}"></span>` : ''}${esc(label)} <span class="fn">${v}${b ? ` · <b>${b}</b>` : ''}</span></button>`;
+  document.getElementById('tfCats').innerHTML = chip('alle', 'Alle categorieën', fs.length, nBand, null)
+    + cats.map(k => { const xs = fs.filter(f => f.klasse === k.key); return chip(k.key, k.label, xs.length, xs.filter(metBand).length, kleurGroep(k.groep)); }).join('');
+  let h = '';
+  (st.tfCat === 'alle' ? cats : cats.filter(k => k.key === st.tfCat)).forEach(k => {
+    const xs = fs.filter(f => f.klasse === k.key && toon(f));
+    if (!xs.length) return;
+    if (st.tfCat === 'alle') h += `<tr class="cat"><td colspan="3"><span class="dot" style="--k:${kleurGroep(k.groep)}"></span>${esc(k.label)} <span class="hint">${xs.length}</span></td></tr>`;
+    h += xs.map(tfRij).join('');
+  });
+  document.getElementById('tfTabel').innerHTML = h ? tfKop() + h : '<tr><td class="leeg">Geen functies in deze selectie.</td></tr>';
+
+  const per = xs => {
+    const g = new Map();
+    xs.forEach(i => { const l = (K[i.klasse] || {}).label || i.klasse; if (!g.has(l)) g.set(l, []); g.get(l).push(i); });
+    return [...g].map(([l, is]) => `<div class="zk-groep"><b>${esc(l)}</b>${is.map(i => i.id ? `<a href="/entiteit/${i.id}">${esc(i.naam)}</a>` : esc(i.naam)).join(', ')}</div>`).join('');
+  };
+  document.getElementById('tfDekking').innerHTML = `<h4>Dekking</h4><p>Instituties van belang die het model nog mist, of zonder leidinggevende functie kent. Wat een bron draagt, komt erbij.</p>`
+    + (ontbreekt.length ? `<h4 style="margin-top:12px">Nog niet in het model <span class="n-goud">${ontbreekt.length}</span></h4>${per(ontbreekt)}` : '')
+    + (zonder.length ? `<h4 style="margin-top:14px">Zonder ${st.tijd === 'alle' ? '' : 'lopende '}leiding <span class="n-goud">${zonder.length}</span></h4>${per(zonder)}` : '')
+    + (!ontbreekt.length && !zonder.length ? '<p>Alle instituties van belang staan erin met hun leiding.</p>' : '');
+}
+document.getElementById('tfFilter').addEventListener('click', e => {
+  const b = e.target.closest('[data-f]'); if (b) { st.tfFilter = b.dataset.f; renderTopfuncties(); }
+});
+document.getElementById('tfCats').addEventListener('click', e => {
+  const b = e.target.closest('[data-cat]'); if (b) { st.tfCat = b.dataset.cat; renderTopfuncties(); }
+});
+
+// ── Tab: gedeelde organisaties ──────────────────────────────────────────
 const SECTOREN = [
-  { key: 'buiten', label: 'Buiten de overheid', test: o => !o.overheid },
-  { key: 'overheid', label: 'Overheid & volksvertegenwoordiging', test: o => o.overheid && o.laag !== 'gemeente' },
-  { key: 'gemeente', label: 'Gemeenten', test: o => o.laag === 'gemeente' },
+  { key: 'staat', label: 'Ongekozen staat', kleur: 'var(--b-staat)', test: o => o.blok === 'staat' && o.laag !== 'gemeente' },
+  { key: 'media', label: 'Media', kleur: 'var(--d-media)', test: o => o.groep === 'media' },
+  { key: 'netwerk', label: 'Bedrijfsleven, lobby & maatschappij', kleur: 'var(--d-markt)', test: o => o.blok === 'buiten' && o.groep !== 'media' },
+  { key: 'politiek', label: 'Parlement & kabinet', kleur: 'var(--b-gekozen)', test: o => o.blok === 'gekozen' && o.laag !== 'gemeente' },
+  { key: 'gemeente', label: 'Gemeenten', kleur: 'var(--d-bestuur)', test: o => o.laag === 'gemeente' },
 ];
 function gedeeldeOrgs(sector) {
   const s = SECTOREN.find(x => x.key === sector);
@@ -397,16 +1018,15 @@ function gedeeldeOrgs(sector) {
       || a.naam.localeCompare(b.naam));
 }
 function renderGedeeld() {
+  const aantallen = Object.fromEntries(SECTOREN.map(s => [s.key, gedeeldeOrgs(s.key).length]));
+  document.getElementById('telGedeeld').textContent = Object.values(aantallen).reduce((a, b) => a + b, 0);
+  if (st.tab !== 'gedeeld') return;
   const naamVan = Object.fromEntries(st.overzicht.partijen.map(p => [p.id, p.naam]));
-  const tabs = document.getElementById('sectorTabs');
-  tabs.innerHTML = SECTOREN.map(s =>
-    `<button type="button" class="tab${st.sector === s.key ? ' actief' : ''}" data-sector="${s.key}">${esc(s.label)} <span class="telb">${gedeeldeOrgs(s.key).length}</span></button>`).join('');
-  tabs.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
-    st.sector = b.dataset.sector; renderGedeeld();
-  }));
+  if (!st.sector || !aantallen[st.sector]) st.sector = (SECTOREN.find(s => aantallen[s.key]) || SECTOREN[0]).key;
+  const sector = SECTOREN.find(s => s.key === st.sector);
+  document.getElementById('sectorChips').innerHTML = SECTOREN.map(s =>
+    `<button type="button" class="fchip${st.sector === s.key ? ' actief' : ''}" data-sector="${s.key}" style="--k:${s.kleur}"><span class="dot" style="--k:${s.kleur}"></span>${esc(s.label)} <span class="fn">${aantallen[s.key]}</span></button>`).join('');
   const orgs = gedeeldeOrgs(st.sector);
-
-  // Partij × partij: in hoeveel van deze organisaties hebben beide partijen iemand?
   const paren = new Map(), perPartij = new Map();
   orgs.forEach(o => o.ps.forEach((a, i) => {
     perPartij.set(a.id, (perPartij.get(a.id) || 0) + 1);
@@ -415,7 +1035,7 @@ function renderGedeeld() {
       paren.set(k, (paren.get(k) || 0) + 1);
     });
   }));
-  const ps = [...perPartij.keys()].sort((a, b) => perPartij.get(b) - perPartij.get(a)).slice(0, 14);
+  const ps = [...perPartij.keys()].sort((a, b) => perPartij.get(b) - perPartij.get(a)).slice(0, 12);
   const max = Math.max(1, ...paren.values());
   let t = '';
   if (ps.length >= 2) {
@@ -425,81 +1045,119 @@ function renderGedeeld() {
         if (a === b) return `<td class="diag" title="${esc(naamVan[a])}: in ${perPartij.get(a)} van deze organisaties">${perPartij.get(a)}</td>`;
         const v = paren.get(Math.min(a, b) + '-' + Math.max(a, b)) || 0;
         if (!v) return '<td class="diag">·</td>';
-        const pct = Math.round(10 + 50 * v / max);
-        return `<td style="background:color-mix(in srgb, var(--goud) ${pct}%, transparent)" title="${esc(naamVan[a])} en ${esc(naamVan[b])}: samen in ${v} ${v === 1 ? 'organisatie' : 'organisaties'}">${v}</td>`;
+        const pct = Math.round(12 + 55 * v / max);
+        return `<td style="background:color-mix(in srgb, ${sector.kleur} ${pct}%, transparent)" title="${esc(naamVan[a])} en ${esc(naamVan[b])}: samen in ${meervoud(v, 'organisatie', 'organisaties')}">${v}</td>`;
       }).join('') + '</tr>';
     });
     t += '</tbody></table>';
+  } else {
+    t = '<div class="leegvak">Te weinig organisaties om partijparen te tonen.</div>';
   }
   document.getElementById('samen').innerHTML = t;
-
-  const LIMIET = 60;
+  const LIMIET = 50;
   const zicht = st.open.has('_orgs') ? orgs : orgs.slice(0, LIMIET);
   document.getElementById('gedeeldLijst').innerHTML = (zicht.map(o => `<div class="org-rij">
-      <div><a href="/entiteit/${o.id}">${esc(o.naam)}</a><span class="tag">${esc(weergaveNaam(o.type))}</span></div>
+      <div><a href="/entiteit/${o.id}">${esc(o.naam)}</a></div>
       <div class="pchips">${o.ps.sort((a, b) => b.n - a.n).map(x =>
-        `<a class="pchip${x.id === st.partijId ? ' actief' : ''}" href="#partij-${x.id}" title="${esc(naamVan[x.id])}: ${x.n} ${x.n === 1 ? 'persoon' : 'personen'}">${esc(kort(naamVan[x.id]))}<b>${x.n}</b></a>`).join('')}</div>
-    </div>`).join('') || '<div class="leeg">Geen organisaties met mensen uit meerdere partijen in deze categorie.</div>')
+        `<a class="pchip${x.id === st.partijId ? ' actief' : ''}" href="#partij-${x.id}" title="${esc(naamVan[x.id])}: ${meervoud(x.n, 'persoon', 'personen')}">${esc(kort(naamVan[x.id]))}<b>${x.n}</b></a>`).join('')}</div>
+    </div>`).join('') || '<div class="leegvak">Geen organisaties met mensen uit meerdere partijen in deze categorie.</div>')
     + (zicht.length < orgs.length ? `<button type="button" class="meer" id="orgsMeer">Toon alle ${orgs.length}</button>` : '');
   const meer = document.getElementById('orgsMeer');
   if (meer) meer.addEventListener('click', () => { st.open.add('_orgs'); renderGedeeld(); });
 }
+document.getElementById('sectorChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-sector]'); if (b) { st.sector = b.dataset.sector; st.open.delete('_orgs'); renderGedeeld(); }
+});
 
-// ── Navigatie & periode ─────────────────────────────────────────────────
-function zetHash(pid, klasse) {
-  const h = pid ? `#partij-${pid}${klasse ? '/' + klasse : ''}` : '';
-  if (location.hash !== h) location.hash = h; else volgHash();
+// ── Navigatie ───────────────────────────────────────────────────────────
+function render() {
+  document.querySelectorAll('#hoofdtabs [data-tab]').forEach(b => {
+    b.classList.toggle('actief', b.dataset.tab === st.tab);
+    b.setAttribute('aria-selected', b.dataset.tab === st.tab);
+  });
+  ['partij', 'vergelijk', 'topfuncties', 'gedeeld'].forEach(t => { document.getElementById(`tab-${t}`).hidden = t !== st.tab; });
+  document.querySelectorAll('#tijdSeg button').forEach(b => b.classList.toggle('actief', b.dataset.tijd === st.tijd));
+  document.getElementById('jaarBalk').hidden = st.tijd !== 'jaar';
+  schuif.value = st.jaar;
+  document.getElementById('jaarLabel').textContent = st.jaar;
+  const zb = st.overzicht.zonder_begin || {};
+  const melding_ = document.getElementById('jaarMelding');
+  melding_.hidden = !(st.tijd === 'jaar' && st.overzicht.gedateerd);
+  melding_.innerHTML = `<b>Stand in ${st.jaar}.</b> Een terugblik telt alleen verbanden waarvan het model het begin kent: ${(zb.banden || 0).toLocaleString('nl')} partijbanden en ${(zb.posities || 0).toLocaleString('nl')} posities hebben (nog) geen begindatum en vallen buiten dit jaar. De datumzoeker vult dat aan; dit overzicht wordt dus vollediger.`;
+  document.querySelectorAll('#fusieSeg button').forEach(b => b.classList.toggle('actief', (b.dataset.fusies === '1') === st.fusies));
+  renderTopfuncties();   // ook de tellers in de tabs
+  renderGedeeld();
+  if (st.tab === 'partij') { renderKiezer(); renderDash(); }
+  if (st.tab === 'vergelijk') renderMatrix();
+  renderLade();
 }
 async function volgHash() {
-  const m = (location.hash || '').match(/^#partij-(\d+)(?:\/([a-z_]+))?$/);
-  const pid = m ? +m[1] : (zichtbarePartijen()[0] || {}).id;
-  const nieuwePartij = pid !== st.partijId;
-  st.klasse = m && m[2] ? m[2] : null;
-  if (nieuwePartij) {
-    st.partijId = pid; st.open.clear(); st.zoek = '';
-    document.getElementById('zoek').value = '';
-    try { st.detail = await haal(`/api/partijen/${pid}${fusieParam()}`); }
-    catch (e) { melding('Kon deze partij niet laden.', 'fout'); return; }
+  const h = location.hash || '';
+  const m = h.match(/^#partij-(\d+)(?:\/([a-z_.]+))?$/);
+  if (m || !h || h === '#') {
+    st.tab = 'partij';
+    const pid = m ? +m[1] : (st.partijId || (zichtbarePartijen()[0] || {}).id);
+    const sel = m && m[2] ? m[2] : null;
+    if (sel !== st.sel) { st.ladeZoek = ''; document.getElementById('ladeZoek').value = ''; st.open.forEach(k => { if (k.startsWith('lade:')) st.open.delete(k); }); }
+    st.sel = sel;
+    if (pid !== st.partijId || !st.detail) {
+      st.partijId = pid; st.open.clear(); st.zoek = '';
+      try { st.detail = await haal(`/api/partijen/${pid}${qs()}`); }
+      catch (e) { melding('Kon deze partij niet laden.', 'fout'); return; }
+    }
+  } else {
+    const tab = h.slice(1);
+    st.tab = ['vergelijk', 'topfuncties', 'gedeeld'].includes(tab) ? tab : 'partij';
+    st.sel = null;
   }
-  renderMatrix();
-  renderDetail();
-  renderGedeeld();
-  if (m && nieuwePartij) document.getElementById('partijSectie').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  render();
 }
-
-document.getElementById('tijdTabs').querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+window.addEventListener('hashchange', volgHash);
+document.getElementById('hoofdtabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]');
+  if (!b) return;
+  location.hash = b.dataset.tab === 'partij' ? `#partij-${st.partijId || (zichtbarePartijen()[0] || {}).id}` : `#${b.dataset.tab}`;
+});
+document.getElementById('tijdSeg').addEventListener('click', e => {
+  const b = e.target.closest('[data-tijd]'); if (!b || b.dataset.tijd === st.tijd) return;
+  const wasJaar = st.tijd === 'jaar';
   st.tijd = b.dataset.tijd;
-  document.querySelectorAll('#tijdTabs .tab').forEach(x => x.classList.toggle('actief', x === b));
-  renderMatrix(); renderDetail(); renderGedeeld();
-}));
-function zetFusieTabs() {
-  document.querySelectorAll('#fusieTabs .tab').forEach(x =>
-    x.classList.toggle('actief', (x.dataset.fusies === '1') === st.fusies));
+  if (wasJaar || st.tijd === 'jaar') herlaad(); else render();
+});
+const schuif = document.getElementById('jaarSchuif');
+schuif.max = JAAR_NU;
+schuif.addEventListener('input', () => { document.getElementById('jaarLabel').textContent = schuif.value; });
+schuif.addEventListener('change', () => zetJaar(+schuif.value));
+document.getElementById('jaarMin').addEventListener('click', () => zetJaar(st.jaar - 1));
+document.getElementById('jaarPlus').addEventListener('click', () => zetJaar(st.jaar + 1));
+function zetJaar(j) {
+  j = Math.max(+schuif.min, Math.min(JAAR_NU, j));
+  if (j === st.jaar) return;
+  st.jaar = j;
+  bewaar('partijen.jaar', String(j));
+  herlaad();
 }
-document.getElementById('fusieTabs').querySelectorAll('.tab').forEach(b => b.addEventListener('click', async () => {
+// Nieuwe gegevens ophalen (jaar of fusies veranderd) en alles opnieuw tekenen.
+async function herlaad() {
+  try {
+    st.overzicht = await haal(`/api/partijen${qs()}`);
+    if (st.partijId) st.detail = await haal(`/api/partijen/${st.partijId}${qs()}`);
+  } catch (err) { melding('Kon de gegevens niet laden.', 'fout'); return; }
+  render();
+}
+document.getElementById('fusieSeg').addEventListener('click', e => {
+  const b = e.target.closest('[data-fusies]'); if (!b) return;
   const fusies = b.dataset.fusies === '1';
   if (fusies === st.fusies) return;
   st.fusies = fusies;
-  try { localStorage.setItem('partijen.fusies', fusies ? '1' : '0'); } catch (e) { /* geen opslag */ }
-  zetFusieTabs();
-  try {
-    st.overzicht = await haal(`/api/partijen${fusieParam()}`);
-    if (st.partijId) st.detail = await haal(`/api/partijen/${st.partijId}${fusieParam()}`);
-  } catch (e) { melding('Kon het overzicht niet opnieuw laden.', 'fout'); return; }
-  renderMatrix(); if (st.detail) renderDetail(); renderGedeeld();
-}));
-let zoekTimer = null;
-document.getElementById('zoek').addEventListener('input', e => {
-  clearTimeout(zoekTimer);
-  zoekTimer = setTimeout(() => { st.zoek = normaliseer(e.target.value.trim()); renderPersonen(); }, 150);
+  bewaar('partijen.fusies', fusies ? '1' : '0');
+  herlaad();
 });
-window.addEventListener('hashchange', volgHash);
 
 (async () => {
-  zetFusieTabs();
-  try { st.overzicht = await haal(`/api/partijen${fusieParam()}`); }
+  try { st.overzicht = await haal(`/api/partijen${qs()}`); }
   catch (e) {
-    document.getElementById('matrix').innerHTML = '<tbody><tr><td class="leeg">Het overzicht kon niet worden geladen. Ververs de pagina om het opnieuw te proberen.</td></tr></tbody>';
+    document.getElementById('kiezer').innerHTML = '<div class="leegvak">Het overzicht kon niet worden geladen. Ververs de pagina om het opnieuw te proberen.</div>';
     return;
   }
   await volgHash();

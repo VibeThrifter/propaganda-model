@@ -896,7 +896,14 @@ CREATE TABLE leads (
         'smaad_hold'         -- negatieve persoonsclaim; eigenaars-wachtrij
     )),
     agent_arg_id INTEGER,                 -- het door een agent afgeleide argument (NULL tot dan)
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Gestructureerde tip (2026-10-14, scripts/migrate_leads_gestructureerd.py):
+    partij_a TEXT,                        -- de twee partijen van het aangedragen verband
+    partij_b TEXT,
+    soort_verband TEXT,                   -- sleutel uit server.LEAD_SOORTEN_VERBAND
+    jaar TEXT,                            -- JJJJ volgens de inzender, of NULL
+    triage_reden TEXT,                    -- '<categorie>: <tekst>' (scripts/lead_triage.py)
+    doel_id INTEGER                       -- het doel 'tip:<id>' in nieuws_doelen
 );
 
 --------------------------------------------------------------
