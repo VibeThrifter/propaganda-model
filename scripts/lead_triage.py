@@ -30,7 +30,19 @@ Per ronde (stap 0 van scripts/automatische_beoordeling.py, of los):
 Plafond op het AI-werk: de server weigert een nieuw tip-doel boven het dagplafond, het plafond
 per 30 dagen of het maximum tegelijk open (server.lead_doel_ruimte; env PROPAGANDA_LEAD_*,
 kill-switch PROPAGANDA_LEADS=0). Dit script stopt dan voor deze ronde; daarnaast hooguit
---max-leads per ronde. Rectificaties ('dit klopt niet') vallen buiten dit script.
+--max-leads per ronde (tips en rectificaties samen).
+
+Rectificaties ('dit klopt niet', J2 / AVG art. 16; eigenaar 2026-10-14 "fix het") gaan vóór tips.
+Een melding wijst een element aan: 'relation:<id>' of 'entity:<id>' (de knop op een elementpagina
+en in de viz vult dat in) of de naam van een knoop. Geen herkenbaar element → afgewezen
+(onvolledig); een mechanisme → afgewezen (theorie: bezwaar loopt via de discussie in het model);
+een element dat niet goedgekeurd is → afgewezen (niet_zichtbaar). Anders een doel
+'rectificatie:<lead_id>': bij een verband voor nieuws-bewijs (soort 'relatie': toetst de bron en
+zoekt bewijs vóór én tegen), bij een knoop voor de nieuws-scout. Eén open rectificatie per element;
+een nieuwe binnen 30 dagen na de vorige is een duplicaat. Prioriteit 60 (70 als er een persoon bij
+betrokken is): onder het nieuws, boven de tips. Uitkomst: diende de agent een tegenargument of
+ondergraving in → 'gecorroboreerd' (bevestigd); anders 'afgewezen' (niet_bevestigd, telt niet
+tegen de melder: wie over zichzelf meldt en ongelijk krijgt, is geen spammer).
 
 Account: nieuws-agent (zet doelen in de wachtrij en mag de lead-wachtrij bijwerken).
 
@@ -65,6 +77,9 @@ PER_ENTITEIT_30D = 3        # tip-doelen per partij per 30 dagen
 VERLOOP_DAGEN = 60          # zo lang wacht een tip op ruimte
 REPUTATIE_STOP = 5          # zoveel onstaafbare en geen gestaafde tips: niet meer doorzetten
 SLECHT = ("onvolledig", "buiten_model", "onstaafbaar")   # telt tegen de inzender
+RECTIFICATIE_PRIORITEIT = 60.0            # onder het nieuws (80+), boven de tips
+RECTIFICATIE_PRIORITEIT_PERSOON = 70.0    # een melding over een persoon gaat iets eerder
+ELEMENT = re.compile(r"(entity|relation|mechanism):(\d+)")
 
 SOORT_LABEL = vocab.LEAD_SOORTEN_VERBAND   # hint voor de scout
 WAARSCHUWING = (
@@ -127,7 +142,8 @@ def reputatie(conn) -> dict:
 
 def tip_doelen(conn) -> list[dict]:
     uit = []
-    for r in conn.execute("SELECT * FROM nieuws_doelen WHERE sleutel LIKE 'tip:%'"):
+    for r in conn.execute("SELECT * FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
+                          "OR sleutel LIKE 'rectificatie:%'"):
         d = dict(r)
         try:
             d["context"] = json.loads(d["context"] or "{}")
@@ -155,6 +171,9 @@ def terugschrijven(conn) -> list[tuple[int, dict]]:
         if not d or d["status"] in ("open", "bezig"):
             continue
         res = d["resultaat"]
+        if lead["soort"] == "rectificatie":
+            uit.append((lead["id"], _uitkomst_rectificatie(conn, d)))
+            continue
         if d["status"] == "klaar" and (res.get("relation_ids") or res.get("argument_ids")):
             args = res.get("argument_ids") or []
             uit.append((lead["id"], {"status": "gecorroboreerd",
@@ -168,6 +187,127 @@ def terugschrijven(conn) -> list[tuple[int, dict]]:
                                      "triage_reden": f"onstaafbaar: de scout vond geen bron "
                                                      f"(doel #{d['id']} {d['status']})"}))
     return uit
+
+
+def _uitkomst_rectificatie(conn, d) -> dict:
+    """Bevestigd als de agent een tegenargument, ondergraving of looptijdcorrectie indiende; anders
+    niet bevestigd
+    (neutraal voor de reputatie). Een fout telt nergens."""
+    if d["status"] == "fout":
+        return {"status": "afgewezen", "triage_reden": f"fout: doel #{d['id']} liep vast"}
+    ids = d["resultaat"].get("argument_ids") or []
+    tegen = [r["id"] for r in conn.execute(
+        f"SELECT id FROM arguments WHERE (stance = 'contradicting' OR property IN "
+        f"('active_from', 'active_until')) AND id IN "
+        f"({','.join('?' * len(ids))}) ORDER BY id", ids)] if ids else []
+    if d["status"] == "klaar" and tegen:
+        return {"status": "gecorroboreerd", "agent_arg_id": tegen[0],
+                "triage_reden": f"bevestigd: tegenbewijs of ondergraving #{tegen[0]} (doel #{d['id']})"}
+    return {"status": "afgewezen", "triage_reden":
+            f"niet_bevestigd: de agent vond geen tegenbewijs (doel #{d['id']} {d['status']})"}
+
+
+def element_van(conn, lead) -> tuple[str, dict] | tuple[None, str]:
+    """('relation'|'entity'|'mechanism', rij) of (None, triage_reden)."""
+    betreft = html.unescape(lead["betreft"] or "").strip()
+    m = ELEMENT.fullmatch(betreft)
+    if m:
+        soort, eid = m.group(1), int(m.group(2))
+    else:
+        e = zoek_entiteit(conn, betreft)
+        if not e:
+            return None, "onvolledig: niet duidelijk welk element de melding betreft"
+        soort, eid = "entity", e["id"]
+    if soort == "mechanism":
+        return None, ("theorie: een mechanisme is theorie; een bezwaar loopt via de discussie "
+                      "in het model")
+    if soort == "entity":
+        r = conn.execute("SELECT id, name, type, description, status, vervangen FROM entities "
+                         "WHERE id = ?", (eid,)).fetchone()
+    else:
+        r = conn.execute("""SELECT r.id, r.relation_type, r.description, r.status, r.vervangen,
+                                   r.functie, r.active_from, r.active_until,
+                                   s.name AS bron, s.type AS bron_type,
+                                   t.name AS doel, t.type AS doel_type
+                            FROM relations r JOIN entities s ON s.id = r.source_id
+                            JOIN entities t ON t.id = r.target_id WHERE r.id = ?""",
+                         (eid,)).fetchone()
+    if r is None or r["status"] != "goedgekeurd" or r["vervangen"]:
+        return None, "niet_zichtbaar: het element staat niet (meer) goedgekeurd in het model"
+    return soort, dict(r)
+
+
+def schiften_rectificaties(conn, nu: datetime.datetime) -> dict:
+    """Zelfde vorm als schiften(), voor soort 'rectificatie'."""
+    rep = reputatie(conn)
+    dertig = (nu - datetime.timedelta(days=30)).isoformat(timespec="seconds")
+    recent = {}   # (soort, id) → lead-id van een open of recente rectificatie-doel
+    for d in tip_doelen(conn):
+        el = d["context"].get("element") or {}
+        if d["sleutel"].startswith("rectificatie:") and el and (
+                d["status"] in ("open", "bezig") or (d["aangemaakt"] or "") >= dertig):
+            recent.setdefault((el.get("soort"), el.get("id")), d["sleutel"].split(":")[1])
+    afwijzen, wachten, doorzetten = [], [], []
+    for lead in conn.execute("SELECT * FROM leads WHERE status = 'binnengekomen' "
+                             "AND soort = 'rectificatie' ORDER BY id"):
+        lid = lead["id"]
+        soort, el = element_van(conn, lead)
+        if soort is None:
+            afwijzen.append((lid, {"status": "afgewezen", "triage_reden": el}))
+            continue
+        eerder = recent.get((soort, el["id"]))
+        if eerder:
+            afwijzen.append((lid, {"status": "duplicaat", "triage_reden":
+                                   f"duplicaat: melding #{eerder} over hetzelfde element loopt "
+                                   "of liep in de afgelopen 30 dagen"}))
+            continue
+        aangemaakt = datetime.datetime.fromisoformat(str(lead["created_at"])[:19].replace(" ", "T"))
+        if (nu - aangemaakt).days > VERLOOP_DAGEN:
+            afwijzen.append((lid, {"status": "afgewezen", "triage_reden":
+                                   f"verlopen: wachtte langer dan {VERLOOP_DAGEN} dagen op ruimte"}))
+            continue
+        goed, slecht = rep.get(lead["ingezonden_ip_hash"], (0, 0))
+        if slecht >= REPUTATIE_STOP and goed == 0:
+            wachten.append((lid, f"melder: {slecht} onstaafbare meldingen, geen gestaafde"))
+            continue
+        melding = {"toelichting": html.unescape(lead["claim"] or ""),
+                   "bron_url": html.unescape(lead["bron_url"] or "") or None,
+                   "quote": html.unescape(lead["quote"] or "") or None}
+        context = {"soort_doel": "rectificatie", "waarschuwing": WAARSCHUWING, "melding": melding}
+        if soort == "relation":
+            persoon = "persoon" in (el["bron_type"], el["doel_type"])
+            naam = f"{el['bron']} – {el['relation_type']} – {el['doel']}"
+            context["element"] = {"soort": "relation", "id": el["id"], "naam": naam,
+                                  "functie": el["functie"], "active_from": el["active_from"],
+                                  "active_until": el["active_until"],
+                                  "beschrijving": el["description"]}
+            context["ontbreekt"] = ("toetsing na een publieke melding dat dit verband (of een "
+                                    "detail ervan, zoals functie of looptijd) niet klopt")
+            context["opdracht"] = (
+                f"Een lezer meldt dat het verband '{naam}' niet klopt. Toets of de bestaande bron "
+                "het verband en zijn details draagt, en zoek zelf bewijs vóór én tegen. Draagt de "
+                "bron het niet: een ondergraving. Vind je tegenbewijs (een andere functie, een "
+                "einddatum, een ander jaar): een contradicting root of een active_until-argument "
+                "met de bron. Klopt het verband: 'klaar' met wat je vond, of 'niets_gevonden'.")
+            doel = {"soort": "relatie", "relation_id": el["id"]}
+        else:
+            persoon = el["type"] == "persoon"
+            naam = el["name"]
+            context["element"] = {"soort": "entity", "id": el["id"], "naam": naam,
+                                  "type": el["type"], "beschrijving": el["description"]}
+            context["opdracht"] = (
+                f"Een lezer meldt dat iets over {naam} in het model niet klopt (zie de toelichting). "
+                "Ga na wat de melding betreft en toets dat aan de bronnen van het model en een eigen "
+                "bron. Vind je tegenbewijs, dien dat dan in als contradicting argument (of een "
+                "active_until bij een beëindigde functie) op het verband of de knoop zelf.")
+            doel = {"soort": "persoon" if persoon else "organisatie", "entity_id": el["id"]}
+        doel.update({"sleutel": f"rectificatie:{lid}", "naam": f"Melding: {naam}"[:300],
+                     "prioriteit": (RECTIFICATIE_PRIORITEIT_PERSOON if persoon
+                                    else RECTIFICATIE_PRIORITEIT),
+                     "context": context, "_lead_id": lid})
+        recent[(soort, el["id"])] = str(lid)
+        doorzetten.append(doel)
+    return {"afwijzen": afwijzen, "wachten": wachten, "doorzetten": doorzetten}
 
 
 def opdracht(a: str, b: str, soort: str | None, jaar: str | None) -> str:
@@ -273,8 +413,9 @@ def schiften(conn, nu: datetime.datetime | None = None) -> dict:
             recent_per_ent[e] = recent_per_ent.get(e, 0) + 1
         doorgezette_paren.setdefault(_paar(lead), lid)
     kandidaten.sort(key=lambda x: (x[0], x[1]))
-    return {"afwijzen": afwijzen, "wachten": wachten,
-            "doorzetten": [d for _, _, d in kandidaten]}
+    rect = schiften_rectificaties(conn, nu)
+    return {"afwijzen": rect["afwijzen"] + afwijzen, "wachten": rect["wachten"] + wachten,
+            "doorzetten": rect["doorzetten"] + [d for _, _, d in kandidaten]}
 
 
 def http_verstuurder(api: str, token: str):
@@ -323,12 +464,17 @@ def draai(*, verstuur=None, db_pad: Path = DB_PATH, max_leads: int = 3, droog: b
         status, j = verstuur("PATCH", f"/api/leads/{lid}", body)
         if status != 200:
             uit["fouten"].append(f"lead {lid}: {status} {j.get('error')}")
+    vol = set()   # voorvoegsels waarvan het plafond deze ronde bereikt is
     for doel in plan["doorzetten"][:max(0, max_leads)]:
         lid = doel.pop("_lead_id")
+        voorvoegsel = doel["sleutel"].split(":")[0]
+        if voorvoegsel in vol:
+            continue
         status, j = verstuur("POST", "/api/nieuws/doelen", doel)
-        if status == 429:   # het plafond op AI-werk: klaar voor deze ronde
+        if status == 429:   # het plafond op AI-werk: klaar voor deze soort, deze ronde
+            vol.add(voorvoegsel)
             uit["plafond"] = j.get("plafond") or j.get("error")
-            break
+            continue
         if status not in (200, 201):
             uit["fouten"].append(f"doel tip:{lid}: {status} {j.get('error')}")
             continue
@@ -336,12 +482,13 @@ def draai(*, verstuur=None, db_pad: Path = DB_PATH, max_leads: int = 3, droog: b
         status, j = verstuur("PATCH", f"/api/leads/{lid}", {
             "status": "in_corroboratie", "doel_id": did,
             "triage_reden": f"doorgezet: doel #{did} (prioriteit {doel['prioriteit']:g})"})
+        # (rectificaties staan vooraan in het plan; tips volgen)
         if status != 200:
             uit["fouten"].append(f"lead {lid}: {status} {j.get('error')}")
             continue
         uit["doorgezet"] += 1
     if uit["doorgezet"] or uit["afgewezen"] or uit["teruggeschreven"] or uit["plafond"]:
-        meld(f"Tips: {uit['doorgezet']} doorgezet, {uit['afgewezen']} afgewezen, "
+        meld(f"Meldingen: {uit['doorgezet']} doorgezet, {uit['afgewezen']} afgewezen, "
              f"{uit['teruggeschreven']} teruggeschreven, {uit['wachten']} wachten"
              + (f"; plafond: {uit['plafond']}" if uit["plafond"] else ""))
     return uit

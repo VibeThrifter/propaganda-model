@@ -14,6 +14,10 @@ Draait met de Flask test_client tegen een tijdelijke KOPIE van de live database.
   5. Terugschrijven: klaar mét argument → gecorroboreerd; niets_gevonden → afgewezen (onstaafbaar).
   6. Reputatie: een inzender met vijf onstaafbare tips en geen gestaafde wacht.
   7. Een droogloop schrijft niets.
+  8. Rectificaties ('dit klopt niet'): element uit 'relation:<id>'/'entity:<id>' of een naam;
+     mechanisme → theorie, onbekend → onvolledig; een verband → doel voor nieuws-bewijs, een knoop →
+     nieuws-scout; zelfde element → duplicaat; eigen plafond; tegenbewijs → bevestigd, alleen steun
+     → niet bevestigd (telt niet tegen de melder).
 
 Gebruik: python3 scripts/test_lead_triage.py   (exit-code 0 = alles groen)
 """
@@ -78,7 +82,7 @@ def main():
     conn.execute("DELETE FROM leads")
     conn.execute("DELETE FROM nieuws_doelen WHERE sleutel LIKE 'tip:%'")
     tokens = {}
-    for naam in ("nieuws-agent", "nieuws-scout"):
+    for naam in ("nieuws-agent", "nieuws-scout", "nieuws-bewijs"):
         tokens[naam] = auth.new_token()
         conn.execute("UPDATE users SET token_hash = ?, active = 1 WHERE username = ?",
                      (auth.hash_token(tokens[naam]), naam))
@@ -125,6 +129,7 @@ def main():
         return verstuur
     agent = verstuurder("nieuws-agent")
     scout = verstuurder("nieuws-scout")
+    bewijs = verstuurder("nieuws-bewijs")
 
     print("1. De gestructureerde tip")
     r = c.post("/api/leads", json={
@@ -235,6 +240,67 @@ def main():
     uit = lead_triage.draai(db_pad=tmp, droog=True)
     eis(uit["gestart"] and rij(tmp, "SELECT COUNT(*) n FROM edit_log")["n"] == n,
         "droog schrijft niets")
+
+    print("8. Rectificaties")
+
+    def melding(betreft, tekst="Dit klopt niet."):
+        r = c.post("/api/leads", json={"claim": tekst, "soort": "rectificatie", "betreft": betreft,
+                                       "lead_token": server._teken_lead_token(time.time() - 10),
+                                       "website": ""},
+                   environ_overrides={"REMOTE_ADDR": "198.51.100.9"})
+        eis(r.status_code == 201, f"melding over '{betreft}' → 201 ({r.status_code})")
+        return rij(tmp, "SELECT id FROM leads ORDER BY id DESC LIMIT 1")["id"]
+    server._lead_emmers.clear()
+    r_rel = melding(f"relation:{xy['id']}", "Deze functie is al jaren voorbij.")
+    r_ent = melding(d_["name"], "Dit is geen stichting maar een BV.")
+    r_mech = melding("mechanism:1")
+    r_onb = melding("Iets wat nergens op slaat 42", "Iets klopt niet.")
+    uit = lead_triage.draai(verstuur=agent, db_pad=tmp, max_leads=3)
+    eis(not uit["fouten"], f"ronde zonder fouten ({uit['fouten']})")
+    for lid, cat in ((r_mech, "theorie"), (r_onb, "onvolledig")):
+        r = rij(tmp, "SELECT status, triage_reden FROM leads WHERE id = ?", (lid,))
+        eis(r["status"] == "afgewezen" and r["triage_reden"].startswith(cat),
+            f"{cat} → afgewezen ({r['triage_reden']})")
+    lr = rij(tmp, "SELECT * FROM leads WHERE id = ?", (r_rel,))
+    eis(lr["status"] == "in_corroboratie", "melding over een verband → in_corroboratie")
+    dr = rij(tmp, "SELECT * FROM nieuws_doelen WHERE id = ?", (lr["doel_id"],))
+    eis(dr["sleutel"] == f"rectificatie:{r_rel}" and dr["soort"] == "relatie"
+        and dr["relation_id"] == xy["id"], "doel 'rectificatie:<id>' van soort relatie (nieuws-bewijs)")
+    eis(dr["prioriteit"] in (lead_triage.RECTIFICATIE_PRIORITEIT,
+                             lead_triage.RECTIFICATIE_PRIORITEIT_PERSOON)
+        and dr["prioriteit"] > lead_triage.PRIORITEIT_BASIS, "prioriteit boven de tips")
+    le = rij(tmp, "SELECT * FROM leads WHERE id = ?", (r_ent,))
+    de = rij(tmp, "SELECT * FROM nieuws_doelen WHERE id = ?", (le["doel_id"],))
+    eis(le["status"] == "in_corroboratie" and de["entity_id"] == d_["id"]
+        and de["soort"] in ("persoon", "organisatie"), "melding over een knoop → doel voor de scout")
+    r_dup = melding(f"relation:{xy['id']}")
+    lead_triage.draai(verstuur=agent, db_pad=tmp, max_leads=3)
+    eis(rij(tmp, "SELECT status FROM leads WHERE id = ?", (r_dup,))["status"] == "duplicaat",
+        "tweede melding over hetzelfde verband → duplicaat")
+    os.environ["PROPAGANDA_LEAD_MAX_OPEN"] = "2"
+    st, _ = agent("POST", "/api/nieuws/doelen", {"sleutel": "rectificatie:999999", "naam": "x",
+                                                "soort": "organisatie"})
+    eis(st == 429, f"rectificaties hebben hun eigen plafond (2 open → 429, {st})")
+    os.environ.pop("PROPAGANDA_LEAD_MAX_OPEN")
+    st, _ = bewijs("PATCH", f"/api/nieuws/doelen/{dr['id']}", {"status": "klaar", "verslag": "x"})
+    eis(st == 200, f"nieuws-bewijs werkt het rectificatie-doel bij ({st})")
+    tegen = rij(tmp, "SELECT id FROM arguments WHERE stance = 'contradicting' ORDER BY id DESC LIMIT 1")["id"]
+    steun = rij(tmp, "SELECT id FROM arguments WHERE stance = 'supporting' AND property IS NULL "
+                     "ORDER BY id DESC LIMIT 1")["id"]
+    bewijs("PATCH", f"/api/nieuws/doelen/{dr['id']}", {"resultaat": {"argument_ids": [steun, tegen]}})
+    scout("PATCH", f"/api/nieuws/doelen/{de['id']}", {"status": "klaar", "verslag": "klopt",
+                                                       "resultaat": {"argument_ids": [steun]}})
+    lead_triage.draai(verstuur=agent, db_pad=tmp, max_leads=0)
+    r = rij(tmp, "SELECT status, agent_arg_id, triage_reden FROM leads WHERE id = ?", (r_rel,))
+    eis(r["status"] == "gecorroboreerd" and r["agent_arg_id"] == tegen,
+        f"tegenbewijs → bevestigd ({r['triage_reden']})")
+    r = rij(tmp, "SELECT status, triage_reden FROM leads WHERE id = ?", (r_ent,))
+    eis(r["status"] == "afgewezen" and r["triage_reden"].startswith("niet_bevestigd"),
+        f"alleen steun → niet bevestigd ({r['triage_reden']})")
+    goed, slecht = lead_triage.reputatie(lead_triage.db(tmp)).get(
+        server._ip_hash("198.51.100.9"), (0, 0))
+    eis(goed == 1 and slecht == 1, f"'niet_bevestigd' telt niet tegen de melder, 'onvolledig' wel "
+                                   f"({goed} goed, {slecht} slecht)")
 
     print("\nAlles groen.")
 

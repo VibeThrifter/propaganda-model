@@ -6566,13 +6566,14 @@ SPAM_DOMEINEN = {
 # Gestructureerde tip (2026-10-14): het soort verband komt uit vocab.LEAD_SOORTEN_VERBAND
 # (een onbekende waarde wordt 'anders').
 LEAD_SOORTEN_VERBAND = vocab.LEAD_SOORTEN_VERBAND
-# Hard plafond op het AI-werk dat publieke tips kosten (eigenaar 2026-10-14: "ook een maximale cap
-# voor totale AI opdrachten van deze aard"). Afgedwongen bij het aanmaken van een doel 'tip:<id>'
-# in nieuws_doelen, dus ook als scripts/lead_triage.py een fout bevat. Env-overrides; kill-switch
+# Hard plafond op het AI-werk dat publieke meldingen kosten (eigenaar 2026-10-14: "ook een maximale
+# cap voor totale AI opdrachten van deze aard"). Afgedwongen bij het aanmaken van een doel
+# 'tip:<id>' of 'rectificatie:<id>' in nieuws_doelen (per voorvoegsel), dus ook als
+# scripts/lead_triage.py een fout bevat. Env-overrides; kill-switch
 # PROPAGANDA_LEADS=0 zet geen enkel tip-doel meer klaar (de intake zelf blijft open).
-LEAD_DOEL_DAGPLAFOND = 5      # nieuwe tip-doelen per kalenderdag
-LEAD_DOEL_MAANDPLAFOND = 60   # nieuwe tip-doelen per 30 dagen
-LEAD_DOEL_MAX_OPEN = 5        # tip-doelen tegelijk open of bezig
+LEAD_DOEL_DAGPLAFOND = 5      # nieuwe doelen per voorvoegsel per kalenderdag
+LEAD_DOEL_MAANDPLAFOND = 60   # nieuwe doelen per voorvoegsel per 30 dagen
+LEAD_DOEL_MAX_OPEN = 5        # doelen per voorvoegsel tegelijk open of bezig
 
 
 def _lead_plafonds():
@@ -6586,21 +6587,29 @@ def _lead_plafonds():
             getal("PROPAGANDA_LEAD_MAX_OPEN", LEAD_DOEL_MAX_OPEN))
 
 
-def lead_doel_ruimte(conn):
-    """(ruimte, reden): hoeveel tip-doelen er nu nog bij mogen, en welk plafond bindt als het 0 is.
-    Gedeeld door de poort in nieuws_doelen_upsert en scripts/lead_triage.py."""
+# Publieke inzendingen die AI-werk worden: een tip (nieuws-scout) en een rectificatie ('dit klopt
+# niet', nieuws-bewijs bij een verband, nieuws-scout bij een knoop). Elk voorvoegsel heeft zijn
+# eigen plafond, zodat een stroom tips de rectificaties niet verdringt; samen dus hooguit 2×.
+LEAD_DOEL_VOORVOEGSELS = ("tip:", "rectificatie:")
+NIEUWS_RECTIFICATIE_SLEUTEL = re.compile(r"rectificatie:(\d+)")
+
+
+def lead_doel_ruimte(conn, voorvoegsel="tip:"):
+    """(ruimte, reden): hoeveel doelen met dit voorvoegsel er nu nog bij mogen, en welk plafond
+    bindt als het 0 is. Gedeeld door de poort in nieuws_doelen_upsert en scripts/lead_triage.py."""
     if os.environ.get("PROPAGANDA_LEADS", "1") == "0":
         return 0, "kill-switch PROPAGANDA_LEADS=0"
     dag, maand, max_open = _lead_plafonds()
     nu = datetime.datetime.now()
     vandaag = nu.date().isoformat()
     dertig = (nu - datetime.timedelta(days=30)).isoformat(timespec="seconds")
-    n_dag = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
-                         "AND aangemaakt >= ?", (vandaag,)).fetchone()[0]
-    n_maand = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
-                           "AND aangemaakt >= ?", (dertig,)).fetchone()[0]
-    n_open = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE 'tip:%' "
-                          "AND status IN ('open', 'bezig')").fetchone()[0]
+    patroon = voorvoegsel + "%"
+    n_dag = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE ? "
+                         "AND aangemaakt >= ?", (patroon, vandaag)).fetchone()[0]
+    n_maand = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE ? "
+                           "AND aangemaakt >= ?", (patroon, dertig)).fetchone()[0]
+    n_open = conn.execute("SELECT COUNT(*) FROM nieuws_doelen WHERE sleutel LIKE ? "
+                          "AND status IN ('open', 'bezig')", (patroon,)).fetchone()[0]
     ruimtes = ((dag - n_dag, f"dagplafond ({dag})"), (maand - n_maand, f"plafond per 30 dagen ({maand})"),
                (max_open - n_open, f"maximum tegelijk open ({max_open})"))
     ruimte, reden = min(ruimtes, key=lambda x: x[0])
@@ -7057,7 +7066,19 @@ def nieuws_doelen_upsert():
         fouten.append("'relation_id' moet een geheel getal of null zijn")
         relation_id = None
     relatie_sleutel = NIEUWS_RELATIE_SLEUTEL.fullmatch(sleutel or "")
-    if relatie_sleutel or soort == "relatie" or relation_id is not None:
+    if NIEUWS_RECTIFICATIE_SLEUTEL.fullmatch(sleutel or ""):
+        # Publieke rectificatie (scripts/lead_triage.py): bij een verband soort 'relatie' met
+        # een expliciete relation_id (de sleutel draagt het lead-id, niet het relatie-id)
+        if soort == "relatie" or relation_id is not None:
+            if soort != "relatie" or relation_id is None:
+                fouten.append("een rectificatie van een verband heeft soort 'relatie' en een "
+                              "relation_id")
+            else:
+                rel = conn.execute("SELECT vervangen FROM relations WHERE id = ?",
+                                   (relation_id,)).fetchone()
+                if rel is None or rel["vervangen"]:
+                    fouten.append(f"relatie {relation_id} bestaat niet of is vervangen")
+    elif relatie_sleutel or soort == "relatie" or relation_id is not None:
         # sleutel 'relatie:<id>', soort 'relatie' en relation_id horen bij elkaar
         if not relatie_sleutel:
             fouten.append("een bewijsdoel (soort 'relatie') heeft de sleutel "
@@ -7085,14 +7106,15 @@ def nieuws_doelen_upsert():
     try:
         rij = conn.execute("SELECT * FROM nieuws_doelen WHERE sleutel = ?",
                            (sleutel,)).fetchone()
-        if rij is None and sleutel.startswith("tip:"):
-            # Publieke tip → AI-werk: hard plafond, ook als het triage-script zich vergist
-            ruimte, plafond = lead_doel_ruimte(conn)
+        voorvoegsel = next((v for v in LEAD_DOEL_VOORVOEGSELS if sleutel.startswith(v)), None)
+        if rij is None and voorvoegsel:
+            # Publieke melding → AI-werk: hard plafond, ook als het triage-script zich vergist
+            ruimte, plafond = lead_doel_ruimte(conn, voorvoegsel)
             if ruimte <= 0:
                 conn.execute("ROLLBACK")
                 conn.close()
-                return jsonify({"error": f"Plafond voor tip-doelen bereikt: {plafond}",
-                                "plafond": plafond}), 429
+                return jsonify({"error": f"Plafond voor '{voorvoegsel}'-doelen bereikt: "
+                                         f"{plafond}", "plafond": plafond}), 429
         if rij is None:
             if soort is None:
                 conn.execute("ROLLBACK")
@@ -7118,11 +7140,11 @@ def nieuws_doelen_upsert():
 
         heropen = False
         if rij["status"] not in NIEUWS_DOEL_ACTIEF:
-            if sleutel.startswith("tip:") and data.get("opnieuw") is True:
+            if sleutel.startswith(LEAD_DOEL_VOORVOEGSELS) and data.get("opnieuw") is True:
                 conn.execute("ROLLBACK")
                 conn.close()
-                return jsonify({"error": "Een tip-doel wordt niet heropend: één poging per "
-                                         "publieke tip"}), 409
+                return jsonify({"error": "Een doel uit een publieke melding wordt niet "
+                                         "heropend: één poging per melding"}), 409
             if data.get("opnieuw") is not True:
                 conn.execute("ROLLBACK")
                 doel = _nieuws_doel_dict(rij)

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Rectificatie &amp; bezwaar — Wie bezit de Nederlandse media</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Hoe een rectificatie of bezwaar (AVG art. 16/21) wordt afgehandeld: van eenrichtings-melding tot onafhankelijke her-verificatie, eigenaarsbesluit en volledig spoor.">
+<meta name="description" content="Hoe een rectificatie of bezwaar (AVG art. 16/21) wordt afgehandeld: van eenrichtings-melding tot onafhankelijk onderzoek, controle door andere agents en volledig spoor.">
 <link rel="stylesheet" href="/static/huisstijl.css">
 <script src="/static/huisstijl.js"></script>
 <style>
@@ -79,19 +79,29 @@ code { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px;
       <code>publiek</code> en telt op dat moment in niets mee: ze beweegt geen score, heft geen
       vlag op en verschijnt niet vanzelf in het publieke onderzoek. Het is een <em>lead</em>, geen
       claim.</li>
-    <li><b>Een agent her-verifieert de bron onafhankelijk.</b> Een controle-agent zoekt de betwiste
-      of aangedragen bron zelf op en beoordeelt haar op eigen kracht. Alleen een zelfstandig
-      bevestigde bron kan tot een wijziging leiden — jouw melding op zichzelf is nooit het bewijs.</li>
-    <li><b>De eigenaar beslist.</b> Een mens weegt de uitkomst van die her-verificatie en besluit
-      of er iets verandert. Publieke meldingen worden nooit automatisch samengevoegd in het model.</li>
+    <li><b>Een eerste schifting, zonder AI.</b> Een melding moet zeggen om welk element het gaat (de
+      knop ⚑ op een pagina vult dat in). Gaat ze over een verband of over een persoon of organisatie
+      die in het onderzoek staat, dan gaat ze door; meldingen over hetzelfde element binnen dertig
+      dagen worden samengevoegd. Per dag wordt maar een beperkt aantal meldingen onderzocht.</li>
+    <li><b>Een agent zoekt het onafhankelijk uit.</b> Een onderzoeksagent toetst of de bestaande bron
+      het element echt draagt en zoekt zelf bewijs, vóór én tegen. Jouw melding wijst alleen waar hij
+      moet kijken; ze is nooit zelf het bewijs.</li>
+    <li><b>Andere agents controleren dat werk.</b> Vindt de agent tegenbewijs, dan dient hij dat in als
+      tegenargument. Dat gaat langs dezelfde controles als al het andere werk: de bron wordt opnieuw
+      opgehaald en het citaat letterlijk teruggezocht, de formulering wordt op neutraliteit getoetst en
+      een claim over een persoon op smaad. Pas daarna verandert er iets in het onderzoek: een verband
+      zonder gedragen bron valt weg, een beëindigde functie krijgt haar einddatum. De eigenaar kan
+      elk besluit terugdraaien.</li>
     <li><b>Smaad-firewall bij een genoemd persoon.</b> Een <b>negatieve claim over een genoemd
-      natuurlijk persoon</b> rendert nooit zonder uitdrukkelijk <b>eigenaars-akkoord</b>. Dit soort
-      meldingen wordt apart geroute en kan niet langs de automatische verwerking het publieke beeld in.</li>
+      natuurlijk persoon</b> wordt niet getoond voordat een aparte smaadtoets heeft vastgesteld dat ze
+      feitelijk is, door de bron gedragen wordt en over de publieke rol gaat, én een onafhankelijke
+      broncontrole haar heeft bevestigd.</li>
     <li><b>Niets wordt stil verwijderd.</b> Elke wijziging laat een spoor na: een statusvlag op het
       betrokken element plus een regel in het <code>edit_log</code>. Ook een verwijdering of
       correctie blijft zo herleidbaar — het onderzoek is controleerbaar op zijn eigen geschiedenis.</li>
     <li><b>Indicatieve responstermijn.</b> We streven ernaar een melding binnen een redelijke
-      <b>termijn</b> van doorgaans enkele weken te beoordelen. Omdat er geen antwoordkanaal is,
+      <b>termijn</b> van doorgaans enkele weken te beoordelen; een melding over een persoon gaat
+      voor op een melding over een organisatie. Omdat er geen antwoordkanaal is,
       krijg je geen persoonlijke reactie; de uitkomst is zichtbaar in het onderzoek zelf en in het
       bijbehorende spoor.</li>
   </ol>

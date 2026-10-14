@@ -120,10 +120,11 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
     <textarea id="claim" name="claim" maxlength="1000" required rows="4"
       placeholder="Beschrijf zo concreet mogelijk wat er niet klopt, of welk verband/bron je aandraagt."></textarea>
 
-    <label for="betreft">Betreft (optioneel) <span class="tel" id="tel-betreft">0 / 200</span></label>
+    <label for="betreft" id="betreftLabel">Betreft (optioneel) <span class="tel" id="tel-betreft">0 / 200</span></label>
     <input type="text" id="betreft" name="betreft" maxlength="200"
       placeholder="De organisatie, persoon of relatie waar het om gaat.">
-    <p class="hint">Vrije tekst — bijvoorbeeld een naam. Vanuit een detailpagina is dit alvast ingevuld.</p>
+    <p class="hint">De volledige naam van de persoon of organisatie. Meld je vanaf een pagina in het
+    onderzoek (knop ⚑), dan staat hier al een verwijzing naar dat element; laat die staan.</p>
 
     <label for="bron_url">Bron-link (optioneel) <span class="tel" id="tel-url">0 / 500</span></label>
     <input type="url" id="bron_url" name="bron_url" maxlength="500"
@@ -188,6 +189,9 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
     verbandVelden.style.display = tip ? '' : 'none';
     document.getElementById('partij_a').required = tip;
     document.getElementById('partij_b').required = tip;
+    document.getElementById('betreft').required = !tip;
+    document.getElementById('betreftLabel').firstChild.nodeValue =
+      tip ? 'Betreft (optioneel) ' : 'Om welk element gaat het? ';
   }
   form.querySelectorAll('input[name="soort"]').forEach(function (r) {
     r.addEventListener('change', werkSoortBij);
@@ -221,6 +225,9 @@ h1 { font-size: 23px; letter-spacing: -0.02em; margin: 4px 0 2px; }
     foutEl.textContent = '';
     var claim = document.getElementById('claim').value.trim();
     if (!claim) { foutEl.textContent = 'Vul eerst je melding in.'; return; }
+    if (!isTip() && !document.getElementById('betreft').value.trim()) {
+      foutEl.textContent = 'Zeg om welk element het gaat.'; return;
+    }
     var soortEl = form.querySelector('input[name="soort"]:checked');
     var tip = isTip();
     var pa = document.getElementById('partij_a').value.trim();
