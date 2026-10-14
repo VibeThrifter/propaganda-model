@@ -7,11 +7,17 @@ Telegraaf — en Kees Berghuis — RTL Nieuws, daarna VVD-voorlichting).
 Per medium één doel in de bestaande wachtrij `nieuws_doelen` (soort 'organisatie', sleutel
 'redactieleiding:<medium>'), voor de missie `nieuws-scout` (zie § "Doelen 'redactieleiding:…'"
 in missies/nieuws_scout_brief.md): wie leidt de redactie (hoofdredacteur, adjuncten), wie leidt
-de politieke verslaggeving (chef politiek / Haagse redactie) en wie zijn de bekendste politieke
-verslaggevers en presentatoren — en welke gedocumenteerde banden hebben zij met partijen
-(lidmaatschap, kandidatuur, partij- of fractiefunctie, voorlichter/woordvoerder, denktank) en
-overstappen tussen politiek en media. De context noemt wie het model al kent, zodat de scout
-aanvult en niet dubbelt.
+de politieke verslaggeving (chef politiek / Haagse redactie), wie zijn de bekendste politieke
+verslaggevers en presentatoren en wie heeft er een vaste column — en welke gedocumenteerde
+banden hebben zij met partijen (lidmaatschap, kandidatuur, partij- of fractiefunctie,
+voorlichter/woordvoerder, denktank) en overstappen tussen politiek en media. De context noemt
+wie het model al kent, zodat de scout aanvult en niet dubbelt.
+
+Sinds 2026-10-14 toont "Wie zit erachter?" in de nieuws-app alleen nog posities en geld (wie bij
+het medium werkt, schrijft, presenteert, het bestuurt of bezit), geen contact (bron, deskundige,
+interview). Een column is daarom een positie: `mediaplatform` (mechanisme Podiumverlening) of
+`personeel` met functie columnist, niet `beinvloeding` / Expert legitimatie. Het onderzoek naar
+posities gaat voor de namen uit het nieuws (PRIORITEIT).
 
 Standaard droog: toont de doelen. Met --indienen gaan ze via POST /api/nieuws/doelen (account
 'nieuws-agent', upsert op de sleutel: opnieuw draaien dubbelt niets). Alles wat de scout daarna
@@ -45,7 +51,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 DEFAULT_API = "http://127.0.0.1:5000"
 DEFAULT_TOKEN = ROOT / "data" / "tokens" / "nieuws-agent.token"
-PRIORITEIT = 80.0  # boven de gewone namen uit het nieuws (± 70–75), onder spoed (≥ 90)
+# Boven de namen uit het nieuws (2026-10: ± 73–87), onder spoed (≥ 90). Op 80 kwamen de doelen na
+# vijf dagen nog niet aan de beurt, terwijl "Wie zit erachter?" op deze posities rust (2026-10-14).
+PRIORITEIT = 88.0
 NA_DAGEN = 90      # een afgerond doel komt na een kwartaal opnieuw
 AFGEROND = ("klaar", "niets_gevonden", "overgeslagen", "twijfel", "fout")
 
@@ -66,15 +74,21 @@ BAND_TYPES = ("personeel", "dienstverband", "bestuurder", "woordvoerder_van", "a
 OPDRACHT = (
     "Redactieleiding en politieke verslaggeving van {medium}: wie zijn (of waren de afgelopen "
     "tien jaar) hoofdredacteur en adjunct-hoofdredacteur, wie leidt de politieke verslaggeving "
-    "(chef politiek / Haagse redactie), en wie zijn de drie tot zes bekendste politieke "
-    "verslaggevers en presentatoren? Leg per persoon de functie bij {medium} vast (dienstverband "
-    "of personeel, gedateerd) en zoek gedocumenteerde banden met partijen en de politiek: "
+    "(chef politiek / Haagse redactie), wie zijn de drie tot zes bekendste politieke "
+    "verslaggevers en presentatoren, en wie heeft er een vaste column of rubriek (columnisten, "
+    "vaste commentatoren)? Leg per persoon de functie bij {medium} vast, gedateerd: dienstverband "
+    "of personeel; een column of vaste rubriek als mediaplatform (mechanisme Podiumverlening) of "
+    "als personeel met functie columnist, nooit als deskundige (Expert legitimatie). Wie alleen "
+    "af en toe als deskundige aan het woord komt, hoort hier niet bij. Zoek gedocumenteerde "
+    "banden met partijen en de politiek, bij alle partijen, niet alleen de grote: "
     "partijlidmaatschap of -bestuur, een kandidatuur (Kiesraad-lijst), een functie bij een "
     "partij, fractie of bewindspersoon (voorlichter, woordvoerder, beleidsmedewerker), een "
     "wetenschappelijk bureau of denktank, en overstappen tussen politiek en media in beide "
     "richtingen (draaideur, gedateerd). Alleen de publieke rol; alleen wat een bron bij naam "
-    "zegt; geen afleiding uit stemgedrag of opinies; privézaken nooit. Eén feit per argument, "
-    "in neutrale eigen woorden."
+    "zegt; geen afleiding uit stemgedrag, columns of opinies; privézaken nooit. Eén feit per "
+    "argument, in neutrale eigen woorden. Staat in context.column_als_deskundige iemand die het "
+    "model als deskundige aan {medium} koppelt terwijl de bron een column of rubriek beschrijft, "
+    "leg die column dan vast als positie."
 )
 BRONNEN = ("colofon en eigen aankondigingen van het medium", "persberichten van de uitgever "
            "(DPG Media, Mediahuis, NPO/NOS, RTL)", "Villamedia", "Parlement.com",
@@ -119,6 +133,30 @@ def bekend(conn, ids: list[int]) -> list[dict]:
     return uit[:40]
 
 
+def column_als_deskundige(conn, ids: list[int]) -> list[dict]:
+    """Personen die het model als deskundige aan dit medium koppelt (beinvloeding, Expert
+    legitimatie) terwijl een steunend argument een column of rubriek beschrijft: een positie,
+    geen contact (eigenaar 2026-10-14). De scout legt die vast als positie."""
+    if not ids:
+        return []
+    plek = ",".join("?" * len(ids))
+    rijen = conn.execute(f"""
+        SELECT DISTINCT p.name AS naam, r.id AS relatie_id
+        FROM relations r
+        JOIN mechanisms m ON m.id = r.mechanism_id
+        JOIN entities p ON p.id = CASE WHEN r.source_id IN ({plek}) THEN r.target_id
+                                       ELSE r.source_id END
+        WHERE (r.source_id IN ({plek}) OR r.target_id IN ({plek}))
+          AND p.type = 'persoon' AND r.status = 'goedgekeurd' AND NOT r.vervangen
+          AND r.relation_type = 'beinvloeding' AND m.name = 'expert_legitimatie'
+          AND EXISTS (SELECT 1 FROM arguments a
+                      WHERE a.relation_id = r.id AND a.stance = 'supporting' AND NOT a.vervangen
+                        AND (lower(a.claim) LIKE '%column%' OR lower(a.claim) LIKE '%rubriek%'))
+        ORDER BY p.name""",  # noqa: S608
+                         [*ids, *ids, *ids]).fetchall()
+    return [{"naam": r["naam"], "relatie_id": r["relatie_id"]} for r in rijen]
+
+
 def doelen(conn) -> list[dict]:
     uit = []
     for medium, namen in MEDIA:
@@ -134,19 +172,22 @@ def doelen(conn) -> list[dict]:
             "soort": "organisatie",
             "entity_id": ids[0],
             "rol_categorie": "media",
-            "rol_hint": "hoofdredactie, adjuncten, chef politiek, politieke verslaggevers en "
-                        "presentatoren — en hun banden met partijen",
+            "rol_hint": "hoofdredactie, adjuncten, chef politiek, politieke verslaggevers, "
+                        "presentatoren en columnisten — en hun banden met partijen",
             "prioriteit": PRIORITEIT,
             "context": {
                 "soort_doel": "redactieleiding",
                 "opdracht": OPDRACHT.format(medium=medium),
                 "medium_entiteiten": ids,
                 "bekend_in_model": bekend(conn, ids),
+                "column_als_deskundige": column_als_deskundige(conn, ids),
                 "bronnen": list(BRONNEN),
                 "aanleiding": "Kamran Ullah (VVD-bestuur Amsterdam-West 2006–2010, nu "
                               "hoofdredactie De Telegraaf) en Kees Berghuis (RTL Nieuws → "
                               "VVD-voorlichting) — de eigenaar wil meer van zulke verbanden "
-                              "zien (2026-10-08).",
+                              "zien (2026-10-08). Sinds 2026-10-14 toont 'Wie zit erachter?' "
+                              "in de nieuws-app alleen nog zulke posities en geld, geen "
+                              "contact (bron, deskundige, interview).",
             },
         })
     return uit
