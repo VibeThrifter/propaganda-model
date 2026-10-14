@@ -358,7 +358,24 @@ async function laadToezicht() {
     tegels.push(tzTegel(rn, 'vastgelopen/lege agent-runs', rn ? 'rood' : 'groen'));
   }
 
+  // Nachtelijke integratiecontrole (scripts/integratiecontrole.py): testsuites, strenge validatie
+  // en de live rooktest. Een regressie = was groen, nu rood.
+  const ic = d.integratie || null;
+  if (ic) {
+    const nReg = (ic.regressies || []).length, nRood = (ic.rood || []).length;
+    tegels.push(tzTegel(nReg ? nReg + ' regressie' + (nReg > 1 ? 's' : '') : `${ic.n_groen}/${ic.n}`,
+      'integratiecontrole', nReg ? 'rood' : (nRood ? 'goud' : 'groen'),
+      (ic.ts ? agentTijd(ic.ts) : '') + (nRood && !nReg ? ` · ${nRood} al rood` : '')));
+  }
   let h = `<div class="tz-tegels">${tegels.join('')}</div>`;
+  if (ic && (ic.onderdelen || []).length) {
+    h += `<div class="tz-blok"><h3>Integratiecontrole — rood
+      <button type="button" class="uitleg" aria-label="Uitleg integratiecontrole"
+        data-uitleg="Elke nacht draaien alle testsuites (elk op een eigen tijdelijke database), validate_model --strict en een rooktest tegen de live server: pagina's antwoorden en het laatst goedgekeurde verband staat in de viz-data en het partijoverzicht. Een regressie is een onderdeel dat de vorige keer groen was en nu rood is.">ⓘ</button></h3><ul class="tz-lijst">` +
+      ic.onderdelen.map(o => `<li><div class="tz-claim">${o.regressie ? '<b>regressie</b> · ' : ''}${esc(o.naam)}</div>
+        <div class="tz-meta">${esc((o.staart || '').split('\n').slice(-2).join(' · '))}</div></li>`).join('') +
+      `</ul><div class="t-sub" style="margin-top:6px">Volledige uitvoer: <code>data/integratiecontrole.json</code>; opnieuw draaien: <code>python3 scripts/integratiecontrole.py</code>.</div></div>`;
+  }
   if (dekPct != null) h += `<div class="tz-balk"><span style="width:${Math.max(0, Math.min(100, dekPct))}%"></span></div>`;
 
   // Steekproef van recent auto-gemergede items — kalibreer de auto-merge-kwaliteit

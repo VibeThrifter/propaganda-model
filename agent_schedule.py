@@ -93,6 +93,14 @@ AGENTS = [
      "spec": ["scripts/nieuws_redactieleiding_doelen.py", "--periodiek"], "timeout": 300,
      "omschrijving": "Redactieleiding van de hoofdbronnen elk kwartaal opnieuw in de wachtrij",
      "default": {"eenheid": "dag", "elke": 1, "aan": True}},
+    # Eigenaar 2026-10-14 ("hoe zorgen we ervoor dat dat goed verloopt, alle integratie"): elke
+    # nacht alle testsuites (eigen tijdelijke DB's), validate_model --strict en een rooktest tegen
+    # de live server (alleen lezen). Resultaat in data/integratiecontrole.json → /beheer. Geen
+    # claude. Een gemiste run (Mac sliep) draait bij het ontwaken.
+    {"naam": "integratiecontrole", "label": "integratiecontrole", "soort": "script",
+     "spec": ["scripts/integratiecontrole.py"], "timeout": 7200,
+     "omschrijving": "Integratiecontrole: testsuites, strenge validatie en een live rooktest",
+     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
     # Uit: geen onderdeel van de beoordeling (inhoud en meters). Aan te zetten op /beheer.
     {"naam": "monitor", "label": "monitor-agent", "soort": "runner",
      "spec": ["--agent", "monitor-agent", "--label", "monitor-agent",

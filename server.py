@@ -5606,6 +5606,18 @@ def _agent_runs_overzicht(limiet_historie=5):
     return {"per_agent": per_agent, "vastgelopen": vastgelopen, "totaal_runs": len(runs)}
 
 
+def _integratie_overzicht():
+    """De laatste nachtelijke integratiecontrole (scripts/integratiecontrole.py): testsuites,
+    validate_model --strict en de live rooktest. None als ze nog niet gedraaid heeft."""
+    try:
+        d = json.loads((DATA_DIR / "integratiecontrole.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return {k: d.get(k) for k in ("ts", "ok", "regressies", "rood", "n", "n_groen", "duur_s")} | {
+        "onderdelen": [{k: o.get(k) for k in ("naam", "ok", "regressie", "staart")}
+                       for o in d.get("onderdelen", []) if not o.get("ok")]}
+
+
 @app.route("/api/toezicht")
 @require_user("reviewer")
 def toezicht():
@@ -5666,6 +5678,7 @@ def toezicht():
                       "info": totalen.get("info", 0)},
         "archief_dekking": archief,
         "agent_runs": _agent_runs_overzicht(),
+        "integratie": _integratie_overzicht(),
     })
 
 
