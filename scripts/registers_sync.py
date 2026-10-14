@@ -2,7 +2,7 @@
 """Registers-sync (Uitbreiding C, eigenaarsbesluit 2026-10-07): de registers elke week bijwerken.
 
 Deterministisch, zonder LLM en zonder mens:
-  1. per register een nieuwe uitgave ophalen (oo, tk, ep, lobby; tools/registers/<bron>.py haal);
+  1. per register een nieuwe uitgave ophalen (oo, tk, ep, lobby, ser; tools/registers/<bron>.py haal);
   2. wat nieuw is indienen (<bron>_naar_model, onder `register-import`; idempotent: bestaande
      verbanden en knopen blijven, nieuwe ambten, Kamerleden, nevenfuncties … komen erbij en gaan
      langs de uurronde: registercheck → A7 → goedkeuren);
@@ -18,7 +18,7 @@ Gebeurtenissen (geschenken, reizen) en de loopbaan lopen niet af; die blijven zo
      noemt op verbanden die nog geen datum hebben, en legt vast waar het register geen begin noemt.
 
 Gepland via agent_schedule.py (wekelijks); los:
-    python3 scripts/registers_sync.py [--droog] [--alleen oo,tk,ep,lobby] [--zonder-ophalen]
+    python3 scripts/registers_sync.py [--droog] [--alleen oo,tk,ep,lobby,ser] [--zonder-ophalen]
 """
 from __future__ import annotations
 
@@ -38,6 +38,8 @@ import lobby  # noqa: E402
 import lobby_naar_model  # noqa: E402
 import naar_model  # noqa: E402
 import oo  # noqa: E402
+import ser  # noqa: E402
+import ser_naar_model  # noqa: E402
 import tk  # noqa: E402
 import tk_naar_model  # noqa: E402
 
@@ -45,9 +47,11 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 IMPORT_TOKEN = ROOT / "data" / "tokens" / "register-import.token"
 CHECK_TOKEN = ROOT / "data" / "tokens" / "registercheck.token"
 API = "http://127.0.0.1:5000"
-BRONNEN = ("oo", "tk", "ep", "lobby")
+BRONNEN = ("oo", "tk", "ep", "lobby", "ser")
+MODULES = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby, "ser": ser}
 # Welke records een lopende toestand zijn (de rest is een gebeurtenis of geschiedenis)
-LOPEND = {"oo": ("org:", "fn:"), "tk": ("persoon:", "nevenfunctie:"), "ep": ("persoon:",), "lobby": ("lobbyist:",)}
+LOPEND = {"oo": ("org:", "fn:"), "tk": ("persoon:", "nevenfunctie:", "commissiezetel:"), "ep": ("persoon:",),
+          "lobby": ("lobbyist:",), "ser": ("zetels:",)}
 MAX_AANDEEL = 0.10
 MIN_ONDERBREKER = 5
 
@@ -60,7 +64,7 @@ def db():
 
 # ── 1. ophalen ─────────────────────────────────────────────────────────────
 def ophalen(bron: str, meld) -> None:
-    module = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby}[bron]
+    module = MODULES[bron]
     vandaag = datetime.date.today().isoformat()
     if any(vandaag in p.name for p in module.uitgaven()):
         meld(f"{bron}: de uitgave van vandaag is er al")
@@ -72,7 +76,7 @@ def nieuwste(bron: str) -> tuple[str, dict]:
     if bron == "oo":
         uitgave = oo.uitgaven()[-1].stem.split("_", 1)[1]
         return uitgave, oo.lees_uitgave(uitgave)
-    module = {"tk": tk, "ep": ep, "lobby": lobby}[bron]
+    module = MODULES[bron]
     data = module.lees(module.uitgaven()[-1])
     return data["uitgave"], data
 
@@ -86,6 +90,8 @@ def plan_voor(bron: str, data: dict, conn):
         return tk_naar_model.Plan(data, conn, koppelingen).maak()
     if bron == "ep":
         return ep_naar_model.Plan(data, conn).maak()
+    if bron == "ser":
+        return ser_naar_model.Plan(data, conn, koppelingen).maak()
     return lobby_naar_model.Plan(data, conn, koppelingen).maak()
 
 
@@ -97,6 +103,10 @@ def indienen(bron: str, plan, rest, meld) -> dict:
         ind.personen()
     elif bron == "lobby":
         ind = tk_naar_model.Indiener(plan, rest, meld, bron=lobby, cluster=lobby_naar_model.CLUSTER)
+        bron_id = ind.bron()
+        ind.entiteiten()
+    elif bron == "ser":
+        ind = ser_naar_model.Indiener(plan, rest, meld)
         bron_id = ind.bron()
         ind.entiteiten()
     else:

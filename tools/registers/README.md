@@ -24,13 +24,17 @@ het onafhankelijke A1-oordeel.
 
 | Bron | Module | Uitgave | Wat erin komt |
 |---|---|---|---|
-| Register van overheidsorganisaties (`organisaties.overheid.nl/archive/exportOO.xml`, namespace 2.6.13) | `oo.py` → `naar_model.py` | `data/registers/oo/exportOO_<datum>.xml` | ministeries met directoraten-generaal, agentschappen, zbo's, adviescolleges, inspecties, Hoge Colleges, rechtspraak, gemeenten, provincies en waterschappen (`zeggenschap`, `adviseur`); bewindspersonen, SG's, DG's, burgemeesters, wethouders, CdK's en dijkgraven (`ambt` met de ambtstitel in `relations.functie`) en hun partij (`lidmaatschap`/`partijlijn`). Raadsleden niet. Contactgegevens van medewerkers worden nooit gelezen. |
-| Tweede Kamer, open data (`gegevensmagazijn.tweedekamer.nl/OData/v4/2.0`) | `tk.py` → `tk_naar_model.py` | `data/registers/tk/tk_<datum>.json` | de zittende Kamerleden (`ambt`/`kamerzetel` met de Tweede Kamer, fractie als `lidmaatschap`/`partijlijn`), hun lopende nevenfuncties (`nevenfunctie_verstrengeling`), hun loopbaan (`draaideurconstructie`), reizen die een ander betaalde en geschenken (`geschenk`/`geschenk_en_gastvrijheid`, sinds 2023-11-22) |
+| Register van overheidsorganisaties (`organisaties.overheid.nl/archive/exportOO.xml`, namespace 2.6.13) | `oo.py` → `naar_model.py` | `data/registers/oo/exportOO_<datum>.xml` | ministeries met directoraten-generaal, agentschappen, zbo's, adviescolleges, inspecties, Hoge Colleges, rechtspraak, gemeenten, provincies en waterschappen (`zeggenschap`, `adviseur`); bewindspersonen, SG's, DG's, burgemeesters, wethouders, CdK's en dijkgraven (`ambt` met de ambtstitel in `relations.functie`) en hun partij (`lidmaatschap`/`partijlijn`). Sinds 2026-10-13 ook gedeputeerden (`lokaal_bestuursmandaat`), gemeente- en provinciesecretarissen, de secretaris-directeur van een waterschap en het bestuur van zbo's, adviescolleges en gerechten (`ambtelijke_leiding`), en lokale partijen als eigen partijknoop (`oo.lokale_partij`: de plaats tussen haakjes tenzij de naam haar noemt en uniek is; niet 'Onafhankelijk', niet een afdeling of combinatie van een landelijke partij). Staatsraden wachten op een mechanisme (`STAATSRAAD_MECH`); gewone collegeleden en raadsleden niet. Contactgegevens van medewerkers worden nooit gelezen. |
+| Tweede Kamer, open data (`gegevensmagazijn.tweedekamer.nl/OData/v4/2.0`) | `tk.py` → `tk_naar_model.py` | `data/registers/tk/tk_<datum>.json` | de zittende Kamerleden (`ambt`/`kamerzetel` met de Tweede Kamer, fractie als `lidmaatschap`/`partijlijn`; een fractie die geen landelijke partij is, zoals 'Groep Markuszower', als eigen partijknoop met `DatumActief`), hun vaste commissiezetels in de controlerende commissies (`ambt`/`kamerzetel` met '<commissie> (Tweede Kamer)', Van/TotEnMet; geen contactgroepen en delegaties), hun lopende nevenfuncties (`nevenfunctie_verstrengeling`), hun loopbaan (`draaideurconstructie`), reizen die een ander betaalde en geschenken (`geschenk`/`geschenk_en_gastvrijheid`, sinds 2023-11-22) |
 | Europees Parlement, open data (`data.europarl.europa.eu/api/v2`) | `ep.py` → `ep_naar_model.py` | `data/registers/ep/ep_<datum>.json` | de zittende Nederlandse Europarlementariërs (`ambt`/`kamerzetel` met het Europees Parlement, externe id `ep_mep`; het parlement zelf heeft wikidata:Q8889) en hun nationale partij (`lidmaatschap`/`partijlijn`) |
+| SER, "Wie zitten er in de SER?" (`ser.nl`, html) | `ser.py` → `ser_naar_model.py` | `data/registers/ser/ser_<datum>.html` | de werkgevers- en werknemersorganisaties met zetels (`lidmaatschap`/`polderoverleg` → SER, het aantal zetels als functie, rol `sociale_partner` erbij). Geen personen: de pagina noemt geen datum per persoon. Geen begin: `register_zonder_datum`. Nieuwe organisatie alleen met de hand getypeerd (`koppelingen.json`, `ser_organisaties`: de VCP). |
+| Wikidata SPARQL (`query.wikidata.org`) | `wikidata.py` → `wikidata_namen.py` (droogloop), `naar_model.py` | `data/registers/wikidata/wikidata_<datum>.json` | geen feiten, alleen naam en QID: burgemeesters en wethouders (P39 met een ambt onder Q13423499/Q20748682, P1001 gemeente, P382 CBS-code). Een registernaam met alleen een achternaam koppelt bij precies één passende persoon (zelfde gemeente, functie, achternaam, ambt loopt); `wikidata_namen.py` meldt welke voorletternamen eenduidig een volledige naam krijgen (hernoemen = maintainer). |
 | Lobbyistenregister van de Tweede Kamer (pdf op `tweedekamer.nl/contact_en_bezoek/lobbyisten`) | `lobby.py` → `lobby_naar_model.py` | `data/registers/lobby/lobby_<bijgewerkt>.pdf` | elke organisatie met een vaste toegangspas, en de opdrachtgevers die al in het model staan (`lobbyt` → Tweede Kamer, `lobbytoegang`). De tabel wordt gelezen uit de woordposities (PyMuPDF); de lobbyisten zelf worden geen knoop. Werkgevers zonder rechtsvorm in de naam zijn met de hand getypeerd in `koppelingen.json` (`lobby_organisaties`). |
 
-Nog te doen (plan fase 3f): subsidies (de download van Rijksfinanciën geeft nu 404), Wikidata
-voor volledige namen bij voorletters, en de wekelijkse `registers-sync`.
+Nog te doen (plan fase 3f): subsidies (de download van Rijksfinanciën geeft nu 404); de
+hernoeming van voorletternamen naar hun Wikidata-naam (een maintainer, zie `wikidata_namen.py`);
+gemeenschappelijke regelingen (veiligheidsregio's, GGD's, omgevingsdiensten: het register heeft
+de deelnemers met toetredingsdatum, maar er is nog geen mechanisme voor gemeente → regeling).
 
 ## Gebruik
 
@@ -45,6 +49,10 @@ python3 tools/registers/tk_naar_model.py --indienen
 
 python3 tools/registers/ep.py haal && python3 tools/registers/ep_naar_model.py [--indienen]
 python3 tools/registers/lobby.py haal && python3 tools/registers/lobby_naar_model.py [--indienen]
+python3 tools/registers/ser.py haal && python3 tools/registers/ser_naar_model.py [--indienen]
+
+python3 tools/registers/wikidata.py haal     # namen en QID's (geen feiten); naar_model.py gebruikt de nieuwste
+python3 tools/registers/wikidata_namen.py    # droogloop: welke voorletternamen eenduidig een volledige naam krijgen
 
 python3 scripts/registercheck.py [--droog]  # draait ook elk uur als stap 2b van de automatische beoordeling
 python3 scripts/test_registers.py           # verse DB + fixtures, de hele keten (exit 0 = groen)
@@ -76,6 +84,12 @@ Een tweede run maakt niets dubbel (externe id's, bestaande verbanden worden over
   een registerfeit het structuurpad (geen A2, geen smaadtoets) en telt het tegen een eigen
   dagplafond (`PROPAGANDA_REGISTER_PLAFOND`, 5000). De bronchecker en de bronzoeker slaan
   registerargumenten over (`registercheck.REGISTER_ARG_SQL`).
+- **Bestaan begrenst** (2026-10-13, `looptijd.py`). Elk gepland verband valt binnen het bestaan
+  van zijn eindpunten (`common.klem_relaties`): het begin wordt het laatste van het recordbegin en
+  het begin van bron en doel (OO-record én model, het strengste), het einde het vroegste. Een
+  ministerie in zijn huidige vorm (EZK 2010-10-14) stuurt een ouder agentschap dus pas vanaf 2010
+  aan. Een ontbrekend begin blijft ontbreken. De droogloop telt wat geklemd is en wat de
+  bestaanspoort nog zou weigeren (`bestaan: …`).
 - **Privacy.** Alleen publieke ambtsdragers; geen raadsleden in bulk; privépersonen nooit; geen
   adressen of telefoonnummers.
 

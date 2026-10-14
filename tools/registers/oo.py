@@ -14,12 +14,14 @@ Geen schrijfacties op het model (dat doet naar_model.py via de REST-API). Contac
 from __future__ import annotations
 
 import json
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import DATA, download, ontleed_naam, partij_naam, schoon, sha256_bestand, sleutel  # noqa: E402
+from common import (DATA, PARTIJEN, download, ontleed_naam, partij_naam, schoon,  # noqa: E402
+                    sha256_bestand, sleutel)
 
 BRON = "oo"
 URL = "https://organisaties.overheid.nl/archive/exportOO.xml"
@@ -174,6 +176,74 @@ def lees(pad: Path) -> dict:
             "organisaties": orgs, "functies": functies}
 
 
+# ── Lokale partijen (2026-10-13) ────────────────────────────────────────────
+# Een partij van een wethouder, burgemeester of gedeputeerde die geen landelijke partij is, wordt
+# een eigen partijknoop met de bestuurslaag van haar gemeente of provincie. De naam is de
+# registernaam, met de plaats erachter tenzij de naam de plaats al noemt én in deze uitgave maar
+# bij één gemeente of provincie voorkomt ("Hart voor Den Haag"; "Gemeentebelangen (Ermelo)").
+# Zo is de naam uniek en volgt hij deterministisch uit de uitgave (de registercheck rekent hem na).
+GEEN_PARTIJ = {"onafhankelijk", "partijloos", "geen", "geen partij", "nvt", "n v t", "n b", "nb",
+               "onafhankelijk partijloos", "partijloos onafhankelijk", "niet van toepassing", "lokaal",
+               "lijst", "fractie", "eenmansfractie"}
+LOKALE_LAGEN = {"Gemeente": "gemeente", "Provincie": "provincie"}
+# Een partijnaam met een landelijke partij erin is een afdeling of een combinatie ("PRO Leusden",
+# "ChristenUnie-SGP", "Groen Drimmelen (VP/D66)"): geen eigen knoop, dat zou een tweede CDA of
+# PRO naast de landelijke maken.
+LANDELIJK_EXTRA = {"cu", "gl", "groen links", "pvda gl", "christen unie", "groenlinks pvda", "d 66"}
+
+
+def _plaats(org: dict) -> str:
+    return re.sub(r"^(Gemeente|Provincie)\s+", "", org["naam"])
+
+
+def _kern(plaats: str) -> str:
+    """'Bergen (NH)' → 'Bergen'."""
+    return schoon(re.sub(r"\([^)]*\)", " ", plaats))
+
+
+def _partij_plaatsen(data: dict) -> dict[str, set]:
+    """Partijsleutel → de gemeenten/provincies (oo-id) waar die partijnaam in deze uitgave staat
+    (alle lopende functies, ook raadsleden: daar ziet het register de partij het vaakst)."""
+    if "_partij_plaatsen" not in data:
+        uit: dict[str, set] = {}
+        orgs = data["organisaties"]
+        for f in data["functies"].values():
+            if f["eind"] or not f.get("partij"):
+                continue
+            top = orgs.get((orgs.get(f["oo_id"]) or {}).get("top_oo") or "") or {}
+            if (top.get("types") or [""])[0] in LOKALE_LAGEN:
+                uit.setdefault(sleutel(f["partij"]), set()).add(top["oo_id"])
+        data["_partij_plaatsen"] = uit
+    return data["_partij_plaatsen"]
+
+
+def lokale_partij(data: dict, rec: dict) -> tuple[str | None, str | None, str | None]:
+    """De partijknoop voor de partij van dit record als het geen landelijke partij is.
+    → (naam, bestuurslaag, None) of (None, None, reden waarom niet)."""
+    partij = schoon(rec.get("partij"))
+    if not partij:
+        return None, None, "geen partij"
+    if partij_naam(partij):
+        return None, None, "landelijke partij"
+    orgs = data["organisaties"]
+    top = orgs.get((orgs.get(rec["oo_id"]) or {}).get("top_oo") or "") or {}
+    laag = LOKALE_LAGEN.get((top.get("types") or [""])[0])
+    if not laag:
+        return None, None, "geen gemeente of provincie"
+    s = sleutel(partij)
+    if s in GEEN_PARTIJ or len(s) < 2:
+        return None, None, "geen partij (onafhankelijk of partijloos)"
+    t = f" {s} "
+    if any(f" {k} " in t for k in set(PARTIJEN) | LANDELIJK_EXTRA):
+        return None, None, "afdeling of combinatie van een landelijke partij"
+    plaats = _plaats(top)
+    kern = sleutel(_kern(plaats))
+    uniek = len(_partij_plaatsen(data).get(s, set())) <= 1
+    if uniek and kern and f" {kern} " in t:
+        return partij, laag, None
+    return f"{partij} ({plaats})", laag, None
+
+
 _CACHE: dict[str, dict] = {}
 
 
@@ -232,6 +302,11 @@ def controleer(data: dict, sleutel_r: str, rec: dict, relatie_type: str,
     if relatie_type == "lidmaatschap":
         partij = rec.get("partij") or _fractie(rec)
         verwacht = partij_naam(partij or "")
+        lokaal = None if verwacht or _fractie(rec) else lokale_partij(data, rec)[0]
+        if lokaal:  # een lokale partij: dezelfde naamsleutel (het register varieert in hoofdletters)
+            if ander["type"] != "partij" or sleutel(ander["name"]) != sleutel(lokaal):
+                return f"partij '{partij}' past niet bij eindpunt #{ander['id']}"
+            return None
         if not verwacht or ander["type"] != "partij" or ander["name"] != verwacht:
             return f"partij '{partij}' past niet bij eindpunt #{ander['id']}"
         return None

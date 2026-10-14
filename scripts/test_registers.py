@@ -17,7 +17,13 @@ overheidsorganisaties:
      betaler blijven weg; idempotent; de registercheck ziet een verlegd ambt;
   8. het Europees Parlement (ep.py, ep_naar_model.py): zetel en nationale partij;
   9. het lobbyistenregister (lobby.py, lobby_naar_model.py): de pdf-tabel, lobbyt → Tweede Kamer;
- 10. de registers-sync: een ambt dat verdwijnt loopt af; de stroomonderbreker bij een halve uitgave.
+ 10. de registers-sync: een ambt dat verdwijnt loopt af; de stroomonderbreker bij een halve uitgave;
+ 11. looptijd uit het record;
+ 12. (2026-10-13) gedeputeerden, gemeente- en provinciesecretarissen, secretaris-directeur van een
+     waterschap en het bestuur van zbo's en gerechten; staatsraden en gewone collegeleden niet;
+     lokale partijen als eigen knoop (met de plaats waar nodig); een fractie die geen partij is
+     ('Groep …') als eigen partijknoop; commissiezetels (geen contactgroepen); Wikidata-namen
+     (alleen eenduidig, de naamgenoot niet); de SER-samenstelling (polderoverleg).
 De live database wordt niet aangeraakt.
 
 Gebruik: python3 scripts/test_registers.py   (exit 0 = alles groen)
@@ -50,13 +56,13 @@ def laad_script(naam):
     return module
 
 
-def org(sid, naam, typ, inhoud="", ministerie=None, functies="", kinderen="", afk=None):
+def org(sid, naam, typ, inhoud="", ministerie=None, functies="", kinderen="", afk=None, tooi=None):
     rel = (f'<p:relatieMetMinisterie p:systeemId="{ministerie[0]}">{ministerie[1]}'
            f'</p:relatieMetMinisterie>' if ministerie else "")
     return (f'<p:organisatie p:systeemId="{sid}"><p:naam>{naam}</p:naam>'
             + (f"<p:afkorting>{afk}</p:afkorting>" if afk else "")
             + f"<p:types><p:type>{typ}</p:type></p:types>{rel}{inhoud}"
-            + f'<p:identificatiecodes><p:resourceIdentifier p:naam="Organisatiecode">oorg{sid}'
+            + f'<p:identificatiecodes><p:resourceIdentifier p:naam="Organisatiecode">{tooi or f"oorg{sid}"}'
               f"</p:resourceIdentifier></p:identificatiecodes>"
             + (f"<p:functies>{functies}</p:functies>" if functies else "")
             + (f"<p:organisaties>{kinderen}</p:organisaties>" if kinderen else "")
@@ -85,20 +91,45 @@ def fixture_xml() -> str:
         org("200", "Testagentschap", "Agentschap", ministerie=fin,
             functies=functie(4, "Directeur-generaal", [(14, "mw. B. (Bea) Voorbeeld", None, "2022-05-01")])),
         org("300", "Testautoriteit", "Zelfstandig bestuursorgaan", ministerie=fin, afk="TA",
-            functies=functie(5, "Voorzitter", [(15, "dhr. mr. C.D. Ezel", None, None)])),
+            functies=functie(5, "Voorzitter", [(15, "dhr. mr. C.D. Ezel", None, None)])
+            + functie(50, "Bestuurslid", [(50, "mw. drs. B. (Bep) Bestuur", None, "2021-03-01")])),
         org("301", "Keuringsinstanties ex Testwet", "Zelfstandig bestuursorgaan", ministerie=fin),
         org("400", "Testraad", "Adviescollege", ministerie=fin,
-            functies=functie(6, "Voorzitter", [(16, "mw. prof. dr. D. (Dora) Advies", None, None)])),
-        org("500", "Gemeente Teststad", "Gemeente",
+            functies=functie(6, "Voorzitter", [(16, "mw. prof. dr. D. (Dora) Advies", None, None)])
+            + functie(51, "Lid", [(51, "dhr. L. (Leo) Collegelid", None, None)])),
+        org("500", "Gemeente Teststad", "Gemeente", tooi="gm9999",
             functies=functie(7, "Burgemeester", [(17, "Dhr. B.C.M. Vostermans", "CDA", None)])
             + functie(8, "Wethouder", [(18, "Mw. A. van Dam", "Lokaal Belang", None),
-                                       (19, "Dhr. Fortuin", "CDA", None)])
-            + functie(9, "Raadslid", [(20, "Dhr. R. Raad", "CDA", None)])),
+                                       (19, "Dhr. Fortuin", "CDA", None),
+                                       (52, "Dhr. Zonder", "CDA", None),
+                                       (53, "Dhr. H. Hart", "Hart voor Teststad", None),
+                                       (54, "Mw. O. Onafhankelijk", "Onafhankelijk", None),
+                                       (55, "Dhr. P. Afdeling", "PRO Teststad", None),
+                                       (56, "Mw. G. Belang", "Gemeentebelangen", None)])
+            + functie(9, "Raadslid", [(20, "Dhr. R. Raad", "CDA", None)])
+            + functie(57, "Gemeentesecretaris", [(57, "Mw. drs. S. (Saskia) Secretaris", None, "2019-05-01")])),
+        # een provincie met Gedeputeerde Staten en een provinciesecretaris
+        org("700", "Provincie Testland", "Provincie",
+            kinderen=org("701", "Gedeputeerde Staten", "Organisatieonderdeel",
+                         functies=functie(70, "Lid", [(70, "dhr. G. (Gerrit) Gedeputeerde", "VVD", "2023-06-01"),
+                                                      (71, "mw. L. (Lotte) Lokaal", "Testland Lokaal", None)])
+                         + functie(72, "Provinciesecretaris", [(72, "Mw. P. Secretaris", None, None)]))),
+        org("800", "Testwaterschap", "Waterschap",
+            functies=functie(80, "Dijkgraaf", [(80, "dhr. D. (Dirk) Dijk", None, "2023-01-01")])
+            + functie(81, "Secretaris-directeur", [(81, "mw. W. (Wil) Water", None, "2020-01-01")])),
+        # staatsraden wachten op een mechanisme (STAATSRAAD_MECH)
+        org("900", "Raad van State", "Hoog College van Staat",
+            kinderen=org("901", "Afdeling advisering", "Organisatieonderdeel",
+                         functies=functie(90, "Staatsraad", [(90, "mr. S.R. Staatsraad", None, "2015-01-01")]))),
     ]
     # vijf verschillende "J. … de Vries"-bestuurders in vijf gemeenten
     for i, vl in enumerate(("J.", "J.M.", "J.G.", "J.D.", "J.A."), start=1):
-        orgs.append(org(str(600 + i), f"Gemeente Vries{i}", "Gemeente",
-                        functies=functie(60 + i, "Burgemeester", [(600 + i, f"Dhr. {vl} de Vries", None, None)])))
+        # Vries4 ontstond in 2023 (herindeling); haar burgemeester zit er volgens het record sinds 2019
+        orgs.append(org(str(600 + i), f"Gemeente Vries{i}", "Gemeente", tooi=f"gm999{i}",
+                        inhoud="<p:startDatum>2023-01-01</p:startDatum>" if i == 4 else "",
+                        functies=functie(60 + i, "Burgemeester", [(600 + i, f"Dhr. {vl} de Vries",
+                                                                    "Gemeentebelangen" if i == 3 else None,
+                                                                    "2019-03-01" if i == 4 else None)])))
     return (f'<?xml version="1.0" encoding="UTF-8"?><p:overheidsorganisaties p:timestamp="2026-01-01T00:00:00+01:00" '
             f'xmlns:p="{NS}"><p:organisaties>{"".join(orgs)}</p:organisaties></p:overheidsorganisaties>')
 
@@ -126,7 +157,8 @@ def tk_fixture() -> dict:
         return {"Id": f"z-{pid}", "Functie": functie, "Van": "2023-12-06T00:00:00Z", "Persoon_Id": pid,
                 "Persoon": {"Id": pid, "Titels": None, "Initialen": f"{roep[0]}.", "Roepnaam": roep,
                             "Voornamen": roep, "Tussenvoegsel": None, "Achternaam": achter},
-                "FractieZetel": {"Fractie": {"Id": f"f-{afk}", "NaamNL": fractie, "Afkorting": afk}}}
+                "FractieZetel": {"Fractie": {"Id": f"f-{afk}", "NaamNL": fractie, "Afkorting": afk,
+                                             "DatumActief": "2025-01-01T00:00:00+01:00"}}}
 
     def neven(nid, pid, tekst):
         return {"Id": nid, "PersoonId": pid, "Omschrijving": tekst, "PeriodeVan": "2024-01-01T00:00:00Z",
@@ -146,6 +178,15 @@ def tk_fixture() -> dict:
         "reizen": [{"Id": "r1", "Persoon_Id": "p1", "Bestemming": "Brussel", "Doel": "Conferentie",
                     "Van": "2024-02-01T00:00:00Z", "TotEnMet": "2024-02-02T00:00:00Z",
                     "BetaaldDoor": "Tweede Kamer der Staten-Generaal"}],
+        "commissies": [
+            {"Id": "c1", "Persoon_Id": "p1", "Functie": "Voorzitter", "Van": "2024-01-10T00:00:00+01:00",
+             "TotEnMet": None, "CommissieZetel": {"Commissie": {
+                 "Id": "k1", "NaamNL": "Vaste commissie voor Testzaken", "Inhoudsopgave": "Vaste commissies",
+                 "DatumActief": None, "DatumInactief": None}}},
+            {"Id": "c2", "Persoon_Id": "p2", "Functie": "Lid", "Van": "2024-01-10T00:00:00+01:00",
+             "TotEnMet": None, "CommissieZetel": {"Commissie": {
+                 "Id": "k2", "NaamNL": "Contactgroep Testland", "Inhoudsopgave": "Delegaties naar internationale vergaderingen",
+                 "DatumActief": None, "DatumInactief": None}}}],
         "geschenken": [{"Id": "g1", "Persoon_Id": "p2", "Datum": "2024-03-01T00:00:00Z",
                         "Omschrijving": "Ontvangen van de Gemeente Teststad een mok. De waarde is onbekend."},
                        {"Id": "g2", "Persoon_Id": "p2", "Datum": "2024-03-02T00:00:00Z",
@@ -178,6 +219,39 @@ def ep_fixture() -> dict:
             "leden": [lid("e1", "Els", "Europa", "PPE", "org/1"), lid("e2", "Kim", "Van Kandidaat", "Renew", "org/2")],
             "organisaties": {"org/1": {"afkorting": "CDA", "naam": "Christen Democratisch Appèl"},
                              "org/2": {"afkorting": "VVD", "naam": "Volkspartij voor Vrijheid en Democratie"}}}
+
+
+def wikidata_fixture() -> dict:
+    """Een kleine Wikidata-uitgave in het formaat van wikidata.haal(): wie in gm9999 (Teststad)
+    burgemeester of wethouder is, plus een naamgenoot die al stopte en een in een andere gemeente."""
+    def ambt(q, cls, cbs, start=None, eind=None):
+        a = {"p": f"http://www.wikidata.org/entity/{q}", "cls": f"http://www.wikidata.org/entity/{cls}",
+             "cbs": cbs}
+        if start:
+            a["start"] = f"{start}T00:00:00Z"
+        if eind:
+            a["eind"] = f"{eind}T00:00:00Z"
+        return a
+
+    def naam(q, label, *voornamen):
+        rijen = [{"p": f"http://www.wikidata.org/entity/{q}", "naam": label}]
+        return [dict(rijen[0], ord=str(i), voornaam=v) for i, v in enumerate(voornamen, 1)] or rijen
+    burg, weth = "Q13423499", "Q20748682"
+    return {"bron": "wikidata", "opgehaald": "2026-01-02",
+            "ambten": [ambt("Q1", weth, "9999", "2022-06-01"),            # Piet Fortuin, Teststad
+                       ambt("Q2", burg, "9999", "2019-01-01"),            # Bob Vostermans
+                       ambt("Q3", weth, "9999", "2014-04-01", "2020-01-01"),  # Anna van Dam, stopte
+                       ambt("Q4", weth, "8888", "2022-06-01"),            # Jack de Vries, andere gemeente
+                       ambt("Q5", weth, "9999", "2022-06-01")],           # Kees Zonderland ≠ 'Zonder'
+            "namen": naam("Q1", "Piet Fortuin", "Pieter") + naam("Q2", "Bob Vostermans")
+                     + naam("Q3", "Anna van Dam") + naam("Q4", "Jack de Vries") + naam("Q5", "Kees Zonderland")}
+
+
+def ser_html() -> str:
+    """De lijsten zoals op ser.nl ('Wie zitten er in de SER?')."""
+    return ("<html><body><main><p>Werkgeversorganisaties:</p>\n<ul>\n    <li>VNO-NCW (8 zetels)</li>\n"
+            "    <li>Testwerkgevers (1 zetel)</li>\n</ul>\n<p>Werknemersorganisaties:</p>\n<ul>\n"
+            "    <li>FNV (8 zetels)</li>\n    <li>VCP (2 zetels)</li>\n</ul></main></body></html>")
 
 
 def tweede_kamer_en_theorie(conn):
@@ -256,7 +330,7 @@ def main():
         pad.write_text(fixture_xml(), encoding="utf-8")
         (oo.MAP / "exportOO_2026-01-01.sha256").write_text(common.sha256_bestand(pad) + "\n")
         data = oo.lees(pad)
-        eis(data["uitgave"] == "2026-01-01" and len(data["organisaties"]) == 12,
+        eis(data["uitgave"] == "2026-01-01" and len(data["organisaties"]) == 17,
             f"uitgave gelezen ({len(data['organisaties'])} organisaties, {len(data['functies'])} functies)")
         eis("NIET-INLEZEN" not in json.dumps(data), "adresgegevens van medewerkers worden niet gelezen")
 
@@ -266,6 +340,12 @@ def main():
         rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
         naar_model.KOPPELINGEN = tmp / "koppelingen.json"
         naar_model.KOPPELINGEN.write_text(json.dumps({"organisaties": {}, "personen": {}}))
+        import wikidata
+        wikidata.MAP = tmp / "registers" / "wikidata"
+        wikidata.MAP.mkdir(parents=True)
+        wpad = wikidata.MAP / "wikidata_2026-01-02.json"
+        wpad.write_text(json.dumps(wikidata_fixture(), ensure_ascii=False), encoding="utf-8")
+        (wikidata.MAP / "wikidata_2026-01-02.sha256").write_text(common.sha256_bestand(wpad) + "\n")
         plan = naar_model.Plan(data, rconn).maak()
         namen = {o_["naam"] for o_ in plan.orgs.values()}
         eis("Ministerie van Financiën" in namen and "Directoraat-generaal Toeslagen" in namen,
@@ -279,14 +359,54 @@ def main():
         vries = [p_ for n, p_ in personen.items() if "de Vries" in n]
         eis(len(vries) == 5 and all(p_["bestaand"] is None for p_ in vries),
             "vijf verschillende J. de Vries'en blijven vijf knopen (geen koppeling aan Jack de Vries)")
-        eis(not any("Fortuin" in n or "Raad" in n for n in personen), "alleen-achternaam en raadsleden overgeslagen")
+        eis(not any("Zonder" in n or "Raad" in n for n in personen),
+            "alleen-achternaam zonder Wikidata-treffer en raadsleden overgeslagen ('Zonder' ≠ 'Kees Zonderland')")
+        eis(personen.get("Piet Fortuin", {}).get("qid") == "Q1",
+            "'Dhr. Fortuin' (alleen achternaam) krijgt de volledige naam en QID uit Wikidata: zelfde gemeente, "
+            "functie en achternaam, ambt loopt")
+        fortuin = [r for r in plan.relaties if r["bron"] == ("persoon", personen["Piet Fortuin"]["sleutel"])]
+        eis(fortuin and all("Fortuin" in r["claim"] and "Piet" not in r["claim"] for r in fortuin),
+            "de bewering noemt de naam zoals het register hem geeft")
+        print("2b. Uitbreiding 2026-10-13: meer ambtsdragers, lokale partijen")
+        functies = {r["functie"] for r in plan.relaties if r["type"] == "ambt"}
+        eis({"Gemeentesecretaris", "Lid van Gedeputeerde Staten", "Provinciesecretaris", "Secretaris-directeur",
+             "Bestuurslid"} <= functies, f"nieuwe ambten in het plan ({sorted(functies)})")
+        eis("G. Gedeputeerde" not in personen and "Gerrit Gedeputeerde" in personen
+            and "L. Lokaal (gedeputeerde Testland)" not in personen,
+            "een gedeputeerde met roepnaam krijgt de volledige naam")
+        gs = [r for r in plan.relaties if r["functie"] == "Lid van Gedeputeerde Staten"]
+        eis(all(r["mechanisme"] == "lokaal_bestuursmandaat" for r in gs) and
+            any(r["start"] == "2023-06-01" for r in gs), "gedeputeerde: lokaal_bestuursmandaat met het begin uit het record")
+        eis(not any("Collegelid" in n or "Staatsraad" in n for n in personen),
+            "een gewoon lid van een adviescollege en een staatsraad (wacht op een mechanisme) gaan niet mee")
+        eis(plan.overgeslagen_functies["staatsraad (Afdeling advisering): wacht op een mechanisme"] == 1
+            and plan.overgeslagen_functies["lid van een adviescollege (geen leiding)"] == 1,
+            f"wat niet meegaat, wordt geteld: {dict(plan.overgeslagen_functies)}")
+        lokaal = {lp["naam"]: lp for lp in plan.lokale_partijen.values()}
+        eis(set(lokaal) == {"Lokaal Belang (Teststad)", "Hart voor Teststad", "Gemeentebelangen (Teststad)",
+                            "Gemeentebelangen (Vries3)", "Testland Lokaal"},
+            f"lokale partijen: plaats erbij tenzij de naam haar noemt en uniek is ({sorted(lokaal)})")
+        eis(lokaal["Testland Lokaal"]["bestuurslaag"] == "provincie" and
+            lokaal["Hart voor Teststad"]["bestuurslaag"] == "gemeente", "bestuurslaag van de lokale partij")
+        eis(plan.overgeslagen["partij: geen partij (onafhankelijk of partijloos)"] == 1 and
+            plan.overgeslagen["partij: afdeling of combinatie van een landelijke partij"] == 1,
+            "'Onafhankelijk' en 'PRO Teststad' (afdeling van een landelijke partij) worden geen partij")
+        vries4 = [r for r in plan.relaties if r["regel"].startswith("Gemeente Vries4 · Burgemeester")]
+        eis(vries4 and vries4[0]["start"] == "2023-01-01" and vries4[0]["start_record"] == "2019-03-01"
+            and plan.bestaan["bestaan: begin naar het begin van een eindpunt"] == 1
+            and not plan.bestaan["bestaan: de poort zou weigeren"],
+            "bestaan begrenst: een ambt sinds 2019 bij een gemeente uit 2023 begint in 2023; de poort weigert niets")
+        lokaal_rel = [r for r in plan.relaties if r["bron"][0] == "partij"]
+        eis(len(lokaal_rel) == 5 and all(r["start"] is None for r in lokaal_rel),
+            "lidmaatschap van een lokale partij zonder begin (het register noemt er geen)")
         soorten = {f"{r['type']}/{r['mechanisme']}" for r in plan.relaties}
         eis({"zeggenschap/hierarchische_aansturing", "zeggenschap/verzelfstandigd_bestuur",
              "adviseur/institutioneel_advies", "ambt/ministeriele_verantwoordelijkheid",
              "ambt/ambtelijke_leiding", "ambt/lokaal_bestuursmandaat", "lidmaatschap/partijlijn"} <= soorten,
             f"alle verbandsoorten in het plan ({len(plan.relaties)} verbanden)")
-        eis(not any("Lokaal Belang" in r["claim"] for r in plan.relaties if r["type"] == "lidmaatschap"),
-            "lokale partij geeft geen lidmaatschap")
+        eis(not any(r["bron"][0] == "bestaand" and "Lokaal Belang" in r["claim"]
+                    for r in plan.relaties if r["type"] == "lidmaatschap"),
+            "een lokale partij wordt nooit een landelijke partij")
 
         print("3. Indienen via REST (register-import)")
         import server
@@ -389,7 +509,13 @@ def main():
         eis(nog == 1, f"alle registerverbanden goedgekeurd behalve het vervalste ({goed} goedgekeurd)")
         reg = conn.execute("SELECT COUNT(*) FROM edit_log WHERE reason LIKE "
                            "'automatische beoordeling (register)%'").fetchone()[0]
-        eis(reg == goed, f"goedkeuringen tellen tegen het registerplafond ({reg})")
+        # een knoop zonder externe id (een lokale partij) is voor de server geen registerelement: die
+        # telt tegen het gewone plafond (server._registerelement); alle verbanden wel tegen het registerplafond
+        zonder_id = conn.execute("""SELECT COUNT(*) FROM entities e WHERE e.status = 'goedgekeurd'
+            AND e.type = 'partij' AND NOT EXISTS (SELECT 1 FROM externe_ids x WHERE x.entity_id = e.id)
+            AND e.name NOT IN ('CDA', 'VVD')""").fetchone()[0]
+        eis(zonder_id == 5 and reg == goed - zonder_id,
+            f"goedkeuringen tellen tegen het registerplafond ({reg}; {zonder_id} lokale partijen tegen het gewone)")
 
         print("7. Tweede Kamer (tk.py + tk_naar_model.py)")
         tweede_kamer_en_theorie(conn)
@@ -410,11 +536,21 @@ def main():
             "dubbele achternaam koppelt aan de bestaande politicus 'Anna Dubbel'")
         eis("Klaas Kamer (Tweede Kamerlid)" in tpers, "naamgenoot met een andere rol krijgt een toevoeging")
         tsoorten = sorted(f"{r['type']}/{r['mechanisme']}" for r in tplan.relaties)
-        eis(tsoorten == sorted(["ambt/kamerzetel"] * 3 + ["lidmaatschap/partijlijn"] * 2
+        eis(tsoorten == sorted(["ambt/kamerzetel"] * 4 + ["lidmaatschap/partijlijn"] * 3
                                + ["bestuurder/nevenfunctie_verstrengeling", "bestuurder/draaideurconstructie",
                                   "geschenk/geschenk_en_gastvrijheid"]), f"Kamerverbanden: {tsoorten}")
-        eis(list(tplan.nieuwe_orgs.values())[0]["naam"] == "Stichting Testfonds" and len(tplan.nieuwe_orgs) == 1,
+        torgs = {o_["naam"]: o_ for o_ in tplan.nieuwe_orgs.values()}
+        eis([n for n, o_ in torgs.items() if o_["type"] not in ("partij", "overheidsinstelling")] == ["Stichting Testfonds"],
             "alleen een organisatie met rechtsvorm komt er nieuw bij")
+        eis(torgs.get("Groep Testsplitsing", {}).get("type") == "partij"
+            and torgs["Groep Testsplitsing"]["active_from"] == "2025-01-01",
+            "een fractie die geen partij in het model is ('Groep …') wordt een eigen partijknoop met haar begin")
+        eis(torgs.get("Vaste commissie voor Testzaken (Tweede Kamer)", {}).get("rol") == "parlementair_controleur"
+            and "Contactgroep Testland (Tweede Kamer)" not in torgs,
+            "een vaste commissie wordt een knoop, een contactgroep niet")
+        czetel = [r for r in tplan.relaties if r["sleutel"] == "commissiezetel:c1"]
+        eis(len(czetel) == 1 and czetel[0]["functie"] == "Voorzitter" and czetel[0]["start"] == "2024-01-10",
+            "commissiezetel: ambt/kamerzetel met functie en begin (Van)")
         redenen = {o_["reden"] for o_ in tplan.overgeslagen}
         eis({"uitgesloten", "politiek ambt", "partij", "uitgesloten of leeg"} <= redenen,
             "partij-eigen stichting, politiek ambt, eigen partij als gever en de Kamer als betaler overgeslagen")
@@ -430,7 +566,7 @@ def main():
         rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
         tind2 = tk_naar_model.Indiener(tk_naar_model.Plan(tkdata, rconn, {}).maak(),
                                        rest_voor(tokens["register-import"]))
-        eis(not tind2.p.nieuwe_orgs, "tweede run: de stichting bestaat al")
+        eis(not tind2.p.nieuwe_orgs, "tweede run: de stichting, de fractie en de commissie bestaan al")
         tind2.bron()
         tind2.entiteiten()
         tind2.relaties(tbron)
@@ -571,6 +707,82 @@ def main():
         r = client.post(f"/api/relations/{heinen['id']}/looptijd", json={"active_from": "2024-07-02", "reden": "x"},
                         headers={"Authorization": f"Bearer {tokens['registercheck']}"})
         eis(r.status_code == 200 and r.get_json()["gewijzigd"] == [], "dezelfde datum is een no-op")
+        lid_lokaal = conn.execute("""SELECT r.id, r.active_from FROM relations r JOIN entities e ON e.id = r.source_id
+            WHERE e.name = 'Hart voor Teststad' AND r.relation_type = 'lidmaatschap'""").fetchone()
+        eis(lid_lokaal["active_from"] is None and conn.execute(
+            "SELECT status FROM looptijd_onderzoek WHERE relation_id = ?", (lid_lokaal["id"],)).fetchone()[0]
+            == "register_zonder_datum", "een lokale partij: geen nep-begin, 'register_zonder_datum'")
+        gs = conn.execute("""SELECT r.active_from, r.status FROM relations r JOIN entities e ON e.id = r.source_id
+            WHERE e.name = 'Gerrit Gedeputeerde' AND r.relation_type = 'ambt'""").fetchone()
+        eis(gs["active_from"] == "2023-06-01", "een gedeputeerde krijgt het begin uit het record")
+        partij_lokaal = conn.execute("SELECT type, bestuurslaag, status FROM entities WHERE name = 'Lokaal Belang (Teststad)'").fetchone()
+        eis(partij_lokaal["type"] == "partij" and partij_lokaal["bestuurslaag"] == "gemeente",
+            "lokale partij als partijknoop met bestuurslaag gemeente")
+        eis(conn.execute("SELECT COUNT(*) FROM externe_ids WHERE stelsel = 'wikidata' AND waarde = 'Q1'").fetchone()[0] == 1,
+            "de QID uit Wikidata hangt aan de knoop 'Piet Fortuin'")
+
+        print("12. Wikidata: volledige namen bij voorletters (droogloop)")
+        import wikidata_namen
+        wd = wikidata.lees(wpad)
+        wuit = wikidata_namen.zoek(oo.lees(oo.MAP / "exportOO_2026-01-08.xml"), wd)
+        wnamen = {t["register"]: t["naam_wikidata"] for t in wuit["treffers"]}
+        eis(wnamen.get("Dhr. B.C.M. Vostermans") == "Bob Vostermans",
+            "B.C.M. Vostermans (burgemeester Teststad) → Bob Vostermans: gemeente, functie, achternaam, voorletter")
+        eis("Mw. A. van Dam" not in wnamen,
+            "de naamgenoot Anna van Dam (wethouder tot 2020) wordt niet gekoppeld aan 'Mw. A. van Dam'")
+        eis(not any("de Vries" in k for k in wnamen), "Jack de Vries (wethouder elders) koppelt aan geen J. de Vries")
+        rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        wtel = wikidata_namen.met_model(wuit["treffers"], rconn)
+        eis(wtel["klaar om te hernoemen"] >= 1, f"Wikidata-treffers naast het model gelegd: {dict(wtel)}")
+        rconn.close()
+
+        print("13. SER-samenstelling (ser.py + ser_naar_model.py)")
+        rol = {n: i for i, n in conn.execute("SELECT id, name FROM roles")}
+        conn.execute("INSERT OR IGNORE INTO roles (name, category, description) VALUES ('sociale_partner', 'polder', 'test')")
+        rol = {n: i for i, n in conn.execute("SELECT id, name FROM roles")}
+        conn.execute("INSERT OR IGNORE INTO mechanisms (name, filter, description, effect, source_role_id, target_role_id) "
+                     "VALUES ('polderoverleg', 'polder', 'test', 'test', ?, ?)", (rol["sociale_partner"], rol["elite_forum"]))
+        conn.execute("INSERT INTO entities (name, type, primary_role_id, status) VALUES "
+                     "('SER (Sociaal-Economische Raad)', 'overheidsinstelling', ?, 'goedgekeurd'), "
+                     "('VNO-NCW', 'lobbygroep', ?, 'goedgekeurd'), "
+                     "('FNV (Federatie Nederlandse Vakbeweging)', 'vakbond', ?, 'goedgekeurd'), "
+                     "('FNV Jong', 'vakbond', ?, 'goedgekeurd')",
+                     (rol["elite_forum"], rol["belanghebbende"], rol["maatschappelijke_organisatie"],
+                      rol["maatschappelijke_organisatie"]))
+        conn.execute("INSERT INTO externe_ids (entity_id, stelsel, waarde) SELECT id, 'oo', '28455002' FROM entities "
+                     "WHERE name = 'SER (Sociaal-Economische Raad)'")
+        conn.commit()
+        import ser
+        import ser_naar_model
+        ser.MAP = tmp / "registers" / "ser"
+        ser.MAP.mkdir(parents=True)
+        pad = ser.MAP / "ser_2026-01-01.html"
+        pad.write_text(ser_html(), encoding="utf-8")
+        (ser.MAP / "ser_2026-01-01.sha256").write_text(common.sha256_bestand(pad) + "\n")
+        sdata = ser.lees(pad)
+        eis(sdata["records"]["zetels:fnv"]["regel"] == "Sociaal-Economische Raad · Werknemersorganisaties: FNV (8 zetels)",
+            "SER-pagina gelezen: groep, organisatie en zetels in de recordregel")
+        rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        skop = {"ser_organisaties": {"VCP": {"naam": "VCP (Vakcentrale voor Professionals)", "type": "vakbond",
+                                             "rol": "sociale_partner"}}}
+        splan = ser_naar_model.Plan(sdata, rconn, skop).maak()
+        sk = {k_.get("model") or k_.get("nieuw") for k_ in splan.koppelingen}
+        eis(sk == {"VNO-NCW", "FNV (Federatie Nederlandse Vakbeweging)", "VCP (Vakcentrale voor Professionals)"},
+            f"FNV koppelt via de afkorting (niet aan 'FNV Jong'), VCP komt erbij uit koppelingen.json: {sorted(sk)}")
+        eis(len(splan.relaties) == 3 and all(r["type"] == "lidmaatschap" and r["mechanisme"] == "polderoverleg"
+                                             and r["start"] is None for r in splan.relaties),
+            "drie keer lidmaatschap/polderoverleg → SER, zonder begin; 'Testwerkgevers' (onbekend, niet getypeerd) niet")
+        sind = ser_naar_model.Indiener(splan, rest_voor(tokens["register-import"]))
+        sind.entiteiten()
+        sind.relaties(sind.bron())
+        eis(sind.tel["relatie nieuw"] == 3 and sind.tel["rol sociale_partner"] == 2 and not any("fout" in k for k in sind.tel),
+            f"SER ingediend: {dict(sind.tel)}")
+        eis(conn.execute("""SELECT COUNT(*) FROM entity_roles er JOIN roles r ON r.id = er.role_id JOIN entities e
+            ON e.id = er.entity_id WHERE r.name = 'sociale_partner' AND e.name = 'VNO-NCW'""").fetchone()[0] == 1,
+            "VNO-NCW krijgt de rol sociale_partner naast wat ze was")
+        stel = registercheck.draai()
+        eis(stel["klopt"] == 3 and stel["klopt-niet"] == 0, f"registercheck SER: {stel}")
+        rconn.close()
         conn.close()
     print("\nRegisterpijplijn: alles groen.")
 

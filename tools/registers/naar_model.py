@@ -15,7 +15,14 @@ Diepte (eigenaarsbesluit "Rijk + alle bestuurders"):
     provincies, gemeenten, waterschappen;
   - ambtsdragers: bewindspersonen, SG's, DG's en de leiding van deze organisaties,
     commissarissen van de Koning, burgemeesters, wethouders, dijkgraven, Eerste Kamerleden.
+    Sinds 2026-10-13 ook: gedeputeerden (lid van Gedeputeerde Staten), gemeente- en
+    provinciesecretarissen, de secretaris-directeur van een waterschap en het hele bestuur dat
+    het register bij een zbo, adviescollege of gerecht noemt (vicevoorzitter, bestuursleden,
+    (niet-)rechterlijke bestuursleden, de Raad voor de rechtspraak). Staatsraden wachten op een
+    mechanisme (STAATSRAAD_MECH); gewone leden van een college zijn geen leiding.
     Raadsleden niet. Kamerleden van de Tweede Kamer komen uit de Tweede Kamer-API (tk.py).
+  - partijen: een landelijke partij uit de partijtabel; een lokale of provinciale partij wordt
+    een eigen partijknoop met de bestuurslaag van haar gemeente of provincie (oo.lokale_partij).
 
 Koppelen (nooit op naam alleen):
   - organisaties: eerst externe_ids (oo/tooi), dan koppelingen.json (ingecheckt, met de hand
@@ -26,6 +33,10 @@ Koppelen (nooit op naam alleen):
     passende rol, of met al een verband met dezelfde organisatie, wordt gekoppeld; anders een
     nieuwe knoop. Een titel achter de naam ("MPM", "MSc") telt niet mee. Een naam met alleen
     voorletters krijgt altijd een toevoeging ("B.C.M. Vostermans (burgemeester Peel en Maas)").
+    Een burgemeester of wethouder met alleen een achternaam ("Dhr. Fortuin") komt erbij als
+    Wikidata precies één persoon kent met die achternaam in die functie in die gemeente, met een
+    ambt dat volgens Wikidata loopt (wikidata.kandidaten): dan met die volledige naam en de QID
+    als externe id. Anders blijft hij weg (2026-10-13).
 
 Gebruik:
     python3 tools/registers/naar_model.py                    # droogloop: plan + aantallen
@@ -48,7 +59,8 @@ from pathlib import Path
 HIER = Path(__file__).resolve().parent
 sys.path.insert(0, str(HIER))
 import oo  # noqa: E402
-from common import ROOT, ontleed_naam, partij_naam, sleutel  # noqa: E402
+import wikidata  # noqa: E402
+from common import ROOT, klem_relaties, looptijd, ontleed_naam, partij_naam, sleutel  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 TOKEN = ROOT / "data" / "tokens" / "register-import.token"
@@ -85,10 +97,31 @@ TOEZICHTHOUDERS = {"Autoriteit Consument en Markt", "Stichting Autoriteit Financ
 # ── Theorie-id's (op naam, uit de DB) ───────────────────────────────────────
 ROLNAMEN = ("departement", "uitvoeringsorganisatie", "adviesorgaan", "controleorgaan",
             "parlementair_controleur", "bestuursrechter", "decentrale_overheid", "toezichthouder",
-            "elite_forum", "bewindspersoon", "topambtenaar", "lokale_bestuurder", "politicus")
+            "elite_forum", "bewindspersoon", "topambtenaar", "lokale_bestuurder", "politicus",
+            "partij")
 MECHNAMEN = ("hierarchische_aansturing", "verzelfstandigd_bestuur", "institutioneel_advies",
              "ministeriele_verantwoordelijkheid", "ambtelijke_leiding", "lokaal_bestuursmandaat",
              "kamerzetel", "partijlijn")
+# Het bestuur dat het register bij een zbo, adviescollege, gerecht of externe commissie noemt,
+# naast de leiding uit de voorkeursvolgorde (2026-10-13): ambtelijke leiding, net als de voorzitter
+BESTUUR_FUNCTIES = {"vicevoorzitter", "ondervoorzitter", "vicepresident", "vicepresident/algemeen secretaris", "bestuurslid", "lid raad van bestuur",
+                    "bestuurder bedrijfsvoering", "bestuurder primair proces", "rechterlijk bestuurslid",
+                    "niet-rechterlijk bestuurslid", "voorzitter raad voor de rechtspraak",
+                    "rechterlijk lid raad voor de rechtspraak", "niet-rechterlijk lid raad voor de rechtspraak",
+                    "permanent lid", "secretaris-directeur", "directeur/algemeen secretaris",
+                    "algemeen secretaris/directeur"}
+BESTUUR_TYPES = {"Zelfstandig bestuursorgaan", "Adviescollege", "Rechtspraak", "Externe commissie",
+                 "Openbaar lichaam voor beroep en bedrijf"}
+# Een gewoon lid van een college (adviesraad, commissie) is geen leiding: overgeslagen en geteld
+COLLEGE_LEDEN = {"lid", "raadslid", "junior-lid", "commissielid", "collegelid"}
+# Staatsraden (Raad van State): geen bestaand mechanisme past op het ambt van een staatsraad (de
+# ambtsmechanismen gaan over leiding, een dagelijks bestuur of een Kamerzetel). Zodra de theorie
+# er een heeft (RfC), komt de naam hier en gaan ze mee; tot dan overgeslagen en geteld.
+STAATSRAAD_MECH: str | None = None
+STAATSRAAD_ROL = "bestuursrechter"
+# Korte functie in de naam van een knoop met voorletters ("A.B. Jansen (gedeputeerde Fryslân)")
+KORT = {"Lid van Gedeputeerde Staten": "gedeputeerde"}
+
 PASSENDE_ROLLEN = {"politicus", "bewindspersoon", "topambtenaar", "lokale_bestuurder",
                    "toezichthouder", "gezagsexpert", "parlementair_controleur", "directie",
                    "raad_van_commissarissen", "belanghebbende", "lobbyist", "voorlichter"}
@@ -156,6 +189,20 @@ class Plan:
         self.personen_plan: dict[str, dict] = {}  # persoon-sleutel → persoon-plan
         self.relaties: list[dict] = []
         self.overgeslagen: Counter = Counter()
+        self.overgeslagen_functies: Counter = Counter()   # functies die (nog) niet meegaan
+        self.bestaan: Counter = Counter()                  # wat het bestaan van een eindpunt begrenst
+        self.ent_bestaan = {i: (af, au) for i, af, au in conn.execute(
+            "SELECT id, active_from, active_until FROM entities WHERE type <> 'persoon' AND NOT vervangen")}
+        self.lokale_partijen: dict[str, dict] = {}         # naam → partijplan (2026-10-13)
+        # Wikidata (optioneel): volledige naam bij alleen een achternaam (2026-10-13)
+        self.wd = wikidata.nieuwste()
+        self.wd_index = wikidata.index(self.wd) if self.wd else {}
+        self.wd_ext = {w: e for e, w in conn.execute(
+            "SELECT entity_id, waarde FROM externe_ids WHERE stelsel = 'wikidata'")}
+        # partijknopen op hun naamsleutel: het register schrijft dezelfde partij soms anders
+        # ("Doe mee! Molenlanden" / "Doe Mee! Molenlanden")
+        self.partij_op_naam = {sleutel(n): i for i, n in conn.execute(
+            "SELECT id, name FROM entities WHERE type = 'partij' AND NOT vervangen AND status <> 'afgewezen'")}
 
     # ── organisaties ────────────────────────────────────────────────────────
     def _gekozen(self, o: dict) -> str | None:
@@ -266,14 +313,23 @@ class Plan:
             if fn in ("burgemeester", "burgemeester waarnemend", "wethouder"):
                 titel = "Burgemeester (waarnemend)" if fn == "burgemeester waarnemend" else f["functie"]
                 return ("lokale_bestuurder", "lokaal_bestuursmandaat", titel)
+            if fn == "gemeentesecretaris":  # de ambtelijke top van de gemeente (2026-10-13)
+                return ("topambtenaar", "ambtelijke_leiding", f["functie"])
             return None
         if t == "Provincie":
             if fn == "commissaris van de koning":
                 return ("lokale_bestuurder", "lokaal_bestuursmandaat", "Commissaris van de Koning")
+            # 2026-10-13: Gedeputeerde Staten (het dagelijks bestuur) en de provinciesecretaris
+            if fn == "lid" and f.get("org_naam") == "Gedeputeerde Staten":
+                return ("lokale_bestuurder", "lokaal_bestuursmandaat", "Lid van Gedeputeerde Staten")
+            if fn in ("provinciesecretaris", "algemeen directeur/provinciesecretaris"):
+                return ("topambtenaar", "ambtelijke_leiding", f["functie"])
             return None
         if t == "Waterschap":
             if fn in ("dijkgraaf", "watergraaf"):
                 return ("lokale_bestuurder", "lokaal_bestuursmandaat", f["functie"])
+            if fn == "secretaris-directeur":  # de ambtelijke top van het waterschap (2026-10-13)
+                return ("topambtenaar", "ambtelijke_leiding", f["functie"])
             return None
         if org["naam"] == "Eerste Kamer der Staten-Generaal":
             if fn.startswith("kamerlid"):
@@ -282,6 +338,10 @@ class Plan:
         if org["naam"] == "Raad van State":
             if fn == "vice-president":
                 return ("topambtenaar", "ambtelijke_leiding", "Vice-president")
+            if fn.startswith("staatsraad"):
+                if STAATSRAAD_MECH and STAATSRAAD_MECH in self.mech:
+                    return (STAATSRAAD_ROL, STAATSRAAD_MECH, f"{f['functie']}, {f['org_naam']}")
+                self.overgeslagen_functies[f"{fn} ({f.get('org_naam')}): wacht op een mechanisme"] += 1
             return None
         if org["naam"] == "Algemene Rekenkamer":
             return ("topambtenaar", "ambtelijke_leiding", f["functie"]) if fn == "president" else None
@@ -301,8 +361,10 @@ class Plan:
                                      "directeur"),
             "Openbaar lichaam voor beroep en bedrijf": ("voorzitter",),
         }.get(t, ())
-        if fn in hoofd:
+        if fn in hoofd or (t in BESTUUR_TYPES and fn in BESTUUR_FUNCTIES):
             return ("topambtenaar", "ambtelijke_leiding", f["functie"].replace("*", "").strip())
+        if t in BESTUUR_TYPES and fn in COLLEGE_LEDEN:
+            self.overgeslagen_functies[f"{fn} van een {t.lower()} (geen leiding)"] += 1
         return None
 
     def personen(self):
@@ -328,6 +390,9 @@ class Plan:
             # bij leiding: alleen de eerste functie in de voorkeursvolgorde, hooguit 2 personen
             if org["oo_type"] not in ("Ministerie", "Gemeente", "Provincie", "Waterschap") \
                     and org["naam"] != "Eerste Kamer der Staten-Generaal":
+                # het bestuur dat het register noemt gaat mee (2026-10-13), naast de leiding
+                bestuur = {k: v for k, v in gekozen.items()
+                           if k in BESTUUR_FUNCTIES or k.startswith("staatsraad")}
                 for voorkeur in ("vice-president", "president", "nationale ombudsman",
                                  "inspecteur-generaal", "directeur-generaal", "korpschef",
                                  "nationaal coördinator terrorismebestrijding en veiligheid",
@@ -337,6 +402,10 @@ class Plan:
                     if voorkeur in gekozen:
                         gekozen = {voorkeur: gekozen[voorkeur][:2]}
                         break
+                else:
+                    gekozen = {}
+                for k, v in bestuur.items():
+                    gekozen.setdefault(k, v)
             for lijst in gekozen.values():
                 for f, (rol, mech, titel) in lijst:
                     self._persoon(org, f, rol, mech, titel)
@@ -385,12 +454,15 @@ class Plan:
 
     def _persoon(self, org, f, rol, mech, titel):
         naam = ontleed_naam(f["naam_register"])
+        qid = None
+        if naam["alleen_achternaam"] and naam["achternaam"]:
+            naam, qid = self._naam_uit_wikidata(org, f, naam)
         if naam["alleen_achternaam"] or not naam["achternaam"]:
             self.overgeslagen["alleen achternaam"] += 1
             return
         plaats = re.sub(r"^(Gemeente|Provincie) ", "", org["naam"]).replace(
             " der Staten-Generaal", "")
-        functie_kort = titel.split(",")[0].strip().lower()
+        functie_kort = KORT.get(titel) or titel.split(",")[0].strip().lower()
         if naam["volledig"]:
             weergave = naam["weergave"]
             sleutel_p = f"vol:{sleutel(weergave)}"
@@ -399,9 +471,19 @@ class Plan:
             sleutel_p = f"init:{sleutel(weergave)}"
         p = self.personen_plan.get(sleutel_p)
         if p is None:
-            bestaand = self.koppel_personen.get(f["naam_register"])
+            bestaand = self.koppel_personen.get(f["naam_register"]) or self.wd_ext.get(qid or "")
             if bestaand:
                 pass
+            elif qid:
+                # naam uit Wikidata: alleen koppelen aan wie al bij deze plaats of organisatie hoort
+                org_eid = self.org_ext.get(org["oo_id"]) or org.get("bestaand")
+                for i, n, prol, beschr in self.pm_personen.get(sleutel(weergave), []):
+                    if plaats.lower() in beschr.lower() or (org_eid and (i, org_eid) in self.banden):
+                        bestaand = i
+                        break
+                else:
+                    if sleutel(weergave) in self.alle_namen:
+                        weergave = f"{weergave} ({functie_kort} {plaats})"
             elif naam["volledig"]:
                 org_eid = self.org_ext.get(org["oo_id"]) or org.get("bestaand")
                 for i, n, prol, beschr in self.pm_personen.get(sleutel(weergave), []):
@@ -417,10 +499,13 @@ class Plan:
                 bestaand = self._zelfde_persoon(naam, context)
                 if bestaand is None and sleutel(weergave) in self.alle_namen:
                     self.overgeslagen["toevoeging bestaat al"] += 1
-            p = {"sleutel": sleutel_p, "naam": weergave, "rol": rol, "bestaand": bestaand,
+            p = {"sleutel": sleutel_p, "naam": weergave, "rol": rol, "bestaand": bestaand, "qid": qid,
                  "register_naam": f["naam_register"], "oo_medewerker": f["sleutel"].split(":")[-1],
-                 "beschrijving": f"{titel} bij {org['naam']} (register van overheidsorganisaties)"}
+                 "beschrijving": f"{titel} bij {org['naam']} (register van overheidsorganisaties"
+                                 + (f"; volledige naam uit Wikidata {qid})" if qid else ")")}
             self.personen_plan[sleutel_p] = p
+        # de bewering noemt de naam zoals het register hem geeft (de volledige naam komt uit Wikidata)
+        wie = ontleed_naam(f["naam_register"])["weergave"] if qid else naam["weergave"]
         medewerker = f["sleutel"].split(":")[-1]
         if medewerker not in p.setdefault("oo_medewerkers", []):
             p["oo_medewerkers"].append(medewerker)
@@ -429,15 +514,17 @@ class Plan:
             "mechanisme": mech, "functie": titel, "start": f["start"], "sleutel": f["sleutel"],
             "regel": f["regel"], "url": org["url"],
             "claim": (f"Volgens het register van overheidsorganisaties (uitgave {self.uitgave}) is "
-                      f"{naam['weergave']} {kleine(titel)} bij {bij(org['naam'])}"
+                      f"{wie} {kleine(titel)} bij {bij(org['naam'])}"
                       f"{' (sinds ' + f['start'] + ')' if f['start'] else ''}."),
         })
         partij = f.get("partij") or self._fractie(f)
         if partij:
             pid = self.partij_id.get(partij_naam(partij) or "")
-            if pid:
+            lokaal = None if pid or partij_naam(partij) or self._fractie(f) else self._lokale_partij(f)
+            if pid or lokaal:
                 self.relaties.append({
-                    "bron": ("bestaand", pid), "doel": ("persoon", sleutel_p), "type": "lidmaatschap",
+                    "bron": ("bestaand", pid) if pid else lokaal, "doel": ("persoon", sleutel_p),
+                    "type": "lidmaatschap",
                     # Een Eerste Kamerfractie begint met de zetel; bij een burgemeester of
                     # wethouder noemt het register geen begin van het partijlidmaatschap
                     "mechanisme": "partijlijn", "functie": None,
@@ -445,13 +532,61 @@ class Plan:
                     "sleutel": f["sleutel"],
                     "regel": f["regel"], "url": org["url"],
                     "claim": (f"Volgens het register van overheidsorganisaties (uitgave {self.uitgave}) "
-                              + (f"is {naam['weergave']} lid van de Eerste Kamerfractie van {partij}."
+                              + (f"is {wie} lid van de Eerste Kamerfractie van {partij}."
                                  if "Fracties EK" in f["org_pad"] else
-                                 f"is {naam['weergave']}, {kleine(titel)} bij {bij(org['naam'])}, "
+                                 f"is {wie}, {kleine(titel)} bij {bij(org['naam'])}, "
                                  f"lid van {partij}.")),
                 })
-            else:
-                self.overgeslagen["partij niet landelijk of onbekend"] += 1
+            elif partij_naam(partij):
+                self.overgeslagen["landelijke partij niet in het model"] += 1
+            elif self._fractie(f):
+                self.overgeslagen["Eerste Kamerfractie zonder landelijke partij"] += 1
+
+    def _naam_uit_wikidata(self, org: dict, f: dict, naam: dict) -> tuple[dict, str | None]:
+        """Alleen een achternaam in het register: de volledige naam uit Wikidata als daar precies
+        één persoon past (zelfde gemeente, functie en achternaam, ambt loopt) en de achternaam in
+        deze gemeente en functie maar één keer in het register staat. → (naam, qid)."""
+        rec_org = self.d["organisaties"].get(org["oo_id"]) or {}
+        cbs, soort = wikidata.cbs_van(rec_org.get("tooi")), wikidata.soort_van(f["functie"])
+        if not (self.wd and cbs and soort):
+            return naam, None
+        achter = sleutel(f"{naam['tussenvoegsel'] or ''} {naam['achternaam'] or ''}")
+        zelfde = [g for g in self.d["functies"].values()
+                  if g["oo_id"] == org["oo_id"] and not g["eind"] and wikidata.soort_van(g["functie"]) == soort
+                  and sleutel(" ".join(filter(None, (ontleed_naam(g["naam_register"])["tussenvoegsel"],
+                                                     ontleed_naam(g["naam_register"])["achternaam"])))) == achter]
+        kand = wikidata.kandidaten(self.wd_index, cbs, soort, naam, f["start"], self.uitgave)
+        if len(zelfde) != 1 or len(kand) != 1:
+            return naam, None
+        volledig = ontleed_naam(kand[0]["naam"])
+        # de registercheck (oo.controleer) eist de achternaam uit het register in de naam: een
+        # Wikidata-naam zonder het tweede deel ('Fleur Gräper' voor 'Gräper-van Koolwijk') niet
+        if not volledig["volledig"] or sleutel(naam["achternaam"]) not in sleutel(kand[0]["naam"]):
+            self.overgeslagen["alleen achternaam: Wikidata-naam mist een deel van de achternaam"] += 1
+            return naam, None
+        self.overgeslagen["alleen achternaam: volledige naam uit Wikidata"] += 1
+        return volledig, kand[0]["qid"]
+
+    def _lokale_partij(self, f: dict) -> tuple | None:
+        """Een lokale of provinciale partij (oo.lokale_partij): een bestaande partijknoop onder
+        precies die naam, anders een nieuwe. Wat geen partij is, wordt geteld."""
+        naam, laag, reden = oo.lokale_partij(self.d, f)
+        if not naam:
+            self.overgeslagen[f"partij: {reden}"] += 1
+            return None
+        k = sleutel(naam)
+        if k in self.partij_op_naam:
+            return ("bestaand", self.partij_op_naam[k])
+        if k in self.alle_namen:
+            self.overgeslagen["partij: naam is al van een andere knoop"] += 1
+            return None
+        if k not in self.lokale_partijen:
+            org = self.d["organisaties"][self.d["organisaties"][f["oo_id"]]["top_oo"]]
+            self.lokale_partijen[k] = {
+                "naam": naam, "bestuurslaag": laag, "partij": f["partij"], "org": org["naam"],
+                "beschrijving": (f"Partij in de {'gemeente' if laag == 'gemeente' else 'provincie'} "
+                                 f"{oo._plaats(org)} (register van overheidsorganisaties).")}
+        return ("partij", k)
 
     @staticmethod
     def _fractie(f: dict) -> str | None:
@@ -472,9 +607,25 @@ class Plan:
                       f"{ww} {self.orgs[record['oo_id']]['naam']} {rest}."),
         })
 
+    def _bestaan_van(self, ref) -> tuple:
+        """(van, tot) van een eindpunt: een organisatie begrenst met het begin en einde uit haar
+        OO-record én wat het model al zegt (het strengste van beide; registers_looptijd zet het
+        OO-begin op de knoop); een bestaande partij met haar eigen looptijd; een persoon of een
+        nieuwe lokale partij zonder datum begrenst niet."""
+        soort, w = ref
+        if soort == "org":
+            o = self.orgs.get(w) or {}
+            rec = o.get("record") or {}
+            db = self.ent_bestaan.get(self.org_ext.get(w) or o.get("bestaand"), (None, None))
+            return looptijd._laatste(rec.get("start"), db[0]), looptijd._vroegste(rec.get("eind"), db[1])
+        if soort == "bestaand":
+            return self.ent_bestaan.get(w, (None, None))
+        return None, None
+
     def maak(self):
         self.organisaties()
         self.personen()
+        klem_relaties(self.relaties, self._bestaan_van, self.bestaan)
         # organisaties zonder enig verband kunnen niet worden goedgekeurd: weglaten
         gebruikt = {r["bron"][1] for r in self.relaties if r["bron"][0] == "org"} | \
                    {r["doel"][1] for r in self.relaties if r["doel"][0] == "org"}
@@ -495,7 +646,11 @@ class Plan:
             "personen_voorletters": sum(1 for p in self.personen_plan.values() if p["sleutel"].startswith("init:")),
             "per_rol_persoon": Counter(p["rol"] for p in self.personen_plan.values()),
             "relaties": Counter(f"{r['type']}/{r['mechanisme']}" for r in self.relaties),
+            "per_functie": Counter(r["functie"] for r in self.relaties if r["type"] == "ambt"),
+            "lokale_partijen": len(self.lokale_partijen),
             "overgeslagen": self.overgeslagen,
+            "overgeslagen_functies": self.overgeslagen_functies,
+            "bestaan": self.bestaan,
         }
 
 
@@ -584,6 +739,8 @@ class Indiener:
             # alle registernummers van deze persoon (één per functie): de registercheck
             # herleidt elk ambt via het nummer van díe functie
             ids = [{"stelsel": "oo", "waarde": f"m:{m}"} for m in p["oo_medewerkers"]]
+            if p.get("qid"):
+                ids.append({"stelsel": "wikidata", "waarde": p["qid"]})
             eid = next((self.ext[("oo", f"m:{m}")] for m in p["oo_medewerkers"]
                         if ("oo", f"m:{m}") in self.ext), None) or p["bestaand"]
             if eid:
@@ -604,6 +761,22 @@ class Indiener:
                     self.log(f"  ✗ {p['naam']}: {status} {res.get('error')}")
                     continue
             self.ent[("persoon", p["sleutel"])] = eid
+        self.partijen()
+
+    def partijen(self):
+        """Lokale en provinciale partijen (2026-10-13): een nieuwe partijknoop per naam."""
+        for k, lp in self.p.lokale_partijen.items():
+            if ("partij", k) in self.ent:
+                continue
+            status, res = self.rest("POST", "/api/entities", {
+                "name": lp["naam"], "type": "partij", "primary_role_id": self.p.rol["partij"],
+                "description": lp["beschrijving"], "bestuurslaag": lp["bestuurslaag"]})
+            if status == 201:
+                self.ent[("partij", k)] = res["id"]
+                self.tel["partij nieuw"] += 1
+            else:
+                self.tel[f"partij fout {status}"] += 1
+                self.log(f"  ✗ {lp['naam']}: {status} {res.get('error')}")
 
     def _id(self, ref):
         soort, waarde = ref

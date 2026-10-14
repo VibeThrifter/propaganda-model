@@ -9,12 +9,16 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 import unicodedata
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DATA = ROOT / "data" / "registers"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+import looptijd  # noqa: E402  (ROOT/looptijd.py: dezelfde tijdlogica als de server)
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/124.0 Safari/537.36 propagandamodel-registers")
 
@@ -229,3 +233,32 @@ def partij_naam(registernaam: str) -> str | None:
         if s.replace(" ", "") in PARTIJEN:
             return PARTIJEN[s.replace(" ", "")]
     return None
+
+
+# ── Bestaan begrenst (eigenaarsbesluit 2026-10-13) ──────────────────────────
+def klem_relaties(relaties: list[dict], bestaan_van, tel) -> None:
+    """Een verband loopt nooit buiten het bestaan van zijn eindpunten (looptijd.py): het begin
+    wordt het laatste van het begin uit het record en het begin van bron en doel, het einde het
+    vroegste. Zo begint het ambt van een burgemeester sinds 2019 bij een gemeente die in 2023
+    ontstond pas in 2023, en de zeggenschap van een ministerie in zijn huidige vorm (EZK
+    2010-10-14) over een ouder agentschap pas in 2010. Een ontbrekend begin blijft ontbreken (nooit
+    een begin verzinnen). `bestaan_van(ref)` → (van, tot) of (None, None) voor wie niet begrenst
+    (een persoon, een nieuwe knoop zonder datum). Telt in `tel` wat geklemd is en wat de
+    bestaanspoort (looptijd.conflicten) daarna nog zou weigeren."""
+    for r in relaties:
+        grenzen = [bestaan_van(r["bron"]), bestaan_van(r["doel"])]
+        start, eind = r.get("start"), r.get("eind")
+        for van, tot in grenzen:
+            if start and van and looptijd.voor(start, van):
+                start = van
+                tel["bestaan: begin naar het begin van een eindpunt"] += 1
+            if eind and tot and looptijd.voor(tot, eind):
+                eind = tot
+                tel["bestaan: einde naar het einde van een eindpunt"] += 1
+        if start != r.get("start"):
+            r["start_record"] = r.get("start")
+        r["start"], r["eind"] = start, eind
+        ents = [{"type": "organisatie", "active_from": van, "active_until": tot, "name": "eindpunt"}
+                for van, tot in grenzen]
+        if looptijd.conflicten({"active_from": start, "active_until": eind}, ents[0], ents[1]):
+            tel["bestaan: de poort zou weigeren"] += 1

@@ -183,5 +183,13 @@
    "rol": "belanghebbende",
    "oo": "27906613"
   }
+ },
+ "ser_organisaties": {
+  "_toelichting": "SER-samenstelling (ser.nl, 'Wie zitten er in de SER?'): organisatie met zetels die nog niet in het model stond → naam, type en rol; met de hand vastgelegd 2026-10-13. Staat de organisatie al in het model (exacte naam of afkorting), dan wint die knoop.",
+  "VCP": {
+   "naam": "VCP (Vakcentrale voor Professionals)",
+   "type": "vakbond",
+   "rol": "sociale_partner"
+  }
  }
 }

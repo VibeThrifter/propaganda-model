@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Tweede Kamer (open data) → het model (Uitbreiding C, eigenaarsbesluit 2026-10-07).
 
-Trap 3c (tk.py leest de uitgave): de zittende Kamerleden met hun ambt en fractie, en als belangen
-en werving hun lopende nevenfuncties, hun loopbaan (draaideur), reizen die derden betaalden en
-geschenken. Alles via de REST-API onder `register-import`; elk feit krijgt als citaat de
+Trap 3c (tk.py leest de uitgave): de zittende Kamerleden met hun ambt en fractie, hun vaste
+commissiezetels, en als belangen en werving hun lopende nevenfuncties, hun loopbaan (draaideur),
+reizen die derden betaalden en geschenken. Alles via de REST-API onder `register-import`; elk feit krijgt als citaat de
 letterlijke recordregel uit de bewaarde uitgave, zodat scripts/registercheck.py het controleert.
 
 Koppelen, nooit op naam alleen:
@@ -22,6 +22,15 @@ Koppelen, nooit op naam alleen:
         'op uitnodiging van').
     Partijen, partij-eigen stichtingen en fracties, de Kamer zelf en de overheid als betaler van
     een reis tellen niet; politieke ambten in de loopbaan ook niet (dat is geen draaideur).
+  - Fracties: een landelijke partij uit de partijtabel (common.PARTIJEN); een fractie die geen
+    bestaande partij is (een afgesplitste groep als 'Groep Markuszower', een eenmansfractie als
+    'Lid Keijzer') wordt een eigen partijknoop onder haar naam in de open data, met de datum
+    waarop de fractie actief werd (2026-10-13).
+  - Commissies: elke vaste commissiezetel die loopt (CommissieZetelVastPersoon, Van/TotEnMet)
+    in een commissie die het bestuur controleert (tk.controlerende_commissie: vaste, algemene en
+    tijdelijke commissies, de commissie-IV en Verzoekschriften; geen delegaties of contactgroepen)
+    wordt een ambt (kamerzetel) van het Kamerlid bij de commissie; de commissie is een knoop
+    '<naam> (Tweede Kamer)' (tk.commissie_naam), gekoppeld op die exacte naam (2026-10-13).
 Wat niet te plaatsen is, staat met reden in data/registers/tk/overgeslagen_<uitgave>.json; elke
 koppeling staat ter controle in data/registers/tk/koppelingen_<uitgave>.json.
 
@@ -44,7 +53,7 @@ sys.path.insert(0, str(HIER))
 import naar_model  # noqa: E402
 import oo  # noqa: E402
 import tk  # noqa: E402
-from common import PARTIJEN, ROOT, namen_van, partij_naam, schoon, sleutel  # noqa: E402
+from common import PARTIJEN, ROOT, klem_relaties, namen_van, partij_naam, schoon, sleutel  # noqa: E402
 from naar_model import PASSENDE_ROLLEN, TOKEN, Rest  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
@@ -53,7 +62,8 @@ CLUSTER = "register:tk"
 TWEEDE_KAMER_OO = "19432"
 MECHNAMEN = ("kamerzetel", "partijlijn", "draaideurconstructie", "nevenfunctie_verstrengeling",
              "geschenk_en_gastvrijheid")
-ROLNAMEN = ("politicus", "maatschappelijke_organisatie", "belanghebbende", "kennisinstituut")
+ROLNAMEN = ("politicus", "maatschappelijke_organisatie", "belanghebbende", "kennisinstituut",
+            "partij", "parlementair_controleur")
 LOKAAL = {"gemeente", "provincie", "waterschap"}
 OVERHEID_TYPES = {"overheidsinstelling", "rechterlijke_macht", "toezichthouder"}
 
@@ -158,6 +168,13 @@ class Plan:
         self.tweede_kamer = rij[0]
         self.partij_id = {n: i for i, n in conn.execute(
             "SELECT id, name FROM entities WHERE type = 'partij' AND status = 'goedgekeurd' AND NOT vervangen")}
+        # Knopen die een eerdere run al aanmaakte (fracties, commissies) zijn misschien nog
+        # 'voorgesteld': op hun exacte naam en type terugvinden, nooit dubbel aanmaken
+        self.op_naam_type = {(n, t): i for i, n, t in conn.execute(
+            "SELECT id, name, type FROM entities WHERE NOT vervangen AND status <> 'afgewezen'")}
+        # het bestaan van organisaties begrenst hun verbanden (2026-10-13, looptijd.py)
+        self.ent_bestaan = {i: (af, au) for i, af, au in conn.execute(
+            "SELECT id, active_from, active_until FROM entities WHERE type <> 'persoon' AND NOT vervangen")}
         # organisaties onder hun naam in het model. Een sleutel van twee organisaties telt niet; een
         # naam gaat voor een afkorting tussen haakjes ('SBS6' tegenover 'Nieuws van de Dag (SBS6)').
         self.org: dict[int, tuple[str, str, str | None]] = {}
@@ -371,14 +388,74 @@ class Plan:
                       claim=f"Volgens de open data van de Tweede Kamer (uitgave {self.uitgave}) is "
                             f"{p['naam']} lid van de Tweede Kamer voor {p['fractie']}"
                             f"{' (sinds ' + p['van'] + ')' if p.get('van') else ''}.")
-            pnaam = partij_naam(p.get("fractie_afkorting") or "") or partij_naam(p.get("fractie") or "")
-            if pnaam and pnaam in self.partij_id:
-                self._rel(("bestaand", self.partij_id[pnaam]), ("persoon", pid), "lidmaatschap",
+            ref = self._fractie(p, rec)
+            if ref:
+                self._rel(ref, ("persoon", pid), "lidmaatschap",
                           "partijlijn", rec, start=p.get("van"),
                           claim=f"Volgens de open data van de Tweede Kamer (uitgave {self.uitgave}) zit "
                                 f"{p['naam']} in de Tweede Kamerfractie van {p['fractie']}.")
+
+    def _fractie(self, p: dict, rec: dict) -> tuple | None:
+        """De partijknoop van de fractie: een landelijke partij die in het model staat, of (een
+        fractie die geen bestaande partij is) een eigen knoop onder de fractienaam."""
+        pnaam = partij_naam(p.get("fractie_afkorting") or "") or partij_naam(p.get("fractie") or "")
+        if pnaam:
+            if pnaam in self.partij_id:
+                return ("bestaand", self.partij_id[pnaam])
+            return self._mis("fractie", rec, f"geen partij in het model voor '{p['fractie']}'")
+        naam = tk.fractie_partij(p)
+        if not naam:
+            return self._mis("fractie", rec, "fractie zonder naam")
+        if (naam, "partij") in self.op_naam_type:
+            return ("bestaand", self.op_naam_type[(naam, "partij")])
+        if sleutel(naam) in self.alle_namen:
+            return self._mis("fractie", rec, f"de naam '{naam}' is al van een andere knoop")
+        k = f"fractie:{sleutel(naam)}"
+        if k not in self.nieuwe_orgs:
+            sinds = p.get("fractie_actief")
+            self.nieuwe_orgs[k] = {
+                "naam": naam, "type": "partij", "rol": "partij", "bestuurslaag": "rijk",
+                "active_from": sinds,
+                "beschrijving": (f"Fractie in de Tweede Kamer"
+                                 + (f", actief sinds {sinds}" if sinds else "")
+                                 + " (open data Tweede Kamer).")}
+            self.tel["nieuwe fractie"] += 1
+        return ("nieuw", k)
+
+    # ── commissies ─────────────────────────────────────────────────────────
+    def commissies(self):
+        """Vaste commissiezetels die lopen: Kamerlid → commissie (ambt, kamerzetel)."""
+        for rec in self.d["records"].values():
+            if rec["soort"] != "commissiezetel" or rec.get("tot"):
+                continue
+            if not tk.controlerende_commissie(rec):
+                self._mis("commissie", rec, "delegatie, contactgroep of interne commissie")
+                continue
+            naam_c = tk.commissie_naam(rec)
+            if (naam_c, "overheidsinstelling") in self.op_naam_type:
+                ref = ("bestaand", self.op_naam_type[(naam_c, "overheidsinstelling")])
+            elif sleutel(naam_c) in self.alle_namen:
+                self._mis("commissie", rec, f"de naam '{naam_c}' is al van een andere knoop")
+                continue
             else:
-                self._mis("fractie", rec, f"geen partij in het model voor '{p['fractie']}'")
+                k = f"commissie:{sleutel(naam_c)}"
+                if k not in self.nieuwe_orgs:
+                    self.nieuwe_orgs[k] = {
+                        "naam": naam_c, "type": "overheidsinstelling", "rol": "parlementair_controleur",
+                        "bestuurslaag": "rijk", "active_from": rec.get("commissie_actief"),
+                        "beschrijving": ("Commissie van de Tweede Kamer"
+                                         + (f" (rubriek '{rec['commissie_soort']}')" if rec.get("commissie_soort") else "")
+                                         + (f", actief sinds {rec['commissie_actief']}" if rec.get("commissie_actief") else "")
+                                         + " (open data Tweede Kamer).")}
+                    self.tel["nieuwe commissie"] += 1
+                ref = ("nieuw", k)
+            functie = tk.commissie_functie(rec)
+            naam = self.d["personen"][rec["persoon_id"]]["naam"]
+            self._rel(("persoon", rec["persoon_id"]), ref, "ambt", "kamerzetel", rec,
+                      functie=functie, start=rec.get("van"),
+                      claim=f"Volgens de open data van de Tweede Kamer (uitgave {self.uitgave}) is {naam} "
+                            f"{functie.lower()} van de {rec['commissie']}"
+                            f"{' (sinds ' + rec['van'] + ')' if rec.get('van') else ''}.")
 
     # ── belangen en werving ────────────────────────────────────────────────
     def nevenfuncties(self):
@@ -561,13 +638,30 @@ class Plan:
                               "regel": rec["regel"], "claim": claim})
         self.tel[f"{rtype}/{mech}"] += 1
 
+    def _bestaan_van(self, ref) -> tuple:
+        """(van, tot) van een eindpunt; een persoon begrenst niet (looptijd.begrenst)."""
+        soort, w = ref
+        if soort == "bestaand":
+            return self.ent_bestaan.get(w, (None, None))
+        if soort == "nieuw":
+            return (self.nieuwe_orgs.get(w) or {}).get("active_from"), None
+        if soort == "oo":
+            return (self.oo_orgs.get(w) or {}).get("start"), None
+        return None, None
+
+    def klem(self):
+        """Elk verband binnen het bestaan van zijn eindpunten (common.klem_relaties)."""
+        klem_relaties(self.relaties, self._bestaan_van, self.tel)
+        return self
+
     def maak(self):
         self.kamerleden()
+        self.commissies()
         self.nevenfuncties()
         self.loopbaan()
         self.reizen()
         self.geschenken()
-        return self
+        return self.klem()
 
 
 class Indiener:
@@ -616,7 +710,7 @@ class Indiener:
         for k, o in self.p.nieuwe_orgs.items():
             body = {"name": o["naam"], "type": o["type"], "primary_role_id": self.p.rol[o["rol"]],
                     "description": o["beschrijving"]}
-            for veld in ("bestuurslaag", "externe_ids"):
+            for veld in ("bestuurslaag", "externe_ids", "active_from"):
                 if o.get(veld):
                     body[veld] = o[veld]
             status, res = self.rest("POST", "/api/entities", body)

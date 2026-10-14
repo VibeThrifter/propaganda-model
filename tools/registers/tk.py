@@ -1,7 +1,9 @@
 """Tweede Kamer (open data, OData v4) — uitgave ophalen en lezen (Uitbreiding C, 2026-10-07).
 
-Haalt voor de zittende Kamerleden op: persoon + fractie (FractieZetelPersoon), lopende
-nevenfuncties, loopbaan, reizen betaald door derden en geschenken (sinds GESCHENK_SINDS). Dat
+Haalt voor de zittende Kamerleden op: persoon + fractie (FractieZetelPersoon, met de datum
+waarop de fractie actief werd), lopende nevenfuncties, loopbaan, reizen betaald door derden,
+geschenken (sinds GESCHENK_SINDS) en hun vaste commissiezetels (CommissieZetelVastPersoon →
+CommissieZetel → Commissie, sinds 2026-10-13; een oudere uitgave heeft ze niet). Dat
 gaat als één JSON-uitgave naar data/registers/tk/tk_<datum>.json (+ .sha256), zodat elk feit
 later deterministisch te controleren is (scripts/registercheck.py), net als het register van
 overheidsorganisaties (oo.py). De recordregels hieronder zijn het citaat in het model.
@@ -43,11 +45,15 @@ def _alles(pad: str, params: dict) -> list[dict]:
     return uit
 
 
-def _per_persoon(pad: str, sleutelveld: str, ids: list[str], extra: str = "") -> list[dict]:
+def _per_persoon(pad: str, sleutelveld: str, ids: list[str], extra: str = "",
+                 expand: str | None = None) -> list[dict]:
     uit = []
     for i in range(0, len(ids), BATCH):
         f = " or ".join(f"{sleutelveld} eq {x}" for x in ids[i:i + BATCH])
-        uit += _alles(pad, {"$filter": f"({f}) and Verwijderd eq false{extra}"})
+        params = {"$filter": f"({f}) and Verwijderd eq false{extra}"}
+        if expand:
+            params["$expand"] = expand
+        uit += _alles(pad, params)
     return uit
 
 
@@ -56,7 +62,7 @@ def haal() -> Path:
         "$filter": "TotEnMet eq null and Verwijderd eq false",
         "$select": "Id,Functie,Van,Persoon_Id",
         "$expand": "Persoon($select=Id,Titels,Initialen,Roepnaam,Voornamen,Tussenvoegsel,Achternaam),"
-                   "FractieZetel($expand=Fractie($select=Id,NaamNL,Afkorting))"})
+                   "FractieZetel($expand=Fractie($select=Id,NaamNL,Afkorting,DatumActief))"})
     ids = sorted({z["Persoon_Id"] for z in zetels})
     data = {
         "bron": BRON, "opgehaald": date.today().isoformat(), "zetels": zetels,
@@ -65,6 +71,12 @@ def haal() -> Path:
         "reizen": _per_persoon("PersoonReis", "Persoon_Id", ids),
         "geschenken": _per_persoon("PersoonGeschenk", "Persoon_Id", ids,
                                    f" and Datum ge {GESCHENK_SINDS}T00:00:00Z"),
+        # Vaste commissiezetels die nu lopen (TotEnMet leeg), met de commissie erbij
+        "commissies": [c for c in _per_persoon(
+            "CommissieZetelVastPersoon", "Persoon_Id", ids, " and TotEnMet eq null",
+            expand="CommissieZetel($expand=Commissie($select=Id,Nummer,Afkorting,NaamNL,Soort,"
+                   "Inhoudsopgave,DatumActief,DatumInactief))")
+            if not (((c.get("CommissieZetel") or {}).get("Commissie") or {}).get("DatumInactief"))],
     }
     MAP.mkdir(parents=True, exist_ok=True)
     pad = MAP / f"tk_{data['opgehaald']}.json"
@@ -107,6 +119,7 @@ def lees(pad: Path) -> dict:
                    "roepnaam": naam_van(p).split(" ")[0], "tussenvoegsel": schoon(p.get("Tussenvoegsel")),
                    "achternaam": schoon(p.get("Achternaam")),
                    "fractie": fractie.get("NaamNL"), "fractie_afkorting": fractie.get("Afkorting"),
+                   "fractie_id": fractie.get("Id"), "fractie_actief": _datum(fractie.get("DatumActief")),
                    "zetel_functie": z.get("Functie"), "van": _datum(z.get("Van"))}
         personen[p["Id"]] = persoon
         rec = {**persoon, "sleutel": f"persoon:{p['Id']}", "persoon_id": p["Id"], "soort": "kamerlid"}
@@ -157,6 +170,22 @@ def lees(pad: Path) -> dict:
                "omschrijving": schoon(g.get("Omschrijving")), "datum": _datum(g.get("Datum"))}
         rec["regel"] = f"{personen[pid]['naam']} · geschenk ({rec['datum']}): {rec['omschrijving']}"
         records[rec["sleutel"]] = rec
+    # Vaste commissiezetels (sinds de uitgave van 2026-10-13; een oudere uitgave heeft ze niet)
+    for c in ruw.get("commissies", []):
+        pid = c.get("Persoon_Id")
+        commissie = ((c.get("CommissieZetel") or {}).get("Commissie") or {})
+        if pid not in personen or not commissie.get("NaamNL"):
+            continue
+        rec = {"sleutel": f"commissiezetel:{c['Id']}", "persoon_id": pid, "soort": "commissiezetel",
+               "commissie": schoon(commissie["NaamNL"]), "commissie_id": commissie.get("Id"),
+               "commissie_afkorting": commissie.get("Afkorting"),
+               "commissie_soort": schoon(commissie.get("Inhoudsopgave")),
+               "commissie_actief": _datum(commissie.get("DatumActief")),
+               "functie": schoon(c.get("Functie")), "van": _datum(c.get("Van")),
+               "tot": _datum(c.get("TotEnMet"))}
+        rec["regel"] = (f"Tweede Kamer · {rec['commissie']} · {rec['functie'] or 'Lid'}: "
+                        f"{personen[pid]['naam']}" + (f" (sinds {rec['van']})" if rec["van"] else ""))
+        records[rec["sleutel"]] = rec
     return {"bron": BRON, "uitgave": uitgave, "sha256": sha256_bestand(pad), "bestand": str(pad),
             "url": URL, "titel": TITEL.format(uitgave=uitgave), "personen": personen,
             "records": records}
@@ -184,6 +213,46 @@ def record(uitgave: str, sleutel_r: str) -> dict | None:
     return None if data is None else data["records"].get(sleutel_r)
 
 
+# Functie in een commissiezetel zoals de open data hem geeft → zoals hij in relations.functie staat
+COMMISSIE_FUNCTIES = {"lid": "Lid", "voorzitter": "Voorzitter", "ondervz": "Ondervoorzitter",
+                      "ondervoorzitter": "Ondervoorzitter", "plvlid": "Plaatsvervangend lid",
+                      "eersteondvztk": "Eerste ondervoorzitter", "tweedeondvztk": "Tweede ondervoorzitter"}
+# Welke commissies controleren het bestuur (kamerzetel: "beslist mee … en controleert het bestuur"):
+# de vaste, algemene en tijdelijke commissies (ook enquêtes) en twee overige met een
+# controletaak. Niet: delegaties en contactgroepen, de Commissie voor de Werkwijze, het Presidium,
+# de Kunstcommissie, de geloofsbrieven en de bouwbegeleiding (2026-10-13).
+COMMISSIE_SOORTEN = {"Vaste commissies", "Algemene commissies", "Tijdelijke commissies"}
+COMMISSIE_EXTRA = {"Commissie voor de Inlichtingen- en Veiligheidsdiensten",
+                   "Commissie voor de Verzoekschriften en de Burgerinitiatieven"}
+COMMISSIE_NIET = {"Bouwbegeleidingscommissie"}
+
+
+def controlerende_commissie(rec: dict) -> bool:
+    if rec["commissie"] in COMMISSIE_NIET:
+        return False
+    return rec.get("commissie_soort") in COMMISSIE_SOORTEN or rec["commissie"] in COMMISSIE_EXTRA
+
+
+def commissie_functie(rec: dict) -> str:
+    ruw = rec.get("functie") or "Lid"
+    return COMMISSIE_FUNCTIES.get(ruw.lower(), ruw)
+
+
+def commissie_naam(rec: dict) -> str:
+    """Naam van de commissieknoop: de naam uit de open data met '(Tweede Kamer)' erachter, want de
+    Eerste Kamer heeft commissies met dezelfde naam ('Vaste commissie voor Financiën')."""
+    naam = rec["commissie"]
+    return f"{naam[:1].upper()}{naam[1:]} (Tweede Kamer)"
+
+
+def fractie_partij(rec: dict) -> str | None:
+    """De partijknoop van een fractie: een landelijke partij uit de partijtabel, anders de
+    fractienaam zelf (een afgesplitste groep als 'Groep Markuszower' of een eenmansfractie als
+    'Lid Keijzer' is een eigen fractie, geen bestaande partij)."""
+    return (partij_naam(rec.get("fractie_afkorting") or "") or partij_naam(rec.get("fractie") or "")
+            or schoon(rec.get("fractie")) or None)
+
+
 def past_naam(p: dict, naam: str) -> bool:
     """Past een modelnaam bij dit Kamerlid? Een deel van de achternaam (dubbele namen:
     'Yeşilgöz-Zegerius' ~ 'Yeşilgöz') als heel woord, en dezelfde eerste letter vooraan."""
@@ -205,12 +274,16 @@ def controleer(data: dict, sleutel_r: str, rec: dict, relatie_type: str,
     ander = [e for e in eindpunten if e is not persoon[0]][0]
     if rec["soort"] == "kamerlid":
         if relatie_type == "lidmaatschap":
-            verwacht = partij_naam(rec.get("fractie_afkorting") or "") or partij_naam(rec.get("fractie") or "")
+            verwacht = fractie_partij(rec)
             if not verwacht or ander["type"] != "partij" or ander["name"] != verwacht:
                 return f"fractie '{rec.get('fractie')}' past niet bij eindpunt #{ander['id']}"
             return None
         if ("oo", "19432") not in ander["ids"]:
             return f"eindpunt #{ander['id']} is niet de Tweede Kamer"
+        return None
+    if rec["soort"] == "commissiezetel":
+        if ander["type"] != "overheidsinstelling" or ander["name"] != commissie_naam(rec):
+            return f"eindpunt #{ander['id']} is niet de {rec['commissie']}"
         return None
     # nevenfunctie, loopbaan, reis, geschenk: de organisatie moet in het record genoemd zijn, onder
     # haar naam in het model of een vastgelegde schrijfwijze uit de Kamerregisters

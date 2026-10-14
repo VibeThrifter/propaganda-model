@@ -13,12 +13,16 @@ check doet zonder LLM wat de bronchecker met een LLM doet, maar dan precies:
        ambtsdrager (externe id 'oo' = 'm:<medewerker>', en de achternaam staat in de naam) of de
        partij (dezelfde partijtabel als de import);
      - Tweede Kamer (tk.py): het Kamerlid (externe id 'tk_persoon', achternaam en voorletter
-       passen), de Tweede Kamer (oo:19432) of de fractiepartij, en bij nevenfuncties, loopbaan,
-       reizen en geschenken: de organisatie staat in de recordregel;
+       passen), de Tweede Kamer (oo:19432) of de fractiepartij (een fractie die geen landelijke
+       partij is: de partijknoop onder de fractienaam), een commissiezetel: de commissie onder
+       tk.commissie_naam, en bij nevenfuncties, loopbaan, reizen en geschenken: de organisatie
+       staat in de recordregel;
      - Europees Parlement (ep.py): de Europarlementariër (externe id 'ep_mep'), het Europees
        Parlement (wikidata:Q8889) of de nationale partij;
      - lobbyistenregister (lobby.py, de pdf zelf is de uitgave): 'lobbyt' met de Tweede Kamer
-       als doel, en de organisatie staat in de recordregel.
+       als doel, en de organisatie staat in de recordregel;
+     - SER-samenstelling (ser.py, de pagina van ser.nl is de uitgave): 'lidmaatschap' met de SER
+       (oo:28455002) als doel, en de organisatie is die uit het record.
 
 Klopt alles → 'klopt'; klopt het record of een eindpunt niet → 'klopt-niet' met de reden.
 Ontbreekt de uitgave, dan geen oordeel (wordt gemeld). Het oordeel gaat via
@@ -45,6 +49,7 @@ sys.path.insert(0, str(ROOT / "tools" / "registers"))
 import ep  # noqa: E402
 import lobby  # noqa: E402
 import oo  # noqa: E402
+import ser  # noqa: E402
 import tk  # noqa: E402
 from common import schoon  # noqa: E402
 
@@ -52,7 +57,7 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 TOKEN = ROOT / "data" / "tokens" / "registercheck.token"
 API = "http://127.0.0.1:5000"
 ACCOUNT = "registercheck"
-BRONNEN = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby}
+BRONNEN = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby, "ser": ser}
 
 # Een argument waarvan ELKE citatie een registerregel is (alias a = arguments). Gedeeld met
 # scripts/bronchecker.py en scripts/bronzoeker.py: die slaan zulke argumenten over.

@@ -2,7 +2,7 @@
 """Looptijd van registerfeiten (eigenaarsbesluit 2026-10-09: "vul bij alles de goede jaartallen
 in he want het model kijkt gewoon per tijdsvak wat de relaties zijn").
 
-Deterministisch, zonder LLM en zonder mens. Per register (oo, tk, ep, lobby) bouwt dit het plan
+Deterministisch, zonder LLM en zonder mens. Per register (oo, tk, ep, lobby, ser) bouwt dit het plan
 van de nieuwste bewaarde uitgave (dezelfde koppeling als de import: externe id's en
 koppelingen.json, nooit op naam alleen) en legt het naast de verbanden die al uit dat register
 in het model staan. Een verband krijgt de datum die zijn eigen record noemt, alleen als:
@@ -27,7 +27,7 @@ veld en vervangt een andere datum alleen als die onbeschermd is (geen mens, geen
 gemerged argument).
 
 Loopt ook mee in de wekelijkse registers-sync. Los:
-    python3 scripts/registers_looptijd.py [--droog] [--alleen oo,tk,ep,lobby]
+    python3 scripts/registers_looptijd.py [--droog] [--alleen oo,tk,ep,lobby,ser]
 """
 from __future__ import annotations
 
