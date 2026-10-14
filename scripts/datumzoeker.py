@@ -92,6 +92,10 @@ REGELS_ORG = (
     "Antwoord alleen met het gevraagde JSON."
 )
 ORG_STAND_PAD = ROOT / "data" / "datumzoeker_organisaties.json"
+# Zelfde vorm als WEB_SCHEMA, plus de naam zoals de bron hem schrijft ("European Parliament" voor
+# het Europees Parlement): de pagina moet díé naam noemen; de bronchecker toetst daarna of het
+# over deze organisatie gaat.
+WEB_SCHEMA_ORG = None   # na WEB_SCHEMA gezet
 ORG_TYPES_NIET = ("persoon",)
 
 EIGEN_SCHEMA = {
@@ -127,6 +131,11 @@ WEB_SCHEMA = {
     "required": ["gevonden", "begin", "begin_bron", "eind", "eind_bron", "bewering", "toelichting"],
     "additionalProperties": False,
 }
+
+
+WEB_SCHEMA_ORG = json.loads(json.dumps(WEB_SCHEMA))
+WEB_SCHEMA_ORG["properties"]["naam_in_bron"] = {"type": "string"}
+WEB_SCHEMA_ORG["required"] = WEB_SCHEMA_ORG["required"] + ["naam_in_bron"]
 
 
 # ------------------------------------------------------------------ database (alleen-lezen)
@@ -442,8 +451,10 @@ def web_ronde_organisatie(e: dict) -> dict:
               "Wikipedia, sociale media en deze database zelf zijn geen bron (Wikipedia mag als "
               "vindplaats: volg de voetnoot). Primaire bronnen eerst: de eigen site (over ons, "
               "geschiedenis), het register van overheidsorganisaties, Parlement.com, DNPP, "
-              "KvK-nieuws, jaarverslagen, persberichten. Geen datum gevonden: gevonden=false.")
-    antwoord = vraag(prompt, WEB_SCHEMA, tools=True, regels=REGELS_ORG)
+              "KvK-nieuws, jaarverslagen, persberichten. Noemt de bron de organisatie anders "
+              "(bijvoorbeeld in het Engels of met haar oude naam), zet die naam dan letterlijk zoals "
+              "op de pagina in naam_in_bron; anders leeg. Geen datum gevonden: gevonden=false.")
+    antwoord = vraag(prompt, WEB_SCHEMA_ORG, tools=True, regels=REGELS_ORG)
     if not antwoord:
         return {"uitkomst": "fout", "toelichting": "model gaf geen bruikbaar antwoord"}
     afgevallen: list[dict] = []
@@ -461,7 +472,8 @@ def web_ronde_organisatie(e: dict) -> dict:
         if not noemt_jaar(bron.get("citaat"), datum):
             afgevallen.append({"url": bron.get("url"), "reden": f"citaat noemt {datum[:4]} niet"})
             continue
-        goed, reden = bz.natrekken(bron, [e["name"]])
+        alias = (antwoord.get("naam_in_bron") or "").strip()
+        goed, reden = bz.natrekken(bron, [alias] if alias and len(alias) >= 3 else [e["name"]])
         if not goed:
             afgevallen.append({"url": bron.get("url"), "reden": reden})
             continue

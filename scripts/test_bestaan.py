@@ -490,6 +490,18 @@ def test_reparaties(api, rij, lees, bron, entiteit, relatie, bewijs, a1, neutraa
     eis(any("ORGANISATIE-ZONDER-BESTAAN" == b["code"] for b in validation.check_bestaan(c)),
         "de meter ORGANISATIE-ZONDER-BESTAAN bestaat")
     c.close()
+    # Een bron die de organisatie anders noemt (Engels): de pagina moet díé naam noemen
+    gezien = {}
+    dz.vraag = lambda prompt, schema, tools, regels=None: {
+        "gevonden": True, "begin": "1952", "eind": "", "naam_in_bron": "Proef Assembly",
+        "begin_bron": {"url": "https://bron.test/en", "titel": "History", "uitgever": "Proef",
+                       "datum": "", "soort": "website", "citaat": "The Proef Assembly was founded in 1952."},
+        "eind_bron": {"url": "", "titel": "", "uitgever": "", "datum": "", "soort": "website", "citaat": ""},
+        "bewering": "", "toelichting": ""}
+    bz.natrekken = lambda b, partijen=None: (gezien.setdefault("partijen", partijen), (b, ""))[1]
+    uit = dz.web_ronde_organisatie({"id": doel, "name": naam, "type": "omroep", "description": "", "active_until": None})
+    eis(uit["uitkomst"] == "gevonden" and gezien["partijen"] == ["Proef Assembly"],
+        "een bron die de organisatie anders noemt: de pagina moet die naam noemen")
 
 
 def _via(api, pad, body):
