@@ -344,7 +344,7 @@ def main():
                     "bewering": "Kees Proef werd in 2012 lid van de Testpartij.", "toelichting": "persbericht"}
 
         dz.vraag = nep_web
-        dz.bz.natrekken = lambda bron_, partijen=None: ({**bron_, "letterlijk": True, "datum": "2012-05-01"}, "ok")
+        dz.bz.natrekken = lambda bron_, partijen=None, afkortingen=None: ({**bron_, "letterlijk": True, "datum": "2012-05-01"}, "ok")
         dz.bz.registreer_bron = lambda api_url, token, b: bron()
         tel = dz.draai(ids=[r5], max_eigen=0, max_web=3, meld=print)
         c = lees()

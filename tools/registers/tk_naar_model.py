@@ -180,11 +180,12 @@ class Plan:
         self.org: dict[int, tuple[str, str, str | None]] = {}
         sterk: dict[str, set[int]] = {}
         zwak: dict[str, set[int]] = {}
-        for i, n, t, laag in conn.execute(
-                "SELECT id, name, type, bestuurslaag FROM entities WHERE type <> 'persoon' "
-                "AND NOT vervangen AND status <> 'afgewezen'"):
+        # metadata.afkorting (2026-10-14) telt als een afkorting tussen haakjes (zwak)
+        for i, n, t, laag, afk in conn.execute(
+                "SELECT id, name, type, bestuurslaag, CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.afkorting') END FROM entities "
+                "WHERE type <> 'persoon' AND NOT vervangen AND status <> 'afgewezen'"):
             self.org[i] = (n, t, laag)
-            namen = namen_van(n)
+            namen = namen_van(n, afk if isinstance(afk, str) else None)
             hoofd = {sleutel(n), sleutel(zonder_haakjes(n))}
             for k in namen:
                 (sterk if k in hoofd else zwak).setdefault(k, set()).add(i)

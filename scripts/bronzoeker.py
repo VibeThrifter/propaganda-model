@@ -222,6 +222,8 @@ _ARGUMENT_KOLOMMEN = """
                r.target_id AS rel_doel, r.relation_type, r.description AS rel_omschrijving,
                s.name AS bron_naam, t.name AS doel_naam,
                m.name AS mechanisme, e.name AS entiteit_naam,
+               CASE WHEN json_valid(s.metadata) THEN json_extract(s.metadata, '$.afkorting') END AS bron_afk, CASE WHEN json_valid(t.metadata) THEN json_extract(t.metadata, '$.afkorting') END AS doel_afk,
+               CASE WHEN json_valid(e.metadata) THEN json_extract(e.metadata, '$.afkorting') END AS entiteit_afk,
                (SELECT COUNT(*) FROM citations c WHERE c.argument_id = a.id AND (
                     TRIM(COALESCE(c.quote, '')) <> ''
                     OR EXISTS (SELECT 1 FROM source_locations sl
@@ -322,14 +324,14 @@ def verbanden_zonder_argument(conn, relaties_ids=None) -> list[dict]:
         params = list(relaties_ids)
     return [{**dict(r), "id": None, "soort": "verband", "probleem": "geen_argument",
              "claim": "", "reasoning": None, "stance": "supporting", "property": None,
-             "property_value": None, "entity_id": None, "entiteit_naam": None,
+             "property_value": None, "entity_id": None, "entiteit_naam": None, "entiteit_afk": None,
              "status": r["rel_status"], "a1": None, "a1_detail": None, "betwist_reden": None,
              "n_echt": 0}
             for r in conn.execute(f"""
         SELECT r.id AS relation_id, r.status AS rel_status, r.relation_type,
                r.description AS rel_omschrijving, r.source_id AS rel_bron,
                r.target_id AS rel_doel, s.name AS bron_naam, t.name AS doel_naam,
-               m.name AS mechanisme
+               m.name AS mechanisme, CASE WHEN json_valid(s.metadata) THEN json_extract(s.metadata, '$.afkorting') END AS bron_afk, CASE WHEN json_valid(t.metadata) THEN json_extract(t.metadata, '$.afkorting') END AS doel_afk
         FROM relations r
         JOIN entities s ON s.id = r.source_id
         JOIN entities t ON t.id = r.target_id
@@ -490,10 +492,11 @@ def datum_van(waarde: str | None) -> str | None:
 LIDWOORDEN = ("de ", "het ", "een ")
 
 
-def namen_van(naam: str | None) -> set[str]:
+def namen_van(naam: str | None, afkorting: str | None = None) -> set[str]:
     """Hoe een partij in een bewering genoemd wordt: haar naam zonder lidwoord, de delen tussen
     haakjes ("Meta (Facebook/Instagram)" → meta, facebook, instagram; "AD (Algemeen Dagblad)" →
-    ad, algemeen dagblad) en een afkorting vooraan ("DPG Media" → dpg)."""
+    ad, algemeen dagblad), een afkorting vooraan ("DPG Media" → dpg) en haar afkorting uit
+    entities.metadata ("Rijkswaterstaat" + RWS → rws; 2026-10-14)."""
     buiten, _, binnen = (naam or "").partition("(")
     buiten = buiten.strip()
     for lidwoord in LIDWOORDEN:
@@ -504,14 +507,16 @@ def namen_van(naam: str | None) -> set[str]:
     eerste = buiten.split(" ")[0] if " " in buiten else ""
     if len(eerste) >= 2 and eerste.isupper():
         namen.add(eerste)
+    if afkorting:
+        namen.add(afkorting)
     return {bc.normaliseer(n) for n in namen if len(n.strip()) >= 2}
 
 
-def noemt(tekst: str | None, naam: str | None) -> bool:
+def noemt(tekst: str | None, naam: str | None, afkorting: str | None = None) -> bool:
     """Noemt de tekst deze partij (als heel woord)? Een naam van meerdere woorden telt ook
     aaneengeschreven ("Haya van Somerenstichting" voor "Haya van Someren Stichting")."""
     gewoon = bc.normaliseer(tekst)
-    namen = namen_van(naam)
+    namen = namen_van(naam, afkorting)
     if any(re.search(rf"(?<![\w]){re.escape(n)}(?![\w])", gewoon) for n in namen):
         return True
     aaneen = gewoon.replace(" ", "").replace("-", "")
@@ -528,7 +533,8 @@ def verboden(url: str) -> bool:
             or any(host == v or host.endswith("." + v) for v in VERBODEN_HOSTS))
 
 
-def natrekken(bron: dict, partijen: list[str] | None = None) -> tuple[dict | None, str]:
+def natrekken(bron: dict, partijen: list[str] | None = None,
+              afkortingen: dict | None = None) -> tuple[dict | None, str]:
     """Haal de bron zelf op en zoek het citaat letterlijk terug; met ``partijen`` moet de
     pagina ze ook allemaal noemen (een verband: beide partijen). → (bron, reden)."""
     url = (bron.get("url") or "").strip()
@@ -545,17 +551,18 @@ def natrekken(bron: dict, partijen: list[str] | None = None) -> tuple[dict | Non
     gevonden, letterlijk, _pos = bc.zoek_citaat(citaat, tekst)
     if not gevonden:
         return None, f"citaat niet teruggevonden ({bc.host_van(gelezen or url)})"
-    ontbreekt = [naam for naam in (partijen or []) if naam and not noemt(tekst, naam)]
+    ontbreekt = [naam for naam in (partijen or [])
+                 if naam and not noemt(tekst, naam, (afkortingen or {}).get(naam))]
     if ontbreekt:
         return None, f"bron noemt {', '.join(ontbreekt)} niet ({bc.host_van(gelezen or url)})"
     return {**bron, "url": url, "citaat": citaat, "letterlijk": letterlijk,
             "datum": datum_van(bron.get("datum"))}, "ok"
 
 
-def _bronnen_natrekken(bronnen, partijen, afgevallen) -> list[dict]:
+def _bronnen_natrekken(bronnen, partijen, afgevallen, afkortingen=None) -> list[dict]:
     gehouden = []
     for bron in (bronnen or [])[:MAX_BRONNEN + 1]:
-        goed, reden = natrekken(bron, partijen)
+        goed, reden = natrekken(bron, partijen, afkortingen)
         if goed:
             if len(gehouden) < MAX_BRONNEN:
                 gehouden.append(goed)
@@ -574,13 +581,15 @@ def zoek(arg: dict) -> dict:
     # partijen, bij naam (geen algemene uitspraak over een sector of "de pers")
     partijen = ([arg["bron_naam"], arg["doel_naam"]] if arg["relation_id"]
                 else [arg["entiteit_naam"]])
+    afk = ({arg["bron_naam"]: arg.get("bron_afk"), arg["doel_naam"]: arg.get("doel_afk")}
+           if arg["relation_id"] else {arg["entiteit_naam"]: arg.get("entiteit_afk")})
     afgevallen = []
-    gehouden = _bronnen_natrekken(antwoord.get("bronnen"), partijen, afgevallen)
+    gehouden = _bronnen_natrekken(antwoord.get("bronnen"), partijen, afgevallen, afk)
     bewering = (antwoord.get("bewering") or "").strip() or arg["claim"]
     if gehouden and not bewering:
         afgevallen.append({"url": None, "reden": "geen bewering geformuleerd"})
         gehouden = []
-    ontbreekt = [naam for naam in partijen if naam and not noemt(bewering, naam)]
+    ontbreekt = [naam for naam in partijen if naam and not noemt(bewering, naam, afk.get(naam))]
     nieuw = (arg.get("soort") == "verband"
              or bc.normaliseer(bewering) != bc.normaliseer(arg["claim"]))
     if gehouden and ontbreekt and nieuw:
@@ -590,12 +599,12 @@ def zoek(arg: dict) -> dict:
     extra = []
     for item in (antwoord.get("extra") or [])[:3] if gehouden else []:
         tekst = (item.get("bewering") or "").strip()
-        mist = [naam for naam in partijen if naam and not noemt(tekst, naam)]
+        mist = [naam for naam in partijen if naam and not noemt(tekst, naam, afk.get(naam))]
         if not tekst or mist or bc.normaliseer(tekst) == bc.normaliseer(bewering):
             afgevallen.append({"url": None, "reden": f"afgesplitst feit valt af: "
                                                      f"{'noemt ' + ', '.join(mist) + ' niet' if mist else 'leeg of dubbel'}"})
             continue
-        bronnen = _bronnen_natrekken(item.get("bronnen"), partijen, afgevallen)
+        bronnen = _bronnen_natrekken(item.get("bronnen"), partijen, afgevallen, afk)
         if bronnen:
             extra.append({"bewering": tekst, "bronnen": bronnen})
     return {"uitkomst": "gevonden" if gehouden else "niets", "bronnen": gehouden,

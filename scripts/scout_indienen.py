@@ -131,6 +131,12 @@ class Indiener:
         self.droog = droog
         self.entiteiten = {n: i for n, i in lees_db("SELECT name, id FROM entities")}
         self.namen = {i: n for n, i in self.entiteiten.items()}
+        # Een organisatie die de scout bij haar afkorting noemt ('RWS'), is de knoop met die
+        # metadata.afkorting (2026-10-14; de server weigert een afkorting die met iets botst)
+        self.afkortingen = {a: i for a, i in lees_db(
+            "SELECT json_extract(metadata, '$.afkorting'), id FROM entities "
+            "WHERE json_valid(metadata) AND json_extract(metadata, '$.afkorting') IS NOT NULL "
+            "AND NOT vervangen AND status <> 'afgewezen'") if isinstance(a, str)}
         self.relaties = {tuple(r) for r in lees_db(
             "SELECT source_id, target_id, relation_type FROM relations")}
         self.bron_keys: dict[str, int | None] = {}
@@ -211,6 +217,12 @@ class Indiener:
             if naam in self.entiteiten:
                 print(f"▸ node bestaat: {naam} (#{self.entiteiten[naam]})")
                 self.ent_keys[e["key"]] = self.entiteiten[naam]
+                self.stats["entiteiten_bestaand"] += 1
+                continue
+            if naam in self.afkortingen:
+                eid = self.afkortingen[naam]
+                print(f"▸ node bestaat: {naam} = afkorting van #{eid} {self.namen.get(eid, '')}")
+                self.ent_keys[e["key"]] = eid
                 self.stats["entiteiten_bestaand"] += 1
                 continue
             body = {"name": naam, "type": e["type"]}

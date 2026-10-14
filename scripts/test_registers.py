@@ -24,6 +24,12 @@ overheidsorganisaties:
      lokale partijen als eigen knoop (met de plaats waar nodig); een fractie die geen partij is
      ('Groep …') als eigen partijknoop; commissiezetels (geen contactgroepen); Wikidata-namen
      (alleen eenduidig, de naamgenoot niet); de SER-samenstelling (polderoverleg).
+ 14. (2026-10-14) afkortingen als metadata.afkorting: zetten, overslaan (gemeente, provinciecode,
+     al in de naam, botsing met 'AP (Associated Press)', gedeeld in het register), nooit
+     overschrijven, lezen bij het matchen (namen_van, bronzoeker, de parkeercheck);
+ 15. (2026-10-14) volledige namen uit Wikidata via de route: QID via /register, de naam via
+     /registernaam (droogloop standaard, toevoeging alleen bij een naamgenoot, terugdraaien,
+     registercheck blijft kloppen).
 De live database wordt niet aangeraakt.
 
 Gebruik: python3 scripts/test_registers.py   (exit 0 = alles groen)
@@ -435,6 +441,10 @@ def main():
             == "gemeente", "bestuurslaag gezet")
         eis(conn.execute("SELECT functie FROM relations WHERE relation_type = 'ambt' AND functie = "
                          "'Secretaris-generaal'").fetchone() is not None, "ambtstitel in relations.functie")
+        eis(conn.execute("SELECT json_extract(metadata, '$.afkorting') FROM entities WHERE name = "
+                         "'Testautoriteit'").fetchone()[0] == "TA" and ind.tel["afkorting gezet"] == 1
+            and plan.afkorting_tel["meesturen (nieuwe knoop)"] == 1,
+            "de afkorting uit het register (TA) staat in metadata.afkorting")
         # idempotent: tweede keer niets nieuws
         ind2 = naar_model.Indiener(naar_model.Plan(data, rconn).maak(),
                                    rest_voor(tokens["register-import"]), None, print)
@@ -783,8 +793,161 @@ def main():
         stel = registercheck.draai()
         eis(stel["klopt"] == 3 and stel["klopt-niet"] == 0, f"registercheck SER: {stel}")
         rconn.close()
+        afkortingen(conn, client, tokens, data, db)
+        registernamen(conn, client, tokens, wpad, db)
         conn.close()
     print("\nRegisterpijplijn: alles groen.")
+
+
+def afkortingen(conn, client, tokens, data, db):
+    """14. metadata.afkorting (eigenaarsbesluit 2026-10-14)."""
+    import copy
+    import bronzoeker
+    import common
+    import naar_model
+    print("14. Afkortingen (metadata.afkorting)")
+    eis("rws" in common.namen_van("Rijkswaterstaat", "RWS") and "om" not in common.namen_van("Openbaar Ministerie", "OM")
+        and common.noemt("Volgens RWS is de brug dicht", "Rijkswaterstaat", "RWS"),
+        "namen_van/noemt lezen de afkorting (vanaf drie tekens: 'OM' is in tekst het woord 'om')")
+    eis(bronzoeker.noemt("RWS sloot de brug", "Rijkswaterstaat", "RWS")
+        and not bronzoeker.noemt("RWS sloot de brug", "Rijkswaterstaat"), "de bronzoeker leest de afkorting")
+    eis(common.geen_afkorting("Utrecht", "Utrecht") and common.geen_afkorting("DG Douane", "Directoraat-generaal Douane")
+        and common.geen_afkorting("CPB", "Centraal Planbureau (CPB)") and not common.geen_afkorting("Ctgb",
+        "College voor de toelating van gewasbeschermingsmiddelen en biociden"),
+        "geen afkorting: de naam zelf, een omschrijving, al in de naam; wél 'Ctgb'")
+    conn.execute("INSERT INTO entities (name, type, status) VALUES ('AP (Associated Press)', 'persbureau', 'goedgekeurd')")
+    conn.commit()
+    kop = {"Authorization": f"Bearer {tokens['register-import']}"}
+    ids = {n: i for i, n in conn.execute("SELECT id, name FROM entities")}
+    r = client.post(f"/api/entities/{ids['Testraad']}/register", json={"afkorting": "AP"}, headers=kop).get_json()
+    eis(r["overgeslagen"]["afkorting"].startswith("botst met #") and "metadata" not in r["gewijzigd"],
+        f"AP botst met 'AP (Associated Press)' en wordt overgeslagen: {r['overgeslagen']}")
+    r = client.post(f"/api/entities/{ids['Testautoriteit']}/register", json={"afkorting": "XTA"}, headers=kop).get_json()
+    eis("al de afkorting 'TA'" in r["overgeslagen"]["afkorting"], "een bestaande afkorting wordt nooit overschreven")
+    r = client.post(f"/api/entities/{ids['Testraad']}/register", json={"afkorting": "TRD"}, headers=kop).get_json()
+    eis(r["gewijzigd"]["metadata"] == {"afkorting": "TRD"}, "een vrije afkorting wordt gezet (en gelogd)")
+    eis(conn.execute("SELECT COUNT(*) FROM edit_log WHERE record_id = ? AND table_name = 'entities' AND "
+                     "new_value LIKE '%TRD%'", (ids["Testraad"],)).fetchone()[0] == 1, "edit_log")
+    r = client.post("/api/entities", json={"name": "Testbureau", "type": "overheidsinstelling",
+                                            "metadata": {"afkorting": "TA"}}, headers=kop)
+    eis(r.status_code == 201 and r.get_json()["afkorting_overgeslagen"].startswith("botst met #")
+        and conn.execute("SELECT metadata FROM entities WHERE name = 'Testbureau'").fetchone()[0] is None,
+        "een nieuwe knoop met een botsende afkorting komt er zonder haar")
+    r = client.post("/api/entities", json={"name": "TRD", "type": "overheidsinstelling"}, headers=kop)
+    trd = r.get_json()["id"]
+    redenen = client.get(f"/api/beoordeling/autokeur/entities/{trd}",
+                         headers={"Authorization": f"Bearer {tokens['merge-service']}"}).get_json()["redenen"]
+    eis(any("afkorting van bestaande entiteit" in x for x in redenen),
+        f"een nieuwe knoop 'TRD' parkeert naast Testraad (afkorting TRD): {redenen}")
+    # het plan: gemeente, provinciecode, al gezet, botsing, gedeeld in de uitgave
+    d2 = copy.deepcopy(data)
+    orgs = d2["organisaties"]
+    orgs["500"]["afkorting"] = "Teststad"
+    orgs["700"]["afkorting"] = "TL"
+    orgs["300"]["afkorting"] = "TAU"
+    orgs["400"]["afkorting"] = "AP"
+    orgs["800"]["afkorting"] = "DGF"
+    orgs["101"]["afkorting"] = "DGF"
+    rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    p2 = naar_model.Plan(d2, rconn).maak()
+    rconn.close()
+    reden = {k: p2.orgs[k].get("afkorting_overgeslagen") for k in ("500", "700", "300", "400", "800", "101")}
+    eis(reden["500"].startswith("gemeente") and reden["700"].startswith("provinciecode")
+        and reden["300"] == "heeft al een afkorting" and reden["400"] == "heeft al een afkorting"
+        and reden["800"] == reden["101"] == "gedeeld met een andere organisatie in het register",
+        f"het plan slaat over met een reden: {reden}")
+    orgs["400"]["afkorting"] = "XYZ"
+    conn.execute("UPDATE entities SET metadata = NULL WHERE id = ?", (ids["Testraad"],))
+    conn.commit()
+    orgs["400"]["afkorting"] = "AP"
+    rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    p3 = naar_model.Plan(d2, rconn).maak()
+    rconn.close()
+    eis(p3.orgs["400"].get("afkorting_overgeslagen") == "botst met een andere knoop"
+        and "AP (Associated Press)" in p3.orgs["400"]["afkorting_botsing"],
+        "het plan ziet de botsing met 'AP (Associated Press)' al in de droogloop")
+    import viz_data
+    vconn = sqlite3.connect(db)
+    vconn.row_factory = sqlite3.Row
+    knopen = {n["name"]: n for n in viz_data.export_data(vconn)["entities"]}
+    vconn.close()
+    eis(knopen["Testautoriteit"].get("afkorting") == "TA" and "afkorting" not in knopen["Ministerie van Financiën"],
+        "graph_data geeft de afkorting mee waar er een is")
+
+
+def registernamen(conn, client, tokens, wpad, db):
+    """15. Voorletternaam → volledige naam uit Wikidata, via de route (2026-10-14)."""
+    import os
+    import registercheck
+    import wikidata
+    import wikidata_namen
+    import oo
+    print("15. Volledige namen uit Wikidata (route register-import)")
+    os.environ.pop("PROPAGANDA_REGISTERNAAM", None)
+    kop = {"Authorization": f"Bearer {tokens['register-import']}"}
+
+    def rest(m, pad, body=None):
+        r = client.open(pad, method=m, json=body, headers=kop)
+        return r.status_code, (r.get_json() or {})
+    oud = "B.C.M. Vostermans (burgemeester Teststad)"
+    eid = conn.execute("SELECT id FROM entities WHERE name = ?", (oud,)).fetchone()[0]
+    st, res = rest("POST", f"/api/entities/{eid}/registernaam", {"waarde": "Q2", "uitgave": "2026-01-02"})
+    eis(st == 409 and "eerst POST" in res["error"], "zonder geregistreerde QID geen naam")
+    wd = wikidata.lees(wpad)
+    uit = wikidata_namen.zoek(oo.lees(oo.MAP / "exportOO_2026-01-08.xml"), wd)
+    rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    wikidata_namen.met_model(uit["treffers"], rconn)
+    rconn.close()
+    # een naamgenoot met de volledige naam: de toevoeging blijft
+    conn.execute("INSERT INTO entities (name, type, status) VALUES ('Bob Vostermans', 'persoon', 'goedgekeurd')")
+    conn.commit()
+    for t in uit["treffers"]:
+        t["hernoemen"] = True
+    tel = wikidata_namen.indienen(uit["treffers"], rest, wd["uitgave"], True, lambda *_: None)
+    naam = conn.execute("SELECT name FROM entities WHERE id = ?", (eid,)).fetchone()[0]
+    eis(tel["QID: gezet"] >= 1 and tel["naam: droogloop (server)"] >= 1 and naam == oud,
+        f"standaard een droogloop: QID gezet, naam ongewijzigd ({dict(tel)})")
+    eis(conn.execute("SELECT entity_id FROM externe_ids WHERE stelsel = 'wikidata' AND waarde = 'Q2'").fetchone()[0] == eid,
+        "de QID hangt aan de voorletterknoop")
+    os.environ["PROPAGANDA_REGISTERNAAM"] = "1"
+    st, res = rest("POST", f"/api/entities/{eid}/registernaam", {"waarde": "Q2", "uitgave": "2026-01-02"})
+    eis(st == 200 and res["nieuw"] == "Bob Vostermans (burgemeester Teststad)",
+        f"naamgenoot: de toevoeging uit het register blijft ({res})")
+    st, res = rest("POST", f"/api/entities/{eid}/registernaam", {"terug": True, "reden": "test"})
+    eis(st == 200 and conn.execute("SELECT name FROM entities WHERE id = ?", (eid,)).fetchone()[0] == oud,
+        "terugdraaien zet de registernaam terug (edit_log)")
+    conn.execute("UPDATE entities SET name = 'Bob Vostermans (ander)' WHERE name = 'Bob Vostermans'")
+    conn.commit()
+    st, res = rest("POST", f"/api/entities/{eid}/registernaam",
+                   {"waarde": "Q2", "uitgave": "2026-01-02", "verwacht": "Bob Vostermans"})
+    log = conn.execute("""SELECT changed_by, old_value, new_value, reason FROM edit_log WHERE table_name = 'entities'
+                          AND record_id = ? ORDER BY id DESC LIMIT 1""", (eid,)).fetchone()
+    eis(st == 200 and res["nieuw"] == "Bob Vostermans" and not res["droog"] and log[0] == "register-import"
+        and oud in log[1] and log[3].startswith("registernaam: wikidata Q2"),
+        "zonder naamgenoot: de volledige naam, gelogd onder register-import")
+    rc = registercheck.db()
+    args = rc.execute(f"""SELECT a.* FROM arguments a JOIN relations r ON r.id = a.relation_id
+        WHERE (r.source_id = ? OR r.target_id = ?) AND {registercheck.REGISTER_ARG_SQL}""", (eid, eid)).fetchall()
+    eis(args and all(registercheck.beoordeel(rc, a)[0] == "klopt" for a in args),
+        f"de registercheck blijft kloppen na het hernoemen ({len(args)} registerargumenten)")
+    rc.close()
+    st, res = rest("POST", f"/api/entities/{eid}/registernaam", {"waarde": "Q2", "uitgave": "2026-01-02"})
+    eis(st == 400 and "voornaam" in res["error"], "een volledige naam wordt niet opnieuw hernoemd")
+    ander = conn.execute("SELECT id FROM entities WHERE name LIKE 'A. van Dam%'").fetchone()[0]
+    conn.execute("INSERT INTO externe_ids (entity_id, stelsel, waarde) VALUES (?, 'wikidata', 'Q3')", (ander,))
+    conn.commit()
+    st, res = rest("POST", f"/api/entities/{ander}/registernaam", {"waarde": "Q3", "uitgave": "2026-01-02"})
+    eis(st == 409, f"Anna van Dam (wethouder tot 2020) past niet bij 'Mw. A. van Dam': {res.get('error')}")
+    sha = wpad.with_suffix(".sha256")
+    goed = sha.read_text()
+    sha.write_text("0" * 64 + "\n")
+    st, res = rest("POST", f"/api/entities/{ander}/registernaam", {"waarde": "Q3", "uitgave": "2026-01-02"})
+    sha.write_text(goed)
+    eis(st == 400 and "sha256" in res["error"], "een gewijzigde Wikidata-uitgave telt niet")
+    st, _ = client.post(f"/api/entities/{eid}/registernaam", json={"waarde": "Q2", "uitgave": "2026-01-02"},
+                        headers={"Authorization": f"Bearer {tokens['maint']}"}).status_code, None
+    eis(st == 403, "alleen register-import (ook een maintainer niet: die heeft PATCH)")
+    os.environ.pop("PROPAGANDA_REGISTERNAAM", None)
 
 
 if __name__ == "__main__":

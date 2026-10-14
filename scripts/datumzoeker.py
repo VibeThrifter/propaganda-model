@@ -178,7 +178,9 @@ def kandidaten(conn, ids=None, nu=None) -> list[dict]:
     rijen = [dict(r) for r in conn.execute(f"""
         SELECT r.id, r.relation_type, r.functie, r.description, r.active_from, r.active_until,
                r.status, s.id AS bron_id, s.name AS bron_naam, s.type AS bron_type,
-               t.id AS doel_id, t.name AS doel_naam, t.type AS doel_type, m.name AS mechanisme
+               t.id AS doel_id, t.name AS doel_naam, t.type AS doel_type, m.name AS mechanisme,
+               CASE WHEN json_valid(s.metadata) THEN json_extract(s.metadata, '$.afkorting') END AS bron_afk,
+               CASE WHEN json_valid(t.metadata) THEN json_extract(t.metadata, '$.afkorting') END AS doel_afk
         FROM relations r JOIN entities s ON s.id = r.source_id JOIN entities t ON t.id = r.target_id
         LEFT JOIN mechanisms m ON m.id = r.mechanism_id
         WHERE NOT r.vervangen AND TRIM(COALESCE(r.active_from, '')) = ''
@@ -337,6 +339,11 @@ def web_prompt(r: dict, eigen: list[dict]) -> str:
             "gevonden: gevonden=false en lege velden.")
 
 
+def _afkortingen(r: dict) -> dict:
+    """Naam → metadata.afkorting van bron en doel (2026-10-14): een bron mag 'RWS' schrijven."""
+    return {r["bron_naam"]: r.get("bron_afk"), r["doel_naam"]: r.get("doel_afk")}
+
+
 def web_ronde(r: dict, eigen: list[dict]) -> dict:
     """Stap 2: zoeken op het web. → {uitkomst: gevonden|niets|fout, begin?, eind?, bewering, …}"""
     antwoord = vraag(web_prompt(r, eigen), WEB_SCHEMA, tools=True)
@@ -356,7 +363,7 @@ def web_ronde(r: dict, eigen: list[dict]) -> dict:
         if not noemt_jaar(bron.get("citaat"), datum):
             afgevallen.append({"url": bron.get("url"), "reden": f"citaat noemt {datum[:4]} niet"})
             continue
-        goed, reden = bz.natrekken(bron, partijen)
+        goed, reden = bz.natrekken(bron, partijen, _afkortingen(r))
         if not goed:
             afgevallen.append({"url": bron.get("url"), "reden": reden})
             continue
@@ -371,8 +378,9 @@ def web_ronde(r: dict, eigen: list[dict]) -> dict:
 def bewering_voor(r: dict, veld: str, datum: str, voorstel: str | None) -> str:
     """De bewering van het argument: die van het model als ze het jaartal en beide partijen
     noemt, anders een vaste neutrale zin."""
-    if voorstel and datum[:4] in voorstel and bz.noemt(voorstel, r["bron_naam"]) \
-            and bz.noemt(voorstel, r["doel_naam"]):
+    afk = _afkortingen(r)
+    if voorstel and datum[:4] in voorstel and bz.noemt(voorstel, r["bron_naam"], afk.get(r["bron_naam"])) \
+            and bz.noemt(voorstel, r["doel_naam"], afk.get(r["doel_naam"])):
         return voorstel[:600]
     band = (r.get("functie") or r["relation_type"].replace("_", " "))
     if veld == "active_from":

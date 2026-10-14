@@ -61,12 +61,18 @@ def export_data(conn):
                e.active_from, e.active_until, CASE WHEN e.active_until IS NOT NULL
                      AND e.active_until < substr(date('now'), 1, length(e.active_until))
                     THEN 0 ELSE e.active END AS active, e.bestuurslaag,
+               CASE WHEN json_valid(e.metadata) THEN json_extract(e.metadata, '$.afkorting') END
+                    AS afkorting,
                r.name as role_name, r.category as filter_category
         FROM entities e
         LEFT JOIN roles r ON e.primary_role_id = r.id
         WHERE NOT e.vervangen AND e.status IN ('goedgekeurd', 'voorgesteld')
     """)
     entities = [dict(row) for row in cur.fetchall()]
+    # metadata.afkorting (2026-10-14): alleen meegeven waar er een is (zoeken in de viz)
+    for e in entities:
+        if not e.get('afkorting'):
+            e.pop('afkorting', None)
 
     # Alle rollen per entiteit (hoofdrol + entity_roles) — nodig om padclaims
     # (rol ⇢ rol) op praktijk-paren te kunnen toetsen.

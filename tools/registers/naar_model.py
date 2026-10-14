@@ -60,7 +60,8 @@ HIER = Path(__file__).resolve().parent
 sys.path.insert(0, str(HIER))
 import oo  # noqa: E402
 import wikidata  # noqa: E402
-from common import ROOT, klem_relaties, looptijd, ontleed_naam, partij_naam, sleutel  # noqa: E402
+from common import (ROOT, afkorting_botst, geen_afkorting, klem_relaties, looptijd,  # noqa: E402
+                    ontleed_naam, partij_naam, sleutel)
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 TOKEN = ROOT / "data" / "tokens" / "register-import.token"
@@ -145,6 +146,13 @@ def fnorm(functie: str) -> str:
     return " ".join(s.split())
 
 
+def _afkorting_uit(metadata) -> str | None:
+    try:
+        return (json.loads(metadata) or {}).get("afkorting") if metadata else None
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
 class Plan:
     """Wat er in het model hoort, los van wat er al staat (dat bepaalt de indiener)."""
 
@@ -203,6 +211,10 @@ class Plan:
         # ("Doe mee! Molenlanden" / "Doe Mee! Molenlanden")
         self.partij_op_naam = {sleutel(n): i for i, n in conn.execute(
             "SELECT id, name FROM entities WHERE type = 'partij' AND NOT vervangen AND status <> 'afgewezen'")}
+        # Afkortingen (2026-10-14): de levende knopen met hun eigen afkorting, voor de botsingsregel
+        self.levend = [(i, n, _afkorting_uit(m)) for i, n, m in conn.execute(
+            "SELECT id, name, metadata FROM entities WHERE NOT vervangen AND status <> 'afgewezen'")]
+        self.afkorting_tel: Counter = Counter()
 
     # ── organisaties ────────────────────────────────────────────────────────
     def _gekozen(self, o: dict) -> str | None:
@@ -632,7 +644,52 @@ class Plan:
         for oo_id in [k for k in self.orgs if k not in gebruikt and not self.orgs[k]["bestaand"]]:
             self.overgeslagen["organisatie zonder verband"] += 1
             del self.orgs[oo_id]
+        self.afkortingen()
         return self
+
+    def afkortingen(self):
+        """De afkorting uit het register als metadata.afkorting (eigenaarsbesluit 2026-10-14):
+        alleen een echte afkorting die nog niet in de naam van de knoop staat, die de knoop nog
+        niet heeft en die met geen andere levende knoop botst (common.afkorting_botst). Twee
+        organisaties in deze uitgave met dezelfde afkorting (SBB) krijgen haar geen van beide.
+        Zet o['afkorting'] (meesturen) of o['afkorting_overgeslagen'] (reden) en telt."""
+        eigen = {i: (n, a) for i, n, a in self.levend}
+        kandidaten = {}
+        for oo_id, o in self.orgs.items():
+            afk = (o["record"].get("afkorting") or "").strip()
+            if not afk:
+                continue
+            eid = self.org_ext.get(oo_id) or o["bestaand"]
+            naam = eigen.get(eid, (o["naam"], None))[0]
+            if o["oo_type"] == "Gemeente":
+                reden = "gemeente (de 'afkorting' is de naam)"
+            elif o["oo_type"] == "Provincie":
+                reden = "provinciecode (NH, ZH …), geen naam in het nieuws"
+            elif eid and eigen.get(eid, (None, None))[1]:
+                reden = "heeft al een afkorting"
+            else:
+                reden = geen_afkorting(afk, naam)
+            if reden:
+                o["afkorting_overgeslagen"] = reden
+                self.afkorting_tel[f"overgeslagen: {reden}"] += 1
+                continue
+            kandidaten[oo_id] = (afk, eid, naam)
+        per_sleutel = Counter(sleutel(a) for a, _, _ in kandidaten.values())
+        for oo_id, (afk, eid, naam) in kandidaten.items():
+            o = self.orgs[oo_id]
+            if per_sleutel[sleutel(afk)] > 1:
+                reden = "gedeeld met een andere organisatie in het register"
+            elif afkorting_botst(afk, eid, self.levend):
+                reden = "botst met een andere knoop"
+                o["afkorting_botsing"] = afkorting_botst(afk, eid, self.levend)
+            else:
+                reden = None
+            if reden:
+                o["afkorting_overgeslagen"] = reden
+                self.afkorting_tel[f"overgeslagen: {reden}"] += 1
+                continue
+            o["afkorting"] = afk
+            self.afkorting_tel["meesturen (bestaande knoop)" if eid else "meesturen (nieuwe knoop)"] += 1
 
     def samenvatting(self) -> dict:
         return {
@@ -651,6 +708,7 @@ class Plan:
             "overgeslagen": self.overgeslagen,
             "overgeslagen_functies": self.overgeslagen_functies,
             "bestaan": self.bestaan,
+            "afkortingen": self.afkorting_tel,
         }
 
 
@@ -705,13 +763,17 @@ class Indiener:
                 [{"stelsel": "tooi", "waarde": o["tooi"]}] if o["tooi"] else [])
             eid = self.ext.get(("oo", o["oo_id"])) or o["bestaand"]
             if eid:
-                status, res = self.rest("POST", f"/api/entities/{eid}/register", {
+                body = {
                     "externe_ids": ids, "bestuurslaag": o["bestuurslaag"],
                     "metadata": {"oo_type": o["oo_type"]},
                     # de rol die de registersoort geeft (een ministerie → departement), naast
                     # wat de organisatie al was; de server vult alleen aan
-                    "rollen": [o["rol"]]})
+                    "rollen": [o["rol"]]}
+                if o.get("afkorting"):
+                    body["afkorting"] = o["afkorting"]
+                status, res = self.rest("POST", f"/api/entities/{eid}/register", body)
                 self.tel["org gekoppeld" if status == 200 else f"org koppelen {status}"] += 1
+                self._tel_afkorting(o, status, res)
                 if status == 409:
                     self.log(f"  ! externe id al bezet: {o['naam']}: {res}")
             else:
@@ -721,10 +783,13 @@ class Indiener:
                         "externe_ids": ids}
                 if o["start"]:
                     body["active_from"] = o["start"]
+                if o.get("afkorting"):
+                    body["metadata"]["afkorting"] = o["afkorting"]
                 status, res = self.rest("POST", "/api/entities", body)
                 if status == 201:
                     eid = res["id"]
                     self.tel["org nieuw"] += 1
+                    self._tel_afkorting(o, status, res)
                 elif status == 409:
                     eid = res.get("entity_id")
                     self.tel["org bestond (externe id)"] += 1
@@ -733,6 +798,17 @@ class Indiener:
                     self.log(f"  ✗ {o['naam']}: {status} {res.get('error')}")
                     continue
             self.ent[("org", o["oo_id"])] = eid
+
+    def _tel_afkorting(self, o: dict, status: int, res: dict):
+        if not o.get("afkorting") or status not in (200, 201):
+            return
+        reden = (res.get("overgeslagen") or res.get("afkorting_overgeslagen") or {})
+        reden = reden.get("afkorting") if isinstance(reden, dict) else reden
+        if reden:
+            self.tel["afkorting overgeslagen (server)"] += 1
+            self.log(f"  · afkorting {o['afkorting']} niet bij {o['naam']}: {reden}")
+        elif status == 201 or "afkorting" in (res.get("gewijzigd") or {}).get("metadata", {}):
+            self.tel["afkorting gezet"] += 1
 
     def personen(self):
         for p in self.p.personen_plan.values():

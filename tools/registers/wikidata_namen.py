@@ -11,14 +11,21 @@ register; precies één kandidaat en één registerrecord). Uitkomst:
     huidige naam, de QID en de volledige naam →
     data/registers/wikidata/namen_<uitgave oo>_<uitgave wikidata>.json.
 
-Toepassen (later, niet in deze droogloop): de QID hangt `register-import` aan de knoop via
-POST /api/entities/<id>/register {"externe_ids": [{"stelsel": "wikidata", "waarde": QID}]}
-(vult alleen aan); de naam zelf wijzigt alleen een maintainer (PATCH /api/entities/<id> name,
-edit_log). Het model heeft geen aliassen: de voorletternaam verdwijnt dan als naam, de
-registercheck blijft kloppen (hij toetst de achternaam en de externe id m:<medewerker>).
+Toepassen ("via de routes", eigenaarsbesluit 2026-10-14), onder het account `register-import`:
+  --indienen   de QID gaat via POST /api/entities/<id>/register {"externe_ids": [{"stelsel":
+               "wikidata", "waarde": QID}]} aan de knoop (vult alleen aan), voor elke eenduidige
+               treffer, ook de voorletterknoop van een duplicaat (bij samenvoegen verhuist de QID
+               naar de opvolger);
+  --hernoemen  daarna de naam via POST /api/entities/<id>/registernaam {"waarde": QID, "uitgave":
+               …}: de server toetst zelf (label in de bewaarde uitgave, achternaam en voorletters,
+               ambt en gemeente) en houdt de toevoeging "(burgemeester …)" alleen bij een
+               naamgenoot. Zonder PROPAGANDA_REGISTERNAAM=1 op de server is dat een droogloop.
+Een duplicaat (de volledige naam is al van dezelfde persoon) wordt niet hernoemd maar
+samengevoegd via een samenvoegen-RfC; een naamgenoot staat in NAAMGENOTEN (nagegaan).
 
 Gebruik:
     python3 tools/registers/wikidata_namen.py [--uitgave-oo D] [--uitgave-wikidata D]
+    python3 tools/registers/wikidata_namen.py --indienen [--hernoemen]
 """
 from __future__ import annotations
 
@@ -36,6 +43,16 @@ import wikidata  # noqa: E402
 from common import ROOT, ontleed_naam, sleutel  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
+TOKEN = ROOT / "data" / "tokens" / "register-import.token"
+API = "http://127.0.0.1:5000"
+# QID → waarom de knoop met dezelfde volledige naam een ándere persoon is (nagegaan 2026-10-14).
+# Zo'n treffer wordt hernoemd mét de toevoeging uit het register; elke andere botsing is een
+# duplicaat en gaat via een samenvoegen-RfC.
+NAAMGENOTEN = {
+    "Q128804255": "Inge van Dijk (VVD, burgemeester van Mook en Middelaar sinds 2024, geboren 1984) is niet "
+                  "de knoop Inge van Dijk (CDA, Tweede Kamerlid sinds 2021): Wikidata P39/P102 en de open "
+                  "data van de Tweede Kamer",
+}
 
 
 def registersleutel(rec: dict, org: dict, naam: dict) -> tuple | None:
@@ -107,10 +124,49 @@ def met_model(treffers: list[dict], conn) -> Counter:
             tel["QID al bij een andere knoop"] += 1
             t["let_op"] = f"QID hoort al bij #{wd_bezet[t['qid']]}"
         elif sleutel(t["naam_wikidata"]) in alle and alle[sleutel(t["naam_wikidata"])] != eid:
-            tel["volledige naam is al van een andere knoop"] += 1
-            t["let_op"] = f"naam bestaat al: #{alle[sleutel(t['naam_wikidata'])]}"
+            if t["qid"] in NAAMGENOTEN:
+                tel["naamgenoot: hernoemen met de toevoeging"] += 1
+                t["naamgenoot"] = NAAMGENOTEN[t["qid"]]
+                t["hernoemen"] = True
+            else:
+                tel["volledige naam is al van een andere knoop (duplicaat: samenvoegen)"] += 1
+                t["let_op"] = f"naam bestaat al: #{alle[sleutel(t['naam_wikidata'])]}"
+        elif t["naam_model"] == t["naam_wikidata"]:
+            tel["heeft de volledige naam al"] += 1
         else:
             tel["klaar om te hernoemen"] += 1
+            t["hernoemen"] = True
+    return tel
+
+
+def indienen(treffers: list[dict], rest, uitgave_wd: str, hernoemen: bool, log=print) -> Counter:
+    """QID's aan de knopen hangen en (met `hernoemen`) de naam laten wijzigen, via de REST-API
+    onder register-import. `rest(methode, pad, body)` → (status, json)."""
+    tel = Counter()
+    for t in treffers:
+        eid = t.get("entity_id")
+        if not eid or (t.get("let_op") or "").startswith("QID hoort al"):
+            tel["QID: overgeslagen (geen knoop of QID bezet)"] += 1
+            continue
+        status, res = rest("POST", f"/api/entities/{eid}/register",
+                           {"externe_ids": [{"stelsel": "wikidata", "waarde": t["qid"]}],
+                            "reden": f"Wikidata-naam bij het register (uitgave {uitgave_wd})"})
+        if status != 200:
+            tel[f"QID: fout {status}"] += 1
+            log(f"  ✗ QID {t['qid']} → #{eid}: {status} {res.get('error')}")
+            continue
+        tel["QID: gezet" if res.get("gewijzigd") else "QID: had hem al"] += 1
+        if not (hernoemen and t.get("hernoemen")):
+            continue
+        status, res = rest("POST", f"/api/entities/{eid}/registernaam",
+                           {"stelsel": "wikidata", "waarde": t["qid"], "uitgave": uitgave_wd})
+        if status != 200:
+            tel[f"naam: geweigerd {status}"] += 1
+            log(f"  ✗ naam #{eid} '{t['naam_model']}': {status} {res.get('error')}")
+            continue
+        tel["naam: droogloop (server)" if res.get("droog") else "naam: gewijzigd"] += 1
+        if "(" in res.get("nieuw", ""):
+            tel["naam: met toevoeging (naamgenoot)"] += 1
     return tel
 
 
@@ -118,6 +174,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--uitgave-oo")
     ap.add_argument("--uitgave-wikidata")
+    ap.add_argument("--indienen", action="store_true", help="QID's aan de knopen hangen (register-import)")
+    ap.add_argument("--hernoemen", action="store_true",
+                    help="met --indienen: ook de naam (de server toetst; droogloop tenzij PROPAGANDA_REGISTERNAAM=1)")
+    ap.add_argument("--api", default=API)
     a = ap.parse_args()
     oo_data = oo.lees(oo.pad_van(a.uitgave_oo) if a.uitgave_oo else oo.uitgaven()[-1])
     wd = wikidata.lees(wikidata.pad_van(a.uitgave_wikidata) if a.uitgave_wikidata else wikidata.uitgaven()[-1])
@@ -129,7 +189,14 @@ def main():
     print(json.dumps({"uitgave_oo": oo_data["uitgave"], "uitgave_wikidata": wd["uitgave"],
                       "register": dict(sorted(uit["tel"].items())), "model": dict(model)},
                      ensure_ascii=False, indent=1))
-    print(f"\n(droogloop — niets gewijzigd; zie {pad})")
+    if not a.indienen:
+        print(f"\n(droogloop — niets gewijzigd; zie {pad})")
+        return
+    if not TOKEN.exists():
+        sys.exit(f"Token ontbreekt: {TOKEN}")
+    from naar_model import Rest
+    tel = indienen(uit["treffers"], Rest(TOKEN.read_text().strip(), a.api), wd["uitgave"], a.hernoemen)
+    print(json.dumps(tel, ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":

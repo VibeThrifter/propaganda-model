@@ -68,11 +68,13 @@ def _afkorting(tekst: str) -> bool:
     return " " not in tekst.strip() and sum(c.isupper() for c in tekst) >= 2
 
 
-def namen_van(naam: str) -> list[str]:
+def namen_van(naam: str, afkorting: str | None = None) -> list[str]:
     """Sleutels waaronder een organisatie in vrije tekst genoemd kan zijn: de hele naam, de naam
     zonder toevoeging tussen haakjes, en de toevoeging zelf alleen als het om een afkorting gaat
     ('Centraal Planbureau (CPB)', 'CPB (Centraal Planbureau)'). Een omschrijving zoals in
-    'HUMAN (omroep)' of 'ISGA (Universiteit Leiden)' is geen naam van die organisatie."""
+    'HUMAN (omroep)' of 'ISGA (Universiteit Leiden)' is geen naam van die organisatie.
+    `afkorting` (entities.metadata.afkorting, 2026-10-14) telt mee onder dezelfde regel als een
+    afkorting tussen haakjes: minstens drie tekens ('OM' is in vrije tekst het woord 'om')."""
     uit = [sleutel(naam)]
     m = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", naam or "")
     if m:
@@ -80,13 +82,83 @@ def namen_van(naam: str) -> list[str]:
         uit.append(sleutel(hoofd))
         if (_afkorting(hoofd) or _afkorting(toevoeging)) and len(sleutel(toevoeging)) >= 3:
             uit.append(sleutel(toevoeging))
+    if afkorting and len(sleutel(afkorting)) >= 3:
+        uit.append(sleutel(afkorting))
     return [u for u in dict.fromkeys(uit) if u]
 
 
-def noemt(tekst: str, naam: str) -> bool:
+def noemt(tekst: str, naam: str, afkorting: str | None = None) -> bool:
     """Staat de organisatie (een van namen_van) als hele woorden in de tekst?"""
     t = f" {sleutel(tekst)} "
-    return any(f" {n} " in t for n in namen_van(naam))
+    return any(f" {n} " in t for n in namen_van(naam, afkorting))
+
+
+# ── Afkortingen (entities.metadata.afkorting, eigenaarsbesluit 2026-10-14) ───
+# Het model kent geen aliassen; een organisatie die het nieuws bij haar afkorting noemt (RWS,
+# IND, CJIB, NVWA) is vindbaar via metadata.afkorting. Een afkorting is van één organisatie:
+# botst ze met een andere levende knoop (naam, afkorting tussen haakjes of eigen afkorting),
+# dan krijgt geen van beide haar (AP = Associated Press, NH = de omroep, RvS ~ RVS).
+def _haakjes(naam: str | None) -> tuple[str, str] | None:
+    m = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", naam or "")
+    return (m.group(1), m.group(2)) if m else None
+
+
+def afkorting_sleutels(naam: str | None, afkorting: str | None = None) -> set[str]:
+    """Alle sleutels waarmee deze knoop kort genoemd kan worden, voor de botsingsregel: de naam,
+    de naam zonder haakjes, wat tussen haakjes staat (ook korter dan drie tekens, maar alleen als
+    één van beide een afkorting is) en de eigen afkorting."""
+    uit = {sleutel(naam)}
+    h = _haakjes(naam)
+    if h:
+        uit.add(sleutel(h[0]))
+        if _afkorting(h[0]) or _afkorting(h[1]):
+            uit.add(sleutel(h[1]))
+    if afkorting:
+        uit.add(sleutel(afkorting))
+    return {u for u in uit if u}
+
+
+def _initialen(naam: str) -> str:
+    return "".join(w[:1] for w in sleutel(naam).split())
+
+
+def _deelreeks(kort: str, lang: str) -> bool:
+    it = iter(lang)
+    return all(c in it for c in kort)
+
+
+def geen_afkorting(afkorting: str | None, naam: str) -> str | None:
+    """Is dit een echte afkorting die nog niet in de naam staat? None = ja; anders de reden.
+    Echt: één woord, en minstens twee hoofdletters/cijfers ('NVWA', 'CvdM', 'aCBG') of de letters
+    volgen de beginletters van de naam ('Ctgb', 'Rli'). Niet: de naam zelf (een gemeente heeft haar
+    naam als 'afkorting'), een omschrijving ('DG Douane', 'Nederlands Filmfonds') of iets wat al
+    in de naam staat ('Centraal Planbureau (CPB)')."""
+    afk = schoon(afkorting)
+    if not afk:
+        return "geen afkorting"
+    k = sleutel(afk)
+    if not k or k == sleutel(naam):
+        return "afkorting is de naam zelf"
+    if k in afkorting_sleutels(naam) or f" {k} " in f" {sleutel(naam)} ":
+        return "staat al in de naam"
+    if " " in afk or len(afk) > 15:
+        return "geen afkorting (meer woorden)"
+    hoofdletters = sum(c.isupper() or c.isdigit() for c in afk)
+    if hoofdletters < 2 and not _deelreeks(k.replace(" ", ""), _initialen(naam)):
+        return "geen afkorting (volgt de naam niet)"
+    return None
+
+
+def afkorting_botst(afkorting: str, eid: int | None, entiteiten) -> str | None:
+    """Botst deze afkorting met een andere levende knoop? `entiteiten`: (id, naam, afkorting)
+    van de levende knopen (niet vervangen, niet afgewezen). None = vrij; anders de reden."""
+    k = sleutel(afkorting)
+    for i, naam, eigen in entiteiten:
+        if i == eid:
+            continue
+        if k in afkorting_sleutels(naam, eigen):
+            return f"botst met #{i} '{naam}'"
+    return None
 
 
 # ── Namen uit het register ontleden ─────────────────────────────────────────

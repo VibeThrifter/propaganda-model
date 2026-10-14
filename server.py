@@ -2963,6 +2963,44 @@ def _externe_ids_bezet(conn, ext, behalve=None):
     return bezet
 
 
+def _registers_module(naam):
+    """Een module uit tools/registers/ (common, wikidata): dezelfde naamregels als de
+    registerpijplijn. Pas bij gebruik geladen; de map staat niet standaard op het pad."""
+    pad = str(ROOT / "tools" / "registers")
+    if pad not in sys.path:
+        sys.path.insert(0, pad)
+    import importlib
+    return importlib.import_module(naam)
+
+
+def _metadata_van(waarde):
+    try:
+        meta = json.loads(waarde) if waarde else {}
+    except (TypeError, ValueError):
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def _levende_namen(conn):
+    """(id, naam, afkorting) van elke levende knoop (niet vervangen, niet afgewezen)."""
+    return [(r["id"], r["name"], _metadata_van(r["metadata"]).get("afkorting"))
+            for r in conn.execute("SELECT id, name, metadata FROM entities "
+                                  "WHERE NOT vervangen AND status <> 'afgewezen'")]
+
+
+def _afkorting_reden(conn, eid, naam, afkorting):
+    """Mag deze knoop deze afkorting dragen (metadata.afkorting, eigenaarsbesluit 2026-10-14)?
+    None = ja; anders de reden. Een echte afkorting die niet al in de naam staat
+    (common.geen_afkorting) en die met geen andere levende knoop botst: niet met haar naam, een
+    afkorting tussen haakjes of haar eigen afkorting (common.afkorting_botst; AP = Associated
+    Press, NH = de omroep)."""
+    if not isinstance(afkorting, str):
+        return "afkorting moet tekst zijn"
+    common = _registers_module("common")
+    return (common.geen_afkorting(afkorting, naam)
+            or common.afkorting_botst(afkorting.strip(), eid, _levende_namen(conn)))
+
+
 @app.route("/api/externe_ids", methods=["GET"])
 def api_externe_ids():
     """Opzoeken: ?stelsel=tooi[&waarde=oorg10212] of ?entity_id=123. Open, zoals alle GET's."""
@@ -2997,7 +3035,7 @@ def api_entity_register(eid):
     if g.user["username"] not in REGISTER_ACCOUNTS and not heeft_rol(conn, g.user, "maintainer"):
         conn.close()
         return jsonify({"error": "alleen de registerpijplijn of een maintainer"}), 403
-    rij = conn.execute("SELECT id, bestuurslaag, metadata, primary_role_id FROM entities "
+    rij = conn.execute("SELECT id, name, bestuurslaag, metadata, primary_role_id FROM entities "
                        "WHERE id = ?", (eid,)).fetchone()
     if not rij:
         conn.close()
@@ -3054,7 +3092,22 @@ def api_entity_register(eid):
         meta = json.loads(rij["metadata"]) if rij["metadata"] else {}
     except (TypeError, ValueError):
         meta = {}
-    nieuw = {k: v for k, v in meta_in.items() if k not in meta}
+    nieuw = {k: v for k, v in meta_in.items() if k not in meta and k != "afkorting"}
+    # De afkorting (2026-10-14): alleen als de knoop er nog geen heeft en ze met niets botst;
+    # anders overgeslagen met de reden (de rest van de koppeling gaat gewoon door).
+    overgeslagen = {}
+    afk = data.get("afkorting", meta_in.get("afkorting"))
+    if afk not in (None, ""):
+        if meta.get("afkorting"):
+            if (_registers_module("common").sleutel(meta["afkorting"])
+                    != _registers_module("common").sleutel(str(afk))):
+                overgeslagen["afkorting"] = f"heeft al de afkorting '{meta['afkorting']}'"
+        else:
+            reden = _afkorting_reden(conn, eid, rij["name"], afk)
+            if reden:
+                overgeslagen["afkorting"] = reden
+            else:
+                nieuw["afkorting"] = afk.strip()
     if nieuw:
         meta.update(nieuw)
         conn.execute("UPDATE entities SET metadata = ? WHERE id = ?",
@@ -3068,7 +3121,166 @@ def api_entity_register(eid):
               (data.get("reden") or "registerkoppeling (tools/registers)")[:300]))
     conn.commit()
     conn.close()
-    return jsonify({"entity_id": eid, "gewijzigd": gewijzigd})
+    antwoord = {"entity_id": eid, "gewijzigd": gewijzigd}
+    if overgeslagen:
+        antwoord["overgeslagen"] = overgeslagen
+    return jsonify(antwoord)
+
+
+# ── Volledige naam uit een register (eigenaarsbesluit 2026-10-14, "via de routes") ──────────
+# Het register van overheidsorganisaties noemt veel burgemeesters en wethouders alleen met
+# voorletters ("H.M.F. Bruls (burgemeester Nijmegen)"). Wikidata kent velen met hun volledige
+# naam (tools/registers/wikidata_namen.py). Een hernoemen-RfC per persoon zou de RfC-agents
+# (± 3 per uur) wekenlang bezetten; dit is de smalle, deterministische route: alleen het account
+# register-import, alleen een voorletternaam uit het register, alleen naar het label dat een
+# bewaarde Wikidata-uitgave (sha256 ongewijzigd) bij de QID van deze knoop geeft, en alleen als
+# dat label de achternaam en voorletters uit het register draagt en Wikidata deze persoon in
+# hetzelfde ambt in dezelfde gemeente kent. Gelogd in edit_log, terug te draaien ("terug").
+# Standaard een droogloop: pas met PROPAGANDA_REGISTERNAAM=1 wijzigt er iets.
+REGISTERNAAM_ACCOUNT = "register-import"
+REGISTERNAAM_REDEN = "registernaam:"
+
+
+def _registernaam_aan():
+    return os.environ.get("PROPAGANDA_REGISTERNAAM", "0") == "1"
+
+
+def _registernaam_plan(conn, ent, qid, uitgave):
+    """→ (nieuwe naam, None) of (None, (fout, http-status))."""
+    common = _registers_module("common")
+    wikidata = _registers_module("wikidata")
+    if ent["type"] != "persoon" or ent["vervangen"] or ent["status"] == "afgewezen":
+        return None, ("alleen een levende persoon", 400)
+    ids = {(r["stelsel"], r["waarde"]) for r in conn.execute(
+        "SELECT stelsel, waarde FROM externe_ids WHERE entity_id = ?", (ent["id"],))}
+    if ("wikidata", qid) not in ids:
+        return None, (f"{qid} hangt niet aan deze knoop; eerst POST /api/entities/{ent['id']}/register", 409)
+    if not any(s == "oo" and w.startswith("m:") for s, w in ids):
+        return None, ("geen ambtsdrager uit het register van overheidsorganisaties", 400)
+    # "P.C. van Maaren (burgemeester (waarnemend) Koggenland)": de toevoeging mag zelf haakjes dragen
+    m = re.match(r"^([^()]*?)\s*\((.*)\)\s*$", ent["name"])
+    basis, toevoeging = (m.group(1), m.group(2)) if m else (ent["name"], None)
+    naam = common.ontleed_naam(basis)
+    if not naam["voorletters"] or naam["volledig"]:
+        return None, ("de naam heeft al een voornaam (alleen voorletternamen)", 400)
+    if not uitgave or not DATUM_RE.fullmatch(uitgave):
+        return None, ("uitgave (JJJJ-MM-DD van de Wikidata-uitgave) is verplicht", 400)
+    pad = wikidata.pad_van(uitgave)
+    sha = pad.with_suffix(".sha256")
+    if not pad.exists() or not sha.exists():
+        return None, (f"Wikidata-uitgave {uitgave} staat niet lokaal", 400)
+    if sha.read_text().split()[0] != common.sha256_bestand(pad):
+        return None, (f"Wikidata-uitgave {uitgave} is gewijzigd (sha256)", 400)
+    wd = wikidata.lees(pad)
+    persoon = wd["personen"].get(qid)
+    if not persoon:
+        return None, (f"{qid} staat niet in de uitgave {uitgave}", 400)
+    label = persoon["naam"]
+    if not common.ontleed_naam(label)["volledig"]:
+        return None, (f"het Wikidata-label '{label}' heeft geen voornaam", 400)
+    # dezelfde eisen als wikidata.kandidaten en de registercheck (achternaam in de naam)
+    if (not wikidata._achternaam_past(label, naam) or not wikidata._voorletters_passen(persoon, label, naam)
+            or common.sleutel(naam["achternaam"] or "") not in common.sleutel(label)):
+        return None, (f"'{label}' past niet bij de registernaam '{basis}' (achternaam, voorletters)", 409)
+    # hetzelfde ambt in dezelfde gemeente: een ambt van deze knoop naar een gemeente (tooi gm…),
+    # en het Wikidata-ambt eindigde niet vóór het begin uit het register (zoals wikidata.kandidaten)
+    past = False
+    for r in conn.execute("""
+            SELECT r.functie, r.active_from, r.created_at, x.waarde FROM relations r
+            JOIN externe_ids x ON x.entity_id = r.target_id
+            WHERE r.source_id = ? AND r.relation_type = 'ambt' AND NOT r.vervangen
+              AND r.status <> 'afgewezen' AND x.stelsel = 'tooi'""", (ent["id"],)):
+        grens = r["active_from"] or (r["created_at"] or "")[:10]
+        soort, cbs = wikidata.soort_van(r["functie"] or ""), wikidata.cbs_van(r["waarde"])
+        past = past or any(a["qid"] == qid and a["soort"] == soort and a["cbs"] == cbs
+                           and not (a["eind"] and grens and a["eind"] < grens) for a in wd["ambten"])
+    if not past:
+        return None, ("Wikidata kent deze persoon niet in het ambt en de gemeente uit het register", 409)
+    # De naam is uniek (entities.name UNIQUE); bij een naamgenoot blijft de toevoeging uit het
+    # register staan ("Inge van Dijk (burgemeester Mook en Middelaar)")
+    levend = {common.sleutel(n): i for i, n, _ in _levende_namen(conn)}
+    for kandidaat in (label, f"{label} ({toevoeging})" if toevoeging else None):
+        if not kandidaat:
+            continue
+        bezet = conn.execute("SELECT id FROM entities WHERE name = ? AND id <> ?",
+                             (kandidaat, ent["id"])).fetchone()
+        ander = levend.get(common.sleutel(kandidaat))
+        if not bezet and ander in (None, ent["id"]):
+            return kandidaat, None
+    return None, (f"'{label}' is al de naam van een andere knoop (naamgenoot of duplicaat: "
+                  "samenvoegen gaat via een RfC)", 409)
+
+
+@app.route("/api/entities/<int:eid>/registernaam", methods=["POST"])
+@require_user()
+def api_entity_registernaam(eid):
+    """Voorletternaam → volledige naam uit Wikidata (zie hierboven). Body: {"waarde": QID,
+    "uitgave": "JJJJ-MM-DD", "verwacht": optioneel, "reden": optioneel} of {"terug": true,
+    "reden": …}. Zonder PROPAGANDA_REGISTERNAAM=1 (of met "droog": true) een droogloop."""
+    data = request.json or {}
+    conn = get_db()
+    terug = data.get("terug") is True
+    if g.user["username"] != REGISTERNAAM_ACCOUNT and not (terug and heeft_rol(conn, g.user, "maintainer")):
+        conn.close()
+        return jsonify({"error": f"alleen het account {REGISTERNAAM_ACCOUNT}"}), 403
+    ent = conn.execute("SELECT * FROM entities WHERE id = ?", (eid,)).fetchone()
+    if not ent:
+        conn.close()
+        return jsonify({"error": "entiteit niet gevonden"}), 404
+    droog = not _registernaam_aan() or data.get("droog") is True
+    reden = (data.get("reden") or "").strip()
+    if terug:
+        if not reden:
+            conn.close()
+            return jsonify({"error": "reden is verplicht"}), 400
+        log = conn.execute("""SELECT old_value, new_value FROM edit_log WHERE table_name = 'entities'
+                              AND record_id = ? AND action = 'updated' AND reason LIKE ?
+                              ORDER BY id DESC LIMIT 1""", (eid, REGISTERNAAM_REDEN + "%")).fetchone()
+        if not log:
+            conn.close()
+            return jsonify({"error": "deze knoop is niet via een register hernoemd"}), 409
+        oud, nieuw = json.loads(log["old_value"])["name"], json.loads(log["new_value"])["name"]
+        if ent["name"] != nieuw:
+            conn.close()
+            return jsonify({"error": f"de naam is sindsdien gewijzigd ('{ent['name']}')"}), 409
+        if conn.execute("SELECT 1 FROM entities WHERE name = ? AND id <> ?", (oud, eid)).fetchone():
+            conn.close()
+            return jsonify({"error": f"'{oud}' is inmiddels van een andere knoop"}), 409
+        if not droog:
+            conn.execute("UPDATE entities SET name = ? WHERE id = ?", (oud, eid))
+            conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value,
+                                                  new_value, reason)
+                            VALUES ('entities', ?, 'updated', ?, ?, ?, ?)""",
+                         (eid, g.user["username"], json.dumps({"name": nieuw}, ensure_ascii=False),
+                          json.dumps({"name": oud}, ensure_ascii=False),
+                          f"registernaam teruggedraaid: {reden}"[:300]))
+            conn.commit()
+        conn.close()
+        return jsonify({"id": eid, "oud": nieuw, "nieuw": oud, "droog": droog, "terug": True})
+    if (data.get("stelsel") or "wikidata") != "wikidata":
+        conn.close()
+        return jsonify({"error": "alleen stelsel wikidata geeft een naam"}), 400
+    qid = str(data.get("waarde") or "").strip()
+    uitgave = str(data.get("uitgave") or "").strip()
+    nieuwe, fout = _registernaam_plan(conn, ent, qid, uitgave)
+    if fout:
+        conn.close()
+        return jsonify({"error": fout[0]}), fout[1]
+    if data.get("verwacht") and data["verwacht"] != nieuwe:
+        conn.close()
+        return jsonify({"error": f"de server komt op '{nieuwe}'", "nieuw": nieuwe}), 409
+    if not droog:
+        conn.execute("UPDATE entities SET name = ? WHERE id = ?", (nieuwe, eid))
+        conn.execute("""INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value,
+                                              new_value, reason)
+                        VALUES ('entities', ?, 'updated', ?, ?, ?, ?)""",
+                     (eid, g.user["username"], json.dumps({"name": ent["name"]}, ensure_ascii=False),
+                      json.dumps({"name": nieuwe, "wikidata": qid}, ensure_ascii=False),
+                      f"{REGISTERNAAM_REDEN} wikidata {qid}, uitgave {uitgave}"
+                      f"{' — ' + reden if reden else ''}"[:300]))
+        conn.commit()
+    conn.close()
+    return jsonify({"id": eid, "oud": ent["name"], "nieuw": nieuwe, "droog": droog})
 
 
 DATUM_RE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
@@ -3344,6 +3556,16 @@ def create_entity():
         conn.close()
         return jsonify({"error": "externe id hoort al bij een andere entiteit",
                         "entity_id": bezet[0]["entity_id"], "bezet": bezet}), 409
+    # Een afkorting (metadata.afkorting, 2026-10-14) alleen als ze met niets botst; anders
+    # komt de knoop er zonder haar en zegt het antwoord waarom
+    afkorting_overgeslagen = None
+    if metadata and metadata.get("afkorting") not in (None, ""):
+        afkorting_overgeslagen = _afkorting_reden(conn, None, name, metadata["afkorting"])
+        metadata = dict(metadata)
+        if afkorting_overgeslagen:
+            del metadata["afkorting"]
+        else:
+            metadata["afkorting"] = metadata["afkorting"].strip()
     # Moderatiewachtrij: admin → meteen 'goedgekeurd'; ieder ander → 'voorgesteld'
     # (onzichtbaar in viz/scores tot een reviewer goedkeurt).
     status = "goedgekeurd" if heeft_rol(conn, g.user, "maintainer") else "voorgesteld"
@@ -3384,7 +3606,10 @@ def create_entity():
             WHERE e.id = ?
         """, (eid,)).fetchone()
         conn.close()
-        return jsonify(dict(row)), 201
+        antwoord = dict(row)
+        if afkorting_overgeslagen:
+            antwoord["afkorting_overgeslagen"] = afkorting_overgeslagen
+        return jsonify(antwoord), 201
 
     except sqlite3.IntegrityError as e:
         conn.close()
@@ -7337,11 +7562,19 @@ def _bewijs_entiteit_redenen(conn, eid):
     verwant |= {r["entity_id"] for r in conn.execute(
         """SELECT entity_id FROM arguments WHERE property = 'opgegaan_in' AND property_value = ?
            AND NOT vervangen AND status <> 'verworpen'""", (str(eid),))}
-    for ander in conn.execute("""SELECT id, name FROM entities
+    # Afkortingen (metadata.afkorting, 2026-10-14) tellen als naam: 'RWS' naast Rijkswaterstaat
+    # met afkorting RWS is dezelfde knoop
+    eigen_afk = _naam_sleutel(_metadata_van(rij["metadata"]).get("afkorting") or "")
+    for ander in conn.execute("""SELECT id, name, metadata FROM entities
                                  WHERE status = 'goedgekeurd' AND NOT vervangen AND id <> ?""",
                               (eid,)):
         if ander["id"] in verwant:
             continue
+        ander_afk = _naam_sleutel(_metadata_van(ander["metadata"]).get("afkorting") or "")
+        if (ander_afk and ander_afk == sleutel) or (eigen_afk and eigen_afk == _naam_sleutel(ander["name"])):
+            redenen.append(f"zelfde naam als de afkorting van bestaande entiteit #{ander['id']} "
+                           f"'{ander['name']}' — koppelen in plaats van dupliceren")
+            break
         if met_id:
             if _naam_sleutel(ander["name"]) == sleutel:
                 redenen.append(f"zelfde naam als bestaande entiteit #{ander['id']} "

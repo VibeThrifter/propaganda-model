@@ -28,11 +28,10 @@ het onafhankelijke A1-oordeel.
 | Tweede Kamer, open data (`gegevensmagazijn.tweedekamer.nl/OData/v4/2.0`) | `tk.py` → `tk_naar_model.py` | `data/registers/tk/tk_<datum>.json` | de zittende Kamerleden (`ambt`/`kamerzetel` met de Tweede Kamer, fractie als `lidmaatschap`/`partijlijn`; een fractie die geen landelijke partij is, zoals 'Groep Markuszower', als eigen partijknoop met `DatumActief`), hun vaste commissiezetels in de controlerende commissies (`ambt`/`kamerzetel` met '<commissie> (Tweede Kamer)', Van/TotEnMet; geen contactgroepen en delegaties), hun lopende nevenfuncties (`nevenfunctie_verstrengeling`), hun loopbaan (`draaideurconstructie`), reizen die een ander betaalde en geschenken (`geschenk`/`geschenk_en_gastvrijheid`, sinds 2023-11-22) |
 | Europees Parlement, open data (`data.europarl.europa.eu/api/v2`) | `ep.py` → `ep_naar_model.py` | `data/registers/ep/ep_<datum>.json` | de zittende Nederlandse Europarlementariërs (`ambt`/`kamerzetel` met het Europees Parlement, externe id `ep_mep`; het parlement zelf heeft wikidata:Q8889) en hun nationale partij (`lidmaatschap`/`partijlijn`) |
 | SER, "Wie zitten er in de SER?" (`ser.nl`, html) | `ser.py` → `ser_naar_model.py` | `data/registers/ser/ser_<datum>.html` | de werkgevers- en werknemersorganisaties met zetels (`lidmaatschap`/`polderoverleg` → SER, het aantal zetels als functie, rol `sociale_partner` erbij). Geen personen: de pagina noemt geen datum per persoon. Geen begin: `register_zonder_datum`. Nieuwe organisatie alleen met de hand getypeerd (`koppelingen.json`, `ser_organisaties`: de VCP). |
-| Wikidata SPARQL (`query.wikidata.org`) | `wikidata.py` → `wikidata_namen.py` (droogloop), `naar_model.py` | `data/registers/wikidata/wikidata_<datum>.json` | geen feiten, alleen naam en QID: burgemeesters en wethouders (P39 met een ambt onder Q13423499/Q20748682, P1001 gemeente, P382 CBS-code). Een registernaam met alleen een achternaam koppelt bij precies één passende persoon (zelfde gemeente, functie, achternaam, ambt loopt); `wikidata_namen.py` meldt welke voorletternamen eenduidig een volledige naam krijgen (hernoemen = maintainer). |
+| Wikidata SPARQL (`query.wikidata.org`) | `wikidata.py` → `wikidata_namen.py` (droogloop), `naar_model.py` | `data/registers/wikidata/wikidata_<datum>.json` | geen feiten, alleen naam en QID: burgemeesters en wethouders (P39 met een ambt onder Q13423499/Q20748682, P1001 gemeente, P382 CBS-code). Een registernaam met alleen een achternaam koppelt bij precies één passende persoon (zelfde gemeente, functie, achternaam, ambt loopt); `wikidata_namen.py` meldt welke voorletternamen eenduidig een volledige naam krijgen; met `--indienen` hangt `register-import` de QID aan de knoop en met `--hernoemen` vraagt hij de naam aan via `POST /api/entities/<id>/registernaam` (zie hieronder). |
 | Lobbyistenregister van de Tweede Kamer (pdf op `tweedekamer.nl/contact_en_bezoek/lobbyisten`) | `lobby.py` → `lobby_naar_model.py` | `data/registers/lobby/lobby_<bijgewerkt>.pdf` | elke organisatie met een vaste toegangspas, en de opdrachtgevers die al in het model staan (`lobbyt` → Tweede Kamer, `lobbytoegang`). De tabel wordt gelezen uit de woordposities (PyMuPDF); de lobbyisten zelf worden geen knoop. Werkgevers zonder rechtsvorm in de naam zijn met de hand getypeerd in `koppelingen.json` (`lobby_organisaties`). |
 
-Nog te doen (plan fase 3f): subsidies (de download van Rijksfinanciën geeft nu 404); de
-hernoeming van voorletternamen naar hun Wikidata-naam (een maintainer, zie `wikidata_namen.py`);
+Nog te doen (plan fase 3f): subsidies (de download van Rijksfinanciën geeft nu 404);
 gemeenschappelijke regelingen (veiligheidsregio's, GGD's, omgevingsdiensten: het register heeft
 de deelnemers met toetredingsdatum, maar er is nog geen mechanisme voor gemeente → regeling).
 
@@ -53,6 +52,7 @@ python3 tools/registers/ser.py haal && python3 tools/registers/ser_naar_model.py
 
 python3 tools/registers/wikidata.py haal     # namen en QID's (geen feiten); naar_model.py gebruikt de nieuwste
 python3 tools/registers/wikidata_namen.py    # droogloop: welke voorletternamen eenduidig een volledige naam krijgen
+python3 tools/registers/wikidata_namen.py --indienen [--hernoemen]   # QID's (en namen) via de REST-API
 
 python3 scripts/registercheck.py [--droog]  # draait ook elk uur als stap 2b van de automatische beoordeling
 python3 scripts/test_registers.py           # verse DB + fixtures, de hele keten (exit 0 = groen)
@@ -90,6 +90,29 @@ Een tweede run maakt niets dubbel (externe id's, bestaande verbanden worden over
   ministerie in zijn huidige vorm (EZK 2010-10-14) stuurt een ouder agentschap dus pas vanaf 2010
   aan. Een ontbrekend begin blijft ontbreken. De droogloop telt wat geklemd is en wat de
   bestaanspoort nog zou weigeren (`bestaan: …`).
+- **Afkortingen** (eigenaarsbesluit 2026-10-14). Het model heeft geen aliassen; de afkorting uit
+  het register gaat als `metadata.afkorting` mee (`/register` met `afkorting`, of `metadata` bij een
+  nieuwe knoop), zodat het nieuws RWS, IND of CJIB vindt. Alleen een echte afkorting die nog niet in
+  de naam staat (`common.geen_afkorting`; niet bij gemeenten, die hun naam als afkorting hebben, en
+  niet de provinciecodes), alleen als de knoop er nog geen heeft, en nooit als ze botst met een
+  andere levende knoop: haar naam, een afkorting tussen haakjes of haar eigen afkorting
+  (`common.afkorting_botst`: AP = 'AP (Associated Press)', RvS ~ 'RVS (…)'). Twee organisaties in
+  één uitgave met dezelfde afkorting (SBB) krijgen haar geen van beide. De server toetst hetzelfde
+  en meldt wat hij overslaat (`overgeslagen.afkorting`). Wie op naam matcht, leest haar mee:
+  `common.namen_van`/`noemt` (vanaf drie tekens), `tk_naar_model.py`, de bronzoeker en
+  datumzoeker, `scripts/scout_indienen.py`, de parkeercheck van de automatische beoordeling
+  ("zelfde naam als de afkorting van …") en de zoekbalk van de viz (`graph_data`).
+- **Volledige namen uit Wikidata** (2026-10-14, "via de routes"). Een hernoemen-RfC per persoon zou
+  de RfC-agents (± 3 per uur) weken bezetten. `POST /api/entities/<id>/registernaam` (alleen
+  `register-import`) wijzigt een voorletternaam deterministisch: de QID hangt al aan de knoop, de
+  knoop is een ambtsdrager uit het register (`oo` `m:…`), de bewaarde Wikidata-uitgave is
+  ongewijzigd (sha256), het label draagt de achternaam en voorletters uit het register en Wikidata
+  kent de persoon in hetzelfde ambt in dezelfde gemeente (niet geëindigd vóór het begin uit het
+  register). De toevoeging "(burgemeester …)" blijft alleen staan als de volledige naam al van een
+  andere knoop is (een nagegane naamgenoot, `wikidata_namen.NAAMGENOTEN`); een duplicaat gaat via
+  een samenvoegen-RfC. Gelogd in `edit_log` (`registernaam: wikidata Q…`), terug te draaien met
+  `{"terug": true, "reden": …}`. Zonder `PROPAGANDA_REGISTERNAAM=1` op de server een droogloop;
+  sinds 2026-10-14 staat de vlag aan in de launchd-plist van de server (eigenaarsbesluit). De registercheck blijft kloppen (hij toetst de achternaam en `m:…`).
 - **Privacy.** Alleen publieke ambtsdragers; geen raadsleden in bulk; privépersonen nooit; geen
   adressen of telefoonnummers.
 

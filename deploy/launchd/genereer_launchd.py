@@ -95,7 +95,9 @@ def bouw_server_plist():
         "Label": label,
         "ProgramArguments": [PY, str(ROOT / "server.py")],
         "WorkingDirectory": str(ROOT),
-        "EnvironmentVariables": {"PATH": PATH_ENV},
+        # De registernaam-route (volledige naam uit Wikidata, alleen register-import) schrijft
+        # alleen met deze vlag; eigenaarsbesluit 2026-10-14.
+        "EnvironmentVariables": {"PATH": PATH_ENV, "PROPAGANDA_REGISTERNAAM": "1"},
         "KeepAlive": True,
         "RunAtLoad": True,
         "StandardOutPath": str(LOGDIR / "server.out.log"),

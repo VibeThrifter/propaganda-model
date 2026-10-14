@@ -5720,6 +5720,7 @@ function computeVisibleLinks(negeerValentie) {
     const matchLegend = !legendSel.size || legendSel.has(legendKeyOf(n));
     // Zoeken matcht de weergavenaam én de ruwe snake_case-sleutel (W2.3).
     const matchSearch = !search || n.name.toLowerCase().includes(search)
+      || (n.afkorting && n.afkorting.toLowerCase().includes(search))
       || (n.key && n.key.toLowerCase().includes(search))
       || (n.description && n.description.toLowerCase().includes(search));
     const matchTime = isActiveAt(n, year);
