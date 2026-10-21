@@ -156,8 +156,13 @@ niet *"zoek bewijs dat NOS PBL napraat"*. Besteed evenveel moeite aan de andere 
 
 Lees de definitie van het mechanisme in het model. Twee voorbeelden waarbij een ander,
 **bestaand** mechanisme beter kan passen:
-- `expert_framing` beschrijft experts van denktanks die door sponsors betaald worden; een
-  planbureau van de overheid is iets anders.
+- `expert_framing` is de denktank **zélf** als bron: zijn rapport, cijfers, peiling, persbericht,
+  standpunt of mediapartnerschap. Een planbureau van de overheid is iets anders
+  (`institutioneel_gezag`). Gaat je bewijs over één medewerker die eigen duiding geeft
+  ("Clingendael-onderzoeker X in Nieuwsuur"), dan hoort het niet op instituut → medium. Het hoort
+  op persoon → medium (`expert_legitimatie`, `"namens"` = het instituut); zie missies/README.md
+  § "Instituut of persoon". Staat zulk bewijs al op het instituutsverband, dien het dan op het
+  persoonsverband in met reasoning `Overgezet van #<oud argument>`.
 - `bron_afhankelijkheid` gaat over structureel leunen op één bron, niet over één keer
   citeren.
 - Sinds 2026-10-07 hoort ook de besluitvorming in het model (categorieën `formele_macht`,
@@ -298,6 +303,14 @@ oprichting van de organisatie of de datum van het artikel. Vind je het echt niet
 zocht (`zonder_jaar`) of laat het verband weg — nooit een geraden jaartal; de datumzoeker zoekt
 verder. Een datum bij een bestaand verband: een aspect-argument (`property` `active_from`/
 `active_until`, `property_value` de datum). Zie missies/README.md § Looptijd.
+
+**Richting.** Een gericht verband wijst van wie de invloed uitoefent naar wie haar ondergaat
+(financier → ontvanger, eigenaar → bezit, zender → programma, expert → medium). Hoort iemand bij
+een organisatie (werkt voor, lid, bestuur, adviseur, woordvoerder, ambt, overstap), dan kies je het
+richtingloze type (`personeel`, `dienstverband`, `lidmaatschap`, `bestuurder`, `adviseur`,
+`woordvoerder_van`, `ambt`, `draaideur`) en nooit `beinvloeding`; twijfel je of de invloed één kant
+op gaat, dan is het geen gericht verband. De richtingtoets controleert elk voorstel. Zie
+missies/README.md § Richting.
 
 ## Harde grenzen
 

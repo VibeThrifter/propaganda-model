@@ -267,10 +267,25 @@ def main():
 
     mech_rfc = {"element_type": "mechanisme", "filter": "flak", "aard": "direct",
                 "source_role_id": 1, "target_role_id": 2,
+                "doelen": ["opinie"], "grondslag": "niet_officieel",
+                "mechanism_type": "psychologisch", "extra_filters": ["belangen"],
                 "definitie": "Testmechanisme bottom-up.", "effect": "Disciplineert.",
                 "freeze_test": "Zonder levende afzender dooft het — dus direct.",
                 "afgrenzing": "Anders dan publieke_aanval: informeel/privé.",
                 "falsificatiecriterium": "Geen gedocumenteerd geval.", "bronnen": ["F2-Bron"]}
+
+    # Uitbreiding D: een mechanisme-RfC zonder doel of grondslag is niet indienbaar.
+    zonder = {k: v for k, v in mech_rfc.items() if k not in ("doelen", "grondslag")}
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "nieuw_theorie_element", "titel": "Mechanisme zonder kenmerken",
+        "payload": dict(zonder, naam="f2_zonder_kenmerken", instantiaties=["t"])})
+    eis(r.status_code == 400 and any("doelen" in f for f in r.get_json()["fouten"])
+        and any("grondslag" in f for f in r.get_json()["fouten"]),
+        "mechanisme-RfC zonder doelen/grondslag → 400")
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "nieuw_theorie_element", "titel": "Mechanisme met onbekend doel",
+        "payload": dict(mech_rfc, naam="f2_onbekend_doel", doelen=["markt"], instantiaties=["t"])})
+    eis(r.status_code == 400, "onbekend doel → 400")
 
     # RfC adopteert de incuberende kandidaat → mechanism_id wordt gezet.
     r = c.post("/api/voorstellen", headers=kop["baas"], json={
@@ -290,7 +305,38 @@ def main():
     eis(conn.execute("SELECT mechanism_id FROM relations WHERE id = ?",
                      (kand_id,)).fetchone()[0] == mech_ad,
         "de geadopteerde kandidaat hangt nu aan het nieuwe mechanisme")
+    eis(conn.execute("SELECT grondslag, mechanism_type FROM mechanisms WHERE id = ?",
+                     (mech_ad,)).fetchone() == ("niet_officieel", "psychologisch")
+        and [d for (d,) in conn.execute("SELECT doel FROM mechanism_doelen WHERE mechanism_id = ?",
+                                        (mech_ad,))] == ["opinie"]
+        and {f for (f,) in conn.execute("SELECT filter FROM mechanism_filters WHERE mechanism_id = ?",
+                                        (mech_ad,))} == {"flak", "belangen"},
+        "aangenomen mechanisme draagt doel, grondslag, type en extra categorie uit de RfC")
     conn.close()
+
+    # Uitbreiding D: de indeling van een bestaand mechanisme wijzigt via 'herformuleren'.
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "herformuleren", "titel": "Grondslag en doel van f2_adoptiemechanisme",
+        "payload": {"element_type": "mechanisme", "element_id": mech_ad,
+                    "velden": {"doelen": ["beslissing", "opinie"], "grondslag": "officieel"},
+                    "motivatie": "test: de bron oefent een formele bevoegdheid uit"}})
+    eis(r.status_code == 201, f"herformuleren van doel/grondslag indienbaar ({r.status_code}: {r.get_json()})")
+    vid_hf = r.get_json()["id"]
+    c.post(f"/api/voorstellen/{vid_hf}/reviews", headers=kop["r1"], json={"oordeel": "akkoord"})
+    j = c.post(f"/api/voorstellen/{vid_hf}/reviews", headers=kop["r2"],
+               json={"oordeel": "akkoord"}).get_json()
+    conn = sqlite3.connect(tmp)
+    eis(j["besluit"] == "geaccepteerd"
+        and conn.execute("SELECT grondslag FROM mechanisms WHERE id = ?", (mech_ad,)).fetchone()[0] == "officieel"
+        and sorted(d for (d,) in conn.execute("SELECT doel FROM mechanism_doelen WHERE mechanism_id = ?",
+                                              (mech_ad,))) == ["beslissing", "opinie"],
+        "herformuleren zet doel en grondslag")
+    conn.close()
+    r = c.post("/api/voorstellen", headers=kop["baas"], json={
+        "soort": "herformuleren", "titel": "Zelfde indeling",
+        "payload": {"element_type": "mechanisme", "element_id": mech_ad,
+                    "velden": {"grondslag": "officieel"}, "motivatie": "test"}})
+    eis(r.status_code == 400, "herformuleren zonder wijziging → 400")
 
     # RfC creëert tegelijk een verse instantie → nieuwe 'voorgesteld'-relatie, influence-vloer.
     r = c.post("/api/voorstellen", headers=kop["baas"], json={
@@ -355,7 +401,8 @@ def main():
     samen = {"element_type": "mechanisme", "oud_ids": [1, 2],
              "doel": {"naam": "f2_fusiemechanisme", "definitie": "Samengevoegd testmechanisme.",
                       "filter": "eigendom", "effect": "Testeffect.", "aard": "direct",
-                      "source_role_id": 1, "target_role_id": 2},
+                      "source_role_id": 1, "target_role_id": 2,
+                      "doelen": ["opinie"], "grondslag": "officieel"},
              "motivatie": "Vrijwel identieke bron- en argumentverzamelingen (test).",
              "herbevestigd": {"argumenten": [901], "relaties": [1],
                               "instantiaties": [1], "padclaims": []}}
@@ -389,10 +436,12 @@ def main():
     print("8. M2.6 — splitsen: restlijst-poort, dan end-to-end")
     nieuwe = [{"naam": "f2_split_a", "definitie": "Deel A.", "filter": "eigendom",
                "effect": "Effect A.", "aard": "direct",
-               "source_role_id": 1, "target_role_id": 2},
+               "source_role_id": 1, "target_role_id": 2,
+               "doelen": ["opinie"], "grondslag": "officieel"},
               {"naam": "f2_split_b", "definitie": "Deel B.", "filter": "eigendom",
                "effect": "Effect B.", "aard": "direct",
-               "source_role_id": 1, "target_role_id": 2}]
+               "source_role_id": 1, "target_role_id": 2,
+               "doelen": ["beslissing"], "grondslag": "niet_officieel"}]
     onvolledig = {"element_type": "mechanisme", "oud_id": fusie_id, "nieuwe": nieuwe,
                   "motivatie": "Vermengt eigendom en redactie (test).",
                   "toewijzing": {"argumenten": {}, "relaties": {}, "instantiaties": {},
@@ -503,7 +552,7 @@ def main():
     rfc = {"soort": "nieuw_theorie_element", "titel": "Herzien-test", "payload": {
         "element_type": "mechanisme", "naam": "herzien_mech", "definitie": "d", "filter": "eigendom",
         "effect": "e", "aard": "direct", "source_role_id": 1, "target_role_id": 2,
-        "afgrenzing": "a", "falsificatiecriterium": "f", "freeze_test": "ft",
+        "doelen": ["opinie"], "grondslag": "officieel", "afgrenzing": "a", "falsificatiecriterium": "f", "freeze_test": "ft",
         "instantiaties": [{"source_id": 1, "target_id": 2, "relation_type": "eigendom",
                            "toelichting": "t"}], "bronnen": [{"titel": "b"}]}}
     vid = c.post("/api/voorstellen", headers=kop["bij"], json=rfc).get_json()["id"]

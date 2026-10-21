@@ -92,7 +92,7 @@ def export_data(conn):
     cur.execute("""
         SELECT r.id, r.source_id, r.target_id, r.relation_type,
                r.certainty, r.influence, r.bidirectional,
-               r.description, r.mechanism_id, r.status, r.functie,
+               r.description, r.mechanism_id, r.status, r.functie, r.namens_id,
                r.active_from, r.active_until,
                -- een afgelopen verband is niet meer actief, ook als de vlag het niet weet
                CASE WHEN r.active_until IS NOT NULL
@@ -168,6 +168,16 @@ def export_data(conn):
         # primair filter vooraan
         m['filters'] = [m['filter']] + [f for f in fs if f != m['filter']]
         m['themes'] = sorted(mech_themes.get(m['id'], []))
+
+    # Uitbreiding D (2026-10-15): waar de macht op werkt en of ze via een formele bevoegdheid loopt.
+    if cur.execute("SELECT 1 FROM sqlite_master WHERE name = 'mechanism_doelen'").fetchone():
+        mech_doelen = {}
+        for mid, doel in cur.execute("SELECT mechanism_id, doel FROM mechanism_doelen"):
+            mech_doelen.setdefault(mid, set()).add(doel)
+        grondslag = dict(cur.execute("SELECT id, grondslag FROM mechanisms"))
+        for m in mechanisms:
+            m['doelen'] = [d for d in ('beslissing', 'agenda', 'opinie') if d in mech_doelen.get(m['id'], ())]
+            m['grondslag'] = grondslag.get(m['id'])
 
     # Emergente effecten (hyperedge): een systeemeigenschap over MEERDERE rollen.
     # Optioneel — oudere DB's zonder de tabel leveren simpelweg een lege lijst.
@@ -423,3 +433,125 @@ def export_data(conn):
         'inkomsten': inkomsten,         # inkomstensamenstelling per outlet (donut, detailpaneel)
         'bereik': bereikmeter,          # bereikmeter: publieksbereik per jaar (node-grootte + detailpaneel)
     }
+
+
+# ── Compacte viz-lading (viz-2) ─────────────────────────────────────────────
+# De canvas-viz op / haalt niet de volledige graafdata (~25 MB) op maar deze
+# compacte variant: geen discussiebomen van de praktijklaag (die komen per
+# element via GET /api/graph_data/discussie), geen velden die de viz niet leest,
+# en wat de viz zelf kan afleiden (namen, mechanisme-velden) laat ze weg.
+# /api/graph_data zelf blijft ongewijzigd (deelbare, volledige graafdata).
+
+_ENTITEIT_WEG = {
+    'score_detail', 'toegekend_filter_category', 'filter_category_bron', 'filter_scores',
+    'influence_norm', 'influence_rank', 'influence_public_norm', 'influence_public_rank',
+    'influence_politiek_norm', 'influence_politiek_rank',
+}
+_RELATIE_WEG = {
+    'source_name', 'target_name', 'mechanism_name', 'mechanism_filter', 'aard',
+    'mechanism_filters', 'mechanism_themes', 'score_detail', 'influence_detail',
+}
+_THEORIE_DOELEN = ('role_id', 'mechanism_id', 'emergent_effect_id')
+
+
+def _subboom_ids(arguments, root_pred):
+    """Id's van de roots die aan root_pred voldoen plus al hun nakomelingen."""
+    kinderen = {}
+    for a in arguments:
+        if a.get('parent_argument_id'):
+            kinderen.setdefault(a['parent_argument_id'], []).append(a['id'])
+    ids, rij = set(), [a['id'] for a in arguments
+                       if not a.get('parent_argument_id') and root_pred(a)]
+    while rij:
+        x = rij.pop()
+        if x in ids:
+            continue
+        ids.add(x)
+        rij.extend(kinderen.get(x, []))
+    return ids
+
+
+def _arg_tellingen(arguments):
+    """{'relation': {id: [totaal, voor, tegen, context]}, 'entity': {...}} over de hele
+    subboom (roots op het doel + alle reacties), zoals countStances in de viz."""
+    by_id = {a['id']: a for a in arguments}
+    root_van = {}
+
+    def root(a):
+        gezien = set()
+        while a.get('parent_argument_id') and a['parent_argument_id'] in by_id \
+                and a['id'] not in gezien:
+            gezien.add(a['id'])
+            a = by_id[a['parent_argument_id']]
+        return a
+    tel = {'relation': {}, 'entity': {}}
+    for a in arguments:
+        r = root_van.get(a['id'])
+        if r is None:
+            r = root_van[a['id']] = root(a)
+        for soort, kol in (('relation', 'relation_id'), ('entity', 'entity_id')):
+            doel = r.get(kol)
+            if not doel:
+                continue
+            t = tel[soort].setdefault(doel, [0, 0, 0, 0])
+            t[0] += 1
+            st = a.get('stance')
+            t[1 if st == 'supporting' else 2 if st == 'contradicting' else 3] += 1
+    return tel
+
+
+def compact_viz(data):
+    """De compacte viz-lading (formaat viz-2) uit de dict van export_data."""
+    from datetime import datetime, timezone
+
+    entities = []
+    for e in data['entities']:
+        entities.append({k: v for k, v in e.items()
+                         if v is not None and k not in _ENTITEIT_WEG and not k.endswith('_veld')})
+    relations = [{k: v for k, v in r.items() if v is not None and k not in _RELATIE_WEG}
+                 for r in data['relations']]
+    theorie_ids = _subboom_ids(data['arguments'],
+                               lambda a: any(a.get(k) for k in _THEORIE_DOELEN))
+    arguments = [a for a in data['arguments'] if a['id'] in theorie_ids]
+    citations = [c for c in data['citations'] if c.get('argument_id') in theorie_ids]
+    instantiations = [[i['id'], i['role_id'], i['mechanism_id'], i['entity_id'],
+                       i['relation_id'], i['exemplarity']] for i in data['instantiations']]
+    return {
+        'formaat': 'viz-2',
+        'gegenereerd': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'entities': entities,
+        'relations': relations,
+        'roles': data['roles'],
+        'mechanisms': data['mechanisms'],
+        'emergent_effects': data['emergent_effects'],
+        'arguments': arguments,
+        'citations': citations,
+        'arg_tel': _arg_tellingen(data['arguments']),
+        'instantiations': instantiations,
+        'release': data['release'],
+        'kleurmeter': data['kleurmeter'],
+        'machtsvalentie': data['machtsvalentie'],
+        'doelgroep': data['doelgroep'],
+        'inkomsten': data['inkomsten'],
+        'bereik': data['bereik'],
+    }
+
+
+def discussie_tabellen(data):
+    """Kleine opzoektabellen voor GET /api/graph_data/discussie, uit dezelfde export:
+    τ/σ en veto-vlaggen per argument, en de score-details per relatie/entiteit."""
+    arg_scores = {}
+    for a in data['arguments']:
+        if a.get('sigma') is None:
+            continue
+        sc = {'tau': a.get('tau'), 'sigma': a['sigma']}
+        if a.get('admin_veto'):
+            sc['admin_veto'] = True
+        if a.get('geveto'):
+            sc['geveto'] = True
+        arg_scores[a['id']] = sc
+    rel_detail = {r['id']: {'score_detail': r.get('score_detail'),
+                            'influence_detail': r.get('influence_detail')}
+                  for r in data['relations']}
+    ent_detail = {e['id']: e.get('score_detail') for e in data['entities']}
+    return {'arg_scores': arg_scores, 'rel_detail': rel_detail, 'ent_detail': ent_detail}

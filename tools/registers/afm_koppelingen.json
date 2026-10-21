@@ -1,0 +1,27 @@
+{
+  "_uitleg": "Met de hand nagelopen koppelingen voor de AFM-registers (afm.py / afm_naar_model.py; de registercheck leest dezelfde lijst via afm.koppelingen). Sleutel = de naam zoals de AFM hem schrijft (ondernemingen, houders) of 'achternaam|voorletters' (personen, zie afm.persoonsleutel); waarde = entiteit-id in het model. Alleen toevoegen na controle dat het dezelfde rechtspersoon of persoon is, niet een dochter of moeder. 'houdersoorten': een houder die een administratiekantoor is zonder dat de naam het zegt.",
+  "ondernemingen": {
+    "_ASML": "ASML Holding N.V. is de genoteerde moeder van ASML (#77); 'Holding' staat niet in de rechtsvormlijst omdat Heineken Holding N.V. niet Heineken N.V. is",
+    "ASML Holding N.V.": 77,
+    "_AkzoNobel": "het model schrijft AkzoNobel aaneen",
+    "Akzo Nobel N.V.": 1126
+  },
+  "houders": {
+    "_APG": "APG (#841) is de pensioenuitvoerder; APG Algemene Pensioen Groep N.V. is die groep, APG Asset Management N.V. haar vermogensbeheerder",
+    "APG Algemene Pensioen Groep N.V.": 841,
+    "APG Asset Management N.V.": 841,
+    "Stichting Pensioenfonds Zorg en Welzijn PFZW": 3917,
+    "_Frankrijk": "de Franse Republiek; #5049 'Franse Staat' (nog voorgesteld)",
+    "The French Government": 5049
+  },
+  "personen": {
+    "_Gates": "W.H. Gates III = William Henry Gates III (Bill Gates, #4904)",
+    "gates|wh": 4904,
+    "_DeMol": "J.H.H. de Mol = Johannes Hendrikus Hubert de Mol (John de Mol, #19)",
+    "mol|jhh": 19
+  },
+  "houdersoorten": {
+    "_ING": "Stichting ING Aandelen was het administratiekantoor dat de certificaten van ING Groep uitgaf (tot 2016)",
+    "Stichting ING Aandelen": "administratiekantoor"
+  }
+}

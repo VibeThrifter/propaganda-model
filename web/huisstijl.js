@@ -66,6 +66,7 @@ async function hsBouwTopbal() {
     return a;
   };
   nav.append(link('/', 'Netwerk', 'netwerk'), link('/partijen', 'Partijen', 'partijen'),
+             link('/metingen', 'Metingen', 'metingen'),   // eigen metingen (2026-10-16)
              link('/overleg', 'Overleg', 'overleg'), link('/methode', 'Methode', 'methode'));
 
   bal.prepend(merk, nav);

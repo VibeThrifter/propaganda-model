@@ -144,3 +144,11 @@ zocht (`zonder_jaar`) of laat het verband weg — nooit een geraden jaartal; de 
 verder. Een datum bij een bestaand verband: een aspect-argument (`property` `active_from`/
 `active_until`, `property_value` de datum). Zie missies/README.md § Looptijd.
 
+**Richting.** Een gericht verband wijst van wie de invloed uitoefent naar wie haar ondergaat
+(financier → ontvanger, eigenaar → bezit, zender → programma, expert → medium). Hoort iemand bij
+een organisatie (werkt voor, lid, bestuur, adviseur, woordvoerder, ambt, overstap), dan kies je het
+richtingloze type (`personeel`, `dienstverband`, `lidmaatschap`, `bestuurder`, `adviseur`,
+`woordvoerder_van`, `ambt`, `draaideur`) en nooit `beinvloeding`; twijfel je of de invloed één kant
+op gaat, dan is het geen gericht verband. De richtingtoets controleert elk voorstel. Zie
+missies/README.md § Richting.
+

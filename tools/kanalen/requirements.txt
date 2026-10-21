@@ -1,0 +1,12 @@
+# Geïsoleerde dependencies voor de kanalen-monitor (YouTube-transcripts, X/Instagram/TikTok).
+# De kern (scripts/kanalen.py, ophalen.py voor RSS/Telegram) is pure stdlib.
+#
+#   /usr/local/bin/python3.12 -m venv tools/kanalen/.venv
+#   tools/kanalen/.venv/bin/pip install -r tools/kanalen/requirements.txt
+#   tools/kanalen/.venv/bin/playwright install chromium   # alleen voor X/Instagram/TikTok
+#
+# Python ≥ 3.10: nieuwe yt-dlp-versies (nodig voor YouTube) draaien niet meer op 3.9.
+# YouTube vraagt een JS-runtime; ophalen.py geeft `node` mee als die er is.
+yt-dlp[default]>=2026.1
+playwright==1.60.0       # nieuwer ondersteunt macOS 13 niet
+faster-whisper>=1.2      # podcasts lokaal transcriberen

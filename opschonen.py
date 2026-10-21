@@ -14,6 +14,8 @@ hetzelfde feit draagt, in een periode die overlapt (twee aparte termijnen zijn t
      mechanisme het vaakst heeft.
 Een band met een ander mechanisme is een ander feit (bv. een draaideur naar een ambt: wie waar
 vandaan kwam) en blijft; of dat mechanisme klopt, is een vraag voor de agents, geen regel hier.
+Een andere pet ook (``namens_id``, 2026-10-19): Korteweg namens Clingendael en Korteweg namens
+Chatham House bij hetzelfde medium zijn twee feiten.
 Het blijvende verband moet zelf gedragen zijn (een eigen bron, of een registerregel). Een
 registerfeit gaat voor, dan wat een bron draagt, dan het oudste. Wat een mens goedkeurde, blijft
 staan. Het dubbele verband wordt afgewezen; zijn discussieboom gaat mee (terug te halen), en een
@@ -23,10 +25,20 @@ Dubbele bronnen. Twee bronnen met dezelfde url (zonder schema, www, slash op het
 en tracking-parameters) zijn één bron: de oudste blijft, citaties, vermeldingen, locaties en
 oordelen verhuizen, de dubbele verdwijnt. Eén pagina telt zo nooit als meer onafhankelijke
 bewijslijnen (M1.2). ``POST /api/sources`` hergebruikt een bron met dezelfde url voortaan.
+
+Overgezet (eigenaarsbesluit 2026-10-19, instituut of persoon). Een optreden staat op precies één
+verband. Wie het bewijs naar het preciezere verband brengt (van instituut → medium naar
+persoon → medium, of omgekeerd voor wie namens het instituut spreekt), dient het daar opnieuw in
+met als reasoning "Overgezet van #<oud argument>". Zodra die opvolger gemerged is, zijn verband
+goedgekeurd en de band tussen persoon en organisatie goedgekeurd, gaat het oude argument op
+'verouderd' + vervangen; draagt het oude verband dan geen eigen bewijs meer, dan wordt het
+afgewezen (ook wat een mens goedkeurde: het bewijs verdwijnt niet, het staat op het preciezere
+verband; terug te draaien met heraanmelden). Een registerfeit nooit.
 """
 from __future__ import annotations
 
 import json
+import re
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 # Banden die niets anders zeggen dan dat een persoon ergens bij hoort of voor werkt
@@ -111,6 +123,11 @@ def _richting_telt(conn, mech_id, bron_is_persoon) -> int:
           AND (s.type = 'persoon') = ?""", (mech_id, 1 if bron_is_persoon else 0)).fetchone()[0]
 
 
+def _namens(rij):
+    """De hoedanigheid van een verband (namens_id), ook op een database van vóór de kolom."""
+    return rij["namens_id"] if "namens_id" in rij.keys() else None
+
+
 def dubbel_kandidaten(conn, rid):
     """Levende, goedgekeurde verbanden die met verband ``rid`` hetzelfde feit kunnen dragen,
     met de regel die het zegt: [(rij, regel)]."""
@@ -128,7 +145,7 @@ def dubbel_kandidaten(conn, rid):
             continue
         zelfde_richting = r["source_id"] == rel["source_id"]
         if (zelfde_richting and r["relation_type"] == rel["relation_type"]
-                and r["mechanism_id"] == rel["mechanism_id"]):
+                and r["mechanism_id"] == rel["mechanism_id"] and _namens(r) == _namens(rel)):
             uit.append((r, "zelfde paar, type en mechanisme"))
         elif zelfde_richting and r["bron_type"] == "persoon" and (
                 {r["relation_type"], rel["relation_type"]} & {"ambt"}
@@ -200,6 +217,117 @@ def dubbele_verbanden(conn, limiet=None) -> list[int]:
         ORDER BY r.id DESC""").fetchall()
     ids = [r[0] for r in rijen]
     return ids[:limiet] if limiet else ids
+
+
+# ------------------------------------------------------------------ overgezet
+OVERGEZET = "Overgezet van #{id}"
+OVERGEZET_REDEN = "automatische beoordeling: overgezet"
+# "Overgezet van #12", of meer oude argumenten tegelijk: "Overgezet van #12, #13 en #14"
+_OVERGEZET_RE = re.compile(r"^Overgezet van (#\d+(?:\s*(?:,|en)\s*#\d+)*)(?!\d)")
+# Een opvolger telt als hij gemerged is en zijn bron hem draagt (geen 'klopt-niet')
+_OPVOLGER_STATUS = ("ongecontroleerd", "geverifieerd")
+_LEVEND = ("ongecontroleerd", "geverifieerd", "betwist", "bronvermelding_nodig")
+
+
+def overgezet_van(reasoning) -> list[int]:
+    """De ids uit "Overgezet van #<id>[, #<id> … en #<id>] …" (leeg als de marker ontbreekt)."""
+    m = _OVERGEZET_RE.match((reasoning or "").strip())
+    return [int(x) for x in re.findall(r"#(\d+)", m.group(1))] if m else []
+
+
+def _band_tussen(conn, a, b) -> bool:
+    """Hebben deze twee entiteiten een goedgekeurde, richtingloze band (persoon en organisatie)?"""
+    import via_medewerkers  # repo-root, stdlib (lazy: de module importeert looptijd en vocab)
+    return conn.execute(f"""
+        SELECT 1 FROM relations r JOIN entities x ON x.id = r.source_id JOIN entities y ON y.id = r.target_id
+        WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
+          AND r.relation_type IN ({','.join('?' * len(via_medewerkers.BAND_TYPES))})
+          AND ((r.source_id = ? AND r.target_id = ?) OR (r.source_id = ? AND r.target_id = ?))
+          AND (x.type = 'persoon') <> (y.type = 'persoon') LIMIT 1""",
+                        (*via_medewerkers.BAND_TYPES, a, b, b, a)).fetchone() is not None
+
+
+def _opvolger(conn, arg, rel):
+    """De gemergede opvolger ("Overgezet van #arg") op een goedgekeurd verband met hetzelfde
+    medium (als doel, of als bron bij een columnistplek: medium → persoon), vanaf de persoon of
+    de organisatie aan de andere kant van een goedgekeurde band, of None. A1 'klopt-niet' op de
+    opvolger telt niet."""
+    m = rel["target_id"]
+    for o in conn.execute(f"""
+            SELECT a.id, a.reasoning, a.relation_id,
+                   CASE WHEN r.target_id = ? THEN r.source_id ELSE r.target_id END AS ander
+            FROM arguments a JOIN relations r ON r.id = a.relation_id
+            WHERE a.reasoning LIKE ? AND a.parent_argument_id IS NULL AND NOT a.vervangen
+              AND a.stance = 'supporting' AND a.status IN ({','.join('?' * len(_OPVOLGER_STATUS))})
+              AND r.status = 'goedgekeurd' AND NOT r.vervangen AND r.id <> ?
+              AND (r.target_id = ? OR r.source_id = ?)
+            ORDER BY a.id""", (m, f"Overgezet van %#{arg['id']}%", *_OPVOLGER_STATUS, rel["id"], m, m)):
+        if arg["id"] not in overgezet_van(o["reasoning"]):
+            continue
+        a1 = conn.execute("""SELECT verdict FROM immuun_oordelen WHERE argument_id = ?
+                             AND fase = 'herverificatie' ORDER BY created_at DESC, id DESC LIMIT 1""",
+                          (o["id"],)).fetchone()
+        if a1 is not None and a1["verdict"] == "klopt-niet":
+            continue
+        if o["ander"] != rel["source_id"] and _band_tussen(conn, o["ander"], rel["source_id"]):
+            return o
+    return None
+
+
+def overgezet_besluit(conn, rid):
+    """Mag de automatische beoordeling het overgezette bewijs van verband ``rid`` laten opgaan in
+    zijn opvolgers? → (ok, redenen waarom niet, motivatie, info) met info = {"overgezet":
+    [{argument_id, opvolger_id, relation_id}], "afwijzen": bool}."""
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rel is None:
+        return False, ["niet gevonden"], None, {}
+    redenen = []
+    if rel["status"] != "goedgekeurd" or rel["vervangen"]:
+        redenen.append(f"status is '{rel['status']}' — alleen goedgekeurde verbanden")
+    if _registerfeit(conn, rid):
+        redenen.append("registerfeit: het register draagt dit verband")
+    if redenen:
+        return False, redenen, None, {}
+    levend = conn.execute(f"""
+        SELECT * FROM arguments WHERE relation_id = ? AND parent_argument_id IS NULL AND NOT vervangen
+          AND stance = 'supporting' AND COALESCE(property, 'existence') = 'existence'
+          AND status IN ({','.join('?' * len(_LEVEND))}) ORDER BY id""", (rid, *_LEVEND)).fetchall()
+    overgezet = []
+    for a in levend:
+        o = _opvolger(conn, a, rel)
+        if o is not None:
+            overgezet.append({"argument_id": a["id"], "opvolger_id": o["id"],
+                              "relation_id": o["relation_id"]})
+    if not overgezet:
+        return False, ["geen gemergede opvolger op een goedgekeurd verband (met een goedgekeurde "
+                       "band tussen persoon en organisatie)"], None, {}
+    afwijzen = len(overgezet) == len(levend)
+    lijst = ", ".join(f"#{x['argument_id']} → #{x['opvolger_id']} (verband #{x['relation_id']})"
+                      for x in overgezet)
+    motivatie = (f"{OVERGEZET_REDEN}: het bewijs staat op het verband van de persoon of zijn "
+                 f"organisatie (eigenaarsbesluit 2026-10-19, instituut of persoon): {lijst}"
+                 + ("; dit verband draagt geen eigen bewijs meer" if afwijzen else ""))
+    return True, [], motivatie, {"overgezet": overgezet, "afwijzen": afwijzen}
+
+
+def overgezet_kandidaten(conn) -> list[int]:
+    """Goedgekeurde verbanden met een levend argument dat een gemergede opvolger kreeg (de
+    server beslist, met dezelfde voorwaarden)."""
+    oud = set()
+    for (reasoning,) in conn.execute("""
+            SELECT a.reasoning FROM arguments a JOIN relations r ON r.id = a.relation_id
+            WHERE a.reasoning LIKE 'Overgezet van #%' AND a.parent_argument_id IS NULL
+              AND NOT a.vervangen AND a.status IN ('ongecontroleerd', 'geverifieerd')
+              AND r.status = 'goedgekeurd' AND NOT r.vervangen"""):
+        oud.update(overgezet_van(reasoning))
+    if not oud:
+        return []
+    ids = sorted(oud)
+    rijen = conn.execute(f"""
+        SELECT DISTINCT a.relation_id FROM arguments a JOIN relations r ON r.id = a.relation_id
+        WHERE a.id IN ({','.join('?' * len(ids))}) AND NOT a.vervangen AND a.parent_argument_id IS NULL
+          AND r.status = 'goedgekeurd' AND NOT r.vervangen ORDER BY a.relation_id""", ids).fetchall()
+    return [r[0] for r in rijen]
 
 
 # ------------------------------------------------------------------ bronnen

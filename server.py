@@ -7,15 +7,18 @@ import csv
 import datetime
 import difflib
 import functools
+import gzip
 import hashlib
 import hmac
 import html
 import json
 import os
 import io
+import pickle
 import re
 import sqlite3
 import sys
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -30,6 +33,7 @@ import doelgroep  # welstandsmeter: getargette marketing-/welstandsklasse per ou
 import bereik  # bereikmeter: gesourcet publieksbereik (kijkers/lezers/invullers) per jaar
 import partijen  # partijnetwerk: wie aan welke partij verbonden is en welke posities die mensen bekleden
 import looptijd  # tijdsvakken: een verband loopt niet buiten het bestaan van zijn eindpunten; fusies
+import metingen  # eigen metingen: vooraf vastgelegde tellingen als bron, journalistieke codes (2026-10-16)
 import validation  # gezondheids-/consistentiechecks, gedeeld met scripts/validate_model.py
 import voorstellen  # RfC's & granulariteitsbeheer (M2.3/M2.6), gedeeld met de tests
 from broncluster import cluster_key_voor  # broncluster-afleiding (M1.2)
@@ -39,6 +43,7 @@ import paginas  # programmatic-SEO: server-gerenderde pagina per element (B4)
 import subprocess  # herlaad de launchd-agents na een schema-wijziging (C1, macOS)
 import agent_schedule  # canonieke agent-lijst + schema (gedeeld met de launchd-generator)
 import opschonen  # dubbele verbanden en bronnen (2026-10-09), gedeeld met de ronde
+import via_medewerkers  # instituut ⇢ doel via zijn mensen (namens_id, eigenaarsbesluit 2026-10-19)
 try:
     import dedup  # A6: semantische (paraphrase-)dedup bovenop difflib; aparte stdlib-module
 except ImportError:  # de module wordt parallel gebouwd — val terug op alleen difflib
@@ -174,7 +179,8 @@ _rate_emmers = {}
 # vrijgesteld (hun inhouds-schrijfacties houden de flood-rem); alleen hun wachtrij-
 # endpoints zijn vrij (RATE_LIMIT_VRIJE_ENDPOINTS hieronder).
 RATE_LIMIT_VRIJGESTELD = {"assistent", "merge-service", "nieuws-autokeur",
-                          "register-import", "registercheck"}  # Uitbreiding C: registerpijplijn
+                          "register-import", "registercheck",  # Uitbreiding C: registerpijplijn
+                          "metingcheck"}  # eigen metingen (2026-10-16): deterministische controle
 # Endpoints die voor ELK account buiten de per-account-limiet vallen: de nieuws-wachtrij
 # (nieuws_doelen) is procesmetadata, geen modelinhoud — de rate limit beschermt tegen
 # score-manipulatie door volume en heeft hier geen functie, terwijl de nieuws-backend per
@@ -432,8 +438,23 @@ def openapi_spec():
 @app.route("/robots.txt")
 def robots_txt():
     """Weert de redactie-/account-routes en de API uit de zoekindex, maar houdt de
-    deelbare graafdata (GET /api/graph_data) expliciet toegankelijk (feed-verhaal E1)."""
-    return send_file(ROOT / "robots.txt", mimetype="text/plain")
+    deelbare graafdata (GET /api/graph_data) expliciet toegankelijk (feed-verhaal E1).
+    Eigen metingen (2026-10-16): /meting* staat op Disallow, behalve de afgeronde metingen —
+    die krijgen hier een eigen Allow-regel (de langste regel wint)."""
+    tekst = (ROOT / "robots.txt").read_text(encoding="utf-8")
+    try:
+        conn = get_db()
+        try:
+            ids = [r[0] for r in conn.execute(
+                "SELECT id FROM metingen WHERE status = 'afgerond' ORDER BY id")]
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        ids = []
+    if ids:
+        extra = "".join(f"\nAllow: /meting/{i}$" for i in ids)
+        tekst = re.sub(r"(?m)^(Disallow: /meting)$", lambda m: m.group(1) + extra, tekst, count=1)
+    return app.response_class(tekst, mimetype="text/plain")
 
 
 @app.route("/beheer")
@@ -762,6 +783,9 @@ _graph_cache = {}
 
 
 def _graph_cache_key():
+    # Ook het -wal-bestand telt: in WAL-modus landen schrijfacties daar eerst, en het
+    # hoofdbestand verandert pas bij een checkpoint. Het DB-pad hoort erbij zodat een
+    # cache van een andere database (tests) nooit voor deze doorgaat.
     def _stat(p):
         try:
             st = p.stat()
@@ -770,25 +794,198 @@ def _graph_cache_key():
             return (0, 0)
     nieuwste_release = max((_stat(p) for p in RELEASES_PATH.glob("model-v*.json")),
                            default=(0, 0))
-    return (_stat(DB_PATH), nieuwste_release)
+    wal = DB_PATH.with_name(DB_PATH.name + "-wal")
+    return (str(DB_PATH), _stat(DB_PATH), _stat(wal), nieuwste_release)
+
+
+def _json_antwoord(raw, gz=None, headers=None):
+    """JSON-antwoord, gzip-gecomprimeerd als de client dat accepteert en gz er is."""
+    if gz is not None and "gzip" in (request.headers.get("Accept-Encoding") or "").lower():
+        resp = app.response_class(gz, mimetype="application/json")
+        resp.headers["Content-Encoding"] = "gzip"
+    else:
+        resp = app.response_class(raw, mimetype="application/json")
+    resp.headers["Vary"] = "Accept-Encoding"
+    for k, v in (headers or {}).items():
+        resp.headers[k] = v
+    return resp
 
 
 @app.route("/api/graph_data")
 def graph_data():
     """Volledige viz-datastructuur (entiteiten, relaties, theorielaag, discussiebomen,
     afgeleide scores, kleurmeter, inkomsten) — identiek aan wat de statische export
-    in data/viz_export.html bakt (zelfde bouw: viz_data.export_data)."""
+    in data/viz_export.html bakt (zelfde bouw: viz_data.export_data). Altijd vers
+    t.o.v. de database; de viz zelf leest de compacte variant hieronder."""
     sleutel = _graph_cache_key()
     entry = _graph_cache.get("entry")
-    if entry is None or entry[0] != sleutel:
+    if entry is None or entry["sleutel"] != sleutel:
         conn = get_db()
         try:
             data = viz_data.export_data(conn)
         finally:
             conn.close()
-        entry = (sleutel, json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+        entry = {"sleutel": sleutel,
+                 "raw": json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+                 "gz": None}
         _graph_cache["entry"] = entry
-    return app.response_class(entry[1], mimetype="application/json")
+    if entry["gz"] is None and "gzip" in (request.headers.get("Accept-Encoding") or "").lower():
+        entry["gz"] = gzip.compress(entry["raw"], 6)
+    return _json_antwoord(entry["raw"], entry["gz"])
+
+
+# ── Compacte viz-lading + discussie per element (canvas-viz, 2026-10-14) ──────
+# De pagina op / leest GET /api/graph_data/viz: de compacte lading (viz_data.compact_viz,
+# ~6 MB i.p.v. ~25 MB) met stale-while-revalidate: een verouderde lading wordt meteen
+# geserveerd terwijl één achtergrondthread hem herbouwt; een kopie op schijf
+# (data/cache/graph_viz.pickle) overleeft een herstart. Discussiebomen van de
+# praktijklaag komen per element via GET /api/graph_data/discussie (live uit de DB).
+_viz_cache = {"entry": None, "bouwt": False, "laatste_start": 0.0, "schijf_gelezen": False}
+_viz_lock = threading.Lock()        # beschermt _viz_cache-vlaggen
+_viz_bouw_lock = threading.Lock()   # één koude (synchrone) bouw tegelijk
+VIZ_HERBOUW_MIN_S = 20
+
+
+def _viz_cache_pad():
+    # Alleen een schijfcache voor de database in DATA_DIR (tests met een tijdelijke DB
+    # schrijven niets naast de echte data).
+    if DB_PATH.parent.resolve() != DATA_DIR.resolve():
+        return None
+    return DATA_DIR / "cache" / "graph_viz.pickle"
+
+
+def _viz_bouw(sleutel):
+    conn = get_db()
+    try:
+        data = viz_data.export_data(conn)
+    finally:
+        conn.close()
+    raw = json.dumps(viz_data.compact_viz(data), ensure_ascii=False,
+                     separators=(",", ":")).encode("utf-8")
+    entry = {"sleutel": sleutel, "raw": raw, "gz": gzip.compress(raw, 6),
+             "tabellen": viz_data.discussie_tabellen(data), "gebouwd": time.time()}
+    _viz_cache["entry"] = entry
+    # Dezelfde scoringsronde vult ook de cache van /api/graph_data (zelfde sleutel).
+    if (_graph_cache.get("entry") or {}).get("sleutel") != sleutel:
+        _graph_cache["entry"] = {
+            "sleutel": sleutel,
+            "raw": json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+            "gz": None}
+    pad = _viz_cache_pad()
+    if pad is not None:
+        try:
+            pad.parent.mkdir(parents=True, exist_ok=True)
+            tmp = pad.with_name(pad.name + f".{os.getpid()}.tmp")
+            with open(tmp, "wb") as f:
+                pickle.dump(entry, f, protocol=pickle.HIGHEST_PROTOCOL)
+            os.replace(tmp, pad)
+        except OSError as e:
+            print(f"viz-cache niet op schijf gezet: {e}", file=sys.stderr)
+    return entry
+
+
+def _viz_herbouw_achtergrond():
+    with _viz_lock:
+        if _viz_cache["bouwt"] or time.time() - _viz_cache["laatste_start"] < VIZ_HERBOUW_MIN_S:
+            return
+        _viz_cache["bouwt"] = True
+        _viz_cache["laatste_start"] = time.time()
+
+    def _werk():
+        try:
+            _viz_bouw(_graph_cache_key())
+        except Exception as e:  # noqa: BLE001 — achtergrond: loggen, oude lading blijft
+            print(f"viz-herbouw mislukt: {e}", file=sys.stderr)
+        finally:
+            _viz_cache["bouwt"] = False
+
+    threading.Thread(target=_werk, name="viz-herbouw", daemon=True).start()
+
+
+def _viz_entry():
+    """(entry, status) — status 'vers', 'verouderd' (geserveerd, herbouw loopt) of 'koud'."""
+    sleutel = _graph_cache_key()
+    entry = _viz_cache["entry"]
+    if entry is None and not _viz_cache["schijf_gelezen"]:
+        with _viz_lock:
+            if _viz_cache["entry"] is None and not _viz_cache["schijf_gelezen"]:
+                _viz_cache["schijf_gelezen"] = True
+                pad = _viz_cache_pad()
+                if pad is not None and pad.exists():
+                    try:
+                        with open(pad, "rb") as f:
+                            kandidaat = pickle.load(f)
+                        if kandidaat.get("sleutel", (None,))[0] == str(DB_PATH):
+                            _viz_cache["entry"] = kandidaat
+                    except Exception as e:  # noqa: BLE001 — kapotte cache: gewoon opnieuw bouwen
+                        print(f"viz-cache op schijf onleesbaar: {e}", file=sys.stderr)
+            entry = _viz_cache["entry"]
+    if entry is None:
+        with _viz_bouw_lock:
+            entry = _viz_cache["entry"]
+            if entry is None:
+                return _viz_bouw(sleutel), "koud"
+    if entry["sleutel"] == sleutel:
+        return entry, "vers"
+    _viz_herbouw_achtergrond()
+    return entry, "verouderd"
+
+
+@app.route("/api/graph_data/viz")
+def graph_data_viz():
+    """Compacte viz-lading (formaat viz-2, viz_data.compact_viz) voor de pagina op /.
+    Stale-while-revalidate: header X-Viz-Cache zegt vers/verouderd/koud."""
+    entry, status = _viz_entry()
+    return _json_antwoord(entry["raw"], entry["gz"], {"X-Viz-Cache": status})
+
+
+_DISCUSSIE_DOELEN = ("relation_id", "entity_id", "role_id", "mechanism_id", "emergent_effect_id")
+
+
+@app.route("/api/graph_data/discussie")
+def graph_data_discussie():
+    """De discussieboom van één element voor de viz: live uit de DB, met dezelfde
+    smaad-firewall als de graafdata (D2.3: een vastgehouden argument en zijn subboom
+    blijven weg), τ/σ uit de viz-cache en (relatie/entiteit) de score-details."""
+    gevraagd = [k for k in _DISCUSSIE_DOELEN if request.args.get(k) is not None]
+    if len(gevraagd) != 1:
+        return jsonify({"error": "geef precies één van " + ", ".join(_DISCUSSIE_DOELEN)}), 400
+    kolom = gevraagd[0]
+    doel = request.args.get(kolom, type=int)
+    if doel is None:
+        return jsonify({"error": f"'{kolom}' moet een geheel getal zijn"}), 400
+    tabellen = _viz_entry()[0]["tabellen"]
+    conn = get_db()
+    try:
+        rows = conn.execute(f"""
+            WITH RECURSIVE boom(id) AS (
+                SELECT id FROM arguments WHERE {kolom} = ? AND COALESCE(smaad_hold, 0) = 0
+                UNION
+                SELECT a.id FROM arguments a JOIN boom b ON a.parent_argument_id = b.id
+                WHERE COALESCE(a.smaad_hold, 0) = 0
+            )
+            SELECT a.id, a.relation_id, a.entity_id, a.role_id, a.mechanism_id,
+                   a.emergent_effect_id, a.parent_argument_id, a.property, a.property_value,
+                   a.stance, a.claim, a.title, a.reasoning, a.weight, a.status,
+                   a.objection_type, a.bezwaar_resolutie, a.contributed_by, a.vervangen
+            FROM arguments a JOIN boom ON a.id = boom.id
+            ORDER BY a.parent_argument_id NULLS FIRST, a.id
+        """, (doel,)).fetchall()
+        args = [dict(r) for r in rows]
+        cites = _citaties_per_argument(conn, [a["id"] for a in args])
+    finally:
+        conn.close()
+    scores = tabellen["arg_scores"]
+    for a in args:
+        a.update(scores.get(a["id"], {}))
+        a["citations"] = cites.get(a["id"], [])
+    if kolom == "relation_id":
+        detail = tabellen["rel_detail"].get(doel) or {"score_detail": None, "influence_detail": None}
+    elif kolom == "entity_id":
+        detail = {"score_detail": tabellen["ent_detail"].get(doel)}
+    else:
+        detail = {}
+    return jsonify({"arguments": args, "detail": detail})
 
 
 # ── Programmatic-SEO: server-gerenderde pagina per element (B4) ──────────────
@@ -863,8 +1060,21 @@ def sitemap_xml_route():
     conn = get_db()
     try:
         xml = paginas.sitemap_xml(conn, request.url_root)
+        # Afgeronde eigen metingen zijn publiek (2026-10-16)
+        try:
+            afgerond = conn.execute("SELECT id, afgerond_at FROM metingen "
+                                    "WHERE status = 'afgerond' ORDER BY id").fetchall()
+        except sqlite3.Error:
+            afgerond = []
     finally:
         conn.close()
+    if afgerond:
+        from xml.sax.saxutils import escape
+        basis = (request.url_root or "").rstrip("/")
+        extra = "".join(f"<url><loc>{escape(basis + '/meting/' + str(r['id']))}</loc>"
+                        f"<lastmod>{str(r['afgerond_at'] or '')[:10]}</lastmod></url>\n"
+                        for r in afgerond)
+        xml = xml.replace("</urlset>", extra + "</urlset>")
     return app.response_class(xml, mimetype="application/xml")
 
 
@@ -1212,7 +1422,13 @@ def _negatieve_persoonsclaim(conn, *, entity_id=None, relation_id=None, betreft=
 @require_user()
 def create_argument():
     """Nieuw argument toevoegen (root of reactie)."""
-    data = request.json
+    return _maak_argument(request.json)
+
+
+def _maak_argument(data):
+    """De kern van POST /api/arguments onder de ingelogde gebruiker (g.user): alle poorten
+    (bronplicht, dedup, smaad-firewall, maintainer-merge). Gedeeld met
+    POST /api/metingen/<id>/als_bewijs (eigen metingen, 2026-10-16). → (respons, status)."""
     if not data:
         return jsonify({"error": "Geen data"}), 400
 
@@ -2820,11 +3036,18 @@ def classificeer_source(sid):
     en is herzienbaar (een latere reviewer kan de classificatie betwisten/wijzigen)."""
     data = request.json or {}
     conn = get_db()
-    bron = conn.execute("SELECT id, source_type, reliability, onderwerp FROM sources "
+    bron = conn.execute("SELECT id, source_type, reliability, onderwerp, cluster_key FROM sources "
                         "WHERE id = ?", (sid,)).fetchone()
     if not bron:
         conn.close()
         return jsonify({"error": "Bron bestaat niet"}), 404
+    # Eigen meting (eigenaarsbesluit 2026-10-16): hoe zwaar die bron weegt, bepaalt de eigenaar
+    # zelf — niet een reviewer of de automatische bronklasse (scripts/bronklasse.py slaat haar over)
+    if (metingen.meting_id_uit_cluster(bron["cluster_key"]) is not None
+            and g.user["role"] != "maintainer"):
+        conn.close()
+        return jsonify({"error": "Het gewicht van een eigen meting bepaalt de eigenaar "
+                                 "(maintainer)"}), 403
 
     nieuwe_rel = data.get("reliability", bron["reliability"])
     nieuw_ond = data.get("onderwerp", bron["onderwerp"])
@@ -3621,10 +3844,36 @@ def create_entity():
         return jsonify({"error": msg}), 400
 
 
+def _namens_waarde(raw):
+    """namens_id uit een verzoek: (id | None, fout | None). Leeg/0/null = geen hoedanigheid."""
+    if raw in (None, "", 0, "0"):
+        return None, None
+    try:
+        return int(raw), None
+    except (ValueError, TypeError):
+        return None, "namens_id moet een entiteit-id (geheel getal) of null zijn"
+
+
+def _namens_fout(conn, source_id, target_id, rtype, namens_id):
+    """Eigenaarsbesluit 2026-10-19 (instituut of persoon): kan deze hoedanigheid? → fout of None.
+    namens_id = de organisatie namens of vanuit welke de PERSOON (de bron) optrad, zoals de bron
+    hem aankondigt; nooit een persoon, niet de bron of het doel zelf, niet op een band."""
+    if namens_id is None:
+        return None
+    bron = conn.execute("SELECT type FROM entities WHERE id = ?", (source_id,)).fetchone()
+    n = conn.execute("SELECT type, vervangen FROM entities WHERE id = ?", (namens_id,)).fetchone()
+    fout = via_medewerkers.namens_fout(bron["type"] if bron else None, rtype, source_id, target_id,
+                                       namens_id, n["type"] if n else None,
+                                       bool(n["vervangen"]) if n else False)
+    return f"namens_id: {fout}" if fout else None
+
+
 @app.route("/api/relations", methods=["POST"])
 @require_user()
 def create_relation():
-    """Nieuwe relatie (edge) tussen twee entiteiten toevoegen."""
+    """Nieuwe relatie (edge) tussen twee entiteiten toevoegen. Bij een persoon als bron mag
+    ``namens_id`` zeggen namens of vanuit welke organisatie hij optrad (de hoedanigheid,
+    eigenaarsbesluit 2026-10-19)."""
     data = request.json
     if not data:
         return jsonify({"error": "Geen data"}), 400
@@ -3644,6 +3893,9 @@ def create_relation():
     description = (data.get("description") or "").strip() or None
     # Uitbreiding C: de ambtstitel zoals het register hem geeft (bij relation_type 'ambt').
     functie = (data.get("functie") or "").strip()[:200] or None
+    namens_id, fout = _namens_waarde(data.get("namens_id"))
+    if fout:
+        return jsonify({"error": fout}), 400
     bidirectional = 1 if data.get("bidirectional") else 0
     active_from = (data.get("active_from") or "").strip() or None
     active_until = (data.get("active_until") or "").strip() or None
@@ -3674,6 +3926,10 @@ def create_relation():
         if not conn.execute("SELECT 1 FROM entities WHERE id = ?", (eid,)).fetchone():
             conn.close()
             return jsonify({"error": f"{label}-entiteit bestaat niet"}), 400
+    fout = _namens_fout(conn, source_id, target_id, rtype, namens_id)
+    if fout:
+        conn.close()
+        return jsonify({"error": fout}), 400
 
     # Een kandidaat-relatie (nog geen theorie-huis: mechanism_id leeg) landt ALTIJD als
     # 'voorgesteld' — ook van een maintainer. Ze incubeert (telt in niets) tot een RfC
@@ -3686,9 +3942,9 @@ def create_relation():
         cur = conn.execute("""
             INSERT INTO relations
                 (source_id, target_id, relation_type, mechanism_id, description, functie,
-                 certainty, influence, bidirectional, active_from, active_until, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (source_id, target_id, rtype, mechanism_id, description, functie,
+                 namens_id, certainty, influence, bidirectional, active_from, active_until, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (source_id, target_id, rtype, mechanism_id, description, functie, namens_id,
               certainty, influence, bidirectional, active_from, active_until, status))
         rid = cur.lastrowid
 
@@ -3706,7 +3962,8 @@ def create_relation():
             VALUES ('relations', ?, 'created', ?, ?, ?)
         """, (rid, contributed_by,
               json.dumps({"source_id": source_id, "target_id": target_id,
-                          "relation_type": rtype, "status": status}),
+                          "relation_type": rtype, "status": status,
+                          **({"namens_id": namens_id} if namens_id else {})}),
               "Nieuwe relatie toegevoegd (admin: direct zichtbaar)" if status == "goedgekeurd"
               else "Nieuwe relatie voorgesteld (wacht op goedkeuring)"))
 
@@ -3714,7 +3971,7 @@ def create_relation():
         row = conn.execute("""
             SELECT r.id, r.source_id, r.target_id, r.relation_type, r.status,
                    r.certainty, r.influence, r.bidirectional, r.description,
-                   r.active_from, r.active_until, r.active,
+                   r.active_from, r.active_until, r.active, r.functie, r.namens_id,
                    e1.name as source_name, e2.name as target_name,
                    m.name as mechanism_name, m.filter as mechanism_filter
             FROM relations r
@@ -4014,6 +4271,12 @@ def _delete_relation_cascade(conn, rid):
         "SELECT id FROM arguments WHERE relation_id = ?", (rid,)).fetchall()]
     _delete_arguments(conn, _collect_argument_tree(conn, direct))
     conn.execute("DELETE FROM instantiations WHERE relation_id = ?", (rid,))
+    # Procesgegevens over het verband zelf: de richtingtoets verwijst er met een foreign key naar
+    # (zonder dit faalde elke delete van een getoetst verband, 2026-10-19); het looptijd-zoekwerk
+    # zou als wees achterblijven.
+    for tabel in ("richting_toetsen", "looptijd_onderzoek"):
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (tabel,)).fetchone():
+            conn.execute(f"DELETE FROM {tabel} WHERE relation_id = ?", (rid,))  # noqa: S608 - vaste namen
     conn.execute("DELETE FROM relations WHERE id = ?", (rid,))
 
 
@@ -4383,8 +4646,11 @@ def create_mechanism():
         "aard": d.get("aard"),
         "source_role_id": d.get("source_role_id"),
         "target_role_id": d.get("target_role_id"),
+        "doelen": d.get("doelen"),
+        "grondslag": d.get("grondslag"),
     }
     fouten = []
+    voorstellen._valideer_kenmerken(velden, fouten, verplicht=True)
     if not velden["naam"]:
         fouten.append("naam is verplicht")
     elif voorstellen._naam_bestaat(conn, "mechanisme", velden["naam"]):
@@ -4613,6 +4879,26 @@ def _maintainer_patch(element_type):
                                      "relatie eerst terug naar 'voorgesteld'."}), 400
         if nieuw_mid != rij["mechanism_id"]:
             diff["mechanism_id"] = {"oud": rij["mechanism_id"], "nieuw": nieuw_mid}
+    # Relatie: richting (2026-10-15) — een maintainer mag bron en doel omdraaien
+    # ("omdraaien": true) en de vlag bidirectional zetten of wissen, zodat een besluit van de
+    # richtingtoets terug te zetten is.
+    if element_type == "relatie" and d.get("omdraaien") is True:
+        diff["source_id"] = {"oud": rij["source_id"], "nieuw": rij["target_id"]}
+        diff["target_id"] = {"oud": rij["target_id"], "nieuw": rij["source_id"]}
+    if element_type == "relatie" and "bidirectional" in d:
+        nieuw_bi = 1 if d["bidirectional"] in (True, 1, "1") else 0
+        if nieuw_bi != int(bool(rij["bidirectional"])):
+            diff["bidirectional"] = {"oud": int(bool(rij["bidirectional"])), "nieuw": nieuw_bi}
+    # Relatie: hoedanigheid (2026-10-19) — namens welke organisatie de persoon optrad; null wist.
+    if element_type == "relatie" and "namens_id" in d:
+        nieuw_namens, fout = _namens_waarde(d["namens_id"])
+        fout = fout or _namens_fout(conn, rij["source_id"], rij["target_id"],
+                                    rij["relation_type"], nieuw_namens)
+        if fout:
+            conn.close()
+            return jsonify({"error": fout}), 400
+        if nieuw_namens != rij["namens_id"]:
+            diff["namens_id"] = {"oud": rij["namens_id"], "nieuw": nieuw_namens}
     # Mechanisme: een maintainer mag de rol-eindpunten (her)zetten. Zonder dit pad is
     # er géén manier om source_role_id/target_role_id te corrigeren — terwijl een
     # 'direct' edge zonder eindpunten niet tekent (precies de val waarin een RfC zonder
@@ -4659,10 +4945,18 @@ def _maintainer_patch(element_type):
             if fout:
                 conn.close()
                 return jsonify({"error": fout}), 400
+    if element_type == "relatie" and "source_id" in diff:
+        # Omdraaien met een hoedanigheid: de nieuwe bron moet er nog bij passen
+        namens = diff["namens_id"]["nieuw"] if "namens_id" in diff else rij["namens_id"]
+        fout = _namens_fout(conn, diff["source_id"]["nieuw"], diff["target_id"]["nieuw"],
+                            rij["relation_type"], namens)
+        if fout:
+            conn.close()
+            return jsonify({"error": f"{fout} — wis namens_id (null) als je dit verband omdraait"}), 400
     if not diff:
         conn.close()
         velden_hint = toegestaan + (["primary_role_id"] if element_type == "entiteit" else []) \
-            + (["mechanism_id"] if element_type == "relatie" else []) \
+            + (["mechanism_id", "omdraaien", "bidirectional", "namens_id"] if element_type == "relatie" else []) \
             + (["source_role_id", "target_role_id"] if element_type == "mechanisme" else []) \
             + (["active_from", "active_until"] if element_type in ("entiteit", "relatie", "rol", "mechanisme") else [])
         return jsonify({"error": f"geen gewijzigd veld (toegestaan: {velden_hint})"}), 400
@@ -6472,6 +6766,23 @@ def get_partij(partij_id):
         conn.close()
     if res is None:
         return jsonify({"error": "Geen goedgekeurde partij met dit id."}), 404
+    return jsonify(res)
+
+
+@app.route("/api/via_medewerkers/<int:entity_id>")
+def get_via_medewerkers(entity_id):
+    """Instituut of persoon (eigenaarsbesluit 2026-10-19, via_medewerkers.py): de afgeleide
+    routes waarin deze entiteit het instituut is (via welke mensen naar welke media en
+    beslissers), het doel (welke instituten achter de experts) of de persoon (namens wie).
+    Alleen goedgekeurde verbanden met namens_id plus een goedgekeurde band die in die periode
+    liep. Beschrijvend, telt nergens mee. 404 als het geen goedgekeurde entiteit is."""
+    conn = get_db()
+    try:
+        res = via_medewerkers.voor_entiteit(conn, entity_id)
+    finally:
+        conn.close()
+    if res is None:
+        return jsonify({"error": "Geen goedgekeurde entiteit met dit id."}), 404
     return jsonify(res)
 
 
@@ -8504,6 +8815,222 @@ def beoordeling_beschrijving(tabel, rid):
     return jsonify({"herschreven": True, "tabel": tabel, "id": rid, "description": nieuw}), 200
 
 
+# ── Richting van een verband (eigenaarsbesluit 2026-10-15: "alleen directioneel als a ook echt
+# invloed heeft op b en niet echt andersom, zoals a financiert b of a is eigenaar van b … ga het
+# hele propagandamodel af … en zorg ook dat de agents ze in de toekomst niet meer maken") ──
+# Een richtingloos type (vocab.RICHTINGLOZE_TYPES: iemand hoort bij een organisatie, of twee
+# partijen zijn bondgenoten) heeft geen invloedsrichting; dat beslist het type. Een verband van
+# een GERICHT type toetst de richtingtoets (scripts/richtingtoets.py, account 'richtingtoets',
+# Haiku, een wijziging bevestigd door Sonnet): 'juist', 'omgekeerd', 'richtingloos' of
+# 'twijfel'. De automatische beoordeling (merge-service) past 'omgekeerd' (bron en doel wisselen)
+# en 'richtingloos' (bidirectional = 1) toe — alleen seed- en agentwerk, geen registerfeit (dat
+# heeft zijn richting uit het record), één keer per verband, oud/nieuw in edit_log (terug te
+# zetten met een maintainer-PATCH). Procesmetadata in `richting_toetsen`; telt nergens in de score.
+RICHTING_VERDICTS = ("juist", "omgekeerd", "richtingloos", "twijfel")
+RICHTING_REDEN_PREFIX = BEOORDELING_REDEN_PREFIX + ": richting"
+RICHTING_PLAFOND_DEFAULT = 400
+
+
+def richting_hash(rel):
+    """sha256 van wat een richtingtoets ziet: bron, doel, type, mechanisme en de vlag. Verandert
+    er één, dan geldt het oordeel niet meer."""
+    sleutel = "|".join(str(rel[k] if rel[k] is not None else "") for k in
+                       ("source_id", "target_id", "relation_type", "mechanism_id"))
+    return hashlib.sha256(f"{sleutel}|{int(bool(rel['bidirectional']))}".encode()).hexdigest()
+
+
+def _richtingtoets_aan():
+    return os.environ.get("PROPAGANDA_RICHTINGTOETS", "1") != "0"
+
+
+def _richtingtoets(conn, rel, auteur=None):
+    """Nieuwste richtingtoets van een ander account dan de auteur over het verband zoals het nu
+    is (relatie_hash), of None."""
+    try:
+        return conn.execute("""
+            SELECT verdict, reden, model, door, created_at FROM richting_toetsen
+            WHERE relation_id = ? AND relatie_hash = ? AND COALESCE(door, '') <> COALESCE(?, '')
+            ORDER BY created_at DESC, id DESC LIMIT 1""",
+                            (rel["id"], richting_hash(rel), auteur)).fetchone()
+    except sqlite3.OperationalError:  # database van vóór de richtingtoets
+        return None
+
+
+def _registerfeit(conn, rid):
+    """Draagt een registerregel dit verband? Dan komt zijn richting uit het record."""
+    return conn.execute("""SELECT 1 FROM arguments a JOIN citations c ON c.argument_id = a.id
+                           WHERE a.relation_id = ? AND c.methode = 'officieel_register_scrape'
+                           LIMIT 1""", (rid,)).fetchone() is not None
+
+
+@app.route("/api/richtingtoets", methods=["POST"])
+@require_user()
+def richtingtoets_vastleggen():
+    """Richtingtoets door een ander account dan de auteur: {relation_id, relatie_hash, verdict:
+    juist|omgekeerd|richtingloos|twijfel, reden, model?}. relatie_hash is de hash van het
+    verband dat de toets zag (richting_hash); wijkt hij af, dan 409. Eén oordeel per account per
+    verband (een nieuw oordeel werkt het eigen oordeel bij). 400 voor een richtingloos type
+    (daar is geen richting te toetsen), 403 voor de auteur van het verband."""
+    data = request.get_json(silent=True) or {}
+    rid = data.get("relation_id")
+    if isinstance(rid, bool) or not isinstance(rid, int) or rid <= 0:
+        return jsonify({"error": "relation_id moet een positief geheel getal zijn"}), 400
+    verdict = data.get("verdict")
+    if verdict not in RICHTING_VERDICTS:
+        return jsonify({"error": "verdict moet 'juist', 'omgekeerd', 'richtingloos' of "
+                                 "'twijfel' zijn"}), 400
+    reden = (data.get("reden") or "").strip()[:1500]
+    if not reden:
+        return jsonify({"error": "een richtingtoets vergt een reden"}), 400
+    model = (data.get("model") or "").strip()[:40] or None
+    conn = get_db()
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rel is None:
+        conn.close()
+        return jsonify({"error": f"relatie #{rid} niet gevonden"}), 404
+    if rel["relation_type"] in vocab.RICHTINGLOZE_TYPES:
+        conn.close()
+        return jsonify({"error": f"'{rel['relation_type']}' is een richtingloos type: "
+                                 "geen richting te toetsen"}), 400
+    auteur = _creator_van(conn, "relations", rid)
+    if auteur and auteur == g.user["username"]:
+        conn.close()
+        return jsonify({"error": "De auteur toetst zijn eigen verband niet"}), 403
+    hash_nu = richting_hash(rel)
+    if data.get("relatie_hash") != hash_nu:
+        conn.close()
+        return jsonify({"error": "het verband veranderde sinds de toets (relatie_hash wijkt af)",
+                        "relatie_hash": hash_nu}), 409
+    oud = conn.execute("SELECT id FROM richting_toetsen WHERE relation_id = ? AND door = ?",
+                       (rid, g.user["username"])).fetchone()
+    if oud is not None:
+        conn.execute("""UPDATE richting_toetsen SET relatie_hash = ?, verdict = ?, reden = ?,
+                        model = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                     (hash_nu, verdict, reden, model, oud["id"]))
+        tid = oud["id"]
+    else:
+        tid = conn.execute("""INSERT INTO richting_toetsen (relation_id, relatie_hash, verdict,
+                              reden, model, door) VALUES (?, ?, ?, ?, ?, ?)""",
+                           (rid, hash_nu, verdict, reden, model, g.user["username"])).lastrowid
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+        VALUES ('richting_toetsen', ?, ?, ?, ?, ?)
+    """, (tid, "updated" if oud else "created", g.user["username"],
+          json.dumps({"relation_id": rid, "verdict": verdict}), f"richtingtoets: {verdict}"))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": tid, "relation_id": rid, "verdict": verdict,
+                    "herzien": oud is not None}), 200 if oud else 201
+
+
+def _richting_plafond():
+    try:
+        return max(0, int(os.environ.get("PROPAGANDA_RICHTING_PLAFOND", RICHTING_PLAFOND_DEFAULT)))
+    except ValueError:
+        return RICHTING_PLAFOND_DEFAULT
+
+
+def richting_besluit(conn, rid):
+    """Mag de automatische beoordeling de richting van dit verband aanpassen? → (actie:
+    'omdraaien' | 'richtingloos' | None, redenen waarom niet, motivatie)."""
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (rid,)).fetchone()
+    if rel is None:
+        return None, ["niet gevonden"], None
+    redenen = []
+    if rel["vervangen"] or rel["status"] not in ("goedgekeurd", "voorgesteld"):
+        redenen.append(f"status {rel['status']}{' (vervangen)' if rel['vervangen'] else ''}")
+    if vocab.richtingloos(rel["relation_type"], rel["bidirectional"]):
+        redenen.append("al richtingloos")
+    auteur = _creator_van(conn, "relations", rid)
+    if auteur and not _is_agent(conn, auteur):
+        redenen.append(f"verband van een mens ({auteur}) — die past het zelf aan")
+    if _registerfeit(conn, rid):
+        redenen.append("registerfeit: de richting komt uit het record")
+    toets = _richtingtoets(conn, rel, auteur)
+    if toets is None:
+        redenen.append("richtingtoets: nog geen oordeel over dit verband zoals het nu is")
+    elif toets["verdict"] not in ("omgekeerd", "richtingloos"):
+        redenen.append(f"richtingtoets: {toets['verdict']} — niets te doen")
+    n = conn.execute("SELECT COUNT(*) FROM edit_log WHERE table_name = 'relations' "
+                     "AND record_id = ? AND reason LIKE ?",
+                     (rid, RICHTING_REDEN_PREFIX + "%")).fetchone()[0]
+    if n:
+        redenen.append("de richting is al eens automatisch aangepast — niet nog eens")
+    actie = None
+    if toets is not None and toets["verdict"] == "omgekeerd" and rel["namens_id"] is not None:
+        # Een persoon die namens een organisatie optrad (2026-10-19): omdraaien maakt het
+        # medium tot bron van een hoedanigheid die niet kan — dat beslist een mens
+        redenen.append("draagt een hoedanigheid (namens_id): niet automatisch omdraaien")
+    elif toets is not None and toets["verdict"] == "omgekeerd":
+        actie = "omdraaien"
+        tweeling = conn.execute("""
+            SELECT id FROM relations WHERE source_id = ? AND target_id = ?
+              AND relation_type = ? AND COALESCE(mechanism_id, 0) = COALESCE(?, 0)
+              AND NOT vervangen AND status IN ('goedgekeurd', 'voorgesteld')""",
+                                (rel["target_id"], rel["source_id"], rel["relation_type"],
+                                 rel["mechanism_id"])).fetchone()
+        if tweeling:
+            redenen.append(f"het omgekeerde verband bestaat al (#{tweeling['id']}) — ontdubbelen")
+    elif toets is not None and toets["verdict"] == "richtingloos":
+        actie = "richtingloos"
+    if redenen:
+        return None, redenen, None
+    wat = "bron en doel omgedraaid" if actie == "omdraaien" else "richtingloos gemaakt"
+    return actie, [], (f"{RICHTING_REDEN_PREFIX}: {wat} ({toets['door']}, {toets['model'] or '?'}: "
+                       f"{(toets['reden'] or '')[:300]})")
+
+
+@app.route("/api/beoordeling/richting/<int:rid>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_richting(rid):
+    """De automatische beoordeling (merge-service) past het oordeel van de richtingtoets toe:
+    'omgekeerd' → bron en doel wisselen, 'richtingloos' → bidirectional = 1. De oude stand gaat
+    mee in edit_log (old_value). GET = droogloop. Kill-switch PROPAGANDA_AUTOMATISCHE_BEOORDELING
+    of PROPAGANDA_RICHTINGTOETS=0 → 503, dagplafond PROPAGANDA_RICHTING_PLAFOND → 429, niet
+    toegestaan → 409."""
+    conn = get_db()
+    actie, redenen, motivatie = richting_besluit(conn, rid)
+    if request.method == "GET" or redenen == ["niet gevonden"]:
+        conn.close()
+        if redenen == ["niet gevonden"]:
+            return jsonify({"error": "Niet gevonden"}), 404
+        return jsonify({"id": rid, "toegestaan": not redenen, "actie": actie,
+                        "redenen": redenen})
+    if (os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0"
+            or not _richtingtoets_aan()):
+        conn.close()
+        return jsonify({"aangepast": False, "error": "automatische beoordeling of richtingtoets "
+                        "uitgeschakeld"}), 503
+    vandaag = conn.execute("""SELECT COUNT(*) FROM edit_log WHERE reason LIKE ?
+                              AND date(created_at, 'localtime') = date('now', 'localtime')""",
+                           (RICHTING_REDEN_PREFIX + "%",)).fetchone()[0]
+    if vandaag >= _richting_plafond():
+        conn.close()
+        return jsonify({"aangepast": False,
+                        "error": f"dagplafond bereikt ({vandaag}/{_richting_plafond()})"}), 429
+    if redenen:
+        conn.close()
+        return jsonify({"aangepast": False, "redenen": redenen}), 409
+    rel = conn.execute("SELECT source_id, target_id, bidirectional FROM relations WHERE id = ?",
+                       (rid,)).fetchone()
+    oud = {"source_id": rel["source_id"], "target_id": rel["target_id"],
+           "bidirectional": int(bool(rel["bidirectional"]))}
+    if actie == "omdraaien":
+        nieuw = {"source_id": rel["target_id"], "target_id": rel["source_id"],
+                 "bidirectional": oud["bidirectional"]}
+        conn.execute("UPDATE relations SET source_id = ?, target_id = ? WHERE id = ?",
+                     (nieuw["source_id"], nieuw["target_id"], rid))
+    else:
+        nieuw = dict(oud, bidirectional=1)
+        conn.execute("UPDATE relations SET bidirectional = 1 WHERE id = ?", (rid,))
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES ('relations', ?, 'updated', ?, ?, ?, ?)
+    """, (rid, g.user["username"], json.dumps(oud), json.dumps(nieuw), motivatie))
+    conn.commit()
+    conn.close()
+    return jsonify({"aangepast": True, "id": rid, "actie": actie, **nieuw}), 200
+
 # ── Verbanden zonder bron eindigen (eigenaarsbesluit 2026-10-08: "dit slaat nergens op …
 # staat niet eens op waar het vandaan komt") ──
 # Een goedgekeurd verband dat door geen enkele bron gedragen wordt (geen levend steunend
@@ -8729,6 +9256,62 @@ def beoordeling_dubbel(rid):
                     "argumenten_mee_afgewezen": n, "motivatie": motivatie}), 200
 
 
+# ── Overgezet (eigenaarsbesluit 2026-10-19, instituut of persoon): opschonen.overgezet_besluit ──
+# Een optreden staat op precies één verband. Is het bewijs als "Overgezet van #…" op het
+# preciezere verband ingediend (persoon → medium met namens_id, of instituut → medium voor wie
+# namens het instituut spreekt) en is die opvolger gemerged, zijn verband goedgekeurd en de band
+# tussen persoon en organisatie goedgekeurd, dan gaat het oude argument op 'verouderd' +
+# vervangen. Draagt het oude verband daarna niets meer, dan wordt het afgewezen (zijn boom gaat
+# mee; terug te draaien met heraanmelden). merge-service; GET = droogloop; kill-switch → 503,
+# dagplafond PROPAGANDA_OVERGEZET_PLAFOND (100) → 429, niet toegestaan → 409 + redenen.
+OVERGEZET_PLAFOND_DEFAULT = 100
+
+
+@app.route("/api/beoordeling/overgezet/<int:rid>", methods=["GET", "POST"])
+@require_user("reviewer")
+def beoordeling_overgezet(rid):
+    conn = get_db()
+    ok, redenen, motivatie, info = opschonen.overgezet_besluit(conn, rid)
+    if redenen == ["niet gevonden"]:
+        conn.close()
+        return jsonify({"error": "Relatie niet gevonden"}), 404
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"id": rid, "toegestaan": ok, "redenen": redenen, "motivatie": motivatie,
+                        **info})
+    if os.environ.get("PROPAGANDA_AUTOMATISCHE_BEOORDELING", "1") == "0":
+        conn.close()
+        return jsonify({"overgezet": False, "error": "automatische beoordeling uitgeschakeld "
+                        "(PROPAGANDA_AUTOMATISCHE_BEOORDELING=0)"}), 503
+    try:
+        plafond = max(0, int(os.environ.get("PROPAGANDA_OVERGEZET_PLAFOND", OVERGEZET_PLAFOND_DEFAULT)))
+    except ValueError:
+        plafond = OVERGEZET_PLAFOND_DEFAULT
+    if _opschoon_vandaag(conn, "arguments", opschonen.OVERGEZET_REDEN) >= plafond:
+        conn.close()
+        return jsonify({"overgezet": False, "error": "dagplafond bereikt"}), 429
+    if not ok:
+        conn.close()
+        return jsonify({"overgezet": False, "redenen": redenen}), 409
+    for x in info["overgezet"]:
+        oud = conn.execute("SELECT status FROM arguments WHERE id = ?", (x["argument_id"],)).fetchone()
+        conn.execute("UPDATE arguments SET status = 'verouderd', vervangen = 1 WHERE id = ?",
+                     (x["argument_id"],))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+            VALUES ('arguments', ?, 'updated', ?, ?, ?, ?)
+        """, (x["argument_id"], g.user["username"], json.dumps({"status": oud["status"], "vervangen": False}),
+              json.dumps({"status": "verouderd", "vervangen": True}),
+              f"{opschonen.OVERGEZET_REDEN} naar #{x['opvolger_id']} (verband #{x['relation_id']}; "
+              "eigenaarsbesluit 2026-10-19, instituut of persoon)"))
+    n = _goedgekeurd_verband_afwijzen(conn, rid, motivatie[:500]) if info["afwijzen"] else 0
+    conn.commit()
+    conn.close()
+    return jsonify({"overgezet": True, "id": rid, "afgewezen": info["afwijzen"],
+                    "argumenten": [x["argument_id"] for x in info["overgezet"]],
+                    "argumenten_mee_afgewezen": n, "motivatie": motivatie}), 200
+
+
 # ── Verhangen (2026-10-13): een band van vóór een fusie hoort bij de voorganger ──
 # looptijd.verhangen_besluit beslist: de eigen looptijd valt helemaal buiten het bestaan van een
 # eindpunt, precies één voorganger (opvolger) omvat haar, en het bewijs noemt die. Het verband
@@ -8856,6 +9439,16 @@ def looptijd_onderzoek_vastleggen():
     detail = (data.get("detail") or "").strip()[:1000] or None
     nu = datetime.datetime.now().isoformat(timespec="seconds")
     oud = conn.execute("SELECT status FROM looptijd_onderzoek WHERE relation_id = ?", (rid,)).fetchone()
+    # Een storing (het model gaf geen antwoord) is geen uitkomst: ze overschrijft geen vastgelegde
+    # uitkomst ('register_zonder_datum', 'niets_gevonden', 'gezocht', 'gevonden'). Anders telt
+    # RELATIE-ZONDER-JAAR zo'n verband weer mee (2026-10-16: 1685 registerfeiten verloren zo hun
+    # status bij één mislukte reeks). Wel telt ze als poging.
+    if status == "fout" and oud and oud["status"] != "fout":
+        conn.execute("""UPDATE looptijd_onderzoek SET pogingen = pogingen + 1, laatste_poging = ?
+                        WHERE relation_id = ?""", (nu, rid))
+        conn.commit()
+        conn.close()
+        return jsonify({"relation_id": rid, "status": oud["status"], "storing_genegeerd": True}), 200
     conn.execute("""INSERT INTO looptijd_onderzoek (relation_id, status, pogingen, laatste_poging, detail, door)
                     VALUES (?, ?, 1, ?, ?, ?)
                     ON CONFLICT(relation_id) DO UPDATE SET status = excluded.status,
@@ -9225,9 +9818,22 @@ def beoordeling_rfc(vid):
               f"{BEOORDELING_REDEN_PREFIX}: RfC aangenomen op {toelichting}"))
         conn.commit()
     except (ValueError, sqlite3.IntegrityError) as e:
+        # Niet uit te voeren (al uitgevoerd, element intussen vervangen, hertriage niet leeg):
+        # het voorstel eindigt afgewezen met die reden, zodat het geen plek in de rij blijft
+        # bezetten; de indiener kan herzien (2026-10-15).
         conn.rollback()
+        reden = f"niet uit te voeren: {e}"
+        conn.execute("UPDATE voorstellen SET status = 'afgewezen', resultaat = ?, besloten_at = "
+                     "CURRENT_TIMESTAMP WHERE id = ?",
+                     (json.dumps({"blokkade": str(e)}, ensure_ascii=False), vid))
+        conn.execute("""
+            INSERT INTO edit_log (table_name, record_id, action, changed_by, new_value, reason)
+            VALUES ('voorstellen', ?, 'updated', ?, ?, ?)
+        """, (vid, g.user["username"], json.dumps({"status": "afgewezen"}),
+              f"{BEOORDELING_REDEN_PREFIX}: RfC {reden}"[:2000]))
+        conn.commit()
         conn.close()
-        return jsonify({"besluit": None, "blokkade": str(e)}), 409
+        return jsonify({"besluit": "afgewezen", "id": vid, "reden": reden, "blokkade": str(e)}), 200
     conn.close()
     return jsonify({"besluit": "geaccepteerd", "id": vid, "resultaat": resultaat}), 200
 
@@ -9323,6 +9929,1018 @@ def nieuws_autokeur_log():
     return jsonify({"regels": regels[-limit:][::-1], "vandaag": vandaag,
                     "plafond": _nieuws_autokeur_plafond(),
                     "uitgeschakeld": os.environ.get("PROPAGANDA_NIEUWS_AUTOKEUR", "1") == "0"})
+
+
+# ══ Eigen metingen (eigenaarsbesluit 2026-10-16) ═══════════════════════════════════
+# "Een eigen meting telt als bewijs … het moet een tool zijn waarmee je zelf dat kan bepalen …
+# zolang je aan journalistieke codes houdt." Een meting is een vooraf vastgelegde telling
+# (metingen.py): opzet → vastgelegd (opzet_hash) → waarnemingen, blinde controles en wederhoor →
+# afgerond (data_hash, bevroren samenvatting). Een afgeronde meting wordt een bron (dataset,
+# cluster 'meting:<id>') waarop een gewoon argument steunt (POST …/als_bewijs, via dezelfde kern
+# als POST /api/arguments); het gewicht kiest de eigenaar met de gewone bronclassificatie. De
+# journalistieke codes a–h (metingen.code_check) zijn harde voorwaarden: afronden eist a–d, een
+# meting als bewijs gebruiken a–h. De deterministische A1 is scripts/metingcheck.py (account
+# metingcheck, stap 2c van de uurronde); een blinde tweede codering levert desgewenst
+# scripts/meting_controle.py (account metingcontrole, door de eigenaar gestart).
+
+METING_CHECK_ACCOUNT = "metingcheck"
+# Velden die na een blinde controle vastliggen: anders kan de invoerder zijn codering na het zien
+# van de controle aanpassen
+METING_VAST_NA_CONTROLE = ("codes", "citaat", "url", "wie", "groep")
+
+
+def _meting_basis_url():
+    return (os.environ.get("PROPAGANDA_BASIS_URL") or "http://localhost:5000").rstrip("/")
+
+
+def _meting_kijker():
+    """De ingelogde gebruiker (dict) of None, voor de open GET's."""
+    conn = get_db()
+    try:
+        rij = _zoek_user(conn)
+    finally:
+        conn.close()
+    return dict(rij) if rij else None
+
+
+def _mag_meting_beheren(m, user):
+    return user is not None and (user["username"] == m["contributed_by"]
+                                 or user["role"] == "maintainer")
+
+
+def _meting_log(conn, tabel, rid, actie, *, oud=None, nieuw=None, reden=None):
+    conn.execute("""
+        INSERT INTO edit_log (table_name, record_id, action, changed_by, old_value, new_value, reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                 (tabel, rid, actie, g.user["username"],
+                  json.dumps(oud, ensure_ascii=False, default=str) if oud is not None else None,
+                  json.dumps(nieuw, ensure_ascii=False, default=str) if nieuw is not None else None,
+                  reden))
+
+
+def _entiteit_bestaat(conn):
+    def bestaat(eid):
+        return conn.execute("SELECT 1 FROM entities WHERE id = ?", (eid,)).fetchone() is not None
+    return bestaat
+
+
+def _is_geheel(x):
+    return isinstance(x, int) and not isinstance(x, bool) and x > 0
+
+
+def _meting_laden(conn, mid):
+    """(meting, None) of (None, (respons, 404))."""
+    m = metingen.laad(conn, mid)
+    if m is None:
+        return None, (jsonify({"error": f"Meting #{mid} bestaat niet"}), 404)
+    return m, None
+
+
+def _waarneming_velden(conn, m, data, *, nieuw):
+    """Controle en schoonmaak van de velden van een waarneming (nieuw: alle velden; anders
+    alleen wat is meegegeven). → (velden, fouten)."""
+    opzet = m["opzet"]
+    groepnamen = [gr.get("naam") for gr in metingen.groepen(opzet)]
+    media_ids = metingen.media(opzet)
+    van, tot = metingen.periode(opzet)
+    velden, fouten = {}, []
+
+    def tekst(naam, maximum, melding=None):
+        if not (nieuw or naam in data):
+            return
+        w = data.get(naam)
+        if w is not None and not isinstance(w, str):
+            fouten.append(f"'{naam}' moet tekst zijn")
+            return
+        w = (w or "").strip()
+        if melding and not w:
+            fouten.append(melding)
+        elif len(w) > maximum:
+            fouten.append(f"'{naam}' is langer dan {maximum} tekens")
+        else:
+            velden[naam] = w or None
+
+    if nieuw or "groep" in data:
+        if data.get("groep") not in groepnamen:
+            fouten.append("'groep' moet een groep uit de opzet zijn: " + ", ".join(groepnamen))
+        else:
+            velden["groep"] = data["groep"]
+    tekst("wie", 300, "'wie' is verplicht: naam en functie zoals in het artikel")
+    tekst("citaat", 3000, "'citaat' is verplicht: letterlijk uit het artikel")
+    tekst("notitie", 2000)
+    for naam, verplicht in (("url", True), ("archief_url", False)):
+        if not (nieuw or naam in data):
+            continue
+        u = data.get(naam)
+        u = u.strip() if isinstance(u, str) else ""
+        if not u and not verplicht:
+            velden[naam] = None
+        elif not metingen.url_ok(u):
+            fouten.append(f"'{naam}' moet een http(s)-adres zijn")
+        else:
+            velden[naam] = u
+    if nieuw or "datum" in data:
+        d = data.get("datum")
+        if not metingen.datum_ok(d):
+            fouten.append("'datum' moet JJJJ-MM-DD zijn (de publicatiedatum van het artikel)")
+        elif (metingen.datum_ok(van) and d < van) or (metingen.datum_ok(tot) and d > tot):
+            fouten.append(f"de datum {d} valt buiten de periode van de selectie "
+                          f"({van or '…'} – {tot or '…'})")
+        else:
+            velden["datum"] = d
+    if nieuw or "entity_id" in data:
+        x = data.get("entity_id")
+        if x in (None, ""):
+            velden["entity_id"] = None
+        elif not _is_geheel(x) or not _entiteit_bestaat(conn)(x):
+            fouten.append(f"'entity_id': knoop #{x} bestaat niet")
+        else:
+            velden["entity_id"] = x
+    if nieuw or "medium_entity_id" in data:
+        x = data.get("medium_entity_id")
+        if x in (None, ""):
+            fouten.append("'medium_entity_id' is verplicht: in welk medium stond het?")
+        elif not _is_geheel(x) or x not in media_ids:
+            fouten.append(f"medium #{x} hoort niet bij de selectie van deze meting")
+        else:
+            velden["medium_entity_id"] = x
+    if nieuw or "codes" in data:
+        codes = data.get("codes")
+        codes = {} if codes is None else codes
+        f = metingen.valideer_codes(opzet, codes)
+        if f:
+            fouten += f
+        else:
+            velden["codes"] = {k: v for k, v in codes.items() if v is not None}
+    return velden, fouten
+
+
+def _waarneming_rij(w):
+    """Een waarneming zoals de API haar teruggeeft aan haar invoerder."""
+    uit = dict(w)
+    uit["codes"] = metingen._json(uit.get("codes"), {})
+    return uit
+
+
+def _meting_weergave(conn, m, kijker):
+    """Alles over een meting voor de API en de pagina, met de blinde controle intact: zolang de
+    meting niet afgerond is, ziet een kijker de codering van een waarneming alleen als hij haar
+    invoerde of zelf al blind codeerde, en de samenvatting en de afwijkingen alleen als hij de
+    maker is."""
+    ik = kijker["username"] if kijker else None
+    rol = kijker["role"] if kijker else None
+    afgerond = m["status"] == "afgerond"
+    beheer = _mag_meting_beheren(m, kijker)
+    eigen_controles = {c["waarneming_id"] for c in m["controles"] if c["door"] == ik}
+    ziet_totaal = afgerond or (ik is not None and ik == m["contributed_by"])
+
+    def ziet_codes(w):
+        return afgerond or (ik is not None and (w["contributed_by"] == ik
+                                                or w["id"] in eigen_controles))
+
+    per_w = {w["id"]: w for w in m["waarnemingen"]}
+    n_controles = {}
+    for c in m["controles"]:
+        n_controles[c["waarneming_id"]] = n_controles.get(c["waarneming_id"], 0) + 1
+    waarnemingen = []
+    for w in m["waarnemingen"]:
+        zichtbaar = ziet_codes(w)
+        rij = {k: w.get(k) for k in ("id", "groep", "wie", "entity_id", "medium_entity_id", "url",
+                                     "archief_url", "datum", "citaat", "notitie",
+                                     "contributed_by", "created_at", "citaat_gevonden",
+                                     "citaat_gecontroleerd_at")}
+        rij.update({
+            "entity_naam": metingen.naam_van(m, w["entity_id"]) if w.get("entity_id") else None,
+            "medium": (metingen.naam_van(m, w["medium_entity_id"])
+                       if w.get("medium_entity_id") else None),
+            "codes": w["codes"] if zichtbaar else None,
+            "codes_verborgen": not zichtbaar,
+            "n_controles": n_controles.get(w["id"], 0),
+            "eigen_controle": w["id"] in eigen_controles,
+            "mag_bewerken": m["status"] == "vastgelegd" and ik == w["contributed_by"],
+        })
+        waarnemingen.append(rij)
+    controles = []
+    for c in m["controles"]:
+        w = per_w.get(c["waarneming_id"])
+        zichtbaar = afgerond or c["door"] == ik or (w is not None and ziet_codes(w))
+        controles.append({"id": c["id"], "waarneming_id": c["waarneming_id"], "door": c["door"],
+                          "created_at": c["created_at"],
+                          "codes": c["codes"] if zichtbaar else None,
+                          "codes_verborgen": not zichtbaar})
+
+    punten = metingen.code_check(m)
+    over = metingen.overeenstemming(m)
+    if not ziet_totaal:
+        for o in over.values():
+            o["afwijkingen"] = [a for a in o["afwijkingen"]
+                                if ziet_codes(per_w[a["waarneming_id"]])]
+        for p in punten:
+            if p["sleutel"] == "d":
+                p["waarschuwingen"] = [
+                    f"'{s}': {str(o['pct']).replace('.', ',')}% overeenstemming over {o['n']} "
+                    "controles (de afwijkingen ziet de maker; blind tot je zelf codeert)"
+                    for s, o in over.items() if o["waarschuwing"]]
+    if afgerond:
+        samenvatting = m["samenvatting"]
+    elif ziet_totaal:
+        samenvatting = metingen.samenvatting(m)
+    else:
+        samenvatting = None
+
+    voorspelling = None
+    if m.get("voorspelling_id"):
+        r = conn.execute("SELECT id, claim, deadline, status FROM predictions WHERE id = ?",
+                         (m["voorspelling_id"],)).fetchone()
+        voorspelling = dict(r) if r else None
+
+    bron = conn.execute("""SELECT id, title, author, reliability, onderwerp, date_published
+                           FROM sources WHERE cluster_key = ? ORDER BY id LIMIT 1""",
+                        (metingen.cluster_key(m["id"]),)).fetchone()
+    bron = dict(bron) if bron else None
+    argumenten = []
+    if bron:
+        bron["gewicht"] = scoring.RELIABILITY_WEIGHT.get(bron["reliability"])
+        bron["relevantie"] = scoring.RELEVANTIE_FACTOR.get(bron["onderwerp"], 1.0)
+        for a in conn.execute("""
+                SELECT a.id, a.claim, a.status, a.stance, a.property, a.relation_id, a.entity_id,
+                       a.mechanism_id, a.contributed_by, a.smaad_hold, c.quote
+                FROM citations c JOIN arguments a ON a.id = c.argument_id
+                WHERE c.source_id = ? AND NOT a.vervangen ORDER BY a.id""", (bron["id"],)):
+            if ik is None and (a["smaad_hold"] or a["status"] in ("voorgesteld", "verworpen")):
+                continue  # publiek: alleen gemerged werk, nooit onder de smaad-firewall
+            d = dict(a)
+            if a["relation_id"]:
+                r = conn.execute("""SELECT s.name AS bron, t.name AS doel, r.relation_type
+                                    FROM relations r JOIN entities s ON s.id = r.source_id
+                                    JOIN entities t ON t.id = r.target_id WHERE r.id = ?""",
+                                 (a["relation_id"],)).fetchone()
+                d["doel"] = f"{r['bron']} → {r['doel']}" if r else f"verband #{a['relation_id']}"
+                d["doel_relatietype"] = r["relation_type"] if r else None
+            elif a["entity_id"]:
+                r = conn.execute("SELECT name FROM entities WHERE id = ?",
+                                 (a["entity_id"],)).fetchone()
+                d["doel"] = r["name"] if r else f"knoop #{a['entity_id']}"
+            else:
+                r = conn.execute("SELECT name FROM mechanisms WHERE id = ?",
+                                 (a["mechanism_id"],)).fetchone()
+                d["doel"] = r["name"] if r else f"mechanisme #{a['mechanism_id']}"
+            argumenten.append(d)
+
+    meldingen = None
+    if ik is not None and (ik == m["contributed_by"] or ROLE_ORDER.get(rol, 0) >= 2):
+        meldingen = [dict(r) for r in conn.execute("""
+            SELECT id, soort, claim, bron_url, quote, status, triage_reden, created_at FROM leads
+            WHERE TRIM(betreft) = ? ORDER BY id DESC""", (f"meting:{m['id']}",))]
+
+    bronklassen = []
+    for k in sorted(RELIABILITY_KLASSEN, key=lambda k: -scoring.RELIABILITY_WEIGHT.get(k, 0)):
+        problemen = validation.klasse_consistentie("dataset", k, True)
+        bronklassen.append({"klasse": k, "gewicht": scoring.RELIABILITY_WEIGHT.get(k),
+                            "toegestaan": not problemen, "probleem": "; ".join(problemen)})
+    onderwerpen = [{"onderwerp": o, "factor": scoring.RELEVANTIE_FACTOR.get(o, 1.0)}
+                   for o in ("nl_systeem", "algemeen", "buitenlands", "onbepaald")]
+    n = len(m["waarnemingen"])
+    return {
+        **{k: m.get(k) for k in ("id", "titel", "vraag", "status", "voorspelling_id",
+                                 "contributed_by", "created_at", "vastgelegd_at", "afgerond_at",
+                                 "opzet_hash", "data_hash")},
+        "url": f"/meting/{m['id']}",
+        "rectificatie_url": f"{metingen.RECTIFICATIE_LINK}{m['id']}&soort=rectificatie",
+        "opzet": m["opzet"],
+        "voorspelling": voorspelling,
+        "waarnemingen": waarnemingen,
+        "controles": controles,
+        "wederhoor": m["wederhoor"],
+        "wederhoor_eisen": [{"soort": e["soort"], "label": e["label"], "ids": e["ids"],
+                             "voldaan": e["voldaan"]} for e in metingen.wederhoor_eisen(m)],
+        "samenvatting": samenvatting,
+        "regels": samenvatting["regels"] if samenvatting else None,
+        "code_check": punten,
+        "afronden_kan": metingen.in_orde(punten, metingen.AFRONDEN_EIST),
+        "overeenstemming": over,
+        "nodig_controles": metingen.nodig_controles(n),
+        "gecontroleerd": len(metingen.gecontroleerd(m)),
+        "namen": {str(i): e["naam"] for i, e in m["entiteiten"].items()},
+        "bron": bron,
+        "argumenten": argumenten,
+        "bronklassen": bronklassen,
+        "onderwerpen": onderwerpen,
+        "meldingen": meldingen,
+        "ik": ik,
+        "rol": rol,
+        "mag": {
+            "beheren": beheer,
+            "opzet_bewerken": beheer and m["status"] == "opzet",
+            "vastleggen": beheer and m["status"] == "opzet",
+            "verwijderen": beheer and m["status"] == "opzet",
+            "waarnemen": beheer and m["status"] == "vastgelegd",
+            "controleren": ik is not None and m["status"] == "vastgelegd",
+            "wederhoor": beheer,
+            "afronden": beheer and m["status"] == "vastgelegd",
+            "als_bewijs": ik is not None and afgerond,
+            "classificeren": rol == "maintainer",
+            "meldingen_afhandelen": ROLE_ORDER.get(rol, 0) >= 2,
+        },
+        "commando_controle": f"python3 scripts/meting_controle.py --meting {m['id']} --indienen",
+        "commando_check": f"python3 scripts/metingcheck.py --meting {m['id']}",
+    }
+
+
+@app.route("/metingen")
+def metingen_pagina():
+    """Overzicht van de eigen metingen (2026-10-16). Publiek ziet alleen afgeronde metingen; de
+    pagina haalt haar lijst uit GET /api/metingen."""
+    return send_file(WEB_PATH / "meting.html")
+
+
+@require_user_page("bijdrager")
+def _meting_pagina_achter_login():
+    return send_file(WEB_PATH / "meting.html")
+
+
+@app.route("/meting/<int:mid>")
+def meting_pagina(mid):
+    """Eén eigen meting: publiek als ze afgerond is, anders achter login (B3)."""
+    conn = get_db()
+    try:
+        rij = conn.execute("SELECT status FROM metingen WHERE id = ?", (mid,)).fetchone()
+    finally:
+        conn.close()
+    if rij is not None and rij["status"] == "afgerond":
+        return send_file(WEB_PATH / "meting.html")
+    if rij is None and _meting_kijker() is not None:
+        return send_file(WEB_PATH / "meting.html"), 404
+    return _meting_pagina_achter_login()
+
+
+@app.route("/api/metingen", methods=["POST"])
+@require_user()
+def meting_maken():
+    """Nieuwe meting in status 'opzet': {titel, vraag, opzet, voorspelling_id?} → {id, url}.
+    De opzet mag nog onvolledig zijn (vastleggen eist haar volledig), maar haar vorm klopt."""
+    data = request.json or {}
+    titel = data.get("titel") if isinstance(data.get("titel"), str) else ""
+    vraag = data.get("vraag") if isinstance(data.get("vraag"), str) else ""
+    titel, vraag = titel.strip(), vraag.strip()
+    opzet = data.get("opzet", {})
+    opzet = {} if opzet is None else opzet
+    fouten = []
+    if not titel:
+        fouten.append("'titel' is verplicht")
+    elif len(titel) > 200:
+        fouten.append("'titel' is langer dan 200 tekens")
+    if not vraag:
+        fouten.append("'vraag' (de onderzoeksvraag) is verplicht")
+    elif len(vraag) > 2000:
+        fouten.append("'vraag' is langer dan 2000 tekens")
+    conn = get_db()
+    try:
+        fouten += metingen.valideer_opzet(opzet, bestaat=_entiteit_bestaat(conn))
+        vid = data.get("voorspelling_id")
+        if vid is not None and (not _is_geheel(vid) or not conn.execute(
+                "SELECT 1 FROM predictions WHERE id = ?", (vid,)).fetchone()):
+            fouten.append(f"voorspelling #{vid} bestaat niet")
+        if fouten:
+            return jsonify({"error": "Meting onvolledig of ongeldig", "fouten": fouten}), 400
+        cur = conn.execute("""
+            INSERT INTO metingen (titel, vraag, opzet, status, voorspelling_id, contributed_by)
+            VALUES (?, ?, ?, 'opzet', ?, ?)""",
+                           (titel, vraag, json.dumps(opzet, ensure_ascii=False), vid,
+                            g.user["username"]))
+        mid = cur.lastrowid
+        _meting_log(conn, "metingen", mid, "created",
+                    nieuw={"titel": titel, "status": "opzet", "voorspelling_id": vid},
+                    reden="Nieuwe eigen meting (opzet)")
+        conn.commit()
+        return jsonify({"id": mid, "url": f"/meting/{mid}", "status": "opzet"}), 201
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen")
+def metingen_lijst():
+    """De metingen. Zonder login alleen de afgeronde (die zijn publiek); ?status= filtert."""
+    kijker = _meting_kijker()
+    status = request.args.get("status")
+    if status and status not in metingen.STATUSSEN:
+        return jsonify({"error": f"status moet een van {metingen.STATUSSEN} zijn"}), 400
+    waar, params = [], []
+    if kijker is None:
+        waar.append("m.status = 'afgerond'")
+    if status:
+        waar.append("m.status = ?")
+        params.append(status)
+    conn = get_db()
+    try:
+        rijen = conn.execute(f"""
+            SELECT m.id, m.titel, m.vraag, m.status, m.voorspelling_id, m.contributed_by,
+                   m.created_at, m.vastgelegd_at, m.afgerond_at,
+                   (SELECT COUNT(*) FROM meting_waarnemingen w WHERE w.meting_id = m.id)
+                       AS n_waarnemingen
+            FROM metingen m {('WHERE ' + ' AND '.join(waar)) if waar else ''}
+            ORDER BY m.id DESC""", params).fetchall()  # noqa: S608 - vaste delen
+    finally:
+        conn.close()
+    lijst = [{**dict(r), "url": f"/meting/{r['id']}"} for r in rijen]
+    return jsonify({"metingen": lijst, "aantal": len(lijst), "ingelogd": kijker is not None})
+
+
+@app.route("/api/metingen/<int:mid>")
+def meting_detail(mid):
+    """Alles over één meting: opzet, waarnemingen, controles, wederhoor, samenvatting,
+    code_check (a–h) en overeenstemming. Openbaar als ze afgerond is; anders inloggen."""
+    kijker = _meting_kijker()
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if m["status"] != "afgerond" and kijker is None:
+            return jsonify({"error": "Deze meting is nog niet afgerond: inloggen vereist"}), 401
+        return jsonify(_meting_weergave(conn, m, kijker))
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/claimtoets", methods=["GET", "POST"])
+def meting_claimtoets():
+    """Punt f live: staat er een oordeel of etiket in de eigen stem van deze claim? Leest alleen
+    (?claim= of {"claim": …})."""
+    data = request.get_json(silent=True) or {}
+    claim = data.get("claim") if isinstance(data.get("claim"), str) else \
+        (request.args.get("claim") or "")
+    treffers = metingen.claim_treffers(claim)
+    return jsonify({"ok": bool(claim.strip()) and not treffers, "treffers": treffers})
+
+
+@app.route("/api/metingen/<int:mid>", methods=["PATCH"])
+@require_user()
+def meting_bewerken(mid):
+    """Titel, vraag, opzet of voorspelling bijwerken: alleen bij status 'opzet', alleen de maker
+    of een maintainer. De opzet wordt in haar geheel vervangen."""
+    data = request.json or {}
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if not _mag_meting_beheren(m, g.user):
+            return jsonify({"error": "Alleen de maker van de meting of een maintainer"}), 403
+        if m["status"] != "opzet":
+            return jsonify({"error": f"De opzet ligt vast (status '{m['status']}'); een andere "
+                                     "opzet is een nieuwe meting"}), 409
+        velden, fouten = {}, []
+        for naam, maximum in (("titel", 200), ("vraag", 2000)):
+            if naam in data:
+                w = data[naam] if isinstance(data[naam], str) else ""
+                if not w.strip():
+                    fouten.append(f"'{naam}' mag niet leeg zijn")
+                elif len(w.strip()) > maximum:
+                    fouten.append(f"'{naam}' is langer dan {maximum} tekens")
+                else:
+                    velden[naam] = w.strip()
+        if "opzet" in data:
+            opzet = {} if data["opzet"] is None else data["opzet"]
+            f = metingen.valideer_opzet(opzet, bestaat=_entiteit_bestaat(conn))
+            if f:
+                fouten += f
+            else:
+                velden["opzet"] = opzet
+        if "voorspelling_id" in data:
+            vid = data["voorspelling_id"]
+            if vid is not None and (not _is_geheel(vid) or not conn.execute(
+                    "SELECT 1 FROM predictions WHERE id = ?", (vid,)).fetchone()):
+                fouten.append(f"voorspelling #{vid} bestaat niet")
+            else:
+                velden["voorspelling_id"] = vid
+        if fouten:
+            return jsonify({"error": "Meting onvolledig of ongeldig", "fouten": fouten}), 400
+        if not velden:
+            return jsonify({"error": "Niets te wijzigen: geef titel, vraag, opzet of "
+                                     "voorspelling_id"}), 400
+        oud = {k: m[k] for k in velden}
+        opslag = {k: (json.dumps(v, ensure_ascii=False) if k == "opzet" else v)
+                  for k, v in velden.items()}
+        conn.execute(f"UPDATE metingen SET {', '.join(k + ' = ?' for k in opslag)} "  # noqa: S608
+                     "WHERE id = ?", [*opslag.values(), mid])
+        _meting_log(conn, "metingen", mid, "updated", oud=oud, nieuw=velden,
+                    reden="Opzet van de meting bijgewerkt")
+        conn.commit()
+        return jsonify(_meting_weergave(conn, metingen.laad(conn, mid), g.user))
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>", methods=["DELETE"])
+@require_user()
+def meting_verwijderen(mid):
+    """Een opzet weggooien (maker of maintainer). Een vastgelegde of afgeronde meting blijft
+    staan. De opzet blijft in edit_log."""
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if not _mag_meting_beheren(m, g.user):
+            return jsonify({"error": "Alleen de maker van de meting of een maintainer"}), 403
+        if m["status"] != "opzet":
+            return jsonify({"error": f"Alleen een opzet kan weg; deze meting is "
+                                     f"'{m['status']}' en blijft staan"}), 409
+        conn.execute("DELETE FROM meting_wederhoor WHERE meting_id = ?", (mid,))
+        conn.execute("DELETE FROM metingen WHERE id = ?", (mid,))
+        _meting_log(conn, "metingen", mid, "deleted",
+                    oud={"titel": m["titel"], "vraag": m["vraag"], "opzet": m["opzet"],
+                         "wederhoor": m["wederhoor"]},
+                    reden="Opzet van een eigen meting verwijderd")
+        conn.commit()
+        return jsonify({"id": mid, "verwijderd": True})
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/vastleggen", methods=["POST"])
+@require_user()
+def meting_vastleggen(mid):
+    """De opzet bevriezen vóór de eerste waarneming: status 'vastgelegd', vastgelegd_at en de
+    sha256 van de opzet. Eist een volledige opzet (punt a)."""
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if not _mag_meting_beheren(m, g.user):
+            return jsonify({"error": "Alleen de maker van de meting of een maintainer"}), 403
+        if m["status"] != "opzet":
+            return jsonify({"error": f"De meting is al '{m['status']}'"}), 409
+        fouten = metingen.valideer_opzet(m["opzet"], bestaat=_entiteit_bestaat(conn),
+                                         volledig=True)
+        if fouten:
+            return jsonify({"error": "De opzet is nog niet volledig", "open": fouten}), 400
+        h = metingen.opzet_hash(m["opzet"])
+        conn.execute("""UPDATE metingen SET status = 'vastgelegd', vastgelegd_at = CURRENT_TIMESTAMP,
+                        opzet_hash = ? WHERE id = ? AND status = 'opzet'""", (h, mid))
+        _meting_log(conn, "metingen", mid, "updated", oud={"status": "opzet"},
+                    nieuw={"status": "vastgelegd", "opzet_hash": h},
+                    reden="Opzet vastgelegd vóór de eerste waarneming (methode vooraf)")
+        conn.commit()
+        return jsonify(_meting_weergave(conn, metingen.laad(conn, mid), g.user))
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/waarnemingen", methods=["POST"])
+@require_user()
+def meting_waarneming_toevoegen(mid):
+    """Een waarneming invoeren (alleen bij 'vastgelegd'; de maker of een maintainer):
+    {groep, wie, entity_id?, medium_entity_id, url, archief_url?, datum, citaat, codes, notitie?}.
+    Codes mogen nog onvolledig zijn; punt c eist ze bij het afronden."""
+    data = request.json or {}
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if m["status"] != "vastgelegd":
+            return jsonify({"error": f"Waarnemingen alleen bij een vastgelegde meting (status "
+                                     f"'{m['status']}')"}), 409
+        if not _mag_meting_beheren(m, g.user):
+            return jsonify({"error": "Waarnemingen voert de maker van de meting (of een "
+                                     "maintainer) in"}), 403
+        velden, fouten = _waarneming_velden(conn, m, data, nieuw=True)
+        if fouten:
+            return jsonify({"error": "Waarneming onvolledig of ongeldig", "fouten": fouten}), 400
+        cur = conn.execute("""
+            INSERT INTO meting_waarnemingen (meting_id, groep, wie, entity_id, medium_entity_id,
+                url, archief_url, datum, citaat, codes, notitie, contributed_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (mid, velden["groep"], velden["wie"], velden["entity_id"],
+                            velden["medium_entity_id"], velden["url"], velden["archief_url"],
+                            velden["datum"], velden["citaat"],
+                            json.dumps(velden["codes"], ensure_ascii=False, sort_keys=True),
+                            velden["notitie"], g.user["username"]))
+        wid = cur.lastrowid
+        _meting_log(conn, "meting_waarnemingen", wid, "created",
+                    nieuw={"meting_id": mid, **velden}, reden=f"Waarneming in meting #{mid}")
+        conn.commit()
+        rij = conn.execute("SELECT * FROM meting_waarnemingen WHERE id = ?", (wid,)).fetchone()
+        return jsonify(_waarneming_rij(rij)), 201
+    finally:
+        conn.close()
+
+
+def _eigen_waarneming(conn, mid, wid):
+    """(meting, waarneming, None) of (…, (respons, status)) voor bewerken en verwijderen."""
+    m, fout = _meting_laden(conn, mid)
+    if fout:
+        return None, None, fout
+    w = next((x for x in m["waarnemingen"] if x["id"] == wid), None)
+    if w is None:
+        return m, None, (jsonify({"error": f"Waarneming #{wid} hoort niet bij meting #{mid}"}), 404)
+    if m["status"] != "vastgelegd":
+        return m, w, (jsonify({"error": f"De meting is '{m['status']}': waarnemingen liggen "
+                                        "vast"}), 409)
+    if w["contributed_by"] != g.user["username"]:
+        return m, w, (jsonify({"error": "Alleen je eigen waarnemingen"}), 403)
+    return m, w, None
+
+
+@app.route("/api/metingen/<int:mid>/waarnemingen/<int:wid>", methods=["PATCH"])
+@require_user()
+def meting_waarneming_bewerken(mid, wid):
+    """Een eigen waarneming bijwerken (alleen bij 'vastgelegd'). Na een blinde controle liggen
+    codering, citaat, url, wie en groep vast. Een gewijzigd citaat of adres moet opnieuw op de
+    url teruggevonden worden."""
+    data = request.json or {}
+    conn = get_db()
+    try:
+        m, w, fout = _eigen_waarneming(conn, mid, wid)
+        if fout:
+            return fout
+        velden, fouten = _waarneming_velden(conn, m, data, nieuw=False)
+        if fouten:
+            return jsonify({"error": "Waarneming ongeldig", "fouten": fouten}), 400
+        velden = {k: v for k, v in velden.items() if v != w.get(k)}
+        if not velden:
+            return jsonify(_waarneming_rij(conn.execute(
+                "SELECT * FROM meting_waarnemingen WHERE id = ?", (wid,)).fetchone()))
+        gecontroleerd = any(c["waarneming_id"] == wid for c in m["controles"])
+        vast = [k for k in velden if k in METING_VAST_NA_CONTROLE]
+        if gecontroleerd and vast:
+            return jsonify({"error": "Deze waarneming is al blind gecontroleerd: "
+                                     f"{', '.join(vast)} liggen vast. Klopt ze niet, verwijder "
+                                     "haar dan met een reden."}), 409
+        opslag = {k: (json.dumps(v, ensure_ascii=False, sort_keys=True) if k == "codes" else v)
+                  for k, v in velden.items()}
+        if {"url", "archief_url", "citaat"} & set(velden):
+            opslag.update({"citaat_gevonden": None, "citaat_gecontroleerd_at": None})
+        conn.execute(f"UPDATE meting_waarnemingen SET {', '.join(k + ' = ?' for k in opslag)} "  # noqa: S608
+                     "WHERE id = ?", [*opslag.values(), wid])
+        _meting_log(conn, "meting_waarnemingen", wid, "updated",
+                    oud={k: w.get(k) for k in velden}, nieuw=velden,
+                    reden=f"Waarneming in meting #{mid} bijgewerkt")
+        conn.commit()
+        return jsonify(_waarneming_rij(conn.execute(
+            "SELECT * FROM meting_waarnemingen WHERE id = ?", (wid,)).fetchone()))
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/waarnemingen/<int:wid>", methods=["DELETE"])
+@require_user()
+def meting_waarneming_verwijderen(mid, wid):
+    """Een eigen waarneming verwijderen (alleen bij 'vastgelegd'). Is ze al blind gecontroleerd,
+    dan is een reden verplicht ({"reden": …} of ?reden=). Alles blijft in edit_log."""
+    data = request.get_json(silent=True) or {}
+    reden = (data.get("reden") if isinstance(data.get("reden"), str) else
+             request.args.get("reden") or "").strip()
+    conn = get_db()
+    try:
+        m, w, fout = _eigen_waarneming(conn, mid, wid)
+        if fout:
+            return fout
+        controles = [c for c in m["controles"] if c["waarneming_id"] == wid]
+        if controles and len(reden) < 5:
+            return jsonify({"error": "Deze waarneming is al blind gecontroleerd: geef een reden "
+                                     "(die blijft in edit_log)"}), 400
+        conn.execute("DELETE FROM meting_controles WHERE waarneming_id = ?", (wid,))
+        conn.execute("DELETE FROM meting_waarnemingen WHERE id = ?", (wid,))
+        _meting_log(conn, "meting_waarnemingen", wid, "deleted",
+                    oud={"waarneming": {k: w.get(k) for k in metingen.DATA_VELDEN},
+                         "controles": [{"door": c["door"], "codes": c["codes"]} for c in controles]},
+                    reden=f"Waarneming uit meting #{mid} verwijderd"
+                          + (f": {reden}" if reden else ""))
+        conn.commit()
+        return jsonify({"id": wid, "verwijderd": True})
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/controle")
+@require_user()
+def meting_controle_wachtrij(mid):
+    """De blinde controle voor de ingelogde gebruiker: de waarnemingen die hij niet zelf invoerde
+    en nog niet codeerde, ZONDER de eerste codering, in een eigen willekeurige volgorde (zodat
+    niemand de makkelijke uitzoekt). De agent scripts/meting_controle.py gebruikt dit ook."""
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+    finally:
+        conn.close()
+    ik = g.user["username"]
+    eigen = {c["waarneming_id"] for c in m["controles"] if c["door"] == ik}
+    kandidaten = [w for w in m["waarnemingen"]
+                  if w["contributed_by"] != ik and w["id"] not in eigen]
+    # Eerst wat nog niemand controleerde (zo haalt punt d het), daarin een eigen willekeurige volgorde
+    al_gecontroleerd = metingen.gecontroleerd(m)
+    kandidaten.sort(key=lambda w: (w["id"] in al_gecontroleerd, hashlib.sha256(
+        f"{mid}:{w['id']}:{ik}".encode()).hexdigest()))
+    open_ = m["status"] == "vastgelegd"
+    return jsonify({
+        "meting_id": mid, "status": m["status"],
+        "reden": None if open_ else "controleren kan alleen bij een vastgelegde meting",
+        "vragen": metingen.vragen(m["opzet"]),
+        "nodig": metingen.nodig_controles(len(m["waarnemingen"])),
+        "gecontroleerd": len(metingen.gecontroleerd(m)),
+        "door_mij": len(eigen),
+        "eigen_waarnemingen": sum(1 for w in m["waarnemingen"] if w["contributed_by"] == ik),
+        "te_controleren": [{
+            "id": w["id"], "groep": w["groep"], "wie": w["wie"],
+            "medium_entity_id": w["medium_entity_id"],
+            "medium": (metingen.naam_van(m, w["medium_entity_id"])
+                       if w.get("medium_entity_id") else None),
+            "url": w["url"], "archief_url": w["archief_url"], "datum": w["datum"],
+            "citaat": w["citaat"]} for w in kandidaten] if open_ else [],
+    })
+
+
+@app.route("/api/metingen/<int:mid>/waarnemingen/<int:wid>/controle", methods=["POST"])
+@require_user()
+def meting_controle_indienen(mid, wid):
+    """Een blinde tweede codering {codes} (alle vragen). Niet door de invoerder (403); één per
+    account per waarneming (409). Daarna ziet de controleur de eerste codering."""
+    data = request.json or {}
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        w = next((x for x in m["waarnemingen"] if x["id"] == wid), None)
+        if w is None:
+            return jsonify({"error": f"Waarneming #{wid} hoort niet bij meting #{mid}"}), 404
+        if m["status"] != "vastgelegd":
+            return jsonify({"error": "Controleren kan alleen bij een vastgelegde meting"}), 409
+        if w["contributed_by"] == g.user["username"]:
+            return jsonify({"error": "Je controleert je eigen waarneming niet: een ander account "
+                                     "codeert haar blind opnieuw"}), 403
+        codes = data.get("codes")
+        fouten = metingen.valideer_codes(m["opzet"], codes, volledig=True)
+        if fouten:
+            return jsonify({"error": "Controle onvolledig of ongeldig", "fouten": fouten}), 400
+        try:
+            cur = conn.execute("""INSERT INTO meting_controles (waarneming_id, codes, door)
+                                  VALUES (?, ?, ?)""",
+                               (wid, json.dumps(codes, ensure_ascii=False, sort_keys=True),
+                                g.user["username"]))
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Je controleerde deze waarneming al"}), 409
+        cid = cur.lastrowid
+        _meting_log(conn, "meting_controles", cid, "created",
+                    nieuw={"waarneming_id": wid, "codes": codes},
+                    reden=f"Blinde controle van waarneming #{wid} (meting #{mid})")
+        conn.commit()
+        eerste = w.get("codes") or {}
+        return jsonify({"id": cid, "waarneming_id": wid, "codes": codes, "eerste": eerste,
+                        "gelijk": {s: eerste.get(s) == o for s, o in codes.items()}}), 201
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/waarnemingen/<int:wid>/citaatcontrole", methods=["POST"])
+@require_user()
+def meting_citaatcontrole(mid, wid):
+    """Of het citaat letterlijk op de url (of de archiefkopie) staat: {gevonden, toelichting}.
+    Alleen het account metingcheck (scripts/metingcheck.py), alleen bij 'vastgelegd'."""
+    if g.user["username"] != METING_CHECK_ACCOUNT:
+        return jsonify({"error": "Alleen het account metingcheck zet of een citaat is "
+                                 "teruggevonden"}), 403
+    data = request.json or {}
+    if not isinstance(data.get("gevonden"), bool):
+        return jsonify({"error": "'gevonden' is true of false"}), 400
+    toelichting = str(data.get("toelichting") or "")[:400]
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        w = next((x for x in m["waarnemingen"] if x["id"] == wid), None)
+        if w is None:
+            return jsonify({"error": f"Waarneming #{wid} hoort niet bij meting #{mid}"}), 404
+        if m["status"] != "vastgelegd":
+            return jsonify({"error": f"De meting is '{m['status']}': geen citaatcontrole"}), 409
+        waarde = 1 if data["gevonden"] else 0
+        conn.execute("""UPDATE meting_waarnemingen SET citaat_gevonden = ?,
+                        citaat_gecontroleerd_at = CURRENT_TIMESTAMP WHERE id = ?""", (waarde, wid))
+        _meting_log(conn, "meting_waarnemingen", wid, "updated",
+                    oud={"citaat_gevonden": w.get("citaat_gevonden")},
+                    nieuw={"citaat_gevonden": waarde},
+                    reden=f"metingcheck: {toelichting}" if toelichting else "metingcheck")
+        conn.commit()
+        return jsonify({"id": wid, "citaat_gevonden": waarde})
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/wederhoor", methods=["POST"])
+@require_user()
+def meting_wederhoor_toevoegen(mid):
+    """Hoor en wederhoor (punt e): {partij, entity_id?, soort, tekst?, bron_url?, datum?}. Een
+    reactie draagt tekst, een verzoek zonder reactie een datum, een gepubliceerd standpunt een
+    bron. De maker of een maintainer; ook na het afronden (een reactie kan later komen)."""
+    data = request.json or {}
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if not _mag_meting_beheren(m, g.user):
+            return jsonify({"error": "Alleen de maker van de meting of een maintainer"}), 403
+        fouten = []
+        soort = data.get("soort")
+        if soort not in metingen.WEDERHOOR_SOORTEN:
+            fouten.append("'soort' moet een van zijn: " + ", ".join(metingen.WEDERHOOR_SOORTEN))
+        eid = data.get("entity_id")
+        if eid in (None, ""):
+            eid = None
+        elif not _is_geheel(eid) or not _entiteit_bestaat(conn)(eid):
+            fouten.append(f"'entity_id': knoop #{eid} bestaat niet")
+            eid = None
+        partij = data.get("partij") if isinstance(data.get("partij"), str) else ""
+        partij = partij.strip()
+        if not partij and eid:
+            partij = conn.execute("SELECT name FROM entities WHERE id = ?", (eid,)).fetchone()[0]
+        if not partij:
+            fouten.append("'partij' is verplicht (of geef een entity_id)")
+        tekst = (data.get("tekst") or "").strip() if isinstance(data.get("tekst"), str) else ""
+        bron_url = (data.get("bron_url") or "").strip() if isinstance(data.get("bron_url"), str) else ""
+        datum = data.get("datum") or None
+        if datum is not None and not metingen.datum_ok(datum):
+            fouten.append("'datum' moet JJJJ-MM-DD zijn")
+        if bron_url and not metingen.url_ok(bron_url):
+            fouten.append("'bron_url' moet een http(s)-adres zijn")
+        if soort == "reactie" and not tekst:
+            fouten.append("een reactie draagt de tekst van de reactie")
+        if soort == "verzoek_zonder_reactie" and not datum:
+            fouten.append("een verzoek zonder reactie draagt de datum van het verzoek")
+        if soort == "gepubliceerd_standpunt" and not bron_url:
+            fouten.append("een gepubliceerd standpunt draagt de bron (bron_url)")
+        if len(tekst) > 4000:
+            fouten.append("'tekst' is langer dan 4000 tekens")
+        if fouten:
+            return jsonify({"error": "Wederhoor onvolledig of ongeldig", "fouten": fouten}), 400
+        cur = conn.execute("""
+            INSERT INTO meting_wederhoor (meting_id, partij, entity_id, soort, tekst, bron_url,
+                                          datum, door)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (mid, partij, eid, soort, tekst or None, bron_url or None, datum,
+                            g.user["username"]))
+        rid = cur.lastrowid
+        _meting_log(conn, "meting_wederhoor", rid, "created",
+                    nieuw={"meting_id": mid, "partij": partij, "entity_id": eid, "soort": soort,
+                           "datum": datum, "bron_url": bron_url or None},
+                    reden=f"Wederhoor bij meting #{mid}: {metingen.WEDERHOOR_LABELS[soort]}")
+        conn.commit()
+        return jsonify(dict(conn.execute("SELECT * FROM meting_wederhoor WHERE id = ?",
+                                         (rid,)).fetchone())), 201
+    finally:
+        conn.close()
+
+
+@app.route("/api/metingen/<int:mid>/afronden", methods=["POST"])
+@require_user()
+def meting_afronden(mid):
+    """De dataset bevriezen: samenvatting (met de mediumnamen van nu) en de sha256 van de
+    dataset; status 'afgerond'. Weigert met de open punten als a–d niet in orde zijn."""
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if not _mag_meting_beheren(m, g.user):
+            return jsonify({"error": "Alleen de maker van de meting of een maintainer"}), 403
+        if m["status"] != "vastgelegd":
+            return jsonify({"error": f"Alleen een vastgelegde meting kan afgerond worden "
+                                     f"(status '{m['status']}')"}), 409
+        punten = metingen.code_check(m)
+        if not metingen.in_orde(punten, metingen.AFRONDEN_EIST):
+            return jsonify({"error": "De meting voldoet nog niet aan de journalistieke codes a–d",
+                            "open": metingen.open_punten(punten, metingen.AFRONDEN_EIST),
+                            "code_check": punten}), 400
+        samenvatting = metingen.samenvatting(m)
+        dh = metingen.data_hash(m)
+        conn.execute("""UPDATE metingen SET status = 'afgerond', afgerond_at = CURRENT_TIMESTAMP,
+                        data_hash = ?, samenvatting = ? WHERE id = ? AND status = 'vastgelegd'""",
+                     (dh, json.dumps(samenvatting, ensure_ascii=False), mid))
+        _meting_log(conn, "metingen", mid, "updated", oud={"status": "vastgelegd"},
+                    nieuw={"status": "afgerond", "data_hash": dh,
+                           "waarnemingen": len(m["waarnemingen"])},
+                    reden="Meting afgerond: dataset en samenvatting bevroren")
+        conn.commit()
+        return jsonify(_meting_weergave(conn, metingen.laad(conn, mid), g.user))
+    finally:
+        conn.close()
+
+
+def _meting_bron(conn, m):
+    """De bron van een afgeronde meting: hergebruikt (cluster 'meting:<id>') of nieuw, met de
+    publieke metingpagina als vindplaats. → (source_id, nieuw)."""
+    ck = metingen.cluster_key(m["id"])
+    url = f"{_meting_basis_url()}/meting/{m['id']}"
+    rij = conn.execute("SELECT id FROM sources WHERE cluster_key = ? ORDER BY id LIMIT 1",
+                       (ck,)).fetchone()
+    if rij:
+        sid = rij["id"]
+        if not conn.execute("SELECT 1 FROM source_locations WHERE source_id = ? "
+                            "AND location_type = 'url'", (sid,)).fetchone():
+            conn.execute("""INSERT INTO source_locations (source_id, location_type, location,
+                            accessed_at, notes) VALUES (?, 'url', ?, ?, ?)""",
+                         (sid, url, datetime.date.today().isoformat(),
+                          "Publieke pagina van de eigen meting"))
+        return sid, False
+    cur = conn.execute("""
+        INSERT INTO sources (title, author, source_type, publisher, date_published, summary,
+                             cluster_key)
+        VALUES (?, ?, 'dataset', ?, ?, ?, ?)""",
+                       (metingen.bron_titel(m), m["contributed_by"], metingen.BRON_PUBLISHER,
+                        str(m["afgerond_at"] or "")[:10] or None, m["vraag"], ck))
+    sid = cur.lastrowid
+    conn.execute("""INSERT INTO source_locations (source_id, location_type, location, accessed_at,
+                    notes) VALUES (?, 'url', ?, ?, ?)""",
+                 (sid, url, datetime.date.today().isoformat(),
+                  "Publieke pagina van de eigen meting"))
+    _meting_log(conn, "sources", sid, "created",
+                nieuw={"title": metingen.bron_titel(m), "source_type": "dataset",
+                       "cluster_key": ck, "url": url},
+                reden=f"Bron van eigen meting #{m['id']} (als bewijs gebruikt)")
+    return sid, True
+
+
+@app.route("/api/metingen/<int:mid>/als_bewijs", methods=["POST"])
+@require_user()
+def meting_als_bewijs(mid):
+    """Een afgeronde meting als bewijs: {relation_id | entity_id | mechanism_id (ook als
+    "doel": {…}), stance (supporting|contradicting), property (null|"influence"), claim, regel,
+    negeer_duplicaten?}. Eist alle codes a–h (de claim voor punt f) en een regel die letterlijk in
+    de samenvatting staat. Maakt of hergebruikt de bron (dataset, cluster 'meting:<id>', de
+    metingpagina als vindplaats) en dient via dezelfde kern als POST /api/arguments een
+    root-argument in met één citatie (quote = de regel, methode verbatim_quote). Een argument van
+    een maintainer merget dus meteen; de rest landt 'voorgesteld'. → {source_id, argument_id}."""
+    data = request.json or {}
+    doel = data.get("doel") if isinstance(data.get("doel"), dict) else {}
+    gezet = {k: data.get(k, doel.get(k)) for k in ("relation_id", "entity_id", "mechanism_id")}
+    gezet = {k: v for k, v in gezet.items() if v not in (None, "")}
+    fouten = []
+    if len(gezet) != 1:
+        fouten.append("geef precies één doel: relation_id, entity_id of mechanism_id")
+    elif not _is_geheel(next(iter(gezet.values()))):
+        fouten.append("het doel is een id (geheel getal)")
+    stance = data.get("stance")
+    if stance not in ("supporting", "contradicting"):
+        fouten.append("'stance' is 'supporting' of 'contradicting'")
+    prop = data.get("property") or None
+    if prop not in (None, "influence"):
+        fouten.append("'property' is null (bestaan) of 'influence'")
+    claim = data.get("claim").strip() if isinstance(data.get("claim"), str) else ""
+    regel = data.get("regel").strip() if isinstance(data.get("regel"), str) else ""
+    if not claim:
+        fouten.append("'claim' is verplicht: wat is er gemeten?")
+    if not regel:
+        fouten.append("'regel' is verplicht: één regel uit de samenvatting")
+    if fouten:
+        return jsonify({"error": "Bewijs onvolledig", "fouten": fouten}), 400
+    conn = get_db()
+    try:
+        m, fout = _meting_laden(conn, mid)
+        if fout:
+            return fout
+        if m["status"] != "afgerond":
+            return jsonify({"error": "Alleen een afgeronde meting kan als bewijs dienen"}), 400
+        kolom, doel_id = next(iter(gezet.items()))
+        tabel = {"relation_id": "relations", "entity_id": "entities",
+                 "mechanism_id": "mechanisms"}[kolom]
+        if not conn.execute(f"SELECT 1 FROM {tabel} WHERE id = ?", (doel_id,)).fetchone():  # noqa: S608
+            return jsonify({"error": f"{kolom} #{doel_id} bestaat niet"}), 400
+        regels = metingen.regels_van(m)
+        if regel not in regels:
+            return jsonify({"error": "De regel staat niet letterlijk in de samenvatting",
+                            "regels": regels}), 400
+        punten = metingen.code_check(m, claim=claim)
+        if not metingen.in_orde(punten, metingen.BEWIJS_EIST):
+            return jsonify({"error": "De meting voldoet nog niet aan de journalistieke codes a–h",
+                            "open": metingen.open_punten(punten), "code_check": punten}), 400
+        bron_id, bron_nieuw = _meting_bron(conn, m)
+        conn.commit()
+    finally:
+        conn.close()
+    reasoning = (f"Eigen meting #{mid} ({len(m['waarnemingen'])} waarnemingen, afgerond "
+                 f"{str(m['afgerond_at'])[:10]}; opzet vooraf vastgelegd, sha256 "
+                 f"{(m['opzet_hash'] or '')[:12]}…). De citatie is een regel uit de samenvatting; "
+                 f"de meting staat op /meting/{mid}.")
+    resp, status = _maak_argument({
+        kolom: doel_id, "stance": stance, "property": prop, "claim": claim,
+        "reasoning": reasoning,
+        "citations": [{"source_id": bron_id, "quote": regel, "methode": "verbatim_quote",
+                       "context": f"Samenvattingsregel van eigen meting #{mid}"}],
+        "negeer_duplicaten": bool(data.get("negeer_duplicaten"))})
+    body = resp.get_json(silent=True) or {}
+    if status != 201:
+        body["source_id"] = bron_id
+        return jsonify(body), status
+    return jsonify({"source_id": bron_id, "argument_id": body.get("id"),
+                    "argument_status": body.get("status"), "bron_nieuw": bron_nieuw,
+                    "meting_id": mid}), 201
 
 
 if __name__ == "__main__":

@@ -93,6 +93,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 from registercheck import REGISTER_ARG_SQL  # noqa: E402  Uitbreiding C: registerfeiten zijn niet voor mij
+from metingcheck import METING_ARG_SQL  # noqa: E402  eigen metingen (2026-10-16): metingcheck oordeelt
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 ACCOUNT = "bronchecker"
@@ -101,6 +102,12 @@ DEFAULT_API = "http://127.0.0.1:5000"
 LOG_PATH = ROOT / "data" / "bronchecker_log.jsonl"
 POGINGEN_PATH = ROOT / "data" / "bronchecker_pogingen.json"
 VERSIE = "[bronchecker v3]"
+# Instituut of persoon (eigenaarsbesluit 2026-10-19): bij deze verbanden van een organisatie telt
+# alleen wat zij zelf brengt; een optreden van één medewerker is het verband van die persoon
+INSTITUUT_DOELTYPEN = ("mediaorganisatie", "omroep", "persbureau", "platform")
+INSTITUUT_MECHANISMEN = ("expert_framing", "expert_legitimatie", "bron_afhankelijkheid",
+                         "institutioneel_gezag", "ngo_levert_expert", "denktank_naar_persbureau",
+                         "denktank_naar_politiek")
 # Alle versies vanaf v2 dragen "[bronchecker vN]"; v1 schreef "[bronchecker]"
 VERSIE_GEZET = "[bronchecker v%"
 MAX_POGINGEN = 3
@@ -469,7 +476,8 @@ def verband_van(conn, arg) -> dict | None:
         return None
     if (arg["property"] or "existence") not in ("existence", "influence"):
         return None
-    r = conn.execute("""SELECT s.name AS bron, t.name AS doel, r.relation_type, m.name AS mech
+    r = conn.execute("""SELECT s.name AS bron, t.name AS doel, r.relation_type, m.name AS mech,
+                               s.type AS bron_type, t.type AS doel_type
                         FROM relations r JOIN entities s ON s.id = r.source_id
                         JOIN entities t ON t.id = r.target_id
                         LEFT JOIN mechanisms m ON m.id = r.mechanism_id
@@ -501,7 +509,7 @@ def kandidaten(conn, ids=None) -> list[sqlite3.Row]:
         SELECT a.* FROM arguments a
         WHERE a.status = 'voorgesteld' AND NOT a.vervangen
           AND COALESCE(a.contributed_by, '') <> ?
-          AND NOT {REGISTER_ARG_SQL}
+          AND NOT {REGISTER_ARG_SQL} AND NOT {METING_ARG_SQL}
           AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
                           AND o.fase = 'herverificatie' AND o.door = ?){filt}
         ORDER BY a.id DESC""", params).fetchall()  # noqa: S608 - alleen placeholders
@@ -587,7 +595,7 @@ def controle_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
           AND (a.entity_id IS NULL OR e.status = 'goedgekeurd')
           AND COALESCE(a.contributed_by, '') <> ?
           AND EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
-          AND NOT {REGISTER_ARG_SQL}
+          AND NOT {REGISTER_ARG_SQL} AND NOT {METING_ARG_SQL}
           AND NOT EXISTS (SELECT 1 FROM immuun_oordelen o WHERE o.argument_id = a.id
                           AND o.fase = 'herverificatie'
                           AND (o.door = ? OR o.verdict = 'klopt')){filt}""",
@@ -682,7 +690,7 @@ def specifiek_kandidaten(conn, ids=None) -> list[sqlite3.Row]:
           AND COALESCE(a.property, 'existence') IN ('existence', 'influence')
           AND o.verdict = 'klopt' AND COALESCE(o.detail, '') NOT LIKE ?
           AND COALESCE(a.contributed_by, '') <> ?
-          AND NOT {REGISTER_ARG_SQL}{filt}""", params).fetchall()  # noqa: S608
+          AND NOT {REGISTER_ARG_SQL} AND NOT {METING_ARG_SQL}{filt}""", params).fetchall()  # noqa: S608
     return sorteer_op_voorrang(conn, rijen)
 
 
@@ -792,6 +800,20 @@ def beoordeel_argument(conn, arg) -> dict:
                      "algemeen gaat ('de pers', 'journalisten', 'de media', 'Nederlandse kranten', "
                      "'de politiek') of over een ander verband; noem dan in 'ontbreekt' de partij "
                      "waar het niet over gaat (anders een lege tekst).\n" if verband else "")
+                  # Instituut of persoon (eigenaarsbesluit 2026-10-19): een optreden van één
+                  # medewerker met eigen duiding is het verband van die persoon, niet van de
+                  # organisatie — alleen wat de organisatie zelf brengt, draagt organisatie → doel
+                  + (f"Let op: {verband['bron']} is een organisatie. Gaat het feit alleen over één "
+                     "persoon die eigen duiding of analyse geeft, met de organisatie als herkomst "
+                     "('zegt Clingendael-onderzoeker X'), dan is het antwoord op vraag 2 'nee': dat "
+                     f"is het verband van die persoon met {verband['doel']}. Noem dan in 'ontbreekt': "
+                     f"'{verband['bron']} zelf (het optreden is van <naam>)'. 'ja' blijft het als de "
+                     "organisatie zelf spreekt: haar rapport, cijfers, peiling, persbericht, standpunt "
+                     "of partnerschap, of iemand die namens haar spreekt (woordvoerder, directeur, "
+                     "hoofdeconoom bij de eigen cijfers).\n"
+                     if verband and verband.get("bron_type") != "persoon"
+                     and (verband.get("doel_type") in INSTITUUT_DOELTYPEN
+                          or verband.get("mech") in INSTITUUT_MECHANISMEN) else "")
                   + "Geef in 'reden' één korte zin.")
         antwoord = vraag_model(prompt, SCHEMA_VERBAND if verband else SCHEMA_ARGUMENT)
         if not antwoord:

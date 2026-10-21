@@ -1,0 +1,1548 @@
+{
+ "_toelichting": "LittleSis-entiteit → knoop in het model, met de hand nagelopen (README § Regels: nooit op naam alleen). 'bewijs' zegt waarop de koppeling rust (blurb, website, alias of een organisatie die beide kennen). Een LittleSis-dubbel mag naar dezelfde knoop; 'niet' legt afgewezen naamgenoten vast.",
+ "model_dubbel": {
+  "_toelichting": "model-dubbels die op een samenvoegen-RfC wachten: id → het id waarnaar LittleSis koppelt",
+  "835": 75
+ },
+ "koppelingen": {
+  "36952": {
+   "model": 20,
+   "littlesis": "Bilderberg Group",
+   "naam": "Bilderberg Groep",
+   "bewijs": "Bilderberg-conferentie; zelfde forum"
+  },
+  "33496": {
+   "model": 21,
+   "littlesis": "Trilateral Commission",
+   "naam": "Trilaterale Commissie",
+   "bewijs": "trilateral.org"
+  },
+  "41410": {
+   "model": 23,
+   "littlesis": "World Economic Forum",
+   "naam": "World Economic Forum",
+   "bewijs": "weforum.org"
+  },
+  "37583": {
+   "model": 23,
+   "littlesis": "World Economic Forum Foundation",
+   "naam": "World Economic Forum",
+   "bewijs": "World Economic Forum Foundation = de stichting achter het WEF"
+  },
+  "151148": {
+   "model": 22,
+   "littlesis": "European Round Table of Industrialists",
+   "naam": "European Round Table of Industrialists",
+   "bewijs": "ERT"
+  },
+  "401931": {
+   "model": 22,
+   "littlesis": "European Round Table for Industrialists",
+   "naam": "European Round Table of Industrialists",
+   "bewijs": "ERT, dubbele schrijfwijze in LittleSis"
+  },
+  "33359": {
+   "model": 976,
+   "littlesis": "Atlantic Council",
+   "naam": "Atlantic Council",
+   "bewijs": "atlanticcouncil.org"
+  },
+  "426104": {
+   "model": 1132,
+   "littlesis": "Munich Security Conference",
+   "naam": "Munich Security Conference (MSC)",
+   "bewijs": "Munich Security Conference"
+  },
+  "461420": {
+   "model": 1156,
+   "littlesis": "SIGINT Seniors Europe",
+   "naam": "SIGINT Seniors Europe (SSEUR / '14 Eyes')",
+   "bewijs": "'Also known as 14 Eyes'"
+  },
+  "34966": {
+   "model": 980,
+   "littlesis": "German Marshall Fund",
+   "naam": "German Marshall Fund of the United States (GMF)",
+   "bewijs": "German Marshall Fund"
+  },
+  "110602": {
+   "model": 977,
+   "littlesis": "Chatham House",
+   "naam": "Chatham House",
+   "bewijs": "Chatham House"
+  },
+  "348694": {
+   "model": 978,
+   "littlesis": "European Council on Foreign Relations",
+   "naam": "European Council on Foreign Relations (ECFR)",
+   "bewijs": "ECFR"
+  },
+  "36883": {
+   "model": 834,
+   "littlesis": "Foundation for Defense of Democracies",
+   "naam": "Foundation for Defense of Democracies (FDD)",
+   "bewijs": "FDD"
+  },
+  "130457": {
+   "model": 776,
+   "littlesis": "Institute for the Study of War",
+   "naam": "Institute for the Study of War (ISW)",
+   "bewijs": "ISW"
+  },
+  "131041": {
+   "model": 4993,
+   "littlesis": "Gatestone Institute",
+   "naam": "Gatestone Institute",
+   "bewijs": "Gatestone"
+  },
+  "101119": {
+   "model": 4959,
+   "littlesis": "Middle East Forum",
+   "naam": "Middle East Forum",
+   "bewijs": "Middle East Forum"
+  },
+  "38930": {
+   "model": 5011,
+   "littlesis": "Institute for National Security Studies",
+   "naam": "Institute for National Security Studies",
+   "bewijs": "INSS (Israël)"
+  },
+  "218779": {
+   "model": 1017,
+   "littlesis": "Oxford Economics",
+   "naam": "Oxford Economics",
+   "bewijs": "Oxford Economics"
+  },
+  "34877": {
+   "model": 622,
+   "littlesis": "World Resources Institute",
+   "naam": "World Resources Institute",
+   "bewijs": "WRI"
+  },
+  "463283": {
+   "model": 4961,
+   "littlesis": "European Leadership Network",
+   "naam": "European Leadership Network (ELNET)",
+   "bewijs": "ELNET, Europa-Israël"
+  },
+  "78899": {
+   "model": 25,
+   "littlesis": "Groupe Bruxelles Lambert S.A.",
+   "naam": "Groupe Bruxelles Lambert",
+   "bewijs": "Groupe Bruxelles Lambert S.A."
+  },
+  "379545": {
+   "model": 43,
+   "littlesis": "Clingendael Institute",
+   "naam": "Clingendael Instituut",
+   "bewijs": "Clingendael Institute"
+  },
+  "69293": {
+   "model": 36,
+   "littlesis": "Unilever NV",
+   "naam": "Unilever",
+   "bewijs": "Unilever NV, 'Dutch controlling company'"
+  },
+  "85651": {
+   "model": 36,
+   "littlesis": "Unilever PLC",
+   "naam": "Unilever",
+   "bewijs": "Unilever PLC (duale structuur)"
+  },
+  "85652": {
+   "model": 36,
+   "littlesis": "Unilever group",
+   "naam": "Unilever",
+   "bewijs": "Unilever group"
+  },
+  "84758": {
+   "model": 75,
+   "littlesis": "Royal Dutch Shell",
+   "naam": "Shell",
+   "bewijs": "Royal Dutch Shell, shell.com (model-duplicaat #835)"
+  },
+  "408593": {
+   "model": 75,
+   "littlesis": "Royal Dutch Shell",
+   "naam": "Shell",
+   "bewijs": "Royal Dutch Shell (dubbel in LittleSis)"
+  },
+  "219932": {
+   "model": 75,
+   "littlesis": "Royal Dutch Shell Group",
+   "naam": "Shell",
+   "bewijs": "Royal Dutch Shell Group"
+  },
+  "88496": {
+   "model": 76,
+   "littlesis": "ING Groep N.V.",
+   "naam": "ING",
+   "bewijs": "ING Groep N.V., Amsterdam"
+  },
+  "119155": {
+   "model": 76,
+   "littlesis": "ING Group, N.V.",
+   "naam": "ING",
+   "bewijs": "ING Group N.V. (dubbel)"
+  },
+  "118949": {
+   "model": 77,
+   "littlesis": "ASML Holding N.V.",
+   "naam": "ASML",
+   "bewijs": "ASML Holding N.V."
+  },
+  "85644": {
+   "model": 78,
+   "littlesis": "Koninklijke Philips Electronics N.V.",
+   "naam": "Philips",
+   "bewijs": "Koninklijke Philips Electronics N.V., 'Dutch electronics'"
+  },
+  "119166": {
+   "model": 78,
+   "littlesis": "Koninklijke Philips N.V.",
+   "naam": "Philips",
+   "bewijs": "Koninklijke Philips N.V., philips.com"
+  },
+  "400692": {
+   "model": 78,
+   "littlesis": "PHILIPS",
+   "naam": "Philips",
+   "bewijs": "PHILIPS"
+  },
+  "327729": {
+   "model": 306,
+   "littlesis": "ABN AMRO Bank N.V.",
+   "naam": "ABN AMRO",
+   "bewijs": "ABN AMRO Bank N.V., abnamro.com"
+  },
+  "327730": {
+   "model": 306,
+   "littlesis": "ABN AMRO Group N.V.",
+   "naam": "ABN AMRO",
+   "bewijs": "ABN AMRO Group N.V."
+  },
+  "380889": {
+   "model": 346,
+   "littlesis": "Rabobank",
+   "naam": "Rabobank",
+   "bewijs": "Rabobank, 'Dutch farmers'"
+  },
+  "116207": {
+   "model": 346,
+   "littlesis": "Rabobank Nederland",
+   "naam": "Rabobank",
+   "bewijs": "Rabobank Nederland"
+  },
+  "251700": {
+   "model": 346,
+   "littlesis": "Coöperatieve Rabobank UA",
+   "naam": "Rabobank",
+   "bewijs": "Coöperatieve Rabobank U.A."
+  },
+  "215433": {
+   "model": 1128,
+   "littlesis": "Heineken N.V.",
+   "naam": "Heineken",
+   "bewijs": "Heineken N.V."
+  },
+  "426616": {
+   "model": 1128,
+   "littlesis": "Heineken",
+   "naam": "Heineken",
+   "bewijs": "Heineken, 'Dutch beer brand'"
+  },
+  "278236": {
+   "model": 385,
+   "littlesis": "Koninklijke KPN NV",
+   "naam": "KPN",
+   "bewijs": "Koninklijke KPN NV"
+  },
+  "37375": {
+   "model": 1126,
+   "littlesis": "Akzo Nobel N.V.",
+   "naam": "AkzoNobel",
+   "bewijs": "Akzo Nobel N.V., akzonobel.com"
+  },
+  "146243": {
+   "model": 1126,
+   "littlesis": "AkzoNobel",
+   "naam": "AkzoNobel",
+   "bewijs": "AkzoNobel"
+  },
+  "112858": {
+   "model": 125,
+   "littlesis": "KLM",
+   "naam": "KLM",
+   "bewijs": "KLM, 'flag carrier of the Netherlands'"
+  },
+  "283541": {
+   "model": 986,
+   "littlesis": "Air France–KLM",
+   "naam": "Air France-KLM",
+   "bewijs": "Air France-KLM"
+  },
+  "217634": {
+   "model": 1125,
+   "littlesis": "Adyen",
+   "naam": "Adyen",
+   "bewijs": "Adyen, Amsterdam"
+  },
+  "411215": {
+   "model": 661,
+   "littlesis": "Triodos Bank",
+   "naam": "Triodos Bank",
+   "bewijs": "Triodos Bank, 'Dutch bank'"
+  },
+  "400580": {
+   "model": 936,
+   "littlesis": "Berenschot Groep B.V.",
+   "naam": "Berenschot",
+   "bewijs": "Berenschot Groep B.V., 'Dutch management consulting'"
+  },
+  "165832": {
+   "model": 74,
+   "littlesis": "Umicore S.A",
+   "naam": "Umicore",
+   "bewijs": "Umicore S.A."
+  },
+  "88501": {
+   "model": 73,
+   "littlesis": "KBC Group NV",
+   "naam": "KBC Groep",
+   "bewijs": "KBC Group NV, 'Belgian financial group'"
+  },
+  "374734": {
+   "model": 1002,
+   "littlesis": "Mecom Group plc",
+   "naam": "Mecom",
+   "bewijs": "Mecom Group plc"
+  },
+  "344764": {
+   "model": 348,
+   "littlesis": "Bank Degroof Petercam",
+   "naam": "Bank Degroof Petercam",
+   "bewijs": "Bank Degroof Petercam"
+  },
+  "278234": {
+   "model": 34,
+   "littlesis": "bol.com",
+   "naam": "Bol.com",
+   "bewijs": "bol.com"
+  },
+  "365232": {
+   "model": 8,
+   "littlesis": "RTL Nederland",
+   "naam": "RTL Nederland",
+   "bewijs": "RTL Nederland"
+  },
+  "116204": {
+   "model": 131,
+   "littlesis": "Netherlands Public Broadcasting System",
+   "naam": "NPO",
+   "bewijs": "NPO, website .nl"
+  },
+  "278237": {
+   "model": 1198,
+   "littlesis": "TROS",
+   "naam": "TROS",
+   "bewijs": "TROS"
+  },
+  "424085": {
+   "model": 1151,
+   "littlesis": "Bellingcat",
+   "naam": "Bellingcat",
+   "bewijs": "Bellingcat, 'Netherlands-based'"
+  },
+  "164131": {
+   "model": 4932,
+   "littlesis": "Hivos",
+   "naam": "Hivos",
+   "bewijs": "Hivos, 'Dutch NGO'"
+  },
+  "414722": {
+   "model": 318,
+   "littlesis": "DOEN Foundation",
+   "naam": "Stichting DOEN",
+   "bewijs": "DOEN Foundation"
+  },
+  "354521": {
+   "model": 839,
+   "littlesis": "Porticus",
+   "naam": "Stichting Porticus",
+   "bewijs": "Porticus, 'Dutch Charity'"
+  },
+  "88632": {
+   "model": 317,
+   "littlesis": "Adessium Foundation",
+   "naam": "Adessium Foundation",
+   "bewijs": "Adessium Foundation"
+  },
+  "400596": {
+   "model": 815,
+   "littlesis": "TNO",
+   "naam": "TNO",
+   "bewijs": "TNO, website .nl"
+  },
+  "82651": {
+   "model": 1014,
+   "littlesis": "Ecorys",
+   "naam": "Ecorys",
+   "bewijs": "Ecorys"
+  },
+  "94561": {
+   "model": 1031,
+   "littlesis": "Erasmus University Rotterdam",
+   "naam": "Erasmus Universiteit Rotterdam",
+   "bewijs": "Erasmus University Rotterdam"
+  },
+  "94562": {
+   "model": 384,
+   "littlesis": "Delft University of Technology",
+   "naam": "TU Delft",
+   "bewijs": "Delft University of Technology"
+  },
+  "94690": {
+   "model": 864,
+   "littlesis": "Vrije Universiteit Amsterdam",
+   "naam": "Vrije Universiteit Amsterdam",
+   "bewijs": "VU Amsterdam"
+  },
+  "353822": {
+   "model": 601,
+   "littlesis": "Tilburg University",
+   "naam": "Tilburg University",
+   "bewijs": "Tilburg University"
+  },
+  "353870": {
+   "model": 1161,
+   "littlesis": "Onderwijsraad",
+   "naam": "Onderwijsraad",
+   "bewijs": "Onderwijsraad"
+  },
+  "399633": {
+   "model": 1575,
+   "littlesis": "City of Rotterdam",
+   "naam": "Gemeente Rotterdam",
+   "bewijs": "City of Rotterdam, website .nl"
+  },
+  "398627": {
+   "model": 53,
+   "littlesis": "VVD",
+   "naam": "VVD",
+   "bewijs": "VVD"
+  },
+  "400502": {
+   "model": 152,
+   "littlesis": "D66",
+   "naam": "D66",
+   "bewijs": "D66"
+  },
+  "400504": {
+   "model": 55,
+   "littlesis": "PVV",
+   "naam": "PVV",
+   "bewijs": "PVV"
+  },
+  "400505": {
+   "model": 54,
+   "littlesis": "CDA",
+   "naam": "CDA",
+   "bewijs": "CDA (Dutch political party)"
+  },
+  "400507": {
+   "model": 153,
+   "littlesis": "GroenLinks",
+   "naam": "GroenLinks",
+   "bewijs": "GroenLinks"
+  },
+  "400511": {
+   "model": 56,
+   "littlesis": "PvdA",
+   "naam": "PvdA",
+   "bewijs": "PvdA"
+  },
+  "400512": {
+   "model": 1071,
+   "littlesis": "PvdD",
+   "naam": "Partij voor de Dieren",
+   "bewijs": "PvdD"
+  },
+  "400513": {
+   "model": 379,
+   "littlesis": "ChristenUnie",
+   "naam": "ChristenUnie",
+   "bewijs": "ChristenUnie"
+  },
+  "400515": {
+   "model": 1082,
+   "littlesis": "50PLUS",
+   "naam": "50PLUS",
+   "bewijs": "50PLUS"
+  },
+  "400517": {
+   "model": 1072,
+   "littlesis": "SGP",
+   "naam": "SGP",
+   "bewijs": "SGP"
+  },
+  "400518": {
+   "model": 1065,
+   "littlesis": "DENK",
+   "naam": "DENK",
+   "bewijs": "DENK"
+  },
+  "398626": {
+   "model": 1105,
+   "littlesis": "Mark Rutte",
+   "naam": "Mark Rutte",
+   "bewijs": "'former Netherlands prime minister'"
+  },
+  "370212": {
+   "model": 1078,
+   "littlesis": "Frans Timmermans",
+   "naam": "Frans Timmermans",
+   "bewijs": "'Dutch Politician'"
+  },
+  "400503": {
+   "model": 4913,
+   "littlesis": "Sigrid Kaag",
+   "naam": "Sigrid Kaag",
+   "bewijs": "leider D66"
+  },
+  "400506": {
+   "model": 4841,
+   "littlesis": "Wopke Hoekstra",
+   "naam": "Wopke Hoekstra",
+   "bewijs": "leider CDA"
+  },
+  "400508": {
+   "model": 1079,
+   "littlesis": "Jesse Klaver",
+   "naam": "Jesse Klaver",
+   "bewijs": "leider GroenLinks"
+  },
+  "400500": {
+   "model": 665,
+   "littlesis": "Thierry Baudet",
+   "naam": "Thierry Baudet",
+   "bewijs": "'Dutch politician'"
+  },
+  "259666": {
+   "model": 640,
+   "littlesis": "Geert Wilders",
+   "naam": "Geert Wilders",
+   "bewijs": "leider PVV"
+  },
+  "426735": {
+   "model": 3779,
+   "littlesis": "Gidi Markuszower",
+   "naam": "Gidi Markuszower",
+   "bewijs": "PVV-politicus"
+  },
+  "400522": {
+   "model": 1271,
+   "littlesis": "Thierry Aartsen",
+   "naam": "Thierry Aartsen",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400523": {
+   "model": 3816,
+   "littlesis": "Bente Becker",
+   "naam": "Bente Becker",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400526": {
+   "model": 395,
+   "littlesis": "André Bosman",
+   "naam": "Andre Bosman",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400527": {
+   "model": 212,
+   "littlesis": "Klaas Dijkhoff",
+   "naam": "Klaas Dijkhoff",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400531": {
+   "model": 619,
+   "littlesis": "Mark Harbers",
+   "naam": "Mark Harbers",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400533": {
+   "model": 3597,
+   "littlesis": "Sophie Hermans",
+   "naam": "Sophie Hermans",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400538": {
+   "model": 618,
+   "littlesis": "Helma Lodders",
+   "naam": "Helma Lodders",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400545": {
+   "model": 3639,
+   "littlesis": "Judith Tielen",
+   "naam": "Judith Tielen",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400548": {
+   "model": 4345,
+   "littlesis": "Arne Weverling",
+   "naam": "Arne Weverling",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "400550": {
+   "model": 1224,
+   "littlesis": "Jeroen van Wijngaarden",
+   "naam": "Jeroen van Wijngaarden",
+   "bewijs": "Tweede Kamer VVD"
+  },
+  "37374": {
+   "model": 1123,
+   "littlesis": "G. J. Wijers",
+   "naam": "Hans Wijers",
+   "bewijs": "alias 'Hans Wijers', 'Dutch politician and economist'; AkzoNobel in beide"
+  },
+  "81066": {
+   "model": 19,
+   "littlesis": "John De Mol",
+   "naam": "John de Mol",
+   "bewijs": "'Media billionaire from the Netherlands'"
+  },
+  "82135": {
+   "model": 4924,
+   "littlesis": "Victor Halberstadt",
+   "naam": "Victor Halberstadt",
+   "bewijs": "Leiden, Bilderberg in beide"
+  },
+  "170055": {
+   "model": 781,
+   "littlesis": "Peter Van Uhm",
+   "naam": "Peter van Uhm",
+   "bewijs": "'Chief of the Netherlands Defence staff'"
+  },
+  "353751": {
+   "model": 900,
+   "littlesis": "Bas ter Weel",
+   "naam": "Bas ter Weel",
+   "bewijs": "'Dutch Economist, SEO'"
+  },
+  "91791": {
+   "model": 761,
+   "littlesis": "Gerrit Zalm",
+   "naam": "Gerrit Zalm",
+   "bewijs": "Gerrit Zalm; Shell-bestuur, oud-minister"
+  },
+  "82143": {
+   "model": 114,
+   "littlesis": "Neelie Kroes",
+   "naam": "Neelie Kroes",
+   "bewijs": "Neelie Kroes, Eurocommissaris in beide"
+  },
+  "82149": {
+   "model": 15,
+   "littlesis": "Thomas Leysen",
+   "naam": "Thomas Leysen",
+   "bewijs": "Thomas Leysen, Umicore in beide"
+  },
+  "291396": {
+   "model": 975,
+   "littlesis": "Jaap de Hoop Scheffer",
+   "naam": "Jaap de Hoop Scheffer",
+   "bewijs": "Jaap de Hoop Scheffer"
+  },
+  "309878": {
+   "model": 4915,
+   "littlesis": "Feike Sijbesma",
+   "naam": "Feike Sijbesma",
+   "bewijs": "Feike Sijbesma, DSM"
+  },
+  "246830": {
+   "model": 774,
+   "littlesis": "Ayaan Hirsi Ali",
+   "naam": "Ayaan Hirsi Ali",
+   "bewijs": "Ayaan Hirsi Ali, auteur; zelfde persoon (oud-VVD-Kamerlid)"
+  },
+  "432394": {
+   "model": 547,
+   "littlesis": "Hélène Vletter-van Dort",
+   "naam": "Hélène Vletter-van Dort",
+   "bewijs": "Hélène Vletter-van Dort, Intertrust (NL)"
+  },
+  "456920": {
+   "model": 4922,
+   "littlesis": "Steven Schuurman",
+   "naam": "Steven Schuurman",
+   "bewijs": "Steven Schuurman, Elastic in beide"
+  },
+  "344761": {
+   "model": 237,
+   "littlesis": "Ludwig Criel",
+   "naam": "Ludwig Criel",
+   "bewijs": "Ludwig Criel, Bank Degroof Petercam en DPG in beide"
+  },
+  "23": {
+   "model": 35,
+   "littlesis": "The Procter & Gamble Company",
+   "naam": "Procter & Gamble",
+   "bewijs": "P&G"
+  },
+  "27": {
+   "model": 940,
+   "littlesis": "Boeing Company",
+   "naam": "Boeing",
+   "bewijs": "Boeing"
+  },
+  "44": {
+   "model": 128,
+   "littlesis": "Microsoft Corporation",
+   "naam": "Microsoft",
+   "bewijs": "Microsoft"
+  },
+  "58": {
+   "model": 938,
+   "littlesis": "Lockheed Martin Corporation",
+   "naam": "Lockheed Martin",
+   "bewijs": "Lockheed Martin"
+  },
+  "77": {
+   "model": 832,
+   "littlesis": "Northrop Grumman Corporation",
+   "naam": "Northrop Grumman",
+   "bewijs": "Northrop Grumman"
+  },
+  "88": {
+   "model": 830,
+   "littlesis": "General Dynamics Corporation",
+   "naam": "General Dynamics",
+   "bewijs": "General Dynamics"
+  },
+  "113": {
+   "model": 831,
+   "littlesis": "Raytheon Company",
+   "naam": "Raytheon (RTX)",
+   "bewijs": "Raytheon"
+  },
+  "151": {
+   "model": 40,
+   "littlesis": "Google Inc.",
+   "naam": "Google",
+   "bewijs": "Google"
+  },
+  "449": {
+   "model": 320,
+   "littlesis": "Northern Trust Corporation",
+   "naam": "Northern Trust",
+   "bewijs": "Northern Trust"
+  },
+  "477": {
+   "model": 29,
+   "littlesis": "BlackRock, Inc.",
+   "naam": "BlackRock",
+   "bewijs": "BlackRock"
+  },
+  "48603": {
+   "model": 30,
+   "littlesis": "Vanguard Group Inc",
+   "naam": "Vanguard",
+   "bewijs": "Vanguard Group"
+  },
+  "14615": {
+   "model": 983,
+   "littlesis": "US Department of State",
+   "naam": "US Department of State",
+   "bewijs": "US Department of State"
+  },
+  "14728": {
+   "model": 1160,
+   "littlesis": "USAID",
+   "naam": "USAID (United States Agency for International Development)",
+   "bewijs": "USAID"
+  },
+  "17683": {
+   "model": 1154,
+   "littlesis": "National Security Agency",
+   "naam": "NSA (National Security Agency)",
+   "bewijs": "National Security Agency"
+  },
+  "16909": {
+   "model": 124,
+   "littlesis": "Ernst & Young LLP",
+   "naam": "Ernst & Young",
+   "bewijs": "Ernst & Young"
+  },
+  "17667": {
+   "model": 123,
+   "littlesis": "KPMG LLP",
+   "naam": "KPMG",
+   "bewijs": "KPMG"
+  },
+  "34817": {
+   "model": 382,
+   "littlesis": "Deloitte LLP",
+   "naam": "Deloitte",
+   "bewijs": "Deloitte"
+  },
+  "76790": {
+   "model": 344,
+   "littlesis": "PricewaterhouseCoopers LLP",
+   "naam": "PwC",
+   "bewijs": "PwC"
+  },
+  "28270": {
+   "model": 498,
+   "littlesis": "Hearst Corporation",
+   "naam": "Hearst",
+   "bewijs": "Hearst"
+  },
+  "28613": {
+   "model": 1127,
+   "littlesis": "The Boston Consulting Group Inc.",
+   "naam": "Boston Consulting Group",
+   "bewijs": "BCG"
+  },
+  "33342": {
+   "model": 363,
+   "littlesis": "Harvard Business School",
+   "naam": "Harvard Business School",
+   "bewijs": "Harvard Business School"
+  },
+  "33551": {
+   "model": 4905,
+   "littlesis": "Bill & Melinda Gates Foundation",
+   "naam": "Bill & Melinda Gates Foundation",
+   "bewijs": "Gates Foundation"
+  },
+  "33692": {
+   "model": 41,
+   "littlesis": "Meta",
+   "naam": "Meta (Facebook/Instagram)",
+   "bewijs": "Meta/Facebook"
+  },
+  "36347": {
+   "model": 4902,
+   "littlesis": "Omidyar Network",
+   "naam": "Omidyar Network",
+   "bewijs": "Omidyar Network"
+  },
+  "370219": {
+   "model": 4903,
+   "littlesis": "Luminate",
+   "naam": "Luminate",
+   "bewijs": "Luminate (Omidyar)"
+  },
+  "37896": {
+   "model": 165,
+   "littlesis": "World Health Organization",
+   "naam": "WHO (Wereldgezondheidsorganisatie)",
+   "bewijs": "WHO"
+  },
+  "41540": {
+   "model": 758,
+   "littlesis": "PayPal, Inc.",
+   "naam": "PayPal",
+   "bewijs": "PayPal"
+  },
+  "43244": {
+   "model": 1116,
+   "littlesis": "Edelman",
+   "naam": "Edelman",
+   "bewijs": "Edelman"
+  },
+  "44801": {
+   "model": 757,
+   "littlesis": "LinkedIn",
+   "naam": "LinkedIn",
+   "bewijs": "LinkedIn"
+  },
+  "45937": {
+   "model": 345,
+   "littlesis": "Allen & Overy",
+   "naam": "Allen & Overy",
+   "bewijs": "Allen & Overy"
+  },
+  "48881": {
+   "model": 4908,
+   "littlesis": "Oxfam America",
+   "naam": "Oxfam America",
+   "bewijs": "Oxfam America"
+  },
+  "49007": {
+   "model": 1152,
+   "littlesis": "National Endowment for Democracy",
+   "naam": "National Endowment for Democracy (NED)",
+   "bewijs": "NED"
+  },
+  "52492": {
+   "model": 3896,
+   "littlesis": "Universal Music Group",
+   "naam": "Universal Music Group",
+   "bewijs": "Universal Music Group"
+  },
+  "59523": {
+   "model": 1232,
+   "littlesis": "Netflix",
+   "naam": "Netflix",
+   "bewijs": "Netflix"
+  },
+  "68344": {
+   "model": 388,
+   "littlesis": "Victor Pinchuk Foundation",
+   "naam": "Victor Pinchuk Foundation",
+   "bewijs": "Victor Pinchuk Foundation"
+  },
+  "69723": {
+   "model": 161,
+   "littlesis": "Open Society Foundations",
+   "naam": "Open Society Foundations",
+   "bewijs": "Open Society Foundations"
+  },
+  "75585": {
+   "model": 833,
+   "littlesis": "Palantir Technologies Inc.",
+   "naam": "Palantir Technologies",
+   "bewijs": "Palantir"
+  },
+  "76201": {
+   "model": 362,
+   "littlesis": "Institut Européen d’Administration des Affaires (INSEAD)",
+   "naam": "INSEAD",
+   "bewijs": "INSEAD"
+  },
+  "87699": {
+   "model": 4926,
+   "littlesis": "SpaceX",
+   "naam": "SpaceX",
+   "bewijs": "SpaceX"
+  },
+  "87863": {
+   "model": 4910,
+   "littlesis": "Bloomberg Philanthropies",
+   "naam": "Bloomberg Philanthropies",
+   "bewijs": "Bloomberg Philanthropies"
+  },
+  "408584": {
+   "model": 4910,
+   "littlesis": "Bloomberg Philanthropies",
+   "naam": "Bloomberg Philanthropies",
+   "bewijs": "Bloomberg Philanthropies (dubbel)"
+  },
+  "89665": {
+   "model": 4958,
+   "littlesis": "David Horowitz Freedom Center",
+   "naam": "David Horowitz Freedom Center",
+   "bewijs": "David Horowitz Freedom Center"
+  },
+  "112802": {
+   "model": 154,
+   "littlesis": "European Investment Bank",
+   "naam": "EIB (Europese Investeringsbank)",
+   "bewijs": "European Investment Bank"
+  },
+  "119140": {
+   "model": 1166,
+   "littlesis": "GlaxoSmithKline PLC",
+   "naam": "GlaxoSmithKline (GSK)",
+   "bewijs": "GSK"
+  },
+  "119214": {
+   "model": 1228,
+   "littlesis": "Philip Morris International Inc",
+   "naam": "Philip Morris International",
+   "bewijs": "Philip Morris International"
+  },
+  "119236": {
+   "model": 5018,
+   "littlesis": "Sanofi S.A.",
+   "naam": "Sanofi",
+   "bewijs": "Sanofi"
+  },
+  "127602": {
+   "model": 751,
+   "littlesis": "YouTube",
+   "naam": "YouTube",
+   "bewijs": "YouTube"
+  },
+  "141330": {
+   "model": 5010,
+   "littlesis": "Weber Shandwick",
+   "naam": "Weber Shandwick",
+   "bewijs": "Weber Shandwick"
+  },
+  "154732": {
+   "model": 122,
+   "littlesis": "Hill+Knowlton Strategies",
+   "naam": "Hill+Knowlton",
+   "bewijs": "Hill+Knowlton"
+  },
+  "160142": {
+   "model": 126,
+   "littlesis": "Uber Technologies",
+   "naam": "Uber",
+   "bewijs": "Uber"
+  },
+  "164492": {
+   "model": 375,
+   "littlesis": "Huawei",
+   "naam": "Huawei",
+   "bewijs": "Huawei"
+  },
+  "234959": {
+   "model": 3928,
+   "littlesis": "Spotify Technology S.A.",
+   "naam": "Spotify",
+   "bewijs": "Spotify"
+  },
+  "361295": {
+   "model": 368,
+   "littlesis": "Vattenfall",
+   "naam": "Vattenfall",
+   "bewijs": "Vattenfall"
+  },
+  "364276": {
+   "model": 4956,
+   "littlesis": "Likud Party",
+   "naam": "Likud",
+   "bewijs": "Likud"
+  },
+  "374879": {
+   "model": 985,
+   "littlesis": "Stiftung Mercator",
+   "naam": "Stiftung Mercator",
+   "bewijs": "Stiftung Mercator"
+  },
+  "354642": {
+   "model": 169,
+   "littlesis": "Reuters",
+   "naam": "Reuters",
+   "bewijs": "Reuters"
+  },
+  "377662": {
+   "model": 787,
+   "littlesis": "Sputnik",
+   "naam": "Sputnik (nieuwsdienst)",
+   "bewijs": "Sputnik"
+  },
+  "379715": {
+   "model": 42,
+   "littlesis": "TikTok",
+   "naam": "TikTok",
+   "bewijs": "TikTok"
+  },
+  "396753": {
+   "model": 266,
+   "littlesis": "Media Development Investment Fund",
+   "naam": "Media Development Investment Fund (MDIF)",
+   "bewijs": "MDIF"
+  },
+  "412266": {
+   "model": 171,
+   "littlesis": "AFP",
+   "naam": "AFP (Agence France-Presse)",
+   "bewijs": "AFP, afp.com"
+  },
+  "412339": {
+   "model": 279,
+   "littlesis": "European Broadcasting Union",
+   "naam": "European Broadcasting Union (EBU)",
+   "bewijs": "EBU"
+  },
+  "412493": {
+   "model": 72,
+   "littlesis": "Unibet",
+   "naam": "Unibet",
+   "bewijs": "Unibet"
+  },
+  "413074": {
+   "model": 813,
+   "littlesis": "Foreign, Commonwealth & Development Office",
+   "naam": "Foreign, Commonwealth & Development Office (FCDO)",
+   "bewijs": "FCDO"
+  },
+  "414363": {
+   "model": 160,
+   "littlesis": "Snapchat",
+   "naam": "Snapchat",
+   "bewijs": "Snapchat"
+  },
+  "432719": {
+   "model": 4925,
+   "littlesis": "xAI",
+   "naam": "xAI",
+   "bewijs": "xAI"
+  },
+  "437819": {
+   "model": 102,
+   "littlesis": "Imerys",
+   "naam": "Imerys",
+   "bewijs": "Imerys"
+  },
+  "463423": {
+   "model": 814,
+   "littlesis": "Generalitat de Catalunya",
+   "naam": "Generalitat de Catalunya (Catalaanse regionale overheid)",
+   "bewijs": "Generalitat de Catalunya"
+  },
+  "270624": {
+   "model": 4994,
+   "littlesis": "International Freedom Alliance Foundation",
+   "naam": "International Freedom Alliance Foundation",
+   "bewijs": "International Freedom Alliance Foundation"
+  },
+  "270657": {
+   "model": 4995,
+   "littlesis": "American Freedom Alliance",
+   "naam": "American Freedom Alliance",
+   "bewijs": "American Freedom Alliance"
+  },
+  "431611": {
+   "model": 5024,
+   "littlesis": "Q Society of Australia Inc",
+   "naam": "Q Society of Australia",
+   "bewijs": "Q Society of Australia"
+  },
+  "284066": {
+   "model": 95,
+   "littlesis": "Adidas",
+   "naam": "Adidas",
+   "bewijs": "Adidas"
+  },
+  "114864": {
+   "model": 984,
+   "littlesis": "Airbus SE",
+   "naam": "Airbus",
+   "bewijs": "Airbus SE"
+  },
+  "261779": {
+   "model": 984,
+   "littlesis": "Airbus Group SE",
+   "naam": "Airbus",
+   "bewijs": "Airbus Group SE"
+  },
+  "1526": {
+   "model": 4904,
+   "littlesis": "Bill Gates",
+   "naam": "Bill Gates",
+   "bewijs": "Bill Gates"
+  },
+  "5332": {
+   "model": 4901,
+   "littlesis": "Pierre Omidyar",
+   "naam": "Pierre Omidyar",
+   "bewijs": "Pierre Omidyar"
+  },
+  "14932": {
+   "model": 4909,
+   "littlesis": "Michael Bloomberg",
+   "naam": "Michael Bloomberg",
+   "bewijs": "Michael Bloomberg"
+  },
+  "14965": {
+   "model": 4899,
+   "littlesis": "George Soros",
+   "naam": "George Soros",
+   "bewijs": "George Soros"
+  },
+  "259036": {
+   "model": 4900,
+   "littlesis": "Alex Soros",
+   "naam": "Alex Soros",
+   "bewijs": "Alex Soros"
+  },
+  "15362": {
+   "model": 4917,
+   "littlesis": "Mark Zuckerberg",
+   "naam": "Mark Zuckerberg",
+   "bewijs": "Mark Zuckerberg"
+  },
+  "15408": {
+   "model": 4911,
+   "littlesis": "Peter Thiel",
+   "naam": "Peter Thiel",
+   "bewijs": "Peter Thiel (PayPal/Palantir)"
+  },
+  "38805": {
+   "model": 4916,
+   "littlesis": "Elon Musk",
+   "naam": "Elon Musk",
+   "bewijs": "Elon Musk"
+  },
+  "80655": {
+   "model": 4914,
+   "littlesis": "Klaus Schwab",
+   "naam": "Klaus Schwab",
+   "bewijs": "Klaus Schwab, WEF"
+  },
+  "118263": {
+   "model": 998,
+   "littlesis": "Noam Chomsky",
+   "naam": "Noam Chomsky",
+   "bewijs": "Noam Chomsky"
+  },
+  "130460": {
+   "model": 851,
+   "littlesis": "Kim Kagan",
+   "naam": "Kimberly Kagan",
+   "bewijs": "Kim(berly) Kagan, ISW"
+  },
+  "130466": {
+   "model": 852,
+   "littlesis": "Frederick Kagan",
+   "naam": "Frederick Kagan",
+   "bewijs": "Frederick Kagan, ISW"
+  },
+  "90906": {
+   "model": 4960,
+   "littlesis": "Robert Shillman",
+   "naam": "Robert Shillman",
+   "bewijs": "Robert Shillman"
+  },
+  "452146": {
+   "model": 1255,
+   "littlesis": "Ursula von der Leyen",
+   "naam": "Ursula von der Leyen",
+   "bewijs": "Ursula von der Leyen"
+  },
+  "353753": {
+   "model": 83,
+   "littlesis": "CPB Netherlands Bureau for Economic Policy Analysis",
+   "naam": "CPB (Centraal Planbureau)",
+   "bewijs": "CPB Netherlands Bureau for Economic Policy Analysis"
+  },
+  "400564": {
+   "model": 85,
+   "littlesis": "Ministry of Defence of the Netherlands",
+   "naam": "Ministerie van Defensie",
+   "bewijs": "Ministry of Defence of the Netherlands"
+  },
+  "400574": {
+   "model": 107,
+   "littlesis": "House of Representatives of The Netherlands",
+   "naam": "Tweede Kamer",
+   "bewijs": "alias 'Tweede Kamer der Staten-Generaal'"
+  },
+  "400501": {
+   "model": 218,
+   "littlesis": "Forum for Democracy",
+   "naam": "Forum voor Democratie",
+   "bewijs": "'Dutch political party', alias FvD"
+  },
+  "94496": {
+   "model": 311,
+   "littlesis": "University of Amsterdam",
+   "naam": "Universiteit van Amsterdam",
+   "bewijs": "University of Amsterdam (er is er één)"
+  },
+  "400557": {
+   "model": 582,
+   "littlesis": "Ministry of General Affairs of the Netherlands",
+   "naam": "Ministerie van Algemene Zaken",
+   "bewijs": "Ministry of General Affairs of the Netherlands"
+  },
+  "400572": {
+   "model": 585,
+   "littlesis": "Ministry of Justice and Security of the Netherlands",
+   "naam": "Ministerie van Justitie en Veiligheid",
+   "bewijs": "Ministry of Justice and Security of the Netherlands"
+  },
+  "400573": {
+   "model": 863,
+   "littlesis": "Ministry of Social Affairs and Employment of the Netherlands",
+   "naam": "Ministerie van Sociale Zaken en Werkgelegenheid",
+   "bewijs": "Ministry of Social Affairs and Employment of the Netherlands"
+  },
+  "353755": {
+   "model": 822,
+   "littlesis": "Social and Economic Council of the Netherlands",
+   "naam": "SER (Sociaal-Economische Raad)",
+   "bewijs": "Social and Economic Council of the Netherlands"
+  },
+  "353756": {
+   "model": 876,
+   "littlesis": "SEO Amsterdam Economics",
+   "naam": "SEO Economisch Onderzoek",
+   "bewijs": "SEO Amsterdam Economics = SEO Economisch Onderzoek"
+  },
+  "353752": {
+   "model": 1013,
+   "littlesis": "Dutch Authority for Financial Markets",
+   "naam": "AFM (Autoriteit Financiële Markten)",
+   "bewijs": "'Autoriteit Financiële Markten'"
+  },
+  "400552": {
+   "model": 3592,
+   "littlesis": "Dilan Yesilgöz",
+   "naam": "Dilan Yesilgöz-Zegerius",
+   "bewijs": "Tweede Kamer VVD; Yesilgöz(-Zegerius)"
+  }
+ },
+ "niet": {
+  "393114": {
+   "littlesis": "Follow the Money",
+   "niet": "Follow the Money",
+   "reden": "followthemoney.org is het Amerikaanse National Institute on Money in Politics, niet het Nederlandse FTM"
+  },
+  "273416": {
+   "littlesis": "HCSS",
+   "niet": "HCSS (The Hague Centre for Strategic Studies)",
+   "reden": "HCSS = Heavy Civil construction software, niet de Haagse denktank"
+  },
+  "202759": {
+   "littlesis": "Chicago Department of Aviation",
+   "niet": "CDA",
+   "reden": "Chicago Department of Aviation ≠ CDA"
+  },
+  "270510": {
+   "littlesis": "Community Development Agency - St Louis",
+   "niet": "CDA",
+   "reden": "Community Development Agency ≠ CDA"
+  },
+  "182": {
+   "littlesis": "ViacomCBS Inc.",
+   "niet": "CBS (Centraal Bureau voor de Statistiek)",
+   "reden": "CBS (VS) ≠ Centraal Bureau voor de Statistiek"
+  },
+  "255502": {
+   "littlesis": "CBS Broadcasting, Inc.",
+   "niet": "CBS (Centraal Bureau voor de Statistiek)",
+   "reden": "idem"
+  },
+  "377787": {
+   "littlesis": "CBS Corporation",
+   "niet": "CBS (Centraal Bureau voor de Statistiek)",
+   "reden": "idem"
+  },
+  "277": {
+   "littlesis": "Norfolk Southern Corporation",
+   "niet": "NSC (Nieuw Sociaal Contract)",
+   "reden": "Norfolk Southern ≠ NSC"
+  },
+  "15575": {
+   "littlesis": "National Security Council",
+   "niet": "NSC (Nieuw Sociaal Contract)",
+   "reden": "National Security Council ≠ NSC (partij)"
+  },
+  "133874": {
+   "littlesis": "Americans for Prosperity",
+   "niet": "AFP (Agence France-Presse)",
+   "reden": "Americans for Prosperity ≠ AFP"
+  },
+  "260951": {
+   "littlesis": "American Freedom Party",
+   "niet": "AFP (Agence France-Presse)",
+   "reden": "American Freedom Party ≠ AFP"
+  },
+  "375408": {
+   "littlesis": "Australian Federal Police",
+   "niet": "AFP (Agence France-Presse)",
+   "reden": "Australian Federal Police ≠ AFP"
+  },
+  "82251": {
+   "littlesis": "Corporation for Public Broadcasting",
+   "niet": "CPB (Centraal Planbureau)",
+   "reden": "Corporation for Public Broadcasting ≠ CPB"
+  },
+  "105123": {
+   "littlesis": "News America Marketing Group",
+   "niet": "NAM (Nederlandse Aardolie Maatschappij)",
+   "reden": "News America Marketing ≠ NAM"
+  },
+  "114300": {
+   "littlesis": "National Student Association",
+   "niet": "NSA (National Security Agency)",
+   "reden": "National Student Association ≠ NSA"
+  },
+  "451045": {
+   "littlesis": "National Smokers Alliance",
+   "niet": "NSA (National Security Agency)",
+   "reden": "National Smokers Alliance ≠ NSA"
+  },
+  "225927": {
+   "littlesis": "Metro A.G.",
+   "niet": "Metro",
+   "reden": "Metro AG ≠ Metro (krant)"
+  },
+  "233542": {
+   "littlesis": "DC Metro",
+   "niet": "Metro",
+   "reden": "DC Metro ≠ Metro"
+  },
+  "283623": {
+   "littlesis": "Metro Inc",
+   "niet": "Metro",
+   "reden": "Metro Inc ≠ Metro"
+  },
+  "2039": {
+   "littlesis": "Jan Bennink",
+   "niet": "Jan Bennink (podcastmaker)",
+   "reden": "Jan Bennink (bestuurder) ≠ Jan Bennink (podcastmaker)"
+  },
+  "19562": {
+   "littlesis": "Andrew Meehan",
+   "niet": "Andrew Meehan",
+   "reden": "andere Andrew Meehan (US Customs)"
+  },
+  "24808": {
+   "littlesis": "Richard C. Lawson",
+   "niet": "Rick Lawson",
+   "reden": "Richard C. Lawson ≠ Rick Lawson"
+  },
+  "136919": {
+   "littlesis": "Robert Jensen",
+   "niet": "Robert Jensen",
+   "reden": "andere Robert Jensen"
+  },
+  "323139": {
+   "littlesis": "Peter Thiel",
+   "niet": "Peter Thiel",
+   "reden": "andere Peter Thiel (AutoNation)"
+  },
+  "371953": {
+   "littlesis": "International Council on Clean Transportation",
+   "niet": "ICCT (International Centre for Counter-Terrorism)",
+   "reden": "ICCT (clean transportation) ≠ ICCT (counter-terrorism)"
+  },
+  "420733": {
+   "littlesis": "America's Physician Groups",
+   "niet": "APG",
+   "reden": "America's Physician Groups ≠ APG"
+  },
+  "387127": {
+   "littlesis": "Wisconsin Manufacturers & Commerce",
+   "niet": "WMC B.V.",
+   "reden": "Wisconsin Manufacturers & Commerce ≠ WMC B.V."
+  },
+  "14658": {
+   "littlesis": "US Department of Energy",
+   "niet": "DOE! (Nuenen, Gerwen en Nederwetten)",
+   "reden": "US Department of Energy ≠ DOE!"
+  },
+  "14615": {
+   "littlesis": "US Department of State",
+   "niet": "DOS (Democratisch Onafhankelijken Stein)",
+   "reden": "State Department ≠ DOS (Stein)"
+  },
+  "194130": {
+   "littlesis": "Pacific Century Group Holdings Limited",
+   "niet": "PCG (Buren)",
+   "reden": "≠ PCG"
+  },
+  "219802": {
+   "littlesis": "STV Group plc.",
+   "niet": "SMG (Sint-Michielsgestel)",
+   "reden": "≠ SMG"
+  },
+  "462790": {
+   "littlesis": "Seed Media Group",
+   "niet": "SMG (Sint-Michielsgestel)",
+   "reden": "≠ SMG"
+  },
+  "280748": {
+   "littlesis": "Partnership for 21st Century Learning",
+   "niet": "P21 (Bunnik)",
+   "reden": "≠ P21"
+  },
+  "376313": {
+   "littlesis": "League of Education Voters",
+   "niet": "LEV (Elburg)",
+   "reden": "≠ LEV"
+  },
+  "381256": {
+   "littlesis": "Portland Police Association",
+   "niet": "PPA (Sint-Michielsgestel)",
+   "reden": "≠ PPA"
+  },
+  "417918": {
+   "littlesis": "Gbp",
+   "niet": "GBP (Purmerend)",
+   "reden": "≠ GBP"
+  },
+  "174586": {
+   "littlesis": "Kraft Foods International, Inc.",
+   "niet": "Philip Morris International",
+   "reden": "Kraft Foods ≠ PMI"
+  },
+  "344293": {
+   "littlesis": "Number 10 St. James's Square",
+   "niet": "Chatham House",
+   "reden": "het gebouw, niet het instituut"
+  },
+  "380973": {
+   "littlesis": "ALDI U.S.",
+   "niet": "Aldi",
+   "reden": "ALDI U.S. is een dochter, niet de NL-keten"
+  },
+  "162200": {
+   "littlesis": "General Dynamics Electric Boat",
+   "niet": "General Dynamics",
+   "reden": "Electric Boat is een dochter"
+  },
+  "276358": {
+   "littlesis": "Raytheon Corporation",
+   "niet": "Raytheon (RTX)",
+   "reden": "lege dubbele knoop"
+  },
+  "267207": {
+   "littlesis": "Oxfam-America Inc",
+   "niet": "Oxfam America",
+   "reden": "lege dubbele knoop"
+  },
+  "86157": {
+   "littlesis": "Monitor Company",
+   "niet": "De Monitor",
+   "reden": "Monitor Company ≠ De Monitor"
+  },
+  "101794": {
+   "littlesis": "Monitor Group",
+   "niet": "De Monitor",
+   "reden": "idem"
+  },
+  "103080": {
+   "littlesis": "RBS Holdings N.V.",
+   "niet": "ABN AMRO",
+   "reden": "RBS Holdings (ex-ABN AMRO) ≠ ABN AMRO"
+  },
+  "344763": {
+   "littlesis": "De Persgroep",
+   "niet": "DPG Media Group NV",
+   "reden": "De Persgroep (2017, België) is de rechtsvoorganger van DPG Media Group; niet automatisch"
+  },
+  "283777": {
+   "littlesis": "Koninklijke Dsm N.v.",
+   "niet": "dsm-firmenich",
+   "reden": "Koninklijke DSM N.V. is de voorganger van dsm-firmenich; niet automatisch"
+  },
+  "394908": {
+   "littlesis": "Don Ceder",
+   "niet": "Don Ceder",
+   "reden": "Don Ceder bij CitizenGO: niet bevestigd, te controleren"
+  },
+  "395923": {
+   "littlesis": "Leo Van Doesburg",
+   "niet": "Leo van Doesburg",
+   "reden": "Leo van Doesburg (Dignitatis Humanae): te controleren"
+  },
+  "125206": {
+   "littlesis": "Lucia van Geuns",
+   "niet": "Lucia van Geuns",
+   "reden": "Lucia van Geuns bij Core Laboratories: te controleren"
+  },
+  "88497": {
+   "littlesis": "ING Bank N.V.",
+   "niet": "ING",
+   "reden": "ING Bank N.V.: dochter; alleen via ING Groep"
+  },
+  "228170": {
+   "littlesis": "HAL Holding N.V.",
+   "niet": "HAL Investments",
+   "reden": "HAL Holding N.V. en HAL Investments B.V. zijn verschillende rechtspersonen"
+  },
+  "194503": {
+   "littlesis": "Leiden Law School",
+   "niet": "Universiteit Leiden",
+   "reden": "een faculteit, niet de universiteit"
+  }
+ }
+}

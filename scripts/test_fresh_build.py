@@ -124,6 +124,7 @@ def main():
             "element_type": "mechanisme", "naam": "verse_build_testmechanisme",
             "filter": "tegenmacht", "definitie": "Testmechanisme.", "effect": "Geen.",
             "aard": "direct", "freeze_test": "n.v.t. (direct kanaal)",
+            "doelen": ["beslissing"], "grondslag": "officieel",
             "afgrenzing": "Bestaat alleen in deze test.",
             "falsificatiecriterium": "De test faalt.",
             "instantiaties": ["testrelatie"], "bronnen": ["testbron"],
@@ -215,6 +216,17 @@ def main():
         j = r.get_json()
         eis(r.status_code == 200 and j.get("entities") and j.get("relations"),
             f"GET /api/graph_data levert de graafdata ({r.status_code})")
+        r = client.get("/api/graph_data/viz")
+        j = r.get_json()
+        eis(r.status_code == 200 and j.get("formaat") == "viz-2" and "arg_tel" in j
+            and j.get("entities") and j.get("relations"),
+            f"GET /api/graph_data/viz levert de compacte viz-lading ({r.status_code})")
+        r = client.get(f"/api/graph_data/discussie?relation_id={rel_id}")
+        j = r.get_json()
+        eis(r.status_code == 200 and isinstance(j.get("arguments"), list) and "detail" in j,
+            f"GET /api/graph_data/discussie levert de discussieboom ({r.status_code})")
+        r = client.get(f"/api/graph_data/discussie?relation_id={rel_id}&entity_id={ent_a}")
+        eis(r.status_code == 400, f"discussie met twee doelen → 400 ({r.status_code})")
         r = client.get(f"/api/arguments/{arg_id}/score_diff?status=verworpen")
         eis(r.status_code == 200, f"GET score_diff ({r.status_code})")
 

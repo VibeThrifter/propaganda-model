@@ -838,6 +838,24 @@ def main():
         c.close()
         eis(st == 200 and j["besluit"] == "afgewezen" and stand == "afgewezen",
             "één agent-afwijzing met reden → afgewezen (de indiener kan herzien)")
+        # Twee akkoorden, maar niet meer uit te voeren (de nieuwe naam is intussen bezet): het
+        # voorstel eindigt afgewezen met die reden, zodat het geen plek in de rij blijft bezetten.
+        st, j = api("post", "/api/voorstellen", "assistent",
+                    {"soort": "hernoemen", "titel": "Hernoem naar een naam die straks bezet is",
+                     "payload": {"element_type": "entiteit", "element_id": medium,
+                                 "nieuwe_naam": "Bezette Naam", "motivatie": "nieuwe naam"}})
+        assert st == 201, (st, j)
+        rfc3 = j["id"]
+        st, j = api("post", "/api/entities", "assistent", {"name": "Bezette Naam", "type": "bedrijf"})
+        assert st == 201, (st, j)
+        for wie in ("rfc-toetser", "rfc-criticus"):
+            api("post", f"/api/voorstellen/{rfc3}/reviews", wie, {"oordeel": "akkoord", "motivatie": "klopt"})
+        st, j = api("post", f"/api/beoordeling/rfc/{rfc3}", "merge-service")
+        c = sqlite3.connect(db)
+        stand = c.execute("SELECT status FROM voorstellen WHERE id = ?", (rfc3,)).fetchone()[0]
+        c.close()
+        eis(st == 200 and j["besluit"] == "afgewezen" and j.get("blokkade") and stand == "afgewezen",
+            "aangenomen maar niet uit te voeren → afgewezen met de reden (geen eeuwig open voorstel)")
 
         print("16. Wachtrijen: aanklager en smaadtoets")
         ab = laad_script("automatische_beoordeling")

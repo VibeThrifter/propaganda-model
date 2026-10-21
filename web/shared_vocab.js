@@ -123,3 +123,10 @@ const RELATION_LABELS = {
   // Algoritmisch
   algoritmische_filtering: 'Algoritmische filtering',
 };
+
+// Richtingloze relatietypen (spiegel van vocab.RICHTINGLOZE_TYPES, eigenaarsbesluit 2026-10-15):
+// iemand hoort bij een organisatie — werkt voor, is lid, bestuurt, adviseert, spreekt namens,
+// bekleedt een ambt, stapte over — of twee partijen zijn bondgenoten. Geen invloedsrichting: de
+// viz tekent zo'n band zonder enkele pijl en de invloedscascade loopt er in beide richtingen over.
+const RICHTINGLOZE_TYPES = new Set(['lidmaatschap', 'personeel', 'dienstverband', 'bestuurder',
+  'adviseur', 'woordvoerder_van', 'draaideur', 'ambt', 'alliantie']);

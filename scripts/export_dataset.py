@@ -87,19 +87,23 @@ def _relations(conn):
     (type, mechanisme, filter, twee-assen-score) is het product."""
     kol = ["id", "source_id", "source_name", "target_id", "target_name",
            "relation_type", "mechanism_id", "mechanism_name", "filter",
-           "certainty", "influence", "active_from", "active_until", "functie"]
+           "certainty", "influence", "active_from", "active_until", "functie",
+           "namens_id", "namens_name"]
     rijen = [[r["id"], r["source_id"], r["source_name"], r["target_id"],
               r["target_name"], r["relation_type"], r["mechanism_id"],
               r["mechanism_name"], r["mechanism_filter"], r["certainty"],
-              r["influence"], r["active_from"], r["active_until"], r["functie"]]
+              r["influence"], r["active_from"], r["active_until"], r["functie"],
+              r["namens_id"], r["namens_name"]]
              for r in conn.execute("""
         SELECT r.id, r.source_id, r.target_id, r.relation_type, r.mechanism_id,
                r.certainty, r.influence, r.active_from, r.active_until, r.functie,
+               r.namens_id, e3.name AS namens_name,
                e1.name AS source_name, e2.name AS target_name,
                m.name AS mechanism_name, m.filter AS mechanism_filter
         FROM relations r
         JOIN entities e1 ON e1.id = r.source_id
         JOIN entities e2 ON e2.id = r.target_id
+        LEFT JOIN entities e3 ON e3.id = r.namens_id
         LEFT JOIN mechanisms m ON m.id = r.mechanism_id
         WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
           AND e1.status = 'goedgekeurd' AND NOT e1.vervangen

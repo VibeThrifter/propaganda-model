@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 from datetime import date
 from pathlib import Path
 
@@ -27,6 +28,7 @@ TITEL = "Europees Parlement, open data (zittende leden voor Nederland), uitgave 
 UITGEVER = "Europees Parlement"
 EP_WIKIDATA = "Q8889"   # het Europees Parlement zelf (externe id van de knoop in het model)
 LAND = "NL"
+PAUZE = 2   # robots.txt van data.europarl.europa.eu: Crawl-delay 2
 
 
 class FormaatFout(Exception):
@@ -34,6 +36,7 @@ class FormaatFout(Exception):
 
 
 def _get(pad: str) -> dict:
+    time.sleep(PAUZE)
     teken = "&" if "?" in pad else "?"
     return get_json(f"{API}/{pad}{teken}format=application%2Fld%2Bjson", timeout=90)
 

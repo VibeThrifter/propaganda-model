@@ -2,7 +2,7 @@
 """Registers-sync (Uitbreiding C, eigenaarsbesluit 2026-10-07): de registers elke week bijwerken.
 
 Deterministisch, zonder LLM en zonder mens:
-  1. per register een nieuwe uitgave ophalen (oo, tk, ep, lobby, ser; tools/registers/<bron>.py haal);
+  1. per register een nieuwe uitgave ophalen (oo, tk, ep, lobby, ser, cbs; tools/registers/<bron>.py haal);
   2. wat nieuw is indienen (<bron>_naar_model, onder `register-import`; idempotent: bestaande
      verbanden en knopen blijven, nieuwe ambten, Kamerleden, nevenfuncties … komen erbij en gaan
      langs de uurronde: registercheck → A7 → goedkeuren);
@@ -18,7 +18,7 @@ Gebeurtenissen (geschenken, reizen) en de loopbaan lopen niet af; die blijven zo
      noemt op verbanden die nog geen datum hebben, en legt vast waar het register geen begin noemt.
 
 Gepland via agent_schedule.py (wekelijks); los:
-    python3 scripts/registers_sync.py [--droog] [--alleen oo,tk,ep,lobby,ser] [--zonder-ophalen]
+    python3 scripts/registers_sync.py [--droog] [--alleen oo,tk,ep,lobby,ser,cbs] [--zonder-ophalen]
 """
 from __future__ import annotations
 
@@ -32,6 +32,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools" / "registers"))
 sys.path.insert(0, str(ROOT / "scripts"))
+import cbs  # noqa: E402
+import cbs_naar_model  # noqa: E402
 import ep  # noqa: E402
 import ep_naar_model  # noqa: E402
 import lobby  # noqa: E402
@@ -47,11 +49,11 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 IMPORT_TOKEN = ROOT / "data" / "tokens" / "register-import.token"
 CHECK_TOKEN = ROOT / "data" / "tokens" / "registercheck.token"
 API = "http://127.0.0.1:5000"
-BRONNEN = ("oo", "tk", "ep", "lobby", "ser")
-MODULES = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby, "ser": ser}
+BRONNEN = ("oo", "tk", "ep", "lobby", "ser", "cbs")
+MODULES = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby, "ser": ser, "cbs": cbs}
 # Welke records een lopende toestand zijn (de rest is een gebeurtenis of geschiedenis)
 LOPEND = {"oo": ("org:", "fn:"), "tk": ("persoon:", "nevenfunctie:", "commissiezetel:"), "ep": ("persoon:",),
-          "lobby": ("lobbyist:",), "ser": ("zetels:",)}
+          "lobby": ("lobbyist:",), "ser": ("zetels:",), "cbs": ("gemeente:",)}
 MAX_AANDEEL = 0.10
 MIN_ONDERBREKER = 5
 
@@ -92,6 +94,8 @@ def plan_voor(bron: str, data: dict, conn):
         return ep_naar_model.Plan(data, conn).maak()
     if bron == "ser":
         return ser_naar_model.Plan(data, conn, koppelingen).maak()
+    if bron == "cbs":
+        return cbs_naar_model.Plan(data, conn, koppelingen).maak()
     return lobby_naar_model.Plan(data, conn, koppelingen).maak()
 
 
@@ -107,6 +111,12 @@ def indienen(bron: str, plan, rest, meld) -> dict:
         ind.entiteiten()
     elif bron == "ser":
         ind = ser_naar_model.Indiener(plan, rest, meld)
+        bron_id = ind.bron()
+        ind.entiteiten()
+    elif bron == "cbs":
+        if not plan.relaties:  # het mechanisme ontbreekt nog (RfC): geen bron registreren
+            return dict(plan.tel)
+        ind = cbs_naar_model.Indiener(plan, rest, meld)
         bron_id = ind.bron()
         ind.entiteiten()
     else:

@@ -22,7 +22,33 @@ check doet zonder LLM wat de bronchecker met een LLM doet, maar dan precies:
      - lobbyistenregister (lobby.py, de pdf zelf is de uitgave): 'lobbyt' met de Tweede Kamer
        als doel, en de organisatie staat in de recordregel;
      - SER-samenstelling (ser.py, de pagina van ser.nl is de uitgave): 'lidmaatschap' met de SER
-       (oo:28455002) als doel, en de organisatie is die uit het record.
+       (oo:28455002) als doel, en de organisatie is die uit het record;
+     - gemeentelijke indeling (cbs.py, CBS 'Gebieden in Nederland'): 'controle' van de provincie
+       uit het record (haar oo-id) naar de gemeente uit het record (haar tooi-code, of de oo-id die
+       koppelingen.json vastlegt);
+     - openbare agenda's van bewindspersonen (agenda.py): 'lobbyt' met het ministerie van de
+       bewindspersoon (zijn oo-id) als doel, en de organisatie staat in de afspraak;
+     - nevenfunctieregister Rechtspraak (rechtspraak.py, via Open Rechtspraak): de rechter
+       (externe id 'rechtspraak', achternaam in de naam) en de instantie, functie of soort uit het
+       record; types bestuurder/adviseur/lidmaatschap/personeel/eigendom/ambt;
+     - inspraak bij Kamercommissies (tk_inspraak.py, gegevensmagazijn): 'lobbyt'/'adviseur' van een
+       organisatie naar de voortouwcommissie (tk.commissie_naam); de organisatie staat in het
+       indiener-, genodigde- of tegenpartijdeel; geen privépersoon en niet op eigen titel;
+     - benoemingen in de Staatscourant (staatscourant.py, SRU van repository.overheid.nl): de
+       benoemde persoon en de organisatie uit het besluit; types ambt/bestuurder;
+     - giften aan politieke partijen (giften.py, Wfpp-overzichten van BZK; de ods is de
+       uitgave): 'donor'/'financiering' naar de partij uit het record; de gever staat in de
+       recordregel (rechtsvorm-ongevoelig, giften.zelfde_gever); een natuurlijk persoon alleen met
+       passende achternaam en voorletter, nooit een persoon als eindpunt van een organisatierecord;
+     - netwerk van Nederlandse Europarlementariërs (ep_netwerk.py: EP Open Data, verklaringen en
+       vergaderingen op europarl.europa.eu, transparantieregister): het lid via 'ep_mep' + naam; de
+       organisatie uit de recordtekst of het transparantieregister; commissieknoop
+       '<commissie> (Europees Parlement)';
+     - AFM-meldingenregisters (afm.py; export.aspx van afm.nl, XML): substantiële deelnemingen →
+       eigendom/zeggenschap/investering van de meldingsplichtige (bron) naar de uitgevende
+       instelling (doel); 5:48 Wft en MAR 19 (alleen bestuur of toezicht bij de instelling zelf)
+       → 'bestuurder' tussen persoon (achternaam + voorletters) en instelling (kvk/lei,
+       afm_koppelingen.json of naam + rechtsvorm).
 
 Klopt alles → 'klopt'; klopt het record of een eindpunt niet → 'klopt-niet' met de reden.
 Ontbreekt de uitgave, dan geen oordeel (wordt gemeld). Het oordeel gaat via
@@ -46,18 +72,28 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools" / "registers"))
+import afm  # noqa: E402
+import agenda  # noqa: E402
+import cbs  # noqa: E402
 import ep  # noqa: E402
+import ep_netwerk  # noqa: E402
+import giften  # noqa: E402
 import lobby  # noqa: E402
 import oo  # noqa: E402
+import rechtspraak  # noqa: E402
 import ser  # noqa: E402
+import staatscourant  # noqa: E402
 import tk  # noqa: E402
+import tk_inspraak  # noqa: E402
 from common import schoon  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 TOKEN = ROOT / "data" / "tokens" / "registercheck.token"
 API = "http://127.0.0.1:5000"
 ACCOUNT = "registercheck"
-BRONNEN = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby, "ser": ser}
+BRONNEN = {"oo": oo, "tk": tk, "ep": ep, "lobby": lobby, "ser": ser, "cbs": cbs, "agenda": agenda, "rechtspraak": rechtspraak,
+            "tk_inspraak": tk_inspraak, "staatscourant": staatscourant, "giften": giften,
+            "ep_netwerk": ep_netwerk, "afm": afm}
 
 # Een argument waarvan ELKE citatie een registerregel is (alias a = arguments). Gedeeld met
 # scripts/bronchecker.py en scripts/bronzoeker.py: die slaan zulke argumenten over.

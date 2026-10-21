@@ -22,6 +22,11 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
    ``--max-specifiek`` gemergede argumenten over verbanden uit het nieuws waarop een eerdere
    versie 'klopt' zei (geen massale herbeoordeling). Een storing van het model is geen oordeel;
    een 'twijfel' die vóór 2026-10-09 zo'n storing was, wordt opnieuw bekeken (``--storing``).
+2c. **Eigen metingen** (scripts/metingcheck.py, zonder model; eigenaarsbesluit 2026-10-16):
+   hooguit ``--max-meting-citaten`` citaten van vastgelegde metingen op hun url terugzoeken
+   (citaat_gevonden), en de A1 voor argumenten op een afgeronde meting: 'klopt' als de dataset
+   ongewijzigd is, het citaat letterlijk een samenvattingsregel is en de journalistieke codes
+   a–h in orde zijn. Kill-switch PROPAGANDA_METINGEN=0.
 3. **Smaadtoets** (scripts/smaadtoets.py, Opus): claims over personen — feitelijk, gedragen
    door de bron, over de publieke rol? Dan smaad_hold eraf en de gewone poorten; zo niet,
    dan teruggekoppeld (stap 11 en 12). Eigen afwijzingen die een nieuw 'klopt'/'feitelijk'
@@ -39,7 +44,18 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
    status van het onafhankelijke A1-oordeel ('geverifieerd' / 'bronvermelding_nodig').
 7. **Mechanismen** (scripts/mechanisme_toewijzer.py): een kandidaat-verband krijgt een
    mechanisme, of wordt afgewezen als het buiten het model valt.
-8. **RfC's** (scripts/rfc_beoordeling.py): twee agents reviewen, de beoordeling beslist.
+7b. **Richting** (scripts/richtingtoets.py, Haiku; een wijziging pas als Sonnet het blind
+   bevestigt; ``--max-richting``): een verband van een gericht type wijst van wie de invloed
+   uitoefent naar wie haar ondergaat. 'omgekeerd' → bron en doel wisselen, 'richtingloos' →
+   bidirectional = 1 (``POST /api/beoordeling/richting/<id>``, één keer per verband, oud/nieuw in
+   edit_log; geen registerfeit, geen werk van een mens). De richtingloze typen
+   (vocab.RICHTINGLOZE_TYPES) hebben nooit een richting.
+8. **RfC's** (scripts/rfc_beoordeling.py): twee agents reviewen, de beoordeling beslist. Een
+   aangenomen RfC die niet uit te voeren is, wordt afgewezen met die reden (de indiener kan
+   herzien); een voorstel dat beide agents al beoordeelden, houdt geen plek in de rij bezet.
+8c. **Vervolg** (scripts/vervolg.py, ``--zonder-vervolg``): werk dat op een theorie-element
+   wachtte (data/vervolg/*.json: een registerimport, verbanden, een volgende RfC), draait zodra
+   dat element bestaat.
 8b. **Ontdubbelen** (opschonen.py, ``--max-ontdubbel``): een bron met dezelfde url als een
    oudere gaat daarin op (één pagina is één bewijslijn), en een goedgekeurd verband dat hetzelfde
    feit draagt als een ander, gedragen verband wordt afgewezen. Deterministisch; de server
@@ -54,6 +70,12 @@ volgorde (eerst repareren en controleren, dan beslissen, dan opruimen):
     fusie ('opgegaan_in'); een onbeschermde organisatiedatum mag een bron corrigeren.
 10d. **Verhangen** (``--max-verhang``): een verband van vóór (ná) een fusie naar de voorganger
     (opvolger) die het bewijs noemt (``POST /api/beoordeling/verhangen/<id>``).
+10e. **Overgezet** (``--max-overgezet``, eigenaarsbesluit 2026-10-19, instituut of persoon):
+    bewijs dat als "Overgezet van #…" op het preciezere verband staat (persoon → medium met
+    namens_id, of instituut → medium voor wie namens het instituut spreekt), vervangt het oude
+    zodra de opvolger gemerged is, zijn verband goedgekeurd en de band tussen persoon en
+    organisatie goedgekeurd; draagt het oude verband dan niets meer, dan wordt het afgewezen
+    (``POST /api/beoordeling/overgezet/<id>``).
 11. **Opruimen** (status-PATCH door merge-service, altijd met reden): wat de bron niet draagt
     en niet te repareren is (na de poging van de bronzoeker), wat de smaad- of stemtoets
     terugkoppelde, en wat na ``--wachttijd-dagen`` (14) nog niet door de poort komt.
@@ -101,10 +123,13 @@ import bronzoeker  # noqa: E402
 import datumzoeker  # noqa: E402
 import lead_triage  # noqa: E402
 import mechanisme_toewijzer  # noqa: E402
+import metingcheck  # noqa: E402  eigen metingen (2026-10-16): stap 2c
 import opschonen  # noqa: E402  dubbel werk (repo-root, gedeeld met de server)
 import looptijd  # noqa: E402  bestaan, fusies en verhangen (repo-root, gedeeld met de server)
 import registercheck  # noqa: E402
+import richtingtoets  # noqa: E402
 import rfc_beoordeling  # noqa: E402
+import vervolg  # noqa: E402
 import smaadtoets  # noqa: E402
 import stemtoets  # noqa: E402
 
@@ -364,7 +389,8 @@ def stap_datumzoeken(args, meld) -> dict:
     finally:
         conn.close()
     return datumzoeker.draai(max_eigen=args.max_datum_eigen, max_web=args.max_datum,
-                             max_web_org=args.max_datum_org, meld=meld)
+                             max_web_org=args.max_datum_org,
+                             max_web_eind=getattr(args, "max_datum_eind", 0), meld=meld)
 
 
 def stap_looptijd(token, args, meld) -> dict:
@@ -425,6 +451,36 @@ def stap_verhangen(token, args, meld) -> dict:
     meld(f"Verhangen: {tel['verhangen']} verband(en) naar de voorganger of opvolger"
          f"{' (droog)' if args.droog else ''}, {tel['blijft']} blijven (loopt over de fusie heen, "
          "of het bewijs noemt de voorganger niet)")
+    return tel
+
+
+def stap_overgezet(token, args, meld) -> dict:
+    """Stap 10e (eigenaarsbesluit 2026-10-19, instituut of persoon): een optreden staat op precies
+    één verband. Bewijs dat als "Overgezet van #…" op het verband van de persoon (of van zijn
+    organisatie) staat, vervangt het oude zodra die route helemaal goedgekeurd is; een verband dat
+    daarna niets meer draagt, wordt afgewezen. De server beslist (opschonen.overgezet_besluit)."""
+    if args.max_overgezet <= 0:
+        return {"overgezet": 0}
+    conn = db()
+    try:
+        ids = opschonen.overgezet_kandidaten(conn)
+    finally:
+        conn.close()
+    tel = {"overgezet": 0, "afgewezen": 0, "blijft": 0}
+    for rid in ids[:args.max_overgezet]:
+        status, antwoord = req("GET" if args.droog else "POST", f"/api/beoordeling/overgezet/{rid}", token)
+        if status in (429, 503):
+            meld(f"Overgezet gestopt: {antwoord.get('error')}")
+            break
+        if (args.droog and antwoord.get("toegestaan")) or antwoord.get("overgezet"):
+            tel["overgezet"] += 1
+            if antwoord.get("afwijzen") or antwoord.get("afgewezen"):
+                tel["afgewezen"] += 1
+        else:
+            tel["blijft"] += 1
+    meld(f"Overgezet: bewijs van {tel['overgezet']} verband(en) staat nu op het preciezere verband, "
+         f"{tel['afgewezen']} daarvan afgewezen (geen eigen bewijs meer){' (droog)' if args.droog else ''}, "
+         f"{tel['blijft']} wachten (de opvolger, zijn verband of de band is nog niet goedgekeurd)")
     return tel
 
 
@@ -558,6 +614,56 @@ def stap_mechanismen(args, meld) -> dict:
     return mechanisme_toewijzer.draai(max_n=args.max_mechanismen, droog=args.droog, meld=meld)
 
 
+def richting_toepassen(token, droog, meld) -> dict:
+    """Pas elk oordeel 'omgekeerd'/'richtingloos' van de richtingtoets toe (de server beslist of
+    het mag: geen mens-werk, geen registerfeit, één keer per verband, dagplafond)."""
+    conn = db()
+    try:
+        ids = []
+        if bronchecker.heeft_tabel(conn, "richting_toetsen"):
+            for r in conn.execute("""
+                    SELECT r.* FROM relations r WHERE NOT r.vervangen
+                      AND r.status IN ('voorgesteld', 'goedgekeurd')
+                      AND COALESCE(r.bidirectional, 0) = 0
+                      AND r.id IN (SELECT relation_id FROM richting_toetsen
+                                   WHERE verdict IN ('omgekeerd', 'richtingloos'))
+                    ORDER BY r.id"""):
+                o = richtingtoets.oordeel_voor(conn, r)
+                if o is not None and o["verdict"] in ("omgekeerd", "richtingloos"):
+                    ids.append(r["id"])
+    finally:
+        conn.close()
+    tel = {"omgedraaid": 0, "richtingloos": 0, "blijft": 0}
+    for rid in ids:
+        status, antwoord = req("GET" if droog else "POST", f"/api/beoordeling/richting/{rid}",
+                               token)
+        if status in (429, 503):
+            meld(f"Richting gestopt: {antwoord.get('error')}")
+            break
+        actie = antwoord.get("actie")
+        if (droog and antwoord.get("toegestaan")) or antwoord.get("aangepast"):
+            tel["omgedraaid" if actie == "omdraaien" else "richtingloos"] += 1
+        else:
+            tel["blijft"] += 1
+    meld(f"Richting: {tel['omgedraaid']} verband(en) omgedraaid, {tel['richtingloos']} "
+         f"richtingloos gemaakt{' (droog)' if droog else ''}")
+    return tel
+
+
+def stap_richting(token, args, meld) -> dict:
+    """Stap 7b: de richtingtoets over verbanden van een gericht type (voorstellen eerst), dan
+    de oordelen toepassen."""
+    if args.max_richting <= 0:
+        return {"gestart": False, "reden": "uitgezet"}
+    if not args.droog and not richtingtoets.DEFAULT_TOKEN.exists():
+        return {"gestart": False, "reden": "geen token voor het account 'richtingtoets'"}
+    uit = {"toets": richtingtoets.draai(token_pad=richtingtoets.DEFAULT_TOKEN,
+                                        max_n=args.max_richting, droog=args.droog,
+                                        parallel=args.parallel, meld=meld)}
+    uit["toegepast"] = richting_toepassen(token, args.droog, meld)
+    return uit
+
+
 def stap_rfc(token, args, meld) -> dict:
     """Open RfC's: reviews van twee agents, dan het besluit (aannemen/afwijzen)."""
     if args.max_rfc <= 0:
@@ -582,6 +688,8 @@ def stap_rfc(token, args, meld) -> dict:
             tel["aangenomen"] += 1
         elif status == 200 and besluit == "afgewezen":
             tel["afgewezen"] += 1
+            if antwoord.get("blokkade"):
+                meld(f"  ✗ RfC #{vid} afgewezen, niet uit te voeren: {antwoord['blokkade'][:160]}")
         elif antwoord.get("blokkade"):
             tel["blokkade"] += 1
             meld(f"  ✗ RfC #{vid} niet uitvoerbaar: {antwoord['blokkade'][:160]}")
@@ -590,6 +698,13 @@ def stap_rfc(token, args, meld) -> dict:
     meld(f"RfC's: {tel['aangenomen']} aangenomen, {tel['afgewezen']} afgewezen, "
          f"{tel['open']} wachten nog")
     return tel
+
+
+def stap_vervolg(args, meld) -> dict:
+    """8c. Werk dat op een (net aangenomen) theorie-element wachtte (scripts/vervolg.py)."""
+    if args.zonder_vervolg:
+        return {"gestart": False, "reden": "uitgezet"}
+    return vervolg.draai(droog=args.droog, meld=meld)
 
 
 def stap_ontdubbelen(token, args, meld) -> dict:
@@ -1256,6 +1371,9 @@ def ronde(args, meld=print) -> dict:
                                                      modus="specifiek", meld=meld)
     # 2b. A1 voor registerfeiten (Uitbreiding C): deterministisch tegen de bewaarde uitgave
     uitkomst["registercheck"] = registercheck.draai(droog=args.droog, meld=meld)
+    # 2c. Eigen metingen (2026-10-16): citaten op de url, en de A1 voor argumenten op een meting
+    uitkomst["metingcheck"] = metingcheck.draai(droog=args.droog,
+                                                max_citaten=args.max_meting_citaten, meld=meld)
     # 3. Smaad-firewall door een agent, en eigen afwijzingen terug na een nieuw 'klopt'
     uitkomst["smaadtoets"] = stap_smaadtoets(args, meld)
     uitkomst["smaad_vrijgegeven"] = stap_smaad_vrijgeven(token, args, meld)
@@ -1277,7 +1395,9 @@ def ronde(args, meld=print) -> dict:
     uitkomst["a7"] = stap_mergen(token, args, meld)
     uitkomst["verificatie"] = stap_verifieren(token, args, meld)
     uitkomst["mechanismen"] = stap_mechanismen(args, meld)
+    uitkomst["richting"] = stap_richting(token, args, meld)
     uitkomst["rfc"] = stap_rfc(token, args, meld)
+    uitkomst["vervolg"] = stap_vervolg(args, meld)
     uitkomst["ontdubbeld"] = stap_ontdubbelen(token, args, meld)
     uitkomst["bronklassen"] = stap_bronklassen(token, args, meld)
     uitkomst["goedgekeurd"] = stap_goedkeuren(token, args, meld)
@@ -1287,6 +1407,8 @@ def ronde(args, meld=print) -> dict:
     uitkomst["looptijd"] = stap_looptijd(token, args, meld)
     # 10d. Verhangen: een band van vóór een fusie naar de voorganger (en andersom)
     uitkomst["verhangen"] = stap_verhangen(token, args, meld)
+    # 10e. Overgezet: een optreden staat op precies één verband (instituut of persoon)
+    uitkomst["overgezet"] = stap_overgezet(token, args, meld)
     # 11–12. Opruimen; verbanden zonder bron eindigen; wat de smaad- of stemtoets
     #        terugkoppelde komt in zijn feitelijke of neutrale vorm opnieuw binnen
     if not args.zonder_opruimen:
@@ -1339,20 +1461,32 @@ def main():
                     help="hooguit zoveel web-zoektochten van de datumzoeker per ronde (0 = uit)")
     ap.add_argument("--max-datum-org", type=int, default=2,
                     help="web-zoektochten per ronde naar het bestaan van organisaties (2026-10-13)")
+    ap.add_argument("--max-datum-eind", type=int, default=2,
+                    help="web-zoektochten per ronde naar het einde van loopbaanbanden, voor de "
+                         "carrousel in de viz (2026-10-16; 0 = uit)")
     ap.add_argument("--max-datum-eigen", type=int, default=20,
                     help="hooguit zoveel verbanden in de eigen-bronnenronde van de datumzoeker")
     ap.add_argument("--max-zonder-bron", type=int, default=20,
                     help="hooguit zoveel verbanden zonder bron per ronde afwijzen (0 = uit)")
     ap.add_argument("--max-mechanismen", type=int, default=12,
                     help="hooguit zoveel kandidaat-verbanden per ronde (0 = uit)")
+    ap.add_argument("--max-richting", type=int, default=100,
+                    help="hooguit zoveel verbanden per ronde door de richtingtoets (0 = uit)")
+    ap.add_argument("--zonder-vervolg", action="store_true",
+                    help="geen vervolgstappen uit data/vervolg/ draaien")
     ap.add_argument("--max-rfc", type=int, default=3,
                     help="hooguit zoveel open RfC's per ronde laten reviewen (0 = uit)")
     ap.add_argument("--max-verhang", type=int, default=50,
                     help="hooguit zoveel verbanden per ronde naar een voorganger of opvolger (0 = uit)")
+    ap.add_argument("--max-overgezet", type=int, default=50,
+                    help="hooguit zoveel verbanden per ronde waarvan het bewijs naar het preciezere "
+                         "verband ging (instituut of persoon, 0 = uit)")
     ap.add_argument("--max-ontdubbel", type=int, default=100,
                     help="hooguit zoveel dubbele bronnen en verbanden per ronde (0 = uit)")
     ap.add_argument("--max-bronklasse", type=int, default=160,
                     help="hooguit zoveel bronnen per ronde classificeren (0 = uit)")
+    ap.add_argument("--max-meting-citaten", type=int, default=metingcheck.MAX_CITATEN,
+                    help="eigen metingen: hooguit zoveel citaten per ronde op hun url terugzoeken")
     ap.add_argument("--max-leads", type=int, default=3,
                     help="hooguit zoveel publieke tips per ronde als doel klaarzetten (0 = uit)")
     ap.add_argument("--max-archief", type=int, default=10,

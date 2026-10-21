@@ -22,7 +22,14 @@ Manifest-schema:
                       "active_from", "active_until"}],
       "relaties":   [{"source", "target",          # int = bestaand DB-id, str = manifest-key
                       "relation_type", "mechanisme_id", "beschrijving",
+                      "mechanisme",                    # of op naam (een vervolgstap, data/vervolg/)
                       "functie",                       # titel zoals de bron hem noemt (ambt e.d.)
+                      "namens",                        # alleen bij een PERSOON als bron: de
+                                                       # organisatie namens of vanuit welke hij
+                                                       # optrad zoals de bron hem aankondigt
+                                                       # ("Clingendael-onderzoeker X"): int id of
+                                                       # manifest-key; leeg bij een oud-medewerker
+                                                       # of een andere pet (2026-10-19)
                       "active_from", "active_until",   # VERPLICHT: begin (en eind als voorbij)
                       "zonder_jaar",                   # alleen als de bron echt geen begin geeft:
                                                        # waar je zocht (komt in de log; de
@@ -116,12 +123,12 @@ class Api:
         return self._call("POST", pad, body)
 
 
-def lees_db(query: str):
+def lees_db(query: str, params=()):
     if not DB_PATH.exists():
         return []
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     try:
-        return list(conn.execute(query))
+        return list(conn.execute(query, params))
     finally:
         conn.close()
 
@@ -138,8 +145,10 @@ class Indiener:
             "SELECT json_extract(metadata, '$.afkorting'), id FROM entities "
             "WHERE json_valid(metadata) AND json_extract(metadata, '$.afkorting') IS NOT NULL "
             "AND NOT vervangen AND status <> 'afgewezen'") if isinstance(a, str)}
+        # Eén verband per pet (namens_id, 2026-10-19): dezelfde persoon kan namens twee
+        # organisaties bij hetzelfde medium optreden
         self.relaties = {tuple(r) for r in lees_db(
-            "SELECT source_id, target_id, relation_type FROM relations")}
+            "SELECT source_id, target_id, relation_type, namens_id FROM relations")}
         self.bron_keys: dict[str, int | None] = {}
         self.ent_keys: dict[str, int | None] = {}
         self.aangemaakt: list[tuple[str, str, int | None]] = []
@@ -293,7 +302,12 @@ class Indiener:
                     continue
                 print(f"  ! zonder begin ({str(r['zonder_jaar']).strip()[:120]}) — de datumzoeker zoekt verder")
                 self.stats["zonder_jaar"] = self.stats.get("zonder_jaar", 0) + 1
-            sleutel = (sid, tid, rt)
+            namens = None
+            if r.get("namens") not in (None, ""):
+                namens = self._ent_id(r["namens"], "namens")
+                if namens is None:
+                    continue
+            sleutel = (sid, tid, rt, namens)
             if sleutel in self.relaties:
                 print(f"▸ relatie bestaat al: {self._naam(sid)} -{rt}-> {self._naam(tid)} — overgeslagen")
                 self.stats["relaties_bestaand"] += 1
@@ -301,15 +315,27 @@ class Indiener:
             body = {"source_id": sid, "target_id": tid, "relation_type": rt}
             if r.get("mechanisme_id"):
                 body["mechanism_id"] = r["mechanisme_id"]
+            elif r.get("mechanisme"):
+                # Op naam (een vervolgstap kent het id van een net aangenomen mechanisme niet)
+                gevonden = lees_db("SELECT id FROM mechanisms WHERE name = ? AND NOT vervangen",
+                                   (r["mechanisme"],))
+                if not gevonden:
+                    print(f"✗ relatie {self._naam(sid)} -{rt}-> {self._naam(tid)}: mechanisme "
+                          f"'{r['mechanisme']}' bestaat niet — niet ingediend")
+                    self.stats["fouten"] = self.stats.get("fouten", 0) + 1
+                    continue
+                body["mechanism_id"] = gevonden[0][0]
             if r.get("beschrijving"):
                 body["description"] = r["beschrijving"]
             if r.get("functie"):
                 body["functie"] = r["functie"]
+            if namens is not None:
+                body["namens_id"] = namens
             for veld in ("active_from", "active_until"):
                 if r.get(veld):
                     body[veld] = r[veld]
             print(f"▸ relatie: {self._naam(sid)} -{rt}-> {self._naam(tid)}"
-                  f"{' [mech ' + str(r['mechanisme_id']) + ']' if r.get('mechanisme_id') else ' [kandidaat]'}")
+                  f"{' [mech ' + str(body['mechanism_id']) + ']' if body.get('mechanism_id') else ' [kandidaat]'}")
             res = self._post("/api/relations", body, "relatie")
             if res is None:
                 continue

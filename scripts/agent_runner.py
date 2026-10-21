@@ -148,6 +148,23 @@ def open_nieuws_doelen(doel_soort: str = "namen"):
         return None
 
 
+def ongelezen_kanaal_items():
+    """Aantal ongelezen items van de kanalen-monitor (data/kanalen/kanalen.db, scripts/kanalen.py).
+    Alleen-lezen. None = nog geen kanalen-database."""
+    pad = ROOT / "data" / "kanalen" / "kanalen.db"
+    if not pad.exists():
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+        try:
+            return int(conn.execute("SELECT COUNT(*) FROM items WHERE status = 'nieuw'"
+                                    ).fetchone()[0])
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+
+
 def rondes_vandaag(label: str, datum: str) -> int:
     """Aantal echte rondes (run-records) van dit label op deze datum."""
     if not RUNS_JSONL.exists():
@@ -299,6 +316,9 @@ def main():
                     help="Welke doelen --alleen-bij-open-doelen telt: 'namen' (persoon, "
                          "organisatie; nieuws-scout) of 'relatie' (bewijsdoelen; "
                          "nieuws-bewijs).")
+    ap.add_argument("--alleen-bij-kanaal-items", action="store_true",
+                    help="Kanalen-lezer: alleen starten als de kanalen-monitor ongelezen items "
+                         "heeft; anders exit 0 zonder claude.")
     ap.add_argument("--max-rondes-per-dag", type=int, default=0,
                     help="Max. echte rondes per kalenderdag voor dit label (0 = onbegrensd); "
                          "daarboven exit 0 zonder claude.")
@@ -354,6 +374,8 @@ def main():
             if not n:
                 return ("geen open nieuws-doelen" if n == 0
                         else "wachtrij nieuws_doelen niet leesbaar (migratie gedraaid?)")
+        if args.alleen_bij_kanaal_items and not ongelezen_kanaal_items():
+            return "geen ongelezen kanaal-items"
         return None
 
     if args.dry_run:
@@ -369,6 +391,9 @@ def main():
         if args.alleen_bij_open_doelen:
             n = open_nieuws_doelen(args.doel_soort)
             print(f"Open doelen ({args.doel_soort}): {'onleesbaar' if n is None else n}")
+        if args.alleen_bij_kanaal_items:
+            n = ongelezen_kanaal_items()
+            print(f"Ongelezen kanaal-items: {'geen database' if n is None else n}")
         reden = overslaan_reden()
         print(f"Zou starten: {'NEE — ' + reden + ' (exit 0, geen claude)' if reden else 'ja'}")
         print("\nCommando:")

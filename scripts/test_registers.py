@@ -29,7 +29,10 @@ overheidsorganisaties:
      overschrijven, lezen bij het matchen (namen_van, bronzoeker, de parkeercheck);
  15. (2026-10-14) volledige namen uit Wikidata via de route: QID via /register, de naam via
      /registernaam (droogloop standaard, toevoeging alleen bij een naamgenoot, terugdraaien,
-     registercheck blijft kloppen).
+     registercheck blijft kloppen);
+ 16. (2026-10-15) de gemeentelijke indeling (cbs.py, cbs_naar_model.py): zonder het mechanisme
+     interbestuurlijk_toezicht niets; daarna 'controle' van de provincie (oo-id) naar de gemeente
+     (tooi-code), zonder begin; een gemeente die het model niet kent niet; de registercheck.
 De live database wordt niet aangeraakt.
 
 Gebruik: python3 scripts/test_registers.py   (exit 0 = alles groen)
@@ -258,6 +261,24 @@ def ser_html() -> str:
     return ("<html><body><main><p>Werkgeversorganisaties:</p>\n<ul>\n    <li>VNO-NCW (8 zetels)</li>\n"
             "    <li>Testwerkgevers (1 zetel)</li>\n</ul>\n<p>Werknemersorganisaties:</p>\n<ul>\n"
             "    <li>FNV (8 zetels)</li>\n    <li>VCP (2 zetels)</li>\n</ul></main></body></html>")
+
+
+def cbs_fixture() -> dict:
+    """De tabel 'Gebieden in Nederland' zoals de OData-API van het CBS haar geeft (ingekort)."""
+    kolommen = [
+        {"ID": 0, "Key": "RegioS", "Type": "GeoDimension", "Title": "Regio's"},
+        {"ID": 1, "Key": "", "Type": "TopicGroup", "Title": "Codes en namen van gemeenten"},
+        {"ID": 2, "ParentID": 1, "Key": "Code_1", "Type": "Topic", "Title": "Code"},
+        {"ID": 3, "ParentID": 1, "Key": "Naam_2", "Type": "Topic", "Title": "Naam"},
+        {"ID": 4, "Key": "", "Type": "TopicGroup", "Title": "Provincies"},
+        {"ID": 5, "ParentID": 4, "Key": "Code_28", "Type": "Topic", "Title": "Code"},
+        {"ID": 6, "ParentID": 4, "Key": "Naam_29", "Type": "Topic", "Title": "Naam"}]
+    rijen = [{"ID": i, "RegioS": f"{code}    ", "Code_1": f"{code}    ", "Naam_2": f"{naam}      ",
+              "Code_28": "PV99      ", "Naam_29": "Testland     "}
+             for i, (code, naam) in enumerate((("GM9999", "Teststad"), ("GM9998", "Elders")))]
+    return {"tabel": "99999NED", "tabelinfo": {"Identifier": "99999NED", "Title": "Gebieden in Nederland 2026",
+                                               "Period": "2026"},
+            "kolommen": kolommen, "rijen": rijen}
 
 
 def tweede_kamer_en_theorie(conn):
@@ -795,6 +816,52 @@ def main():
         rconn.close()
         afkortingen(conn, client, tokens, data, db)
         registernamen(conn, client, tokens, wpad, db)
+
+        print("16. Gemeentelijke indeling (cbs.py + cbs_naar_model.py)")
+        import cbs
+        import cbs_naar_model
+        cbs.MAP = tmp / "registers" / "cbs"
+        cbs.MAP.mkdir(parents=True)
+        cbs.PROVINCIES = {"PV99": ("Testland", "700")}
+        cbs.MIN_GEMEENTEN = 1
+        pad = cbs.MAP / "cbs_2026-01-01.json"
+        pad.write_text(json.dumps(cbs_fixture(), ensure_ascii=False), encoding="utf-8")
+        (cbs.MAP / "cbs_2026-01-01.sha256").write_text(common.sha256_bestand(pad) + "\n")
+        cdata = cbs.lees(pad)
+        eis(cdata["records"]["gemeente:gm9999"]["regel"]
+            == "Gebieden in Nederland 2026 (CBS, tabel 99999NED) · gemeente Teststad (GM9999) · provincie Testland (PV99)",
+            "CBS-tabel gelezen: gemeente en provincie met hun codes in de recordregel")
+        rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        cplan = cbs_naar_model.Plan(cdata, rconn, {}).maak()
+        rconn.close()
+        eis(not cplan.relaties and cplan.tel[f"wacht op het mechanisme {cbs_naar_model.TOEZICHT_MECH}"] == 2,
+            f"zonder het mechanisme plant de import niets: {dict(cplan.tel)}")
+        rol = {n: i for i, n in conn.execute("SELECT id, name FROM roles")}
+        conn.execute("INSERT OR IGNORE INTO mechanisms (name, filter, description, effect, source_role_id, target_role_id) "
+                     "VALUES (?, 'formele_macht', 'test', 'test', ?, ?)",
+                     (cbs_naar_model.TOEZICHT_MECH, rol["decentrale_overheid"], rol["decentrale_overheid"]))
+        conn.commit()
+        rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        cplan = cbs_naar_model.Plan(cdata, rconn, {}).maak()
+        namen = {i: n for i, n in rconn.execute("SELECT id, name FROM entities")}
+        eis(len(cplan.relaties) == 1 and cplan.relaties[0]["type"] == "controle"
+            and cplan.relaties[0]["start"] is None
+            and namen.get(cplan.relaties[0]["bron"][1]) == "Provincie Testland"
+            and namen.get(cplan.relaties[0]["doel"][1]) == "Gemeente Teststad",
+            f"Provincie Testland (oo-id) → Gemeente Teststad (tooi), zonder begin: {cplan.relaties}")
+        eis(any("GM9998" in o["reden"] for o in cplan.overgeslagen), "een gemeente die het model niet kent: overgeslagen")
+        cind = cbs_naar_model.Indiener(cplan, rest_voor(tokens["register-import"]))
+        rconn.close()
+        cind.entiteiten()
+        cind.relaties(cind.bron())
+        eis(cind.tel["relatie nieuw"] == 1 and not any("fout" in k for k in cind.tel), f"CBS ingediend: {dict(cind.tel)}")
+        stel = registercheck.draai()
+        eis(stel["klopt"] == 1 and stel["klopt-niet"] == 0, f"registercheck CBS: {stel}")
+        rconn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        cind2 = cbs_naar_model.Indiener(cbs_naar_model.Plan(cdata, rconn, {}).maak(), rest_voor(tokens["register-import"]))
+        rconn.close()
+        cind2.relaties(cind.bron())
+        eis(cind2.tel["relatie bestond"] == 1 and cind2.tel["relatie nieuw"] == 0, f"tweede run: niets dubbel {dict(cind2.tel)}")
         conn.close()
     print("\nRegisterpijplijn: alles groen.")
 

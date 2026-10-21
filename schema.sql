@@ -89,7 +89,12 @@ CREATE TABLE mechanisms (
     active_from TEXT,
     active_until TEXT,
     -- M2.6: vervangen door opvolger(s); zie `lineage`.
-    vervangen BOOLEAN NOT NULL DEFAULT FALSE
+    vervangen BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Uitbreiding D (2026-10-15): loopt de invloed via een formeel toegekende bevoegdheid of
+    -- recht van de bron over het doel (wet, ambt, mandaat, statuut, eigendom, benoemingsrecht,
+    -- werkgeversgezag, rechterlijke uitspraak)? Zo niet: geld, toegang, netwerk, informatie,
+    -- druk of ideeën. Waar de macht op werkt staat in mechanism_doelen.
+    grondslag TEXT CHECK(grondslag IN ('officieel', 'niet_officieel'))
 );
 
 -- Twee-assen-categorisatie van mechanismen (zie enrich_filters_themas.py).
@@ -113,6 +118,18 @@ CREATE TABLE mechanism_themes (
         'omroepbestel', 'kennis_expertise', 'benoemingsketen'
     )),
     PRIMARY KEY (mechanism_id, theme)
+);
+
+-- Uitbreiding D (2026-10-15, machtsuitoefening op beslissing en opinie): waar de macht van
+-- een mechanisme op werkt, één of meer (DOCUMENTATIE.md § "Uitbreiding D").
+CREATE TABLE mechanism_doelen (
+    mechanism_id INTEGER NOT NULL REFERENCES mechanisms(id) ON DELETE CASCADE,
+    doel TEXT NOT NULL CHECK(doel IN (
+        'beslissing',   -- wat overheid, politiek of rechter besluit
+        'agenda',       -- wat op de besluitvormingsagenda komt en welke opties meetellen
+        'opinie'        -- wat het publiek te zien krijgt en denkt
+    )),
+    PRIMARY KEY (mechanism_id, doel)
 );
 
 -- Emergente effecten als HYPEREDGE: een systeemeigenschap die uit het samenspel van
@@ -269,10 +286,11 @@ CREATE TABLE relations (
         'donor',                 -- donatie, mecenaat
         'investering',           -- kapitaalbelang, deelneming
 
-        -- Organisatorisch
+        -- Organisatorisch — richtingloos (vocab.RICHTINGLOZE_TYPES, 2026-10-15): de volgorde
+        -- van bron en doel zegt niets; geen pijl, invloed in beide richtingen
         'lidmaatschap',          -- lid van netwerk, partij, groep
         'personeel',             -- werkgever-werknemer
-        'dienstverband',         -- economische afhankelijkheid journalist<-org (Eigendom-filter; gerichte edge, geen affiliatie-brug)
+        'dienstverband',         -- economische afhankelijkheid journalist<->org (Eigendom-filter; richtingloos sinds 2026-10-15, geen affiliatie-brug)
         'bestuurder',            -- bestuurslid, commissaris, voorzitter
         'adviseur',              -- formeel of informeel advies
         'woordvoerder_van',      -- officiële voorlichter/woordvoerder
@@ -280,7 +298,7 @@ CREATE TABLE relations (
 
         -- Informatiestromen
         'bron_van',              -- levert informatie aan (journalist, medium)
-        'mediaplatform',         -- publiceert via dit medium
+        'mediaplatform',         -- zender/krant (bron) biedt het platform voor programma/columnist (doel)
         'framing',               -- bepaalt het frame/narratief
         'citeert',               -- gebruikt als bron in berichtgeving
 
@@ -303,7 +321,7 @@ CREATE TABLE relations (
         'algoritmische_filtering', -- platformalgoritme bepaalt zichtbaarheid
 
         -- Bestuur (Uitbreiding C, eigenaarsbesluit 2026-10-07)
-        'ambt',                  -- persoon bekleedt een openbaar ambt bij deze organisatie (titel in `functie`)
+        'ambt',                  -- persoon bekleedt een openbaar ambt bij deze organisatie (titel in `functie`; richtingloos)
         'zeggenschap',           -- org -> org: hiërarchie, verantwoordelijkheid op afstand, deelname
         'controle',              -- controleorgaan/rechter/volksvertegenwoordiging -> bestuur (verantwoording)
         'geschenk'               -- geregistreerd geschenk of betaalde reis (openbaar register)
@@ -311,9 +329,15 @@ CREATE TABLE relations (
     mechanism_id INTEGER REFERENCES mechanisms(id),
     description TEXT,
     functie TEXT,                -- Uitbreiding C: ambtstitel zoals het register hem geeft (bv. 'Secretaris-generaal')
+    -- Hoedanigheid (eigenaarsbesluit 2026-10-19, "instituut of persoon"): bij een verband van
+    -- een PERSOON de organisatie namens of vanuit welke hij optrad, zoals de bron hem aankondigt
+    -- ("Clingendael-onderzoeker Bob Deen" → Clingendael). Leeg = eigen titel, oud-medewerker of
+    -- een andere pet. Eén pet per verband: wie van pet wisselt, krijgt een tweede verband. De
+    -- route instituut ⇢ medium via zijn mensen wordt hieruit afgeleid (via_medewerkers.py).
+    namens_id INTEGER REFERENCES entities(id),
     certainty REAL CHECK(certainty BETWEEN 0.0 AND 1.0),
     influence REAL CHECK(influence BETWEEN 0.0 AND 1.0),
-    bidirectional BOOLEAN DEFAULT FALSE,
+    bidirectional BOOLEAN DEFAULT FALSE,  -- verband zonder invloedsrichting (de richtingtoets zet het)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- Temporeel (zie migrate_model_v2.py): NULL = onbegrensd voor zover bekend.
     active_from TEXT,
@@ -1019,6 +1043,103 @@ CREATE TABLE looptijd_onderzoek (
 );
 
 --------------------------------------------------------------
+-- RICHTING_TOETSEN (eigenaarsbesluit 2026-10-15: "alleen directioneel als a ook echt invloed
+-- heeft op b en niet echt andersom, zoals a financiert b of a is eigenaar van b"): het oordeel
+-- van een agent (scripts/richtingtoets.py, account 'richtingtoets', nooit de auteur) over de
+-- richting van een verband van een GERICHT type (de richtingloze typen staan in
+-- vocab.RICHTINGLOZE_TYPES): 'juist', 'omgekeerd' (bron en doel wisselen), 'richtingloos'
+-- (bidirectional = 1) of 'twijfel' (niets doen). relatie_hash = sha256 van wat het oordeel zag:
+-- verandert het verband, dan geldt het oordeel niet meer. De automatische beoordeling past een
+-- oordeel toe (POST /api/beoordeling/richting/<id>, edit_log, terug te draaien). PROCESMETADATA,
+-- telt in niets mee. Aangelegd via schema.sql (verse build) én
+-- scripts/migrate_add_richting_toetsen.py.
+--------------------------------------------------------------
+
+CREATE TABLE richting_toetsen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relation_id INTEGER NOT NULL REFERENCES relations(id),
+    relatie_hash TEXT NOT NULL,           -- sha256 van bron|doel|type|mechanisme|bidirectional
+    verdict TEXT NOT NULL CHECK(verdict IN ('juist', 'omgekeerd', 'richtingloos', 'twijfel')),
+    reden TEXT NOT NULL,
+    model TEXT,                           -- welk model oordeelde ('haiku', 'haiku+sonnet')
+    door TEXT REFERENCES users(username),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(relation_id, door)
+);
+
+--------------------------------------------------------------
+-- EIGEN METINGEN (eigenaarsbesluit 2026-10-16: een eigen meting telt als bewijs, "het moet een
+-- tool zijn waarmee je zelf dat kan bepalen", "zolang je aan journalistieke codes houdt"). Een
+-- meting is een vooraf vastgelegde telling: welke organisatie of deskundige komt in welk medium
+-- aan het woord, over welk onderwerp, met welk standpunt, wordt de financiering vermeld.
+-- opzet (JSON: selectie, groepen, vragen, uitkomst, stopregel) → vastgelegd (opzet_hash, vóór de
+-- eerste waarneming) → afgerond (data_hash over waarnemingen en controles, samenvatting
+-- bevroren). Een afgeronde meting wordt een bron (dataset, cluster_key 'meting:<id>') waarop een
+-- gewoon argument steunt; het gewicht kiest de eigenaar met de bronclassificatie. De
+-- journalistieke codes (a–h) staan in metingen.py. De tabellen zelf tellen nergens mee: alleen
+-- het argument dat op de meting steunt. Aangelegd via schema.sql (verse build) én
+-- scripts/migrate_add_metingen.py.
+--------------------------------------------------------------
+
+CREATE TABLE metingen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titel TEXT NOT NULL,
+    vraag TEXT NOT NULL,                  -- de onderzoeksvraag
+    opzet TEXT NOT NULL,                  -- JSON {selectie, groepen, vragen, uitkomst, stopregel}
+    status TEXT NOT NULL DEFAULT 'opzet' CHECK(status IN ('opzet', 'vastgelegd', 'afgerond')),
+    voorspelling_id INTEGER REFERENCES predictions(id),
+    contributed_by TEXT NOT NULL REFERENCES users(username),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    vastgelegd_at TIMESTAMP,              -- opzet bevroren (UTC, zoals created_at)
+    afgerond_at TIMESTAMP,                -- dataset bevroren
+    opzet_hash TEXT,                      -- sha256 van de opzet bij het vastleggen
+    data_hash TEXT,                       -- sha256 van de dataset bij het afronden
+    samenvatting TEXT                     -- JSON, bevroren bij het afronden (vaste tekstregels)
+);
+
+CREATE TABLE meting_waarnemingen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meting_id INTEGER NOT NULL REFERENCES metingen(id),
+    groep TEXT NOT NULL,                  -- naam van een groep uit de opzet
+    wie TEXT NOT NULL,                    -- naam en functie zoals in het artikel
+    entity_id INTEGER REFERENCES entities(id),         -- de geciteerde, als knoop in het model
+    medium_entity_id INTEGER REFERENCES entities(id),  -- het medium (uit de selectie)
+    url TEXT NOT NULL,
+    archief_url TEXT,
+    datum TEXT NOT NULL,                  -- publicatiedatum van het artikel (JJJJ-MM-DD)
+    citaat TEXT NOT NULL,                 -- letterlijk uit het artikel
+    codes TEXT NOT NULL DEFAULT '{}',     -- JSON {sleutel: optie}
+    notitie TEXT,
+    contributed_by TEXT NOT NULL REFERENCES users(username),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    citaat_gevonden INTEGER CHECK(citaat_gevonden IS NULL OR citaat_gevonden IN (0, 1)),
+    citaat_gecontroleerd_at TIMESTAMP     -- wanneer metingcheck het citaat op de url zocht
+);
+
+CREATE TABLE meting_controles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    waarneming_id INTEGER NOT NULL REFERENCES meting_waarnemingen(id),
+    codes TEXT NOT NULL,                  -- JSON {sleutel: optie}: de blinde tweede codering
+    door TEXT NOT NULL REFERENCES users(username),  -- nooit de invoerder
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(waarneming_id, door)
+);
+
+CREATE TABLE meting_wederhoor (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meting_id INTEGER NOT NULL REFERENCES metingen(id),
+    partij TEXT NOT NULL,                 -- naam van de partij (organisatie of medium)
+    entity_id INTEGER REFERENCES entities(id),
+    soort TEXT NOT NULL CHECK(soort IN ('reactie', 'verzoek_zonder_reactie',
+                                        'gepubliceerd_standpunt')),
+    tekst TEXT,                           -- de reactie, het verzoek of het standpunt
+    bron_url TEXT,                        -- vindplaats (verplicht bij een gepubliceerd standpunt)
+    datum TEXT,                           -- JJJJ-MM-DD (verplicht bij een verzoek zonder reactie)
+    door TEXT NOT NULL REFERENCES users(username),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--------------------------------------------------------------
 -- INDEXEN
 --------------------------------------------------------------
 
@@ -1028,6 +1149,7 @@ CREATE INDEX idx_relations_source ON relations(source_id);
 CREATE INDEX idx_relations_target ON relations(target_id);
 CREATE INDEX idx_relations_type ON relations(relation_type);
 CREATE INDEX idx_relations_mechanism ON relations(mechanism_id);
+CREATE INDEX idx_relations_namens ON relations(namens_id);
 CREATE UNIQUE INDEX idx_inst_role_entity ON instantiations(role_id, entity_id) WHERE role_id IS NOT NULL;
 CREATE UNIQUE INDEX idx_inst_mech_relation ON instantiations(mechanism_id, relation_id) WHERE mechanism_id IS NOT NULL;
 CREATE INDEX idx_inst_role ON instantiations(role_id);
@@ -1049,6 +1171,7 @@ CREATE INDEX idx_immuun_argument ON immuun_oordelen(argument_id, fase);
 CREATE INDEX idx_mechanisms_filter ON mechanisms(filter);
 CREATE INDEX idx_mechfilters_filter ON mechanism_filters(filter);
 CREATE INDEX idx_mechthemes_theme ON mechanism_themes(theme);
+CREATE INDEX idx_mechdoelen_doel ON mechanism_doelen(doel);
 CREATE INDEX idx_edit_log_table ON edit_log(table_name, record_id);
 CREATE INDEX idx_edit_log_changed_by ON edit_log(changed_by);
 CREATE INDEX idx_arguments_status ON arguments(status);
@@ -1065,6 +1188,11 @@ CREATE INDEX idx_leads_ip ON leads(ingezonden_ip_hash);
 CREATE INDEX idx_nieuws_doelen_status ON nieuws_doelen(status, prioriteit);
 CREATE INDEX idx_smaad_toetsen_argument ON smaad_toetsen(argument_id);
 CREATE INDEX idx_stem_toetsen_doel ON stem_toetsen(soort, doel_id);
+CREATE INDEX idx_richting_toetsen_relatie ON richting_toetsen(relation_id);
+CREATE INDEX idx_metingen_status ON metingen(status);
+CREATE INDEX idx_meting_waarnemingen_meting ON meting_waarnemingen(meting_id);
+CREATE INDEX idx_meting_controles_waarneming ON meting_controles(waarneming_id);
+CREATE INDEX idx_meting_wederhoor_meting ON meting_wederhoor(meting_id);
 
 --------------------------------------------------------------
 -- SEED DATA: ROLLEN (theoretisch model)

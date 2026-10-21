@@ -73,6 +73,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import bronchecker as bc  # noqa: E402
 from registercheck import REGISTER_ARG_SQL  # noqa: E402
+from metingcheck import METING_ARG_SQL  # noqa: E402
 
 DB_PATH = ROOT / "data" / "propaganda_model.db"
 ACCOUNT = "bronzoeker"
@@ -253,6 +254,9 @@ _ARGUMENT_KOLOMMEN = """
 # Uitbreiding C: een registerfeit repareert de registercheck niet met een andere bron; het
 # register is de bron. Zulke argumenten zijn dus nooit werk voor de bronzoeker.
 _ARGUMENT_KOLOMMEN += f"\n          AND NOT {REGISTER_ARG_SQL}"
+# Eigen metingen (2026-10-16): de meting is de bron; scripts/metingcheck.py oordeelt, een
+# andere bron repareert haar niet.
+_ARGUMENT_KOLOMMEN += f"\n          AND NOT {METING_ARG_SQL}"
 
 
 def sleutel(item: dict) -> str:
@@ -448,6 +452,13 @@ OPDRACHT = (
     "'extreemrechts', 'linkse media', 'mainstream', 'neoliberale consensus', 'omstreden'), "
     "geen retoriek van één kant. Zo'n oordeel alleen als citaat met de naam van wie het "
     "uitsprak ('De NVJ noemde de uitspraak …').\n"
+    "10. Instituut of persoon (eigenaarsbesluit 2026-10-19). Gaat het verband van een "
+    "organisatie naar een medium (of naar de Kamer of een ministerie), dan telt alleen een bron "
+    "waarin de organisatie ZELF spreekt: haar rapport, cijfers, peiling, persbericht, standpunt "
+    "of partnerschap, of iemand die namens haar spreekt (woordvoerder, directeur, hoofdeconoom "
+    "bij de eigen cijfers). Een bericht waarin één medewerker eigen duiding geeft ('zegt "
+    "Clingendael-onderzoeker X') draagt het verband van die persoon met het medium, niet dit "
+    "verband: gevonden = false, en noem de persoon en de bron in 'toelichting'.\n"
     f"Hooguit {MAX_BRONNEN} bronnen; liever één goede dan twee matige.")
 
 

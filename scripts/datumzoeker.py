@@ -4,8 +4,9 @@ goede jaartallen in he want het model kijkt gewoon per tijdsvak wat de relaties 
 dat dit overal wordt gehandhaafd en dat alle agents dit weten").
 
 Voor verbanden zonder begin (active_from), wat het nieuws toont eerst, dan verbanden rond
-entiteiten uit het nieuws, dan personen, dan de rest, en registerfeiten waarvan het register
-geen begin noemt als laatste:
+entiteiten uit het nieuws, dan personen met banden bij twee of meer organisaties (hun loopbaan
+maakt de carrousel zichtbaar, 2026-10-16), dan andere personen, dan de rest, en registerfeiten
+waarvan het register geen begin noemt als laatste:
   1. EIGEN BRONNEN (goedkoop, één aanroep voor een hele portie, zonder tools): de citaten die
      het verband al draagt ("(2011–2020)", "per 1 juni 2023"). Alleen een citaat telt, nooit de
      beschrijving of de bewering van het model zelf.
@@ -26,9 +27,18 @@ DAG_PLAFOND_ORG) naar haar oprichting en eventuele opheffing. Dat wordt een aspe
 entiteit (entity_id, property active_from/active_until); stap 10c zet het na A1. De stand staat in
 data/datumzoeker_organisaties.json (zelfde wachttijden).
 
+Daarna (2026-10-16, "baantjescarrousel") het EINDE van loopbaanbanden: een band van een persoon
+met een organisatie die een begin heeft maar geen einde, terwijl dezelfde persoon later bij een
+andere organisatie begon. Alleen met een einde is te zien dat iemand van X naar Y ging (de
+Carrousel in het onderzoekspaneel van de viz). Een latere functie bewijst geen einde: het model
+zoekt een bron die het einde noemt, en loopt de band nog, dan is er niets. Geen partijlidmaatschap
+(loopt meestal door) en geen registerfeiten (die krijgen hun einde uit het register).
+`--max-web-eind` per ronde, eigen dagplafond DAG_PLAFOND_EIND, stand in
+data/datumzoeker_einden.json (zelfde wachttijden).
+
 Account `datumzoeker` (bijdrager, eigen token). Stap 1b van scripts/automatische_beoordeling.py.
 Los:
-    python3 scripts/datumzoeker.py [--droog] [--max-eigen 20] [--max-web 8] [--ids 1879,1880]
+    python3 scripts/datumzoeker.py [--droog] [--max-eigen 20] [--max-web 8] [--max-web-eind 2] [--ids 1879,1880]
 """
 from __future__ import annotations
 
@@ -53,12 +63,13 @@ ACCOUNT = "datumzoeker"
 DEFAULT_TOKEN = ROOT / "data" / "tokens" / f"{ACCOUNT}.token"
 DEFAULT_API = "http://127.0.0.1:5000"
 LOG_PATH = ROOT / "data" / "datumzoeker_log.jsonl"
-MODEL = "sonnet"
+MODEL = os.environ.get("DATUMZOEKER_MODEL", "haiku")   # eigenaar 2026-10-15: Haiku (Sonnet kostte te veel abonnement)
 LLM_TIMEOUT_S = 600
 OPNIEUW_NA_DAGEN = 30
 FOUT_OPNIEUW_NA_UREN = 20
-DAG_PLAFOND = 150            # web-zoektochten per dag
-DAG_PLAFOND_ORG = 48         # en apart voor het bestaan van organisaties (2026-10-13)
+DAG_PLAFOND = int(os.environ.get("DATUMZOEKER_DAGPLAFOND", "150"))   # web-zoektochten per dag
+DAG_PLAFOND_ORG = int(os.environ.get("DATUMZOEKER_DAGPLAFOND_ORG", "48"))   # en apart voor het bestaan van organisaties (2026-10-13)
+DAG_PLAFOND_EIND = int(os.environ.get("DATUMZOEKER_DAGPLAFOND_EIND", "24"))  # en voor het einde van loopbaanbanden (2026-10-16)
 MERK = "Looptijd voor verband #{id}"
 DATUM_RE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
 
@@ -92,6 +103,20 @@ REGELS_ORG = (
     "Antwoord alleen met het gevraagde JSON."
 )
 ORG_STAND_PAD = ROOT / "data" / "datumzoeker_organisaties.json"
+EIND_STAND_PAD = ROOT / "data" / "datumzoeker_einden.json"
+# Banden tussen een persoon en een organisatie die een loopbaan vormen (spiegel van SPEUR_PERSOON
+# in web/template.html: BRUG_AFFILIATIE + dienstverband + ambt).
+LOOPBAAN_TYPES = ("lidmaatschap", "bestuurder", "adviseur", "draaideur", "personeel",
+                  "woordvoerder_van", "dienstverband", "ambt")
+_LOOPBAAN_IN = ", ".join(f"'{t}'" for t in LOOPBAAN_TYPES)
+# Persoon en organisatie van elke goedgekeurde loopbaanband.
+_AFF_CTE = f"""aff AS (
+    SELECT r.id, r.active_from,
+           CASE WHEN s.type = 'persoon' THEN r.source_id ELSE r.target_id END AS p,
+           CASE WHEN s.type = 'persoon' THEN r.target_id ELSE r.source_id END AS o
+    FROM relations r JOIN entities s ON s.id = r.source_id JOIN entities t ON t.id = r.target_id
+    WHERE r.status = 'goedgekeurd' AND NOT r.vervangen AND r.relation_type IN ({_LOOPBAAN_IN})
+      AND (s.type = 'persoon') <> (t.type = 'persoon'))"""
 # Zelfde vorm als WEB_SCHEMA, plus de naam zoals de bron hem schrijft ("European Parliament" voor
 # het Europees Parlement): de pagina moet díé naam noemen; de bronchecker toetst daarna of het
 # over deze organisatie gaat.
@@ -191,19 +216,33 @@ def kandidaten(conn, ids=None, nu=None) -> list[dict]:
           {filt}""", params)]  # noqa: S608 - alleen placeholders
     stand = onderzoek(conn)
     nieuws, ent = bc.nieuws_voorrang(conn)
+    loopbaan = loopbaan_personen(conn)
     uit = []
     for r in rijen:
         st = stand.get(r["id"])
         if not ids and not mag_weer(st, nu):
             continue
         register = bool(st and st["status"] == "register_zonder_datum")
-        r["voorrang"] = (4 if register else 0 if r["id"] in nieuws
+        persoon = r["bron_id"] if r["bron_type"] == "persoon" else r["doel_id"] if r["doel_type"] == "persoon" else None
+        r["voorrang"] = (5 if register else 0 if r["id"] in nieuws
                          else 1 if (r["bron_id"] in ent or r["doel_id"] in ent)
-                         else 2 if "persoon" in (r["bron_type"], r["doel_type"]) else 3)
+                         else 2 if persoon in loopbaan
+                         else 3 if persoon is not None else 4)
         r["register"] = register
         uit.append(r)
     uit.sort(key=lambda r: (r["voorrang"], -r["id"]))
+    # Parallel werken (2026-10-15): DATUMZOEKER_DEEL="n/m" neemt alleen de verbanden met id % m == n
+    deel = os.environ.get("DATUMZOEKER_DEEL", "")
+    if re.fullmatch(r"\d+/\d+", deel):
+        n, m = map(int, deel.split("/"))
+        uit = [r for r in uit if m > 0 and r["id"] % m == n]
     return uit
+
+
+def loopbaan_personen(conn) -> set[int]:
+    """Personen met goedgekeurde loopbaanbanden bij twee of meer organisaties."""
+    return {r[0] for r in conn.execute(f"""WITH {_AFF_CTE}
+        SELECT p FROM aff GROUP BY p HAVING COUNT(DISTINCT o) >= 2""")}
 
 
 def eigen_citaten(conn, rid) -> list[dict]:
@@ -344,9 +383,10 @@ def _afkortingen(r: dict) -> dict:
     return {r["bron_naam"]: r.get("bron_afk"), r["doel_naam"]: r.get("doel_afk")}
 
 
-def web_ronde(r: dict, eigen: list[dict]) -> dict:
+def web_ronde(r: dict, eigen: list[dict], prompt: str | None = None,
+              velden: tuple[str, ...] = ("begin", "eind")) -> dict:
     """Stap 2: zoeken op het web. → {uitkomst: gevonden|niets|fout, begin?, eind?, bewering, …}"""
-    antwoord = vraag(web_prompt(r, eigen), WEB_SCHEMA, tools=True)
+    antwoord = vraag(prompt or web_prompt(r, eigen), WEB_SCHEMA, tools=True)
     if not antwoord:
         return {"uitkomst": "fout", "toelichting": "model gaf geen bruikbaar antwoord"}
     partijen = [r["bron_naam"], r["doel_naam"]]
@@ -355,13 +395,16 @@ def web_ronde(r: dict, eigen: list[dict]) -> dict:
            "toelichting": (antwoord.get("toelichting") or "")[:600]}
     if not antwoord.get("gevonden"):
         return uit
-    for veld in ("begin", "eind"):
+    for veld in velden:
         datum = schone_datum(antwoord.get(veld))
         bron = antwoord.get(f"{veld}_bron") or {}
         if not datum or not (bron.get("url") or "").strip():
             continue
         if not noemt_jaar(bron.get("citaat"), datum):
             afgevallen.append({"url": bron.get("url"), "reden": f"citaat noemt {datum[:4]} niet"})
+            continue
+        if veld == "eind" and r.get("active_from") and datum[:4] < str(r["active_from"])[:4]:
+            afgevallen.append({"url": bron.get("url"), "reden": f"einde {datum} ligt vóór het begin {r['active_from']}"})
             continue
         goed, reden = bz.natrekken(bron, partijen, _afkortingen(r))
         if not goed:
@@ -404,22 +447,23 @@ def leg_vast(api, token, rid: int, status: str, detail: str) -> None:
 
 
 # ------------------------------------------------------------------ organisaties (2026-10-13)
-def org_stand() -> dict:
+def org_stand(pad: Path | None = None) -> dict:
     try:
-        return json.loads(ORG_STAND_PAD.read_text(encoding="utf-8"))
+        return json.loads((pad or ORG_STAND_PAD).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
 
-def org_stand_zet(eid: int, status: str, detail: str) -> None:
-    stand = org_stand()
+def org_stand_zet(eid: int, status: str, detail: str, pad: Path | None = None) -> None:
+    pad = pad or ORG_STAND_PAD
+    stand = org_stand(pad)
     oud = stand.get(str(eid)) or {}
     stand[str(eid)] = {"status": status, "laatste_poging": datetime.datetime.now().isoformat(
         timespec="seconds"), "pogingen": int(oud.get("pogingen", 0)) + 1, "detail": detail[:400]}
-    ORG_STAND_PAD.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ORG_STAND_PAD.with_suffix(".tmp")
+    pad.parent.mkdir(parents=True, exist_ok=True)
+    tmp = pad.with_suffix(".tmp")
     tmp.write_text(json.dumps(stand, ensure_ascii=False, indent=1), encoding="utf-8")
-    tmp.replace(ORG_STAND_PAD)
+    tmp.replace(pad)
 
 
 def organisatie_kandidaten(conn, ids=None, nu=None) -> list[dict]:
@@ -550,6 +594,105 @@ def organisatie_ronde(api, token, max_web_org, ruimte, droog, meld, ids=None) ->
     return tel
 
 
+# ------------------------------------------------------------------ einden van loopbaanbanden (2026-10-16)
+def eind_kandidaten(conn, ids=None, nu=None) -> list[dict]:
+    """Loopbaanbanden met een begin maar zonder einde, terwijl dezelfde persoon later (een later
+    beginjaar) bij een andere organisatie begon (een partij telt niet: lid worden zegt niets over
+    het einde van een functie). Geen partijlidmaatschap, geen registerfeit, geen
+    lopend active_until-argument. Wat het nieuws toont eerst, dan wie de meeste latere banden heeft."""
+    nu = nu or datetime.datetime.now()
+    filt, params = "", []
+    if ids:
+        filt = f" AND r.id IN ({','.join('?' * len(ids))})"
+        params = list(ids)
+    rijen = [dict(r) for r in conn.execute(f"""WITH {_AFF_CTE}
+        SELECT r.id, r.relation_type, r.functie, r.description, r.active_from, r.active_until,
+               r.status, s.id AS bron_id, s.name AS bron_naam, s.type AS bron_type,
+               t.id AS doel_id, t.name AS doel_naam, t.type AS doel_type, m.name AS mechanisme,
+               CASE WHEN json_valid(s.metadata) THEN json_extract(s.metadata, '$.afkorting') END AS bron_afk,
+               CASE WHEN json_valid(t.metadata) THEN json_extract(t.metadata, '$.afkorting') END AS doel_afk,
+               (SELECT COUNT(DISTINCT a2.o) FROM aff a1 JOIN aff a2 ON a2.p = a1.p AND a2.o <> a1.o
+                 WHERE a1.id = r.id AND SUBSTR(a2.active_from, 1, 4) > SUBSTR(r.active_from, 1, 4)
+                   AND (SELECT type FROM entities WHERE id = a2.o) <> 'partij') AS n_later,
+               (SELECT GROUP_CONCAT(naam, '; ') FROM (SELECT DISTINCT e2.name || ' (' || SUBSTR(a2.active_from, 1, 4) || ')' AS naam
+                 FROM aff a1 JOIN aff a2 ON a2.p = a1.p AND a2.o <> a1.o JOIN entities e2 ON e2.id = a2.o
+                 WHERE a1.id = r.id AND SUBSTR(a2.active_from, 1, 4) > SUBSTR(r.active_from, 1, 4)
+                   AND (SELECT type FROM entities WHERE id = a2.o) <> 'partij' LIMIT 4)) AS later
+        FROM relations r JOIN entities s ON s.id = r.source_id JOIN entities t ON t.id = r.target_id
+        LEFT JOIN mechanisms m ON m.id = r.mechanism_id
+        WHERE r.status = 'goedgekeurd' AND NOT r.vervangen AND r.relation_type IN ({_LOOPBAAN_IN})
+          AND (s.type = 'persoon') <> (t.type = 'persoon')
+          AND NOT (r.relation_type = 'lidmaatschap' AND 'partij' IN (s.type, t.type))
+          AND TRIM(COALESCE(r.active_from, '')) <> '' AND TRIM(COALESCE(r.active_until, '')) = ''
+          AND NOT EXISTS (SELECT 1 FROM arguments a WHERE a.relation_id = r.id
+                          AND a.property = 'active_until' AND NOT a.vervangen
+                          AND a.status NOT IN ('verworpen'))
+          AND NOT EXISTS (SELECT 1 FROM arguments a JOIN citations c ON c.argument_id = a.id
+                          JOIN sources so ON so.id = c.source_id
+                          WHERE a.relation_id = r.id AND so.cluster_key LIKE 'register:%')
+          {filt}""", params) if r["n_later"]]  # noqa: S608 - alleen placeholders
+    stand = org_stand(EIND_STAND_PAD)
+    nieuws, ent = bc.nieuws_voorrang(conn)
+    uit = [r for r in rijen if ids or mag_weer(stand.get(str(r["id"])), nu)]
+    uit.sort(key=lambda r: (0 if r["id"] in nieuws else 1 if (r["bron_id"] in ent or r["doel_id"] in ent) else 2,
+                            -r["n_later"], -r["id"]))
+    return uit
+
+
+def web_prompt_eind(r: dict) -> str:
+    persoon = r["bron_naam"] if r["bron_type"] == "persoon" else r["doel_naam"]
+    return (f"Verband: {verband_zin(r)}, sinds {r['active_from']}.\n\nLater begon {persoon} bij: "
+            f"{r.get('later') or 'een andere organisatie'}. Dat bewijst niet dat dit verband eindigde. "
+            "Zoek op het web of en wanneer dit verband EINDIGDE (vertrek, aftreden, einde van de "
+            f"termijn of het lidmaatschap). Een bron moet {r['bron_naam']} én {r['doel_naam']} bij "
+            "naam noemen. Open de pagina met WebFetch en neem het citaat dat de einddatum geeft "
+            "teken voor teken over. Loopt het verband nog, of noemt geen bron een einde: "
+            "gevonden=false en lege velden. Laat begin en begin_bron leeg. Wikipedia, sociale media "
+            "en deze database zelf zijn geen bron (Wikipedia mag als vindplaats: volg de voetnoot). "
+            "Primaire bronnen eerst: Parlement.com, persberichten, jaarverslagen, het colofon of de "
+            "eigen site, nieuwsberichten over het vertrek.")
+
+
+def eind_ronde(api, token, max_web_eind, ruimte, droog, meld, ids=None) -> dict:
+    tel = {"einden_aan_de_beurt": 0, "einden_gevonden": 0, "einden_niets": 0,
+           "einden_ingediend": 0, "einden_fout": 0, "web_gezocht": 0}
+    if max_web_eind <= 0 or ruimte <= 0:
+        return tel
+    conn = db()
+    try:
+        alle = eind_kandidaten(conn, ids)
+    finally:
+        conn.close()
+    tel["einden_aan_de_beurt"] = len(alle)
+    for r in alle[:min(max_web_eind, ruimte)]:
+        tel["web_gezocht"] += 1
+        uit = web_ronde(r, [], prompt=web_prompt_eind(r), velden=("eind",))
+        log({"relatie": r["id"], "waar": "web", "uitkomst": uit["uitkomst"], "web_eind": True,
+             **{k: uit[k] for k in ("eind", "toelichting", "afgevallen") if k in uit}}, droog)
+        if uit["uitkomst"] in ("fout", "niets"):
+            tel["einden_fout" if uit["uitkomst"] == "fout" else "einden_niets"] += 1
+            if not droog:
+                org_stand_zet(r["id"], "fout" if uit["uitkomst"] == "fout" else "niets_gevonden",
+                              uit.get("toelichting", ""), EIND_STAND_PAD)
+            continue
+        tel["einden_gevonden"] += 1
+        item = uit["eind"]
+        if droog:
+            meld(f"  (droog) #{r['id']} {verband_zin(r)}: active_until = {item['datum']} — {item['bron']['url']}")
+            continue
+        bron_id = bz.registreer_bron(api, token, item["bron"])
+        if not bron_id:
+            tel["einden_fout"] += 1
+            continue
+        citatie = {"source_id": bron_id, "quote": item["bron"]["citaat"], "methode": "verbatim_quote"}
+        nieuw, fout = dien_in(api, token, r, "active_until", item["datum"], citatie, uit.get("bewering"), "web, einde")
+        tel["einden_ingediend" if nieuw else "einden_fout"] += 1
+        if fout:
+            meld(f"  ✗ #{r['id']}: {fout}")
+        org_stand_zet(r["id"], "gezocht", "einde van het web ingediend", EIND_STAND_PAD)
+    return tel
+
+
 def web_vandaag(sleutel: str = "web") -> int:
     vandaag = datetime.date.today().isoformat()
     try:
@@ -569,7 +712,8 @@ def log(regel: dict, droog: bool = False) -> None:
 
 
 def draai(*, api=DEFAULT_API, token_pad=None, max_eigen=20, max_web=8, droog=False,
-          ids=None, meld=print, dag_plafond=DAG_PLAFOND, max_web_org=0, org_ids=None) -> dict:
+          ids=None, meld=print, dag_plafond=DAG_PLAFOND, max_web_org=0, org_ids=None,
+          max_web_eind=0, eind_ids=None) -> dict:
     conn = db()
     try:
         alle = kandidaten(conn, ids)
@@ -662,6 +806,15 @@ def draai(*, api=DEFAULT_API, token_pad=None, max_eigen=20, max_web=8, droog=Fal
         meld(f"Datumzoeker (organisaties): {org['organisaties_aan_de_beurt']} zonder oprichtingsdatum "
              f"aan de beurt; {org['organisaties_gevonden']} gevonden, {org['organisaties_niets']} niets, "
              f"{org['organisaties_ingediend']} argument(en) ingediend{' (droog)' if droog else ''}")
+    # Stap 4 (2026-10-16): het einde van loopbaanbanden, voor de carrousel
+    if max_web_eind > 0:
+        eind = eind_ronde(api, token, max_web_eind, max(0, DAG_PLAFOND_EIND - web_vandaag("web_eind")),
+                          droog, meld, eind_ids)
+        tel.update({k: v for k, v in eind.items() if k != "web_gezocht"})
+        tel["web_gezocht"] += eind["web_gezocht"]
+        meld(f"Datumzoeker (einden): {eind['einden_aan_de_beurt']} loopbaanband(en) zonder einde aan de "
+             f"beurt; {eind['einden_gevonden']} gevonden, {eind['einden_niets']} niets, "
+             f"{eind['einden_ingediend']} argument(en) ingediend{' (droog)' if droog else ''}")
     meld(f"Datumzoeker: {tel['kandidaten']} verband(en) zonder begin aan de beurt; "
          f"{tel['uit_eigen_bronnen']} uit eigen bronnen, {tel['van_het_web']} van het web, "
          f"{tel['niets']} niets gevonden, {tel['ingediend']} argument(en) ingediend"
@@ -677,14 +830,19 @@ def main():
     ap.add_argument("--max-web", type=int, default=8, help="web-zoektochten per ronde")
     ap.add_argument("--max-web-org", type=int, default=2,
                     help="web-zoektochten per ronde naar het bestaan van organisaties (2026-10-13)")
+    ap.add_argument("--max-web-eind", type=int, default=2,
+                    help="web-zoektochten per ronde naar het einde van loopbaanbanden (2026-10-16)")
+    ap.add_argument("--eind-ids", help="alleen deze loopbaanbanden voor de einde-zoektocht (komma's)")
     ap.add_argument("--ids", help="alleen deze verbanden (komma's), ongeacht de wachttijd")
     ap.add_argument("--org-ids", help="alleen deze organisaties (komma's), ongeacht de wachttijd")
     ap.add_argument("--droog", action="store_true", help="niets indienen of vastleggen")
     a = ap.parse_args()
     ids = [int(x) for x in a.ids.split(",")] if a.ids else None
     org_ids = [int(x) for x in a.org_ids.split(",")] if a.org_ids else None
+    eind_ids = [int(x) for x in a.eind_ids.split(",")] if a.eind_ids else None
     tel = draai(api=a.api, token_pad=Path(a.token), max_eigen=a.max_eigen, max_web=a.max_web,
-                droog=a.droog, ids=ids, max_web_org=a.max_web_org, org_ids=org_ids)
+                droog=a.droog, ids=ids, max_web_org=a.max_web_org, org_ids=org_ids,
+                max_web_eind=a.max_web_eind, eind_ids=eind_ids)
     print(json.dumps(tel, ensure_ascii=False))
 
 

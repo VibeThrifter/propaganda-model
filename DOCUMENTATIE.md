@@ -2,7 +2,7 @@
 
 ## Doel
 
-Dit project modelleert de structurele mechanismen waarmee nieuws in Nederland wordt gefilterd en gevormd voordat het het publiek bereikt, én — in hetzelfde netwerk — hoe besluiten tot stand komen en wie ze vormt (zie [Uitbreiding C: Besluitvorming](#uitbreiding-c-besluitvorming), eigenaarsbesluit 2026-10-07). Het is gebaseerd op het propagandamodel van Herman & Chomsky (*Manufacturing Consent*, 1988), toegepast op de Nederlandse context met behulp van het werk van Tabe Bergman, Joris Luyendijk, Kees van der Pijl en anderen.
+Dit project modelleert **machtsuitoefening op beslissing en opinie** in Nederland, in één netwerk: de structurele mechanismen waarmee nieuws wordt gefilterd en gevormd voordat het het publiek bereikt, én hoe besluiten tot stand komen en wie ze vormt (zie [Uitbreiding C: Besluitvorming](#uitbreiding-c-besluitvorming), eigenaarsbesluit 2026-10-07). Elk mechanisme zegt waar de macht op werkt (beslissing, agenda, opinie) en of ze via een formele bevoegdheid loopt of niet-officieel is (zie [Uitbreiding D: Macht op beslissing en opinie](#uitbreiding-d-macht-op-beslissing-en-opinie), eigenaarsbesluit 2026-10-15). Het is gebaseerd op het propagandamodel van Herman & Chomsky (*Manufacturing Consent*, 1988), toegepast op de Nederlandse context met behulp van het werk van Tabe Bergman, Joris Luyendijk, Kees van der Pijl en anderen.
 
 Het model is geen complottheorie. Het beschrijft hoe structurele krachten — eigendom, economische druk, bronafhankelijkheid, disciplinering en ideologie — leiden tot een systematische pro-elite bias als *emergente eigenschap* van het systeem, zonder dat er sprake hoeft te zijn van centrale sturing.
 
@@ -202,6 +202,29 @@ Zo vangt de `belanghebbende` de elite-/kapitaalkant die voorheen versplinterd ov
 
 **Waar de praktijklaag vandaan komt.** Open registers, zonder AI, via `tools/registers/` en het gewone REST-pad (account `register-import`): het register van overheidsorganisaties (organisaties.overheid.nl), de Tweede Kamer (Kamerleden, fracties, nevenfuncties, loopbaan, geschenken, reizen), Wikidata (volledige namen en id's), het Europees Parlement en het lobbyistenregister. Externe id's (`externe_ids`: tooi, oo, tk_persoon, wikidata, ep_mep) voorkomen dubbele knopen; personen worden **nooit op naam alleen** gekoppeld. Een deterministische **registercheck** (account `registercheck`, geen LLM) toetst elk registerfeit aan de bewaarde registeruitgave en geeft het onafhankelijke A1-oordeel; zie CLAUDE.md § "Besluitvorming".
 
+<a id="uitbreiding-d-macht-op-beslissing-en-opinie"></a>
+### Uitbreiding D: Macht op beslissing en opinie — doel en grondslag
+*Eigenaarsbesluit 2026-10-15.* De eigenaar: *"Het gaat ook om het propagandamodel en niet-officiële invloed op bestuurlijke beslissingen"* en *"machtsuitoefening van beslissing en opinie"*. De categorieën zeggen langs welk kanaal macht loopt; ze zeggen niet waar die macht op werkt en of ze officieel is. Een ambt en een lobbycontact stonden daardoor gelijk, en de vraag *welke niet-officiële invloed is er op dit besluit?* was niet te stellen. Daarom draagt elk mechanisme twee kenmerken naast zijn categorieën.
+
+**Doel** (`mechanism_doelen`, één of meer), naar de drie dimensies van macht van Steven Lukes (*Power: A Radical View*, 1974) en Bachrach & Baratz (*Two Faces of Power*, 1962):
+
+| Doel | Waar de macht op werkt | Voorbeelden |
+|---|---|---|
+| `beslissing` | wat overheid, politiek of rechter besluit: beleid, wetten, benoemingen, uitvoering, uitspraken | `ambtelijke_leiding`, `kamerzetel`, `geschenk_en_gastvrijheid`, `partijlijn` |
+| `agenda` | wat op de besluitvormingsagenda komt en welke opties meetellen, ook wat er níet komt (de tweede dimensie) | `media_agendering`, `akkoord_preemptie`, `lobbyist_naar_politicus`, `begrotingsorthodoxie` |
+| `opinie` | wat het publiek te zien en te horen krijgt en denkt: berichtgeving, publiek debat, wereldbeeld (de derde dimensie; Herman & Chomsky) | de vijf filters: `eigendomsconcentratie`, `expert_framing`, `publieke_aanval` |
+
+**Grondslag** (`mechanisms.grondslag`, precies één):
+
+- `officieel` — de invloed loopt via een formeel toegekende bevoegdheid of een formeel recht van de bron over het doel: wet, ambt, mandaat, statuut, eigendom, benoemingsrecht, werkgeversgezag of een rechterlijke uitspraak (`ministeriele_verantwoordelijkheid`, `commissarisbenoeming`, `beleid_via_rechter`, `woo_verzoek`).
+- `niet_officieel` — de invloed loopt daarbuiten om: via geld (financiering, advertenties, giften), toegang, netwerken, circulerend personeel, informatie, expertise, druk of dreiging, of gedeelde ideeën (`lobbytoegang`, `draaideurconstructie`, `advertentiedruk`, `partijlijn` — Kamerleden stemmen volgens Grondwet art. 67 lid 3 "zonder last").
+
+Geld is niet-officieel, ook als het uit een wettelijke regeling komt (`staatspartijfinanciering`, `overheidssubsidie_denktank`): de subsidie geeft de gever geen bevoegdheid over de ontvanger. Een contract tussen marktpartijen (adverteerder, persbureau, bank) evenmin; werkgeversgezag wel (`dienstverband`, `woordvoerdersregie`).
+
+**Indeling.** De bestaande mechanismen zijn op 2026-10-15 ingedeeld door `scripts/migrate_add_doel_grondslag.py` (gelogd onder `assistent`). Doel volgt uit de categorieën (een filter → opinie, een besluitvormingscategorie → beslissing) en de doelrol (een beslisser als doel → beslissing); de uitzonderingen en de agenda-mechanismen staan bij naam in het script, net als de officiële mechanismen buiten `formele_macht`. Een nieuw mechanisme draagt `doelen` en `grondslag` verplicht in zijn RfC (de rfc-toetser toetst ze); een bestaande indeling wijzigt via een RfC `herformuleren` met `velden: {"doelen": [...], "grondslag": "..."}`. De validator (`KOPPEL-MECH-KENMERK`, fout) houdt elk levend mechanisme op een doel en een grondslag.
+
+**Wat niet verandert.** Categorieën, scores en relaties blijven gelijk; doel en grondslag zijn kenmerken van de theorie en tellen niet mee in zekerheid of invloed. Een relatie erft ze van haar mechanisme (`GET /api/graph_data`: `doelen`, `grondslag` per mechanisme).
+
 ---
 
 ## Databaseschema
@@ -237,6 +260,7 @@ Zie "Scores: van discussieboom naar theorie".
 | `mechanisms` | Processen waarmee rollen invloed uitoefenen | name, filter (primaire categorie; vijf filters, vijf besluitvormingscategorieën, `tegenmacht`/`overig`), mechanism_type (`structureel`/`procedureel`/`psychologisch`/`economisch`/`juridisch`/`technologisch`/`discursief`), **aard** (`direct`/`veld_eigenschap` live; `indirect`/`veld_instantiatie` deprecated — zie [Aard: direct & systemisch](#aard-direct--systemisch)), description, effect, source_role_id, target_role_id, active_from/active_until (temporeel) |
 | `mechanism_filters` | Multi-filter: alle filter-tags per mechanisme (≥1, incl. primair) | mechanism_id, filter |
 | `mechanism_themes` | Thema-as: dwarsverbanden per mechanisme (0+) | mechanism_id, theme (`draaideur`/`elite_netwerk`/`geldstromen`/`platform`/`omroepbestel`/`kennis_expertise`/`benoemingsketen`; `systemisch` deprecated/leeg — aard-laag codeert dat) |
+| `mechanism_doelen` | Waar de macht van een mechanisme op werkt (1+; Uitbreiding D) | mechanism_id, doel (`beslissing`/`agenda`/`opinie`); `mechanisms.grondslag` (`officieel`/`niet_officieel`) is het tweede kenmerk |
 | `emergent_effects` | Emergent effect als **hyperedge**: systeemeigenschap uit het samenspel van een gróép rollen (geen bron→doel-pijl). Eersteklas theorie-element: eigen discussieboom (`arguments.emergent_effect_id`), eigen tijdvenster en eigen score (lit-only) | name, label, category, description, effect, active_from/active_until (temporeel) |
 | `emergent_effect_members` | Koppeltabel: welke rollen dragen samen een emergent effect | emergent_effect_id, role_id |
 | `emergent_effect_subeffects` | Tweede-orde-structuur: deel-effecten van een emergent effect. Gebruikt voor het apex-veld `fabricage_van_instemming` ⊃ de elf overige velden; de ledenset van het apex-veld blijft pars pro toto | parent_effect_id, child_effect_id |
@@ -273,7 +297,7 @@ Zie "Scores: van discussieboom naar theorie".
 | `entities` | Concrete actoren (personen, organisaties, partijen) | name, type, primary_role_id, description, metadata (JSON; bv. `oo_type` = de registersoort), **bestuurslaag** (`eu`/`rijk`/`provincie`/`gemeente`/`waterschap`/`caribisch`/`regio`, alleen organisaties), active_from/active_until/active (temporeel) |
 | `externe_ids` | Externe identificatie per entiteit (uniek per stelsel): voorkomt dubbele knopen bij registerimport en sync | entity_id, stelsel (`tooi`/`oo`/`tk_persoon`/`wikidata`/`ep_mep`), waarde |
 | `entity_roles` | Koppeltabel: entiteit kan meerdere rollen vervullen | entity_id, role_id, notes |
-| `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, description, **functie** (ambtstitel uit het register, bij `ambt`), certainty, influence, bidirectional, active_from/active_until/active (temporeel) |
+| `relations` | Concrete relaties tussen entiteiten | source_id, target_id, relation_type, mechanism_id, description, **functie** (ambtstitel uit het register, bij `ambt`), **namens_id** (de hoedanigheid: namens of vanuit welke organisatie de persoon optrad, § "Instituut of persoon"), certainty, influence, bidirectional, active_from/active_until/active (temporeel) |
 | `instantiations` | Expliciete klasse↔instantie-koppeling: rol↔entiteit of mechanisme↔relatie, met **exemplariteit** (hoe prototypisch is dit voorbeeld). Basis voor de bottom-up aggregatie. | role_id/mechanism_id (de klasse), entity_id/relation_id (de instantie), exemplarity (0–1), notes |
 | `source_mentions` | Welke entiteiten worden in welke bronnen genoemd | source_id, entity_id, context |
 
@@ -298,6 +322,7 @@ Zie "Scores: van discussieboom naar theorie".
 | `watchlists` | M2.4: volglijsten op de recent-changes-feed | user_id, table_name, record_id |
 | `lineage` | M2.6: opvolging bij splitsen/samenvoegen/hernoemen — niets wissen | soort, element_type, oud_id, nieuw_id, voorstel_id, reden |
 | `stem_toetsen` | 2026-10-08: het oordeel van de stemtoets (account `stemtoets`, nooit de auteur) over de eigen stem van een tekst; procesmetadata, telt nergens mee | soort (`argument`/`relatie`/`entiteit`), doel_id, tekst_hash (sha256 van de getoetste tekst), verdict (`neutraal`/`niet_neutraal`), reden, herformulering, door; UNIQUE per (soort, doel_id, door) |
+| `metingen` + `meting_waarnemingen` + `meting_controles` + `meting_wederhoor` | 2026-10-16: eigen metingen — vooraf vastgelegde tellingen die als bron (dataset) kunnen dienen (§ "Eigen metingen") | titel, vraag, opzet (JSON), status (`opzet`/`vastgelegd`/`afgerond`), opzet_hash, data_hash, samenvatting; waarnemingen: groep, wie, medium, url, datum, citaat, codes, citaat_gevonden; controles: codes, door (UNIQUE per waarneming en account); wederhoor: partij, soort, tekst, bron_url, datum |
 | `predictions` | M3.4: voorspellingsregister — toetsbare verwachtingen, vastgelegd vóór de uitkomst | claim, afleiding, meetcriterium, kans (0–1 exclusief), deadline (toekomst), theorie-anker (mechanism_id/role_id/emergent_effect_id, ≥1), status (`open`/`uitgekomen`/`niet_uitgekomen`/`onbeslisbaar`), uitkomst, brier, self_scored, contributed_by, beoordeeld_door |
 
 Argumenten vormen een boomstructuur:
@@ -500,6 +525,121 @@ voorspellingen (VOORSPELLING-DEADLINE) en de heraudit-lijst (VOORSPELLING-ZELF).
 (aard/tiers, bronclassificaties, halo-criteria & constanten, proces/provenance);
 eerstvolgende audit: juni 2027, afgesloten met een modelrelease.
 
+### Toets: een spoor als te toetsen bewering (2026-10-16)
+
+Het tabblad **Toets** in het onderzoekspaneel van de kaart behandelt je spoor als een bewering die je zelf toetst. Het geeft geen oordeel; het laat zien wat het model draagt en wat open is.
+
+1. **Schakels.** Per schakel staan de banden met:
+   - hun bewijsniveau: *geen band*, *geen bewijs met bron*, *dun* (één bronlijn, of niet gecontroleerd) of *gedocumenteerd* (twee of meer bronlijnen, waarvan één gecontroleerd);
+   - tegenargumenten en open bezwaren;
+   - of er invloedsbewijs is ("invloed niet onderzocht" als dat ontbreekt);
+   - de looptijd tegenover je periode, het inkomensaandeel, en of de rollen bij het mechanisme passen.
+
+   Een keten is zo sterk als haar zwakste schakel; die wordt gemarkeerd.
+2. **Hoe bijzonder (de omkeertoets).** Zou je dit ook zien als je vermoeden niet klopt? Per kenmerk toont de toets welk deel van de knopen van hetzelfde soort het heeft, en hoeveel andere precies dezelfde tegenpartij hebben. Daarna volgt de basiskans van de route: de kortste afstand, en welk deel van de knopen van dat soort binnen zoveel stappen ligt. Een kenmerk of route die bijna iedereen heeft, onderscheidt niets.
+3. **Vergelijkingsgroep.** Knopen van hetzelfde soort als de kern die ook met de uitkomstkant verbonden zijn, gesplitst naar wel of niet dezelfde financier of partij. Een knoop met dezelfde financier is geen vergelijking voor die financier.
+4. **Toetsplan.** Je vult in:
+   - vraag, onderwerp en periode;
+   - de verwachte richting per partij (met een waarschuwing als partijen tegengesteld duwen);
+   - wat je ziet als het klopt en als het niet klopt;
+   - toetsen per soort schakel (gewicht en doel van het geld, zeggenschap, wie aan het woord komt, vermelding van de financiering, afwijking van de vergelijkingsgroep, functie, tijd, onderwerptoets, andere verklaringen), elk met uitkomst en notitie;
+   - een stopregel, kans en deadline.
+
+   Je legt het plan vast als voorspelling (register M3.4) of start er een eigen meting mee (§ Eigen metingen). De meting codeert op een neutrale stelling, niet op het vermoeden, zodat de codering niet door de hypothese gekleurd wordt.
+
+### Eigen metingen (eigenaarsbesluit 2026-10-16)
+
+De eigenaar wil zelf onderzoek kunnen doen: een eigen meting telt als bewijs, "het moet een tool
+zijn waarmee je zelf dat kan bepalen", "zolang je aan journalistieke codes houdt". Een meting is
+een **vooraf vastgelegde telling**: welke organisatie of deskundige komt in welk medium aan het
+woord, over welk onderwerp, met welk standpunt, en wordt de financiering vermeld.
+
+**Levensloop** (`metingen.py`, pagina's `/metingen` en `/meting/<id>`):
+
+1. **opzet** — de selectieregel (media als knopen, periode `van`–`tot`, zoektermen, en in `regel`
+   hoe de artikelen gevonden worden), de groepen (naam + organisaties als knopen), de vragen met
+   hun opties (`sleutel`, `vraag`, `opties`), de uitkomstmaat en de stopregel. Bewerkbaar door de
+   maker of een maintainer; een opzet kan nog weg.
+2. **vastgelegd** — de opzet is bevroren vóór de eerste waarneming (`opzet_hash` = sha256 van de
+   opzet). Nu volgen de waarnemingen (url, datum, medium, groep, wie met functie zoals in het
+   artikel, letterlijk citaat, een code per vraag), de blinde controles en het wederhoor. Een
+   waarneming moet binnen de selectie vallen (periode, media, groep); na een blinde controle liggen
+   haar codering, citaat, url, wie en groep vast.
+3. **afgerond** — de dataset (waarnemingen en controles) is bevroren (`data_hash`), net als de
+   samenvatting. Alleen nu is de meting publiek (anders achter login; `robots.txt` krijgt per
+   afgeronde meting een eigen `Allow`) en kan ze als bron dienen.
+
+**Samenvatting.** Per groep × vraag × optie: n, aantal en percentage (half naar boven afgerond),
+plus per groep het aantal per medium en een regel voor alle groepen samen. Elke telling is ook een
+vaste tekstregel, bijvoorbeeld
+`Clingendael (n=34) · standpunt: tegen 25 (74%), voor 3 (9%), neutraal 6 (18%)`. Een argument
+citeert er letterlijk één. De mediumnamen worden bij het afronden mee bevroren, zodat een latere
+hernoeming de regels niet verandert.
+
+**De journalistieke codes** (Leidraad van de Raad voor de Journalistiek, NVJ-code) zijn harde
+voorwaarden (`metingen.code_check`); afronden eist a–d, een meting als bewijs gebruiken a–h:
+
+| | Code | Toets |
+|---|---|---|
+| a | Methode vooraf (transparantie) | opzet vastgelegd vóór de eerste waarneming, hash klopt, volledig (selectieregel, groepen, vragen met ≥2 opties, uitkomstmaat, stopregel) |
+| b | Volledigheid (geen cherry-picking) | elke waarneming binnen periode en media van de selectie; de selectieregel beschrijft hoe artikelen gevonden zijn |
+| c | Juistheid en herleidbaarheid | url, datum, letterlijk citaat en een code per vraag; het citaat letterlijk teruggevonden op de url of de archiefkopie (`citaat_gevonden = 1`, alleen te zetten door `metingcheck`); na het afronden passen dataset en samenvatting bij de hash |
+| d | Verificatie door een ander | ≥20% van de waarnemingen (minimaal 5, of alle bij minder dan 5) blind opnieuw gecodeerd door een ander account dan de invoerder; overeenstemming per vraag (percentage en Cohen's kappa), onder 80% een waarschuwing met de afwijkingen |
+| e | Hoor en wederhoor | per groep met een benoemde organisatie en per medium een reactie (tekst), een verzoek zonder reactie (datum) of een gepubliceerd standpunt (bron) |
+| f | Feit en mening gescheiden | de claim van het bewijsargument zonder oordeel in de eigen stem (`validation.EIGEN_STEM_STRENG`, plus telling-oordelen als "eenzijdig"; citaten en toeschrijvingen uitgezonderd) |
+| g | Privacy | wie geciteerd wordt, staat er met functie of als knoop in het model; geen privépersonen ("een buurtbewoner") |
+| h | Correctie | de metingpagina linkt naar `/tip?betreft=meting:<id>`; zo'n melding gaat naar de maker (`lead_triage.py` laat haar staan), niet naar een agent |
+
+**Blind.** Zolang een meting niet afgerond is, ziet een kijker de codering van een waarneming
+alleen als hij haar invoerde of zelf al codeerde; samenvatting en afwijkingen ziet alleen de maker.
+`GET /api/metingen/<id>/controle` geeft een controleur zijn wachtrij zonder codering, eerst wat nog
+niemand controleerde, in een eigen willekeurige volgorde. Niemand controleert een eigen waarneming
+(403). Wie alleen werkt, laat de agent coderen: `scripts/meting_controle.py --meting <id>`
+(account `metingcontrole`, Sonnet; hij leest het artikel, niet de eerste codering; standaard een
+droogloop, `--indienen` dient in; niet in de uurronde).
+
+**Als bewijs** (`POST /api/metingen/<id>/als_bewijs`): bij een afgeronde meting met a–h in orde
+ontstaat (of wordt hergebruikt) de bron "Eigen meting #<id>: <titel>" — brontype `dataset`,
+uitgever "Propagandamodel (eigen meting)", auteur de maker, `cluster_key` `meting:<id>`,
+vindplaats `${PROPAGANDA_BASIS_URL}/meting/<id>` — en via dezelfde kern als `POST /api/arguments`
+(bronplicht, dedup, smaad-firewall) een root-argument met één citatie: de gekozen regel,
+`methode = verbatim_quote`. Een argument van een maintainer merget meteen; de rest landt
+`voorgesteld` en gaat langs de automatische beoordeling. **Het gewicht** kiest de eigenaar met de
+gewone bronclassificatie (`PATCH /api/sources/<id>/classificatie`, voor een meting-bron alleen een
+maintainer; een dataset mag `primair` of `institutioneel` zijn, niet `academisch`); de pagina toont
+bij elke klasse haar gewicht uit `scoring.RELIABILITY_WEIGHT`. `scripts/bronklasse.py` slaat
+meting-bronnen over, net als `scripts/archiveer_bronnen.py`.
+
+**Controle** (`scripts/metingcheck.py`, account `metingcheck`, geen LLM; stap 2c van de uurronde,
+plafond `--max-meting-citaten` 20, kill-switch `PROPAGANDA_METINGEN=0`): (a) zoekt per waarneming
+van een vastgelegde meting het citaat letterlijk terug op de url, de eigen archiefkopie of de
+Wayback Machine (de ophaalfunctie van de bronchecker) en zet `citaat_gevonden`; niet gevonden →
+opnieuw na 24 uur; (b) geeft een argument waarvan elke citatie uit een meting komt (`METING_ARG_SQL`)
+zijn A1: `klopt` als de meting afgerond is, de data-hash klopt, het citaat letterlijk een regel uit
+de samenvatting is en a–h in orde zijn; anders `klopt-niet` met de reden (een later ander oordeel
+herziet het eigen oordeel). De bronchecker en de bronzoeker slaan zulke argumenten over. De
+validator meldt `METING-INTEGRITEIT` (fout) als een afgeronde meting niet meer bij haar hashes past.
+
+**API** (schrijven vereist login; alles in `edit_log`):
+
+| Endpoint | Wie | Wat |
+|---|---|---|
+| `POST /api/metingen` | ingelogd | `{titel, vraag, opzet, voorspelling_id?}` → `{id, url, status}`; nette 400 met `fouten` |
+| `GET /api/metingen` | open | lijst; zonder login alleen afgeronde (`?status=`) |
+| `GET /api/metingen/<id>` | open als afgerond, anders ingelogd | alles: opzet, waarnemingen, controles, wederhoor, samenvatting, `regels`, `code_check`, `overeenstemming`, bron, argumenten, `bronklassen`, `mag` |
+| `PATCH /api/metingen/<id>` · `DELETE` | maker/maintainer, alleen `opzet` | opzet bijwerken · opzet weggooien |
+| `POST …/vastleggen` · `POST …/afronden` | maker/maintainer | bevriezen; afronden weigert met `open` als a–d niet in orde zijn |
+| `POST …/waarnemingen` · `PATCH`/`DELETE …/waarnemingen/<wid>` | maker/maintainer · alleen eigen | alleen bij `vastgelegd`; verwijderen na een controle vergt een `reden` |
+| `GET …/controle` · `POST …/waarnemingen/<wid>/controle` | ingelogd, niet de invoerder | blinde wachtrij · `{codes}` (alle vragen) |
+| `POST …/waarnemingen/<wid>/citaatcontrole` | alleen `metingcheck` | `{gevonden, toelichting}` |
+| `POST …/wederhoor` | maker/maintainer | `{partij, entity_id?, soort, tekst?, bron_url?, datum?}` |
+| `POST …/als_bewijs` | ingelogd, alleen `afgerond` | `{relation_id\|entity_id\|mechanism_id, stance, property, claim, regel}` → `{source_id, argument_id}` |
+| `GET /api/metingen/claimtoets?claim=` | open | punt f live: `{ok, treffers}` |
+
+Tabellen: `metingen`, `meting_waarnemingen`, `meting_controles` (UNIQUE per waarneming en account),
+`meting_wederhoor` (migratie `scripts/migrate_add_metingen.py`). Ze tellen zelf nergens mee: alleen
+het argument dat op een meting steunt. Test: `scripts/test_metingen.py`.
+
 ---
 
 ## Scores op relaties
@@ -650,6 +790,121 @@ sterkste ≥2-hops-route (max-product over de zichtbare graaf) tekent als violet
    benoemingen; Luyendijk over de lobby-driehoek), en alleen als er ook een route bestaat die het
    verhaal van de claim volgt — een claim wiens enige doorlatende route iets ánders vertelt, hoort er
    niet in.
+
+<a id="instituut-of-persoon"></a>
+### Instituut of persoon: één optreden, één verband (eigenaarsbesluit 2026-10-19)
+
+*Aanleiding.* De eigenaar: "denktank of instituut zoals clingendael en universiteit stuurt experts
+naar de media. Deze verbanden zijn er … ook de experts zelf zou in het propaganda model moeten
+komen … invloed gaat wss van clingendael via die expert naar media … beide erin zetten?", en
+daarna "voer uit". Het onderzoek (2026-10-16) liet zien dat de theorie dit al goed had:
+`expert_framing` (#8) is de denktank zélf als bron, `denktank_levert_expert` (#118) →
+`expert_legitimatie` (#87) is de route via de persoon. De praktijklaag volgde dat niet:
+- Van de 146 goedgekeurde verbanden organisatie → medium met een expert- of bronmechanisme ging
+  bij 56 (een deel van) het bewijs over een optreden van één medewerker. Bij Clingendael was dat
+  5 van de 6.
+- Zes keer stond hetzelfde optreden ook als persoonsverband in het model (dubbeltelling).
+- Drie keer droeg een oud-medewerker of iemand met een andere pet het instituutsverband.
+- De route via de persoon bleef onzichtbaar: twee schakels van 0,05 halen de 5%-drempel van een
+  afgeleide pijl nooit.
+
+*De regel: wie is de bron van de uitspraak?*
+
+| Wat de bron laat zien | Verband |
+|---|---|
+| Het instituut spreekt zelf: rapport, cijfers, peiling, persbericht, standpunt, mediapartnerschap of coproductie; of iemand die in een officiële functie het product of standpunt van het instituut presenteert (woordvoerder, directeur, president, hoofdeconoom bij de eigen cijfers) | instituut → medium (`expert_framing`; bij een gezagsinstituut `institutioneel_gezag`/`bron_afhankelijkheid`) |
+| Een persoon geeft eigen duiding, met het instituut als herkomst ("Clingendael-onderzoeker Bob Deen") | persoon → medium (`expert_legitimatie`) met `namens_id` = het instituut, plus de band persoon — instituut (`personeel`, functie, looptijd) |
+| Een oud-medewerker of iemand met een andere pet ("oud-directeur van Clingendael", "oud-NAVO-topambtenaar") | persoon → medium zonder `namens_id` |
+| Meerdere experts van één instituut in hetzelfde medium | geen eigen feit: afgeleid |
+
+- Eén optreden staat op precies één verband.
+- Wie van pet wisselt, krijgt per pet een verband, elk met een eigen looptijd.
+- Aan de bestuurskant geldt hetzelfde. Een position paper van het instituut is instituut → Kamer
+  (`denktank_naar_politiek`). Een onderzoeker die op persoonlijke titel een rondetafelgesprek
+  adviseert, is persoon → Kamer met `namens_id`.
+
+*Waarom afleiden en niet opslaan.* Indirectheid is een eigenschap van een pad (§ "Aard"), en het
+partijnetwerk leidt de banden van een partij al via haar mensen af. Netwerkanalyse doet hetzelfde:
+de lidmaatschappen persoon–organisatie worden opgeslagen, de banden tussen organisaties afgeleid
+(Breiger 1974, *The Duality of Persons and Groups*). Mediaonderzoek telt de zichtbaarheid van
+denktanks wel per instituut (Rich & Weaver 2000, "Think Tanks in the U.S. Media"). Maar die
+telling neemt de experts mee: het is een optelsom van individuele optredens in die hoedanigheid,
+precies wat de afgeleide weergave doet. Herman & Chomsky (1988) noemen beide routes als aparte
+handelingen: denktanks "hire them directly and help disseminate their messages".
+
+*De afgeleide route* (`via_medewerkers.py`). Een route bestaat uit:
+- een goedgekeurd verband persoon → doel met `namens_id` = de organisatie;
+- een goedgekeurde band tussen persoon en organisatie (een richtingloos type) waarvan de looptijd
+  die van het optreden niet uitsluit. Wie al weg was, trad niet meer namens haar op.
+
+`GET /api/via_medewerkers/<id>` geeft per entiteit de routes als instituut, als doel en als
+persoon; de viz toont ze in de sectie *Via medewerkers*. De weergave is beschrijvend: ze telt
+nergens mee, doet geen invloedsbewering en slaat geen edge op. `influence.py` blijft de keten zelf
+meten, gedempt en bij 0,05-vloeren verwaarloosbaar.
+
+*Handhaving.*
+- **API** (`_namens_fout`): alleen een persoon als bron, namens een organisatie (geen persoon, niet
+  de bron of het doel zelf, niet vervangen), en niet op een band. Een maintainer zet of wist
+  `namens_id` met een PATCH.
+- **Controles:**
+  - `NAMENS-ONGELDIG` (fout);
+  - `NAMENS-ZONDER-BAND` (waarschuwing): er is geen band, of de band liep toen niet;
+  - `INSTITUUT-VIA-PERSOON` (waarschuwing): instituut → medium waarvan al het bewijs over
+    optredens van één medewerker gaat, zonder dat het instituut zelf spreekt.
+- **Ontdubbelen:** een andere pet is een ander feit.
+- **Richtingtoets:** een verband met `namens_id` wordt niet automatisch omgedraaid.
+- **Overzetten** (stap 10e; `opschonen.overgezet_besluit`, `POST /api/beoordeling/overgezet/<id>`,
+  merge-service, plafond `PROPAGANDA_OVERGEZET_PLAFOND` 100):
+  - Bewijs dat op het verkeerde verband staat, wordt op het preciezere verband opnieuw ingediend
+    met als reasoning "Overgezet van #<oud>". Het doorloopt de gewone controles: bronchecker,
+    smaadtoets, stemtoets, aanklager.
+  - Zodra de opvolger gemerged is en zijn verband én de band goedgekeurd zijn, gaat het oude
+    argument op verouderd + vervangen.
+  - Draagt het oude verband dan niets meer, dan wordt het afgewezen. Dat geldt ook als een mens
+    het goedkeurde, want het bewijs leeft op het preciezere verband. Terugdraaien kan met
+    heraanmelden. Een registerfeit wordt nooit afgewezen.
+  - Zo valt er geen gat: het oude verband verdwijnt pas als de nieuwe route er staat.
+
+*Migratie* (`scripts/migrate_instituut_via_persoon.py`, 2026-10-19; Clingendael eerst als proef).
+De beslissing per argument is met de hand genomen, op de eigen bewering en bron, en staat als data
+in het script.
+- **Direct gezet, gelogd onder `assistent`:**
+  - de hoedanigheid op 15 bestaande persoonsverbanden waarvan het eigen bewijs de organisatie noemt
+    (o.a. Deen en Pronk namens Clingendael, Wijninga, Ten Broeke en De Wijk namens HCSS);
+  - 2 persoonsverbanden van `expert_framing` naar `expert_legitimatie`, en 18 banden met een
+    universiteit van `denktank_levert_expert` naar `academische_autoriteit`;
+  - 7 begindatums leeg die alleen het oprichtingsjaar waren. Waar het eigen bewijs dat jaar noemt,
+    bleef de datum staan, zoals bij AD 1983 en OMT 2020.
+  - #10514 (het AD als mediapartner van de Clingendael Buitenland Barometer) is heropend: het werd
+    verworpen om een storing (HTTP 429).
+- **Opnieuw ingediend, alles voorgesteld, met reasoning "Overgezet van #…":**
+  - 8 nieuwe personen, onder wie Stijnman, Jelsma, Sasse en Zwijnenburg, elk met een band met het
+    instituut;
+  - 48 verbanden persoon → medium (46 met namens_id), samen met de rest 63 overgezette argumenten;
+  - 9 optredens van 8 mensen die namens hun instituut spreken, teruggezet naar instituut → medium
+    (Van Mulligen naar CBS, Knot en Sleijpen naar DNB, Hekkert naar PBL, Hasekamp naar CPB, Van
+    Oudenhoven naar SCP, Van den Heuvel naar CNV, Megens naar AWVN). Drie instituutsverbanden waren
+    er nog niet en zijn nieuw: CPB en SCP → Nieuwsuur, AWVN → NPO Radio 1;
+  - een column als positie: Trouw → Rob de Wijk (mediaplatform).
+- **Bewust niet verplaatst:**
+  - OMT → RTL: een claim over OMT-leden als groep;
+  - Radboud → NOS: een algemene zin zonder persoon;
+  - de optredens van El Ouali, die SPIOR en Meld Islamofobie in één optreden vertegenwoordigde;
+  - Nieuwsuur en de vaste huiseconoom (#3438): de bewering noemt geen persoon.
+
+Stap 10e ruimt de oude argumenten en verbanden op naarmate de nieuwe route goedgekeurd raakt.
+`INSTITUUT-VIA-PERSOON` meet hoeveel er nog wachten.
+
+*Bestuurskant.* Het rondetafelgesprek "Versterking Europese landstrijdkrachten" (vaste commissie
+Defensie, 16 april 2026) laat beide routes zien:
+- het position paper van Instituut Clingendael (Clingendael → Tweede Kamer, `denktank_naar_politiek`);
+- de onderzoekers Bart van den Berg en Youri Verschoor als genodigde deskundigen.
+
+Voor de tweede route ligt RfC 118 voor, het mechanisme `expert_naar_politiek` (gezagsexpert →
+politicus, `kennis_advies`). Zodra die is aangenomen, dient `data/vervolg/50_expert_naar_politiek.json`
+de twee persoonsverbanden in, met namens_id Clingendael. RfC 117 herformuleert `expert_framing`
+(#8) tot wat de denktank zelf brengt. Padclaim #11413 (denktank ⇢ mediaorganisatie, Herman &
+Chomsky) maakt de afgeleide route toetsbaar.
 
 ---
 
@@ -926,6 +1181,42 @@ De volledige lijst staat in de `CHECK`-constraint van `relations` in `schema.sql
 
 Meest gebruikt: `beinvloeding` (151), `eigendom` (51), `adverteerder` (40), `lidmaatschap` (24), `personeel` (16), `draaideur` (14).
 
+### Richting (eigenaarsbesluit 2026-10-15)
+
+"Alleen directioneel als a ook echt invloed heeft op b en niet echt andersom, zoals a financiert b
+of a is eigenaar van b." Een verband `bron → doel` zegt dat de bron invloed uitoefent op het doel.
+Dat bepaalt de pijl in de viz en de stroom in de invloedsgraaf (`influence.py`, de cascade *Heeft
+invloed op* / *Krijgt invloed van* en de routes van het onderzoekspaneel).
+
+- **Richtingloze typen** (`vocab.RICHTINGLOZE_TYPES`, gespiegeld in `web/shared_vocab.js`):
+  `lidmaatschap`, `personeel`, `dienstverband`, `bestuurder`, `adviseur`, `woordvoerder_van`,
+  `draaideur`, `ambt` en `alliantie`. Iemand hoort bij een organisatie, of twee partijen zijn
+  bondgenoten. De persoon kan de organisatie beïnvloeden en de organisatie de persoon, en via hem
+  verder. Bron en doel zeggen hier niets. De viz tekent een punt aan beide kanten (in het spoor geen
+  pijl) en `influence.py` telt de band in beide richtingen. Voorbeeld: Frits Wester ↔ CDA
+  (woordvoerder), Frits Wester ↔ RTL Nieuws (personeel).
+- **Gerichte typen**: alle andere. Wat bron → doel betekent, staat per type in
+  `vocab.RICHTING_PER_TYPE`. Een paar voorbeelden: financier → ontvanger, eigenaar → bezit,
+  zender → programma (`mediaplatform`), expert → medium, toezichthouder → wie toezicht krijgt,
+  aanvaller → doelwit.
+- **Per verband richtingloos**: `relations.bidirectional = 1` maakt een verband van een gericht
+  type richtingloos, bijvoorbeeld twee instituten die elkaar wederzijds voeden. De viz, de
+  invloedsgraaf en de afgeleide primaire rol (`scoring.py`: bij een bidirectionele relatie oefenen
+  beide kanten uit) lezen de vlag.
+- **Richtingtoets**: `scripts/richtingtoets.py`, account `richtingtoets`, tabel
+  `richting_toetsen`, `POST /api/richtingtoets`. Haiku beoordeelt elk gericht verband, ook elk
+  voorstel, als `juist`, `omgekeerd`, `richtingloos` of `twijfel`. Een wijziging telt alleen als
+  Sonnet haar onafhankelijk bevestigt; zijn ze het oneens, dan wordt het `twijfel`. Een
+  registerfeit krijgt zijn richting uit het record en wordt niet getoetst.
+- **Toepassen**: stap 7b van de automatische beoordeling, via `POST /api/beoordeling/richting/<id>`
+  (merge-service, GET = droogloop). `omgekeerd` draait bron en doel om, `richtingloos` zet de vlag.
+  - Alleen voor seed- en agentwerk, en één keer per verband.
+  - Oud en nieuw staan in `edit_log`.
+  - Kill-switch: `PROPAGANDA_RICHTINGTOETS=0`. Dagplafond: `PROPAGANDA_RICHTING_PLAFOND` (400).
+  - Terugdraaien kan met een maintainer-PATCH: `{"omdraaien": true}` of `{"bidirectional": false}`.
+  - De meter `RICHTING-DEKKING` (info) telt gerichte verbanden zonder oordeel.
+  - Test: `scripts/test_richtingtoets.py`.
+
 ---
 
 ## Projectstructuur
@@ -1195,3 +1486,6 @@ HAVING n_contra > 0;
 | *Outsourcing the news?* (2016) | Jelle Boumans | Kwantificering ANP-afhankelijkheid (emergent effect `schijnpluriformiteit`) |
 | *Agressie en bedreiging richting journalisten* (2021) | PersVeilig / I&O Research | Collectief chilling effect (emergent effect `verkillingsspiraal`) |
 | *Digital News Report Nederland* (2024/2025) | Commissariaat voor de Media | Fragmentatie en nieuwsmijding (halo `publieksfragmentatie`) |
+| *Who Rules America?* (1967, 7e druk 2014) | G. William Domhoff | Vier netwerken naar beleid: de besluitvormingscategorieën (Uitbreiding C) |
+| *Two Faces of Power* (1962) | Peter Bachrach & Morton Baratz | Macht over de agenda en niet-besluiten (doel `agenda`, Uitbreiding D) |
+| *Power: A Radical View* (1974, 2e druk 2005) | Steven Lukes | Drie dimensies van macht: beslissing, agenda, voorkeuren (doel, Uitbreiding D) |

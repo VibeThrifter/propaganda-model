@@ -7,7 +7,8 @@ info:
     geldstroomgraaf van het Nederlandse mediasysteem (propagandamodel, Herman &
     Chomsky toegepast op Nederland) en, in hetzelfde netwerk, de besluitvorming
     (Uitbreiding C, 2026-10-07: wie beslist, wie adviseert, wie zit aan tafel, wie
-    heeft belang; kolommen `bestuurslaag` en `functie`). Twee soorten endpoints:
+    heeft belang; kolommen `bestuurslaag` en `functie`), en sinds 2026-10-19 de
+    hoedanigheid `namens_id` van een persoon (instituut of persoon). Twee soorten endpoints:
 
     (1) OPEN + ONGEMETERD — dezelfde data die de publieke portal-visualisatie
     laadt. Geen key nodig.
@@ -133,6 +134,38 @@ paths:
             application/json:
               schema:
                 type: object
+
+  /api/via_medewerkers/{id}:
+    get:
+      tags: [open]
+      operationId: getViaMedewerkers
+      summary: Instituut ⇢ doel via zijn medewerkers (open, afgeleid)
+      description: >
+        Instituut of persoon (2026-10-19): een expert die eigen duiding geeft,
+        staat op het verband persoon → medium met namens_id = het instituut. Dit
+        endpoint leidt daaruit de routes af waarin de entiteit het instituut is
+        (via welke mensen naar welke media en beslissers), het doel (welke
+        instituten achter de experts) of de persoon (namens wie). Alleen
+        goedgekeurde verbanden met een goedgekeurde band in die periode;
+        beschrijvend, telt nergens mee. 404 als het geen goedgekeurde entiteit is.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: >
+            {entiteit, als_instituut: [{id, naam, routes}], als_doel: [{id, naam,
+            routes}], als_persoon: [route], aantal}; een route heeft relation_id,
+            persoon, doel, instituut, band_id, band_type, band_functie en de looptijden.
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: Geen goedgekeurde entiteit met dit id.
 
   /api/feed/graph:
     get:

@@ -11,6 +11,9 @@ Disallow: /beheer
 Disallow: /werkbank
 Disallow: /account
 Disallow: /login
+# Eigen metingen (2026-10-16): alleen een afgeronde meting is publiek; de server voegt per
+# afgeronde meting een eigen "Allow: /meting/<id>$" toe onder deze regel.
+Disallow: /meting
 # De API is geen leessurface — op één na: de deelbare graafdata blijft indexeerbaar
 # (feed-verhaal E1).
 Disallow: /api/

@@ -43,6 +43,8 @@ een nieuwe binnen 30 dagen na de vorige is een duplicaat. Prioriteit 60 (70 als 
 betrokken is): onder het nieuws, boven de tips. Uitkomst: diende de agent een tegenargument of
 ondergraving in → 'gecorroboreerd' (bevestigd); anders 'afgewezen' (niet_bevestigd, telt niet
 tegen de melder: wie over zichzelf meldt en ongelijk krijgt, is geen spammer).
+Een melding over een eigen meting ('meting:<id>', de link op de metingpagina; 2026-10-16) is geen
+AI-werk: ze blijft 'binnengekomen' voor de maker van de meting, die haar op de metingpagina ziet.
 
 Account: nieuws-agent (zet doelen in de wachtrij en mag de lead-wachtrij bijwerken).
 
@@ -80,6 +82,7 @@ SLECHT = ("onvolledig", "buiten_model", "onstaafbaar")   # telt tegen de inzende
 RECTIFICATIE_PRIORITEIT = 60.0            # onder het nieuws (80+), boven de tips
 RECTIFICATIE_PRIORITEIT_PERSOON = 70.0    # een melding over een persoon gaat iets eerder
 ELEMENT = re.compile(r"(entity|relation|mechanism):(\d+)")
+METING = re.compile(r"meting:(\d+)")   # eigen meting (2026-10-16): de maker beslist
 
 SOORT_LABEL = vocab.LEAD_SOORTEN_VERBAND   # hint voor de scout
 WAARSCHUWING = (
@@ -251,6 +254,23 @@ def schiften_rectificaties(conn, nu: datetime.datetime) -> dict:
     for lead in conn.execute("SELECT * FROM leads WHERE status = 'binnengekomen' "
                              "AND soort = 'rectificatie' ORDER BY id"):
         lid = lead["id"]
+        # Een melding over een eigen meting (betreft 'meting:<id>', 2026-10-16) is geen AI-werk:
+        # de maker van de meting beslist (punt h, correctie). Ze blijft staan tot die haar
+        # afhandelt; de metingpagina toont haar.
+        mm = METING.fullmatch(html.unescape(lead["betreft"] or "").strip())
+        if mm:
+            try:
+                meting = conn.execute("SELECT id FROM metingen WHERE id = ?",
+                                      (int(mm.group(1)),)).fetchone()
+            except sqlite3.OperationalError:
+                meting = None
+            if meting is None:
+                afwijzen.append((lid, {"status": "afgewezen", "triage_reden":
+                                       "onvolledig: deze meting bestaat niet"}))
+            else:
+                wachten.append((lid, f"meting: melding over eigen meting #{meting['id']}; de "
+                                     "maker beslist (zie de metingpagina)"))
+            continue
         soort, el = element_van(conn, lead)
         if soort is None:
             afwijzen.append((lid, {"status": "afgewezen", "triage_reden": el}))

@@ -83,9 +83,11 @@ def print_path(conn, names, types, src_term, dst_term):
     src = resolve(conn, names, src_term)
     dst = resolve(conn, names, dst_term)
     relations = [
-        {"source_id": s, "target_id": t, "influence": inf, "relation_type": rt}
-        for s, t, inf, rt in conn.execute(
-            "SELECT source_id, target_id, influence, relation_type FROM relations")
+        {"source_id": s, "target_id": t, "influence": inf, "relation_type": rt,
+         "bidirectional": bidir}
+        for s, t, inf, rt, bidir in conn.execute(
+            "SELECT source_id, target_id, influence, relation_type, COALESCE(bidirectional, 0) "
+            "FROM relations")
     ]
     adj = influence.build_adjacency(relations)
     result = influence.best_path(adj, src, dst)

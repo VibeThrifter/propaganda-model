@@ -50,14 +50,22 @@ ROLLEN = {
             "Je bent toetser van voorstellen (RfC's) voor een onderzoeksdatabase over het "
             "Nederlandse media- en bestuurssysteem als één netwerk: het propagandamodel van "
             "Herman & Chomsky plus de besluitvormingscategorieën (formele macht, belangen, kennis "
-            "& advies, polder, werving; naar Domhoff). Je "
+            "& advies, polder, werving; naar Domhoff): machtsuitoefening op beslissing en "
+            "opinie. Je "
             "toetst of een voorstel klopt en past: (1) feiten kloppen (ga ze na op het web met "
             "WebSearch/WebFetch; verzin niets); (2) het past in de theorie en het model; (3) het "
             "is geen duplicaat of bijna-duplicaat van een bestaand element; (4) een nieuwe "
             "definitie is helder en onderscheidend; (5) de tekst neemt in eigen woorden geen "
             "etiket of retoriek van één kant over ('ondermijnt het vertrouwen', "
             "'rechts-populistisch', 'neoliberale consensus') en een voorbeeld over een genoemde "
-            "partij zegt wat die deed of zei. 'akkoord' als het aan alles voldoet, anders "
+            "partij zegt wat die deed of zei; (6) bij een mechanisme kloppen 'doelen' (waar de "
+            "macht op werkt: beslissing = wat overheid, politiek of rechter besluit; agenda = "
+            "wat op de besluitvormingsagenda komt; opinie = wat het publiek te zien krijgt en "
+            "denkt) en 'grondslag' (officieel = de invloed loopt via een formeel toegekende "
+            "bevoegdheid of recht van de bron over het doel, zoals wet, ambt, mandaat, statuut, "
+            "eigendom, benoemingsrecht, werkgeversgezag of een rechterlijke uitspraak; "
+            "niet_officieel = via geld, toegang, netwerk, informatie, druk of ideeën). "
+            "'akkoord' als het aan alles voldoet, anders "
             "'afwijzen' met een concrete, controleerbare reden. Antwoord alleen met het JSON."),
     },
     "rfc-criticus": {
@@ -66,7 +74,8 @@ ROLLEN = {
             "Je bent de criticus van voorstellen (RfC's) voor een onderzoeksdatabase over het "
             "Nederlandse media- en bestuurssysteem als één netwerk (propagandamodel van Herman & "
             "Chomsky plus besluitvorming: formele macht, belangen, kennis & advies, polder, "
-            "werving). Hoe besluiten tot stand komen valt BINNEN het onderwerp. Je zoekt redenen "
+            "werving): machtsuitoefening op beslissing en opinie. Hoe besluiten tot stand komen, "
+            "ook via niet-officiële invloed, valt BINNEN het onderwerp. Je zoekt redenen "
             "om een voorstel af te wijzen: een duplicaat van een bestaand element, te vaag of "
             "niet onderscheidend, feitelijk onjuist (ga feiten na op het web met "
             "WebSearch/WebFetch), buiten het onderwerp van het model, of een tekst die in eigen "
@@ -178,7 +187,12 @@ def draai(*, api=DEFAULT_API, droog=False, ids=None, max_n=6, meld=print) -> dic
     """Eén ronde over de open voorstellen. → {voorstellen, reviews, akkoord, afwijzen, fout}."""
     conn = db()
     try:
-        voorstellen = open_voorstellen(conn, ids)[:max_n]
+        # Alleen voorstellen die nog een review nodig hebben: een voorstel dat beide agents al
+        # beoordeelden (bv. een aangenomen samenvoeging die niet meer uit te voeren is) houdt
+        # anders elke ronde een plek bezet en de rest van de rij staat stil (2026-10-15).
+        voorstellen = [v for v in open_voorstellen(conn, ids)
+                       if any(rol != v["ingediend_door"] and not al_gereviewd(conn, v["id"], rol)
+                              for rol in ROLLEN)][:max_n]
         werk = []
         for v in voorstellen:
             for rol in ROLLEN:
@@ -187,7 +201,7 @@ def draai(*, api=DEFAULT_API, droog=False, ids=None, max_n=6, meld=print) -> dic
                 werk.append((v, rol, context(conn, v)))
     finally:
         conn.close()
-    meld(f"RfC-beoordeling: {len(voorstellen)} open voorstel(len), {len(werk)} review(s) te doen"
+    meld(f"RfC-beoordeling: {len(voorstellen)} voorstel(len) met een open review, {len(werk)} review(s) te doen"
          f"{' (droog)' if droog else ''}")
     tel = {"voorstellen": len(voorstellen), "reviews": 0, "akkoord": 0, "afwijzen": 0, "fout": 0}
     if not droog:

@@ -167,6 +167,7 @@ zijn `status='goedgekeurd' AND NOT vervangen` (de `voorgesteld`/`afgewezen`/
 | `influence` | As 2 — *hoe sterk stuurt ze berichtgeving?* 0,0–1,0. 0,05 = onbewezen prior. |
 | `active_from` / `active_until` | Looptijd; leeg = onbegrensd voor zover bekend. |
 | `functie` | De ambtstitel of functie zoals het register hem geeft (bv. "Secretaris-generaal", "Kamerlid, fractievoorzitter", "Vaste toegangspas (…)"); meestal bij `ambt`, verder leeg. |
+| `namens_id` / `namens_name` | De hoedanigheid (sinds 2026-10-19): bij een verband van een persoon de organisatie namens of vanuit welke hij optrad, zoals de bron hem aankondigt ("Clingendael-onderzoeker Bob Deen" → Clingendael). Leeg = eigen titel, oud-medewerker of een andere pet. De route organisatie → medium via haar medewerkers is hieruit af te leiden (`GET /api/via_medewerkers/<id>`); zo'n optreden staat bewust niet óók als verband organisatie → medium in de data. |
 
 ### `sources.csv` — de bronnenlijst (bibliografisch)
 

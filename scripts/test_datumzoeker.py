@@ -13,7 +13,8 @@ overal wordt gehandhaafd"):
     (oud/nieuw in edit_log), merget het argument, weigert een begin na het einde;
   * scripts/datumzoeker.py: kandidaten en volgorde, wachttijden, de eigen-bronnenronde (alleen
     een letterlijk stuk van een bestaand citaat dat het jaar noemt), de webronde (natrekken,
-    beide partijen) en de ronde met een nagebootst model;
+    beide partijen) en de ronde met een nagebootst model; het einde van loopbaanbanden voor de
+    carrousel (2026-10-16);
   * scripts/automatische_beoordeling.py: stap 10c zet de datum, looptijd-argumenten wachten niet
     op de aanklager;
   * de geratchete controle RELATIE-ZONDER-JAAR;
@@ -352,6 +353,46 @@ def main():
         eis(tel["van_het_web"] == 1 and web_arg is not None and web_arg["property_value"] == "2012",
             "met --ids zoekt hij ook na 'niets gevonden'; een webbron met het jaartal levert een argument")
         c.close()
+
+        print("4b. Het einde van loopbaanbanden (carrousel, 2026-10-16)")
+        dz.EIND_STAND_PAD = Path(tmp) / "datumzoeker_einden.json"
+        anna = entiteit("Anna Proef")
+        krant_a, omroep_b = entiteit("Proefkrant", "mediaorganisatie"), entiteit("Proefomroep", "omroep")
+        ra = relatie(anna, krant_a, "personeel", active_from="2010")
+        rb = relatie(anna, omroep_b, "personeel", active_from="2016")
+        rp = relatie(anna, partij, "lidmaatschap", active_from="2008")
+        for x in (ra, rb, rp):
+            bewijs(x, quote=f"Anna Proef, verband {x}, sinds 2010.")
+            api("patch", f"/api/relations/{x}/status", "t-admin", {"status": "goedgekeurd", "motivatie": "test"})
+        c = lees()
+        ek = {r["id"]: r for r in dz.eind_kandidaten(c)}
+        eis(ra in ek and "Proefomroep (2016)" in (ek[ra]["later"] or ""),
+            "een band zonder einde, terwijl de persoon later elders begon: kandidaat (met de latere band)")
+        eis(rb not in ek and rp not in ek, "de laatste band en een partijlidmaatschap zijn geen kandidaat")
+        eis(anna in dz.loopbaan_personen(c), "een persoon met twee organisaties telt als loopbaan")
+        c.close()
+
+        def nep_eind(prompt, schema, tools, eind="2015"):
+            b = {"url": "https://bron.test/anna", "titel": "Anna Proef", "uitgever": "Proefkrant",
+                 "datum": "2015-06-01", "soort": "nieuwsartikel",
+                 "citaat": f"Anna Proef vertrok in {eind} bij Proefkrant."}
+            leeg = {**b, "url": "", "citaat": ""}
+            return {"gevonden": True, "begin": "", "begin_bron": leeg, "eind": eind, "eind_bron": b,
+                    "bewering": f"Anna Proef werkte tot {eind} bij Proefkrant.", "toelichting": "persbericht"}
+
+        dz.vraag = nep_eind
+        tel = dz.draai(max_eigen=0, max_web=0, max_web_eind=2, eind_ids=[ra], meld=print)
+        c = lees()
+        eind_arg = c.execute("""SELECT * FROM arguments WHERE relation_id = ? AND property = 'active_until'""", (ra,)).fetchone()
+        eis(tel["einden_ingediend"] == 1 and eind_arg is not None and eind_arg["property_value"] == "2015"
+            and eind_arg["status"] == "voorgesteld", "het gevonden einde wordt een voorgesteld active_until-argument")
+        eis(ra not in {r["id"] for r in dz.eind_kandidaten(c)}, "met een lopend einde-argument geen kandidaat meer")
+        c.close()
+        dz.vraag = lambda prompt, schema, tools: nep_eind(prompt, schema, tools, eind="2005")
+        uit = dz.web_ronde({"id": ra, "bron_naam": "Anna Proef", "doel_naam": "Proefkrant", "active_from": "2010"},
+                           [], prompt="x", velden=("eind",))
+        eis(uit["uitkomst"] == "niets" and any("vóór het begin" in a["reden"] for a in uit["afgevallen"]),
+            "een einde vóór het begin valt af")
 
         print("5. Redactieleiding elk kwartaal")
         c = lees()

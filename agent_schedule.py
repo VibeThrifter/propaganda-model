@@ -85,6 +85,41 @@ AGENTS = [
      "spec": ["scripts/registers_sync.py"], "timeout": 5400,
      "omschrijving": "Registers bijwerken: nieuwe uitgaven, nieuwe ambten en functies, afgelopen ambten",
      "default": {"eenheid": "dag", "elke": 7, "aan": True}},
+    # Eigenaar 2026-10-19 ("openlobby … interessante connecties minen zonder te bedelven in
+    # onbelangrijke afspraken"): nieuwe weekagenda's van bewindspersonen ophalen; herhaalde
+    # gesprekken met een bekende organisatie worden 'lobbyt' → ministerie, of een extra bron op
+    # dat verband. Geen claude; de registercheck controleert. Zie tools/registers/agenda_naar_model.py.
+    {"naam": "agenda-sync", "label": "agenda-sync", "soort": "script",
+     "spec": ["tools/registers/agenda_naar_model.py", "--haal", "--indienen"], "timeout": 3600,
+     "omschrijving": "Agenda's van bewindspersonen: nieuwe weken, lobbycontacten als verband of bron",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    # Eigenaar 2026-10-19 ("doe hetzelfde … voor openrechtspraak.nl"): het nevenfunctieregister
+    # van de Rechtspraak via Open Rechtspraak; ophalen duurt ~60 min. Zie
+    # tools/registers/rechtspraak_naar_model.py.
+    {"naam": "rechtspraak-sync", "label": "rechtspraak-sync", "soort": "script",
+     "spec": ["tools/registers/rechtspraak_naar_model.py", "--haal", "--indienen"], "timeout": 7200,
+     "omschrijving": "Nevenfunctieregister Rechtspraak (Open Rechtspraak): nevenbetrekkingen en loopbaan van rechters",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    {"naam": "tk-inspraak-sync", "label": "tk-inspraak-sync", "soort": "script",
+     "spec": ["tools/registers/tk_inspraak_naar_model.py", "--haal", "--indienen"], "timeout": 3600,
+     "omschrijving": "Inspraak bij Kamercommissies: position papers, genodigden en briefings van organisaties",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    {"naam": "staatscourant-sync", "label": "staatscourant-sync", "soort": "script",
+     "spec": ["tools/registers/staatscourant_naar_model.py", "--haal", "--indienen"], "timeout": 3600,
+     "omschrijving": "Benoemingen uit de Staatscourant (KB en ministerieel besluit): persoon → organisatie",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    {"naam": "giften-sync", "label": "giften-sync", "soort": "script",
+     "spec": ["tools/registers/giften_naar_model.py", "--haal", "--indienen"], "timeout": 1800,
+     "omschrijving": "Giften aan politieke partijen (Wfpp-overzichten BZK): gever → partij als verband of bron",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    {"naam": "ep-netwerk-sync", "label": "ep-netwerk-sync", "soort": "script",
+     "spec": ["tools/registers/ep_netwerk_naar_model.py", "--haal", "--indienen"], "timeout": 3600,
+     "omschrijving": "EP open data + verklaringen en vergaderingen van Nederlandse Europarlementariërs",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
+    {"naam": "afm-sync", "label": "afm-sync", "soort": "script",
+     "spec": ["tools/registers/afm_naar_model.py", "--haal", "--indienen"], "timeout": 3600,
+     "omschrijving": "AFM-registers: aandeelhouders ≥ 3% en bestuurders van beursondernemingen in het model",
+     "default": {"eenheid": "dag", "elke": 7, "aan": False}},
     # Eigenaar 2026-10-09: de redactieleiding van de acht hoofdbronnen en hun partijbanden elk
     # kwartaal opnieuw laten uitzoeken (redacties veranderen). Dagelijks gecontroleerd; zet
     # alleen doelen in nieuws_doelen die > 90 dagen geleden afgerond zijn (de nieuws-scout pakt
@@ -100,6 +135,21 @@ AGENTS = [
     {"naam": "integratiecontrole", "label": "integratiecontrole", "soort": "script",
      "spec": ["scripts/integratiecontrole.py"], "timeout": 7200,
      "omschrijving": "Integratiecontrole: testsuites, strenge validatie en een live rooktest",
+     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
+    # Eigenaar 2026-10-19 ("om de x tijd bepaalde social media accounts of blogs of youtubers
+    # minen naar verbanden … dagelijks"): de kanalen-monitor. De sync (geen claude) leest het
+    # manifest van de lezer in, haalt nieuwe items op, zet kanaal-/netwerkdoelen klaar voor de
+    # nieuws-scout en schrijft de uitkomsten terug; de lezer (alleen-lezen, alleen als er
+    # ongelezen items zijn) haalt de beweerde verbanden uit de items. Zie scripts/kanalen.py.
+    {"naam": "kanalen-sync", "label": "kanalen-sync", "soort": "script",
+     "spec": ["scripts/kanalen.py", "sync"], "timeout": 3600,
+     "omschrijving": "Kanalen: items ophalen, claims inlezen, doelen klaarzetten, uitkomsten terug",
+     "default": {"eenheid": "dag", "elke": 1, "aan": True}},
+    {"naam": "kanalen-lezer", "label": "kanalen-lezer", "soort": "leesagent",
+     "spec": ["--geen-token", "--label", "kanalen-lezer",
+              "--brief", "missies/kanalen_lezer_brief.md", "--alleen-bij-kanaal-items",
+              "--max-rondes-per-dag", "2", "--actieve-uren", "8-22"], "timeout": 2400,
+     "omschrijving": "Kanalen: beweerde verbanden uit posts, artikelen en video's halen",
      "default": {"eenheid": "dag", "elke": 1, "aan": True}},
     # Uit: geen onderdeel van de beoordeling (inhoud en meters). Aan te zetten op /beheer.
     {"naam": "monitor", "label": "monitor-agent", "soort": "runner",

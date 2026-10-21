@@ -138,6 +138,7 @@ nav.topbal-nav a.actief {
 @media (max-width: 700px) {
   header.topbal { padding: 8px 12px; gap: 8px 12px; }
   .topbal-merk .sub { display: none; }
+  nav.topbal-nav { flex-wrap: wrap; }
 }
 
 /* ── Voettekst (gedeeld; gevuld door huisstijl.js) ─────────────────── */

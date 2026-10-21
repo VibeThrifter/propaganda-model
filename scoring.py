@@ -372,6 +372,12 @@ def _beta_ppf(q, a, b):
     return (lo + hi) / 2.0
 
 
+# Memo voor beta_interval: een pure functie van exact dezelfde floats, en veel
+# relaties delen dezelfde steun/tegen-massa's. Scheelt het grootste deel van de
+# rekentijd van compute_all_scores; de uitkomst is identiek.
+_BETA_INTERVAL_MEMO = {}
+
+
 def beta_interval(steun: float, tegen: float, k: float) -> tuple:
     """95%-geloofwaardigheidsinterval voor de steunratio (M1.3).
 
@@ -379,9 +385,14 @@ def beta_interval(steun: float, tegen: float, k: float) -> tuple:
     Jeffreys-achtige smoothing (+0,5); de demping k telt als tegenmassa, conform
     de puntscore steun/(steun+tegen+k). Weinig massa = breed interval.
     """
-    a = steun + 0.5
-    b = tegen + k + 0.5
-    return (round(_beta_ppf(0.025, a, b), 4), round(_beta_ppf(0.975, a, b), 4))
+    sleutel = (steun, tegen, k)
+    uit = _BETA_INTERVAL_MEMO.get(sleutel)
+    if uit is None:
+        a = steun + 0.5
+        b = tegen + k + 0.5
+        uit = (round(_beta_ppf(0.025, a, b), 4), round(_beta_ppf(0.975, a, b), 4))
+        _BETA_INTERVAL_MEMO[sleutel] = uit
+    return uit
 
 
 def instance_detail(roots, prior_certainty=None, k=None) -> dict:
@@ -500,10 +511,23 @@ def theory_scores(literature_roots, instances, seed=0) -> dict:
 
     if instances:
         rng = random.Random(f"bootstrap:{seed}")
+        # Zelfde trekkingen en dezelfde optelvolgorde als _praktijk_score over de
+        # steekproef (dus bit-identiek), maar zonder per trekking dicts op te zoeken.
+        n = len(instances)
+        ex = [float(i.get("exemplarity", 1.0)) for i in instances]
+        excert = [float(i.get("exemplarity", 1.0)) * float(i.get("certainty", 0.0))
+                  for i in instances]
+        k_agg = K_AGG
+        randrange = rng.randrange
         samples = []
         for _ in range(BOOTSTRAP_N):
-            steekproef = [instances[rng.randrange(len(instances))] for _ in instances]
-            samples.append(_praktijk_score(steekproef))
+            idx = [randrange(n) for _ in range(n)]
+            n_eff = sum(ex[j] for j in idx)
+            if n_eff <= 0:
+                samples.append(0.0)
+                continue
+            weighted = sum(excert[j] for j in idx)
+            samples.append((weighted / n_eff) * (n_eff / (n_eff + k_agg)))
         samples.sort()
         pr_lo = samples[int(0.025 * (BOOTSTRAP_N - 1))]
         pr_hi = samples[int(0.975 * (BOOTSTRAP_N - 1))]

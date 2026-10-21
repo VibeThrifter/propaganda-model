@@ -145,6 +145,72 @@ verband zonder begin staat altijd en overal "aan".
   Een onbeschermde datum (geen mens, geen register, geen gemerged argument) wordt dan verfijnd of
   verruimd. Een datum die het bestaan verkort, blijft staan tot een mens beslist.
 
+## Richting: bron → doel alleen als de bron echt invloed heeft op het doel (eigenaarsbesluit 2026-10-15)
+
+"Frits Wester werkt voor RTL Nieuws is een niet-directioneel verband … maar werkt voor CDA staat
+erin als Frits Wester directioneel naar CDA en dat klopt niet echt … alleen directioneel als a ook
+echt invloed heeft op b en niet echt andersom, zoals a financiert b of a is eigenaar van b … zorg
+ook dat de agents ze in de toekomst niet meer maken." De viz tekent een gericht verband met een
+pijl en de invloedsgraaf laat invloed alleen langs die pijl stromen; een verkeerde richting maakt
+dus een verkeerde route.
+
+- **Hoort iemand bij een organisatie, dan is er geen richting.** Werkt voor, is lid van, zit in
+  het bestuur, adviseert, spreekt namens, bekleedt een ambt, stapte over: kies `personeel`,
+  `dienstverband`, `lidmaatschap`, `bestuurder`, `adviseur`, `woordvoerder_van`, `ambt` of
+  `draaideur`. Twee partijen die samenwerken: `alliantie`. Deze typen zijn richtingloos
+  (`vocab.RICHTINGLOZE_TYPES`): de volgorde van bron en doel zegt niets, de viz tekent geen enkele
+  pijl en de invloed loopt in beide richtingen. Gebruik voor zo'n band nooit `beinvloeding` of
+  een ander gericht type.
+- **Een gericht type wijst van wie de invloed uitoefent naar wie haar ondergaat**:
+  `financiering` financier → ontvanger, `eigendom` eigenaar → bezit, `adverteerder` adverteerder
+  → medium, `zeggenschap` hogere → lagere organisatie, `controle` controleur → gecontroleerde,
+  `geschenk` gever → ontvanger, `bron_van`/`beinvloeding` expert, instituut of gast → medium,
+  `mediaplatform` zender of krant → programma of columnist (niet andersom: "Beau → RTL" is fout),
+  `lobbyt` lobbyist → wie bewerkt wordt, `flak`/`intimidatie`/`etikettering`/`censuur` wie
+  aanvalt → wie aangevallen wordt, `regulering` toezichthouder → wie toezicht krijgt. De volledige
+  lijst staat in `vocab.RICHTING_PER_TYPE`.
+- **Twijfel je of de invloed één kant op gaat**, dan is het geen gericht verband: kies het
+  richtingloze type dat de band beschrijft. Verzin geen invloedspijl.
+- **Controle**: de richtingtoets (`scripts/richtingtoets.py`, account `richtingtoets`, Haiku; een
+  wijziging pas als Sonnet haar onafhankelijk bevestigt) toetst elk gericht verband, ook elk
+  voorstel. De automatische beoordeling draait een verkeerd verband om of maakt het richtingloos
+  (stap 7b, in `edit_log`, terug te draaien); `RICHTING-DEKKING` meet de achterstand.
+
+## Instituut of persoon: één optreden, één verband (eigenaarsbesluit 2026-10-19)
+
+"denktank of instituut zoals clingendael en universiteit stuurt experts naar de media … ook de
+experts zelf zou in het propaganda model moeten komen … invloed gaat wss van clingendael via die
+expert naar media". Vraag bij elk optreden in een medium (of bij de Kamer of een ministerie): wie
+is de bron van de uitspraak?
+
+- **Het instituut spreekt zelf**: rapport, cijfers, peiling, persbericht, standpunt,
+  mediapartnerschap of coproductie, of iemand die in een officiële functie het product of
+  standpunt van het instituut presenteert (woordvoerder, directeur, hoofdeconoom bij de eigen
+  cijfers). Leg vast: instituut → medium (`expert_framing` bij een denktank, `institutioneel_gezag`
+  of `bron_afhankelijkheid` bij een gezagsinstituut).
+- **Een persoon geeft eigen duiding**, met het instituut als herkomst ("Clingendael-onderzoeker Bob
+  Deen", "hoogleraar X van de UvA"). Leg twee verbanden vast:
+  - persoon → medium (`beinvloeding`, `expert_legitimatie`) met `"namens"` = het instituut in
+    `scout_indienen.py` (`namens_id` in de API);
+  - de band persoon — instituut (`personeel` met functie en looptijd; `denktank_levert_expert`
+    bij een denktank, `academische_autoriteit` bij een universiteit).
+
+  Leg géén instituut → medium vast voor dit optreden: de route via de medewerker leidt het model
+  zelf af (`via_medewerkers.py`).
+- **Een oud-medewerker of iemand met een andere pet** ("oud-directeur van Clingendael",
+  "oud-NAVO-topambtenaar"): persoon → medium zonder `"namens"`. Neem de pet over die de bron
+  noemt, nooit een band die het model toevallig kent.
+- **Eén pet per verband.** Treedt iemand eerst namens Clingendael en later namens Chatham House op,
+  dan zijn dat twee verbanden, elk met een eigen looptijd.
+- **Bestaand bewijs op het verkeerde verband.** Dien het opnieuw in op het preciezere verband, met
+  dezelfde bron en als reasoning `Overgezet van #<oud argument>`. Het doorloopt de gewone
+  controles. Stap 10e van de uurronde vervangt het oude argument zodra de nieuwe route goedgekeurd
+  is, en wijst het oude verband af als het daarna niets meer draagt. Zet het oude zelf niet op
+  verworpen.
+- **Controle.** De API weigert een `namens_id` die niet kan (de bron moet een persoon zijn, namens
+  een organisatie, niet op een band). De meters zijn `NAMENS-ZONDER-BAND` en
+  `INSTITUUT-VIA-PERSOON` (waarschuwing). Zie DOCUMENTATIE.md § "Instituut of persoon".
+
 ## Accounts
 
 | Account | Rol | Brief | Mag niet |

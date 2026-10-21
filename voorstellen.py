@@ -63,6 +63,12 @@ ROL_CATEGORIEEN = ("eigendom", "advertentie", "sourcing", "flak", "ideologie",
                    "systeemactor", "tegenmacht", "overig",
                    "formele_macht", "belangen", "kennis_advies", "polder", "werving")
 AARD_KEUZES = ("direct", "veld_eigenschap")  # de twee levende waarden (zie CLAUDE.md)
+# Uitbreiding D (2026-10-15): machtsuitoefening op beslissing en opinie. Waar een mechanisme op
+# werkt (één of meer) en of het via een formele bevoegdheid loopt (DOCUMENTATIE.md).
+MECHANISME_DOELEN = ("beslissing", "agenda", "opinie")
+GRONDSLAGEN = ("officieel", "niet_officieel")
+# Kenmerken die een RfC 'herformuleren' naast de tekstvelden mag wijzigen.
+KENMERKVELDEN = {"mechanisme": ("doelen", "grondslag")}
 
 
 def _tekst(payload, veld):
@@ -151,6 +157,10 @@ def _valideer_elementvelden(conn, element_type, velden, fouten, prefix=""):
             fouten.append(f"{prefix}filter moet een van {MECHANISME_FILTERS} zijn")
         if not _tekst(velden, "effect"):
             fouten.append(f"{prefix}effect is verplicht")
+        _valideer_kenmerken(velden, fouten, prefix, verplicht=True)
+        for f in velden.get("extra_filters") or []:
+            if f not in MECHANISME_FILTERS or f == "cross_filter":
+                fouten.append(f"{prefix}extra_filters: '{f}' is geen categorie")
         aard = velden.get("aard")
         if aard not in AARD_KEUZES:
             fouten.append(f"{prefix}aard moet 'direct' of 'veld_eigenschap' zijn "
@@ -202,6 +212,42 @@ def _valideer_elementvelden(conn, element_type, velden, fouten, prefix=""):
     elif element_type == "entiteit":
         if not _tekst(velden, "type"):
             fouten.append(f"{prefix}type is verplicht")
+
+
+def _valideer_kenmerken(velden, fouten, prefix="", verplicht=False):
+    """Doelen (lijst uit MECHANISME_DOELEN) en grondslag (uit GRONDSLAGEN) van een mechanisme."""
+    if "doelen" in velden or verplicht:
+        doelen = velden.get("doelen")
+        if not isinstance(doelen, list) or not doelen:
+            fouten.append(f"{prefix}doelen is verplicht: een lijst uit {MECHANISME_DOELEN} "
+                          "(waar werkt de macht op?)")
+        else:
+            onbekend = [d for d in doelen if d not in MECHANISME_DOELEN]
+            if onbekend:
+                fouten.append(f"{prefix}onbekende doelen {onbekend} (kies uit {MECHANISME_DOELEN})")
+    if "grondslag" in velden or verplicht:
+        if velden.get("grondslag") not in GRONDSLAGEN:
+            fouten.append(f"{prefix}grondslag moet een van {GRONDSLAGEN} zijn (loopt de invloed "
+                          "via een formeel toegekende bevoegdheid?)")
+
+
+def zet_kenmerken(conn, mechanism_id, doelen=None, grondslag=None):
+    """Schrijf doelen (vervangt de set) en/of grondslag van een mechanisme."""
+    if doelen is not None:
+        conn.execute("DELETE FROM mechanism_doelen WHERE mechanism_id = ?", (mechanism_id,))
+        for d in dict.fromkeys(doelen):
+            conn.execute("INSERT INTO mechanism_doelen (mechanism_id, doel) VALUES (?, ?)",
+                         (mechanism_id, d))
+    if grondslag is not None:
+        conn.execute("UPDATE mechanisms SET grondslag = ? WHERE id = ?", (grondslag, mechanism_id))
+
+
+def kenmerken(conn, mechanism_id) -> dict:
+    rij = conn.execute("SELECT grondslag FROM mechanisms WHERE id = ?", (mechanism_id,)).fetchone()
+    doelen = {d for (d,) in conn.execute(
+        "SELECT doel FROM mechanism_doelen WHERE mechanism_id = ?", (mechanism_id,))}
+    return {"doelen": [d for d in MECHANISME_DOELEN if d in doelen],
+            "grondslag": rij[0] if rij else None}
 
 
 def valideer_payload(conn, soort, payload) -> list:
@@ -261,15 +307,25 @@ def valideer_payload(conn, soort, payload) -> list:
             fouten.append("element is al vervangen; herformuleer de opvolger")
         velden = payload.get("velden") or {}
         toegestaan = TEKSTVELDEN[et]
-        onbekend = [k for k in velden if k not in toegestaan]
+        kenmerkvelden = KENMERKVELDEN.get(et, ())
+        onbekend = [k for k in velden if k not in toegestaan + kenmerkvelden]
         if onbekend:
             fouten.append(f"onbekende velden voor {et}: {onbekend} "
-                          f"(toegestaan: {toegestaan}; de naam loopt via hernoemen)")
+                          f"(toegestaan: {toegestaan + kenmerkvelden}; de naam loopt via hernoemen)")
         gewijzigd = [k for k, v in velden.items()
-                     if k in toegestaan and (v or "").strip()
-                     and (rij is None or (v or "").strip() != (rij[k] or ""))]
+                     if k in toegestaan and isinstance(v, str) and v.strip()
+                     and (rij is None or v.strip() != (rij[k] or ""))]
+        if kenmerkvelden and any(k in velden for k in kenmerkvelden):
+            _valideer_kenmerken({k: velden[k] for k in kenmerkvelden if k in velden}, fouten)
+            if rij is not None:
+                nu = kenmerken(conn, rij["id"])
+                if "doelen" in velden and isinstance(velden["doelen"], list) \
+                        and set(velden["doelen"]) != set(nu["doelen"]):
+                    gewijzigd.append("doelen")
+                if "grondslag" in velden and velden["grondslag"] != nu["grondslag"]:
+                    gewijzigd.append("grondslag")
         if not gewijzigd:
-            fouten.append(f"geef ≥ 1 gewijzigd tekstveld op ({', '.join(toegestaan)})")
+            fouten.append(f"geef ≥ 1 gewijzigd veld op ({', '.join(toegestaan + kenmerkvelden)})")
         if not _tekst(payload, "motivatie"):
             fouten.append("motivatie is verplicht (verschuift de betekenis wezenlijk, "
                           "dan is het de facto vervangen → kies splitsen/samenvoegen)")
@@ -410,7 +466,9 @@ def _maak_element(conn, element_type, velden) -> int:
             """INSERT INTO mechanisms (name, filter, mechanism_type, description, effect,
                                        source_role_id, target_role_id, aard)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (velden["naam"].strip(), velden["filter"], velden.get("mechanisme_type"),
+            (velden["naam"].strip(), velden["filter"],
+             # RfC's sturen 'mechanism_type' (het kolomnaam), oudere routes 'mechanisme_type'
+             velden.get("mechanisme_type") or velden.get("mechanism_type"),
              velden["definitie"].strip(), velden["effect"].strip(),
              velden.get("source_role_id"), velden.get("target_role_id"), velden["aard"]))
         # mechanism_filters bevat ALLE filter-tags incl. de primaire (DOCUMENTATIE.md); zonder
@@ -418,6 +476,14 @@ def _maak_element(conn, element_type, velden) -> int:
         if velden["filter"] != "cross_filter":
             conn.execute("INSERT OR IGNORE INTO mechanism_filters (mechanism_id, filter) "
                          "VALUES (?, ?)", (cur.lastrowid, velden["filter"]))
+        for f in velden.get("extra_filters") or []:
+            conn.execute("INSERT OR IGNORE INTO mechanism_filters (mechanism_id, filter) "
+                         "VALUES (?, ?)", (cur.lastrowid, f))
+        for thema in velden.get("themes") or velden.get("themas") or []:
+            conn.execute("INSERT OR IGNORE INTO mechanism_themes (mechanism_id, theme) "
+                         "VALUES (?, ?)", (cur.lastrowid, thema))
+        zet_kenmerken(conn, cur.lastrowid, doelen=velden.get("doelen") or None,
+                      grondslag=velden.get("grondslag") or None)
     elif element_type == "entiteit":
         cur = conn.execute(
             "INSERT INTO entities (name, type, primary_role_id, description) VALUES (?, ?, ?, ?)",
@@ -601,14 +667,24 @@ def voer_uit(conn, soort, payload, voorstel_id, ingediend_door=None) -> dict:
         toegestaan = TEKSTVELDEN[et]
         diff = {}
         for kol in toegestaan:
-            if kol in velden and (velden[kol] or "").strip():
+            if kol in velden and isinstance(velden[kol], str) and velden[kol].strip():
                 nieuw = velden[kol].strip()
                 if nieuw != (rij[kol] or ""):
                     diff[kol] = {"oud": rij[kol], "nieuw": nieuw}
                     conn.execute(f"UPDATE {TABEL[et]} SET {kol} = ? WHERE id = ?",
                                  (nieuw, payload["element_id"]))
+        if et in KENMERKVELDEN and any(k in velden for k in KENMERKVELDEN[et]):
+            nu = kenmerken(conn, payload["element_id"])
+            doelen = velden.get("doelen")
+            if isinstance(doelen, list) and set(doelen) != set(nu["doelen"]):
+                zet_kenmerken(conn, payload["element_id"], doelen=doelen)
+                diff["doelen"] = {"oud": nu["doelen"], "nieuw": doelen}
+            gs = velden.get("grondslag")
+            if gs and gs != nu["grondslag"]:
+                zet_kenmerken(conn, payload["element_id"], grondslag=gs)
+                diff["grondslag"] = {"oud": nu["grondslag"], "nieuw": gs}
         if not diff:
-            raise ValueError("geen gewijzigd tekstveld")
+            raise ValueError("geen gewijzigd veld")
         conn.execute("""INSERT INTO lineage (soort, element_type, oud_id, nieuw_id,
                                              voorstel_id, reden)
                         VALUES ('herformuleren', ?, ?, ?, ?, ?)""",

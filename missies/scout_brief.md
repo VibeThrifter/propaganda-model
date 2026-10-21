@@ -100,9 +100,12 @@ het model in komt.
      mechanisme op dát niveau werkt. IJkvoorbeeld onderwijs (juli 2026):
      journalistiek-opleidingen (School voor Journalistiek, UvA Journalistiek) zijn eigen
      knopen omdat `academische_socialisatie` op opleidingsniveau werkt — de opleiding
-     vormt en levert de journalisten, niet de instelling als geheel. Financiering, flak
-     en `expert_legitimatie` werken juist op instellingsniveau (universiteit/hogeschool)
-     en blijven daar. Andere opleidingen (rechten, economie, …) krijgen **geen** eigen
+     vormt en levert de journalisten, niet de instelling als geheel. Financiering en flak
+     werken juist op instellingsniveau (universiteit/hogeschool) en blijven daar. Een
+     hoogleraar die in een medium duidt, loopt via de persoon: persoon → medium
+     (`expert_legitimatie`, `"namens"` = de universiteit) plus de band persoon — universiteit
+     (`personeel`, `academische_autoriteit`); zie missies/README.md § "Instituut of persoon".
+     Andere opleidingen (rechten, economie, …) krijgen **geen** eigen
      knoop: hun invloed loopt al via de instelling of de individuele expert. Bestaan
      beide niveaus als knoop, leg dan de koppel vast: één beschrijvende
      `eigendom`-relatie instelling→opleiding (mechanisme-loos = kandidaat), zodat de
@@ -164,6 +167,14 @@ oprichting van de organisatie of de datum van het artikel. Vind je het echt niet
 zocht (`zonder_jaar`) of laat het verband weg — nooit een geraden jaartal; de datumzoeker zoekt
 verder. Een datum bij een bestaand verband: een aspect-argument (`property` `active_from`/
 `active_until`, `property_value` de datum). Zie missies/README.md § Looptijd.
+
+**Richting.** Een gericht verband wijst van wie de invloed uitoefent naar wie haar ondergaat
+(financier → ontvanger, eigenaar → bezit, zender → programma, expert → medium). Hoort iemand bij
+een organisatie (werkt voor, lid, bestuur, adviseur, woordvoerder, ambt, overstap), dan kies je het
+richtingloze type (`personeel`, `dienstverband`, `lidmaatschap`, `bestuurder`, `adviseur`,
+`woordvoerder_van`, `ambt`, `draaideur`) en nooit `beinvloeding`; twijfel je of de invloed één kant
+op gaat, dan is het geen gericht verband. De richtingtoets controleert elk voorstel. Zie
+missies/README.md § Richting.
 
 ## Harde grenzen
 

@@ -165,6 +165,8 @@ def bronnen_zonder_archief(conn, nieuwste_eerst=False):
         JOIN source_locations l ON l.source_id = s.id AND l.location_type = 'url'
         WHERE NOT EXISTS (SELECT 1 FROM source_locations a
                           WHERE a.source_id = s.id AND a.location_type = 'archive_url')
+          -- een eigen meting is een pagina van dit model zelf (2026-10-16), geen webbron
+          AND COALESCE(s.cluster_key, '') NOT LIKE 'meting:%'
         GROUP BY s.id
         ORDER BY s.id {'DESC' if nieuwste_eerst else ''}
     """).fetchall()  # noqa: S608 - vaste volgorde

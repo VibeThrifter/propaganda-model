@@ -10,10 +10,14 @@ uit op doel". Het gewicht is de ``influence`` (0..1) van de relatie; omdat dat t
 ligt, *dempt* elke extra stap vanzelf — invloed op afstand telt zwakker (vermenigvuldigen
 langs een pad).
 
-Richtingsregels per relatietype (zie ``DIRECTION``):
-  - GERICHT  (bron beïnvloedt doel): eigendom, adverteerder, beinvloeding, draaideur,
-    financiering, censuur, regulering, cooptatie, bestuurder, personeel, lidmaatschap.
-  - SYMMETRISCH (wederzijds): alliantie.
+Richtingsregels per relatietype (zie ``edge_direction``):
+  - GERICHT  (bron beïnvloedt doel): eigendom, financiering, adverteerder, beinvloeding,
+    censuur, regulering, cooptatie, zeggenschap, controle, … — alles wat niet richtingloos is.
+  - SYMMETRISCH (wederzijds): de richtingloze typen uit ``vocab.RICHTINGLOZE_TYPES`` —
+    iemand hoort bij een organisatie (lidmaatschap, personeel, dienstverband, bestuurder,
+    adviseur, woordvoerder_van, draaideur, ambt) of twee partijen zijn bondgenoten (alliantie)
+    — en elk verband met ``bidirectional = 1`` (eigenaarsbesluit 2026-10-15: "alleen
+    directioneel als a ook echt invloed heeft op b en niet echt andersom").
   - Niets uitgesloten: ook oppositie/tegenmacht telt mee. Counter-power oefent eveneens
     invloed uit op de rest van het netwerk (het duwt terug), dus het is een gericht kanaal
     — niet langer op nul gezet. De maat meet zo *alle* gerichte invloed, niet alleen de
@@ -35,9 +39,11 @@ from __future__ import annotations
 import heapq
 from collections import defaultdict
 
+from vocab import RICHTINGLOZE_TYPES
+
 # ── Instelbare constanten ────────────────────────────────────
 
-SYMMETRIC_TYPES = frozenset({"alliantie"})
+SYMMETRIC_TYPES = RICHTINGLOZE_TYPES
 # Niets uitgesloten: tegenmacht/oppositie telt óók als invloedskanaal — counter-power duwt
 # terug op de rest van het netwerk en hoort dus mee te tellen (besluit juni 2026).
 EXCLUDED_TYPES = frozenset()
@@ -85,11 +91,11 @@ THEORY_BASE = 0.4
 THEORY_SPAN = 0.4
 
 
-def edge_direction(relation_type: str) -> str:
-    """'directed' | 'symmetric' | 'excluded' voor een relatietype."""
+def edge_direction(relation_type: str, bidirectional=False) -> str:
+    """'directed' | 'symmetric' | 'excluded' voor een relatietype (en het verband zelf)."""
     if relation_type in EXCLUDED_TYPES:
         return "excluded"
-    if relation_type in SYMMETRIC_TYPES:
+    if relation_type in SYMMETRIC_TYPES or bidirectional:
         return "symmetric"
     return "directed"
 
@@ -133,7 +139,7 @@ def build_adjacency(relations, field_mode: str = "full"):
     adj: dict = defaultdict(list)
     for r in relations:
         rt = r["relation_type"]
-        direction = edge_direction(rt)
+        direction = edge_direction(rt, r.get("bidirectional"))
         if direction == "excluded":
             continue
         aard = r.get("aard", "direct") if field_mode != "full" else "direct"
@@ -306,10 +312,10 @@ def compute_influence(conn, max_hops: int = MAX_HOPS, prune: float = PRUNE,
 
     relations = [
         {"source_id": s, "target_id": t, "influence": inf, "relation_type": rt,
-         "mechanism_id": mid, "aard": aard or "direct", "filter": flt}
-        for s, t, inf, rt, mid, aard, flt in conn.execute(
+         "mechanism_id": mid, "aard": aard or "direct", "filter": flt, "bidirectional": bidir}
+        for s, t, inf, rt, mid, aard, flt, bidir in conn.execute(
             "SELECT r.source_id, r.target_id, r.influence, r.relation_type, r.mechanism_id, "
-            "       COALESCE(m.aard, 'direct'), m.filter "
+            "       COALESCE(m.aard, 'direct'), m.filter, COALESCE(r.bidirectional, 0) "
             "FROM relations r LEFT JOIN mechanisms m ON m.id = r.mechanism_id "
             "WHERE NOT r.vervangen AND r.status = 'goedgekeurd'")
     ]

@@ -9,3 +9,6 @@ __pycache__/
 # LinkedIn-integratie: gescrapete persoonsdata + auth-sessie + geïsoleerde venv
 tools/linkedin/session.json
 tools/linkedin/.venv/
+# Kanalen-monitor: geïsoleerde venv + inlogsessies voor X/Instagram/TikTok
+tools/kanalen/.venv/
+tools/kanalen/sessies/

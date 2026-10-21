@@ -133,6 +133,54 @@ RELATIE_LABELS = {
 }
 
 
+# Richting (eigenaarsbesluit 2026-10-15: "alleen directioneel als a ook echt invloed heeft op b en
+# niet echt andersom, zoals a financiert b of a is eigenaar van b"). Een band waarbij iemand bij
+# een organisatie hoort — werkt voor, is lid van, zit in het bestuur, adviseert, spreekt namens,
+# bekleedt er een ambt, stapte over — heeft geen invloedsrichting: de persoon kan de organisatie
+# beïnvloeden én de organisatie de persoon (en via hem verder). Zo'n band is richtingloos: de viz
+# tekent hem zonder enkele pijl, de invloedsgraaf (influence.py) telt hem in beide richtingen. De
+# opgeslagen volgorde van bron en doel zegt bij deze typen niets. Een gericht type kan per verband
+# toch richtingloos zijn (relations.bidirectional = 1, gezet door de richtingtoets).
+# Spiegel in web/shared_vocab.js (RICHTINGLOZE_TYPES); verschillen() bewaakt dat.
+RICHTINGLOZE_TYPES = frozenset({
+    "lidmaatschap", "personeel", "dienstverband", "bestuurder", "adviseur", "woordvoerder_van",
+    "draaideur", "ambt", "alliantie",
+})
+
+# Wat bron → doel betekent bij elk gericht type: de bron oefent de invloed uit. De richtingtoets
+# (scripts/richtingtoets.py) en de missiebriefs gebruiken deze zinnen.
+RICHTING_PER_TYPE = {
+    "eigendom": "bron is eigenaar of aandeelhouder van doel",
+    "financiering": "bron betaalt, subsidieert of sponsort doel",
+    "adverteerder": "bron adverteert bij doel (betaalt het medium)",
+    "donor": "bron doneert aan doel",
+    "investering": "bron investeert in doel",
+    "zeggenschap": "bron heeft zeggenschap over doel (hogere organisatie → lagere)",
+    "controle": "bron controleert doel (rekenkamer, rechter, volksvertegenwoordiging → bestuur)",
+    "geschenk": "bron geeft het geschenk of de reis, doel ontvangt het",
+    "bron_van": "bron levert informatie of expertise aan doel (het medium of de journalist)",
+    "mediaplatform": "bron biedt het platform of het programma waarop doel publiceert of verschijnt",
+    "framing": "bron bepaalt het frame dat doel overneemt",
+    "citeert": "bron citeert doel",
+    "lobbyt": "bron lobbyt bij doel",
+    "censuur": "bron onderdrukt informatie van of bij doel",
+    "flak": "bron valt doel aan of disciplineert doel",
+    "intimidatie": "bron bedreigt of dreigt juridisch tegen doel",
+    "regulering": "bron houdt toezicht op of reguleert doel",
+    "zelfcensuur": "bron (de druk) brengt doel tot zelfcensuur",
+    "oppositie": "bron treedt op tegen doel",
+    "beinvloeding": "bron beïnvloedt doel (expert in een programma, instituut dat een medium voedt)",
+    "cooptatie": "bron lijft doel of zijn kritiek in",
+    "etikettering": "bron plakt doel een etiket op",
+    "algoritmische_filtering": "bron (het platform) bepaalt wat van doel zichtbaar is",
+}
+
+
+def richtingloos(relatietype, bidirectional=False):
+    """True als een verband geen invloedsrichting heeft (het type, of het verband zelf)."""
+    return relatietype in RICHTINGLOZE_TYPES or bool(bidirectional)
+
+
 def weergave_naam(naam):
     """snake_case → leesbare naam (spiegel van weergaveNaam() in shared_vocab.js)."""
     if naam is None or naam == "":
@@ -190,6 +238,17 @@ def verschillen(web=WEB):
         for k in sorted(set(js) | set(py)):
             if js.get(k) != py.get(k):
                 uit.append(f"{bestand} {naam}.{k}: JS {js.get(k)!r} ≠ vocab.py {py.get(k)!r}")
+    try:
+        tekst = (Path(web) / "shared_vocab.js").read_text(encoding="utf-8")
+    except OSError:
+        tekst = ""
+    m = re.search(r"const\s+RICHTINGLOZE_TYPES\s*=\s*new Set\(\[(.*?)\]\)", tekst, re.S)
+    js_set = set(re.findall(r"'(\w+)'", m.group(1))) if m else None
+    if js_set is None:
+        uit.append("shared_vocab.js: RICHTINGLOZE_TYPES niet gevonden")
+    elif js_set != set(RICHTINGLOZE_TYPES):
+        uit.append(f"shared_vocab.js RICHTINGLOZE_TYPES: JS {sorted(js_set)} ≠ vocab.py "
+                   f"{sorted(RICHTINGLOZE_TYPES)}")
     return uit
 
 

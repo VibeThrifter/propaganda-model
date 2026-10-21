@@ -28,10 +28,12 @@ BEKENDE_DDL_VERSCHILLEN = {
                 "kolom kwam via ALTER TABLE (moderatiewachtrij). bestuurslaag kwam via ALTER "
                 "TABLE (migrate_add_besluitvorming.py)",
     "mechanisms": "aard-CHECK leeft alleen in schema.sql; live kolom kwam via ALTER TABLE "
-                  "(zie CLAUDE.md)",
+                  "(zie CLAUDE.md); grondslag kwam via ALTER TABLE "
+                  "(migrate_add_doel_grondslag.py)",
     "relations": "status-CHECK (moderatiewachtrij) leeft alleen in schema.sql; live kolom "
                  "kwam via ALTER TABLE; functie kwam via ALTER TABLE "
-                 "(migrate_add_besluitvorming.py)",
+                 "(migrate_add_besluitvorming.py); namens_id kwam via ALTER TABLE "
+                 "(migrate_add_namens.py)",
     "sources": "CHECK op reliability_voorgesteld/onderwerp_voorgesteld leeft alleen in "
                "schema.sql; live kolommen kwamen via ALTER TABLE (classificatievoorstel)",
     "arguments": "property-CHECK kreeg 'politieke_positie' + 'machtsvalentie' via tabel-"
@@ -111,6 +113,21 @@ def check_koppelingsplicht(conn):
             ORDER BY m.id
         """)]
 
+    # Uitbreiding D (2026-10-15): elk levend mechanisme zegt waar het op werkt (doel) en of
+    # het via een formele bevoegdheid loopt (grondslag). Een DB zonder de tabel (oude kopie,
+    # seed-replay vóór de migratie) slaat de check over.
+    mech_zonder_kenmerk = []
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' "
+                    "AND name = 'mechanism_doelen'").fetchone():
+        mech_zonder_kenmerk = [
+            f"mechanisme #{m['id']}: {m['name']}"
+            for m in conn.execute("""
+                SELECT m.id, m.name FROM mechanisms m
+                WHERE NOT m.vervangen AND (m.grondslag IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM mechanism_doelen d WHERE d.mechanism_id = m.id))
+                ORDER BY m.id
+            """)]
+
     ent_zonder_inst = [
         f"entiteit #{e['id']}: {e['name']} ({e['type']})"
         for e in conn.execute("""
@@ -140,6 +157,12 @@ def check_koppelingsplicht(conn):
                    "mechanism_filters", "fout", mech_zonder_primair,
                    "mechanism_filters hoort alle filter-tags te bevatten, inclusief de primaire; "
                    "anders verdringt een extra (overlappende) categorie de primaire filter."),
+        _bevinding("KOPPEL-MECH-KENMERK", "Mechanismen zonder doel of grondslag", "fout",
+                   mech_zonder_kenmerk,
+                   "Elk mechanisme zegt waar de macht op werkt (mechanism_doelen: beslissing, "
+                   "agenda, opinie) en of ze via een formele bevoegdheid loopt "
+                   "(mechanisms.grondslag). Nieuwe mechanismen krijgen ze via hun RfC; "
+                   "wijzigen via een RfC 'herformuleren'."),
     ]
 
 
@@ -221,7 +244,7 @@ def check_bewijs(conn):
             SELECT a.id, a.stance, a.claim FROM arguments a
             WHERE a.stance IN ('supporting', 'contradicting')
               AND a.parent_argument_id IS NULL
-              AND a.status != 'voorgesteld'
+              AND a.status NOT IN ('voorgesteld', 'verworpen')  -- verworpen telt nergens mee
               AND NOT a.vervangen
               AND NOT EXISTS (SELECT 1 FROM citations c WHERE c.argument_id = a.id)
             ORDER BY a.id
@@ -929,6 +952,44 @@ def check_bestaan(conn):
     ]
 
 
+# ── Instituut of persoon (eigenaarsbesluit 2026-10-19) ───────
+
+def check_hoedanigheid(conn):
+    """Eén optreden staat op precies één verband (via_medewerkers.py, DOCUMENTATIE.md §
+    "Instituut of persoon"): spreekt het instituut zelf, dan instituut → medium; geeft een persoon
+    eigen duiding met het instituut als herkomst, dan persoon → medium met namens_id.
+
+    NAMENS-ONGELDIG (fout): een namens_id die niet kan (geen persoon als bron, namens een
+    persoon, de bron of het doel zelf, op een band, of een vervangen entiteit). De API houdt het
+    tegen. NAMENS-ZONDER-BAND (waarschuwing): namens een organisatie zonder goedgekeurde band in
+    die periode. INSTITUUT-VIA-PERSOON (waarschuwing): instituut → medium waarvan al het bewijs
+    over optredens van één van haar mensen gaat zonder dat het instituut zelf spreekt."""
+    if "namens_id" not in {r[1] for r in conn.execute("PRAGMA table_info(relations)")}:
+        return [_bevinding("NAMENS-ONGELDIG", "Hoedanigheden (namens_id) die niet kunnen", "fout", [],
+                           "De kolom relations.namens_id ontbreekt: draai scripts/migrate_add_namens.py.")]
+    import via_medewerkers   # repo-root, stdlib (lazy zoals de rest van deze checks)
+    return [
+        _bevinding(
+            "NAMENS-ONGELDIG", "Hoedanigheden (namens_id) die niet kunnen", "fout",
+            via_medewerkers.ongeldig(conn),
+            "Alleen een persoon treedt namens een organisatie op, en namens hoort bij wat hij doet "
+            "(een optreden, advies), niet bij de band zelf. Wis namens_id of zet de juiste organisatie."),
+        _bevinding(
+            "NAMENS-ZONDER-BAND", "Optredens namens een organisatie zonder band in die periode",
+            "waarschuwing", via_medewerkers.zonder_band(conn),
+            "De route via de medewerker telt pas als het model de band tussen persoon en organisatie "
+            "kent en die in die periode liep. Ontbreekt de band, dan zoekt de scout hem; liep hij niet "
+            "meer (oud-medewerker), dan klopt de pet niet: wis namens_id."),
+        _bevinding(
+            "INSTITUUT-VIA-PERSOON", "Instituut → medium gedragen door optredens van één medewerker",
+            "waarschuwing", via_medewerkers.instituut_via_persoon(conn),
+            "Een expert die eigen duiding geeft, hoort op persoon → medium met namens_id = het "
+            "instituut; dien het bewijs daar in als 'Overgezet van #…' (stap 10e ruimt het oude op). "
+            "Instituut → medium blijft voor wat het instituut zelf brengt: rapport, cijfers, peiling, "
+            "persbericht, standpunt, partnerschap, of een woordvoerder of directeur namens het instituut."),
+    ]
+
+
 # ── Schema-pariteit (Z9) ─────────────────────────────────────
 
 def _strip_sql_commentaar(sql):
@@ -1370,6 +1431,46 @@ def check_immuunsysteem(conn):
     ]
 
 
+def check_richting(conn):
+    """RICHTING-DEKKING (info, eigenaarsbesluit 2026-10-15: "alleen directioneel als a ook echt
+    invloed heeft op b en niet echt andersom").
+
+    Goedgekeurde verbanden van een GERICHT type (niet in vocab.RICHTINGLOZE_TYPES, niet
+    bidirectional, geen registerfeit) zonder oordeel van de richtingtoets over het verband zoals
+    het nu is. De uurronde werkt de achterstand weg (stap 7b); dit meet haar."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' "
+                    "AND name = 'richting_toetsen'").fetchone() is None:
+        return []
+    import hashlib
+    from vocab import RICHTINGLOZE_TYPES
+    plek = ",".join("?" * len(RICHTINGLOZE_TYPES))
+    getoetst = {}
+    for r in conn.execute("SELECT relation_id, relatie_hash FROM richting_toetsen"):
+        getoetst.setdefault(r["relation_id"], set()).add(r["relatie_hash"])
+    open_ = []
+    for r in conn.execute(f"""
+            SELECT r.id, r.source_id, r.target_id, r.relation_type, r.mechanism_id,
+                   r.bidirectional, s.name AS bron, t.name AS doel FROM relations r
+            JOIN entities s ON s.id = r.source_id JOIN entities t ON t.id = r.target_id
+            WHERE r.status = 'goedgekeurd' AND NOT r.vervangen
+              AND COALESCE(r.bidirectional, 0) = 0 AND r.relation_type NOT IN ({plek})
+              AND NOT EXISTS (SELECT 1 FROM arguments a JOIN citations c ON c.argument_id = a.id
+                              WHERE a.relation_id = r.id
+                                AND c.methode = 'officieel_register_scrape')
+            ORDER BY r.id""", sorted(RICHTINGLOZE_TYPES)):  # noqa: S608
+        sleutel = "|".join(str(r[k] if r[k] is not None else "") for k in
+                           ("source_id", "target_id", "relation_type", "mechanism_id"))
+        h = hashlib.sha256(f"{sleutel}|{int(bool(r['bidirectional']))}".encode()).hexdigest()
+        if h not in getoetst.get(r["id"], ()):
+            open_.append(f"relatie #{r['id']} ({r['relation_type']}): {r['bron']} → {r['doel']}")
+    return [_bevinding("RICHTING-DEKKING",
+                       "Gerichte verbanden zonder oordeel van de richtingtoets",
+                       "info", open_,
+                       "Een gericht verband wijst van wie de invloed uitoefent naar wie haar "
+                       "ondergaat. De richtingtoets (scripts/richtingtoets.py, stap 7b van de "
+                       "automatische beoordeling) toetst dat; dit meet de achterstand.")]
+
+
 # ── Publieke-intake-anomalie (D2.4, Laag 4) ──────────────────
 
 # Drempels voor de burst-vlag. Bewust modest; een piek is een signaal voor de eigenaar
@@ -1426,6 +1527,27 @@ def check_lead_anomalie(conn):
         "blocklisten (Laag 0).")]
 
 
+def check_metingen(conn):
+    """METING-INTEGRITEIT (fout; eigen metingen, 2026-10-16): een afgeronde meting waarvan de opzet
+    of de dataset niet meer past bij de hash die bij het vastleggen en afronden werd vastgelegd. Een
+    argument dat erop steunt, krijgt dan van metingcheck 'klopt-niet'."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'metingen'"
+                        ).fetchone():
+        return []
+    import metingen  # hier: metingen leest validation alleen lui (punt f)
+    gevlagd = []
+    for (mid,) in conn.execute("SELECT id FROM metingen WHERE status = 'afgerond' ORDER BY id"):
+        m = metingen.laad(conn, mid)
+        if metingen.opzet_hash(m["opzet"]) != m["opzet_hash"]:
+            gevlagd.append(f"meting #{mid}: de opzet past niet bij de opzet-hash")
+        elif not m["data_hash"] or metingen.data_hash(m) != m["data_hash"]:
+            gevlagd.append(f"meting #{mid}: de dataset past niet bij de data-hash")
+    return [_bevinding(
+        "METING-INTEGRITEIT", "Afgeronde eigen metingen die na het afronden veranderden", "fout",
+        gevlagd, "Opzet en dataset van een afgeronde meting liggen vast (sha256); een verschil "
+        "betekent dat er na het afronden iets is gewijzigd buiten de API om.")]
+
+
 def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen = []
     bevindingen += check_koppelingsplicht(conn)
@@ -1438,15 +1560,18 @@ def run_all(conn, schema_path=SCHEMA_PATH, network=False):
     bevindingen += check_methode(conn)
     bevindingen += check_woordenschat()
     bevindingen += check_immuunsysteem(conn)
+    bevindingen += check_richting(conn)
     bevindingen += check_neutraliteit(conn)
     bevindingen += check_eigen_stem(conn)
     bevindingen += check_looptijd(conn)
     bevindingen += check_bestaan(conn)
+    bevindingen += check_hoedanigheid(conn)
     bevindingen += check_bronnen(conn, network=network)
     bevindingen += check_scoring_v2(conn)
     bevindingen += check_fase2(conn)
     bevindingen += check_fase3(conn)
     bevindingen += check_lead_anomalie(conn)
+    bevindingen += check_metingen(conn)
     bevindingen += check_schema_pariteit(conn, schema_path)
 
     totalen = {"fout": 0, "waarschuwing": 0, "info": 0}

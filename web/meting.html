@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Eigen metingen — Propagandamodel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Eigen metingen: vooraf vastgelegde tellingen van wie in welk medium aan het woord komt, met welk standpunt, volgens de journalistieke codes.">
+<link rel="stylesheet" href="/static/huisstijl.css">
+<script src="/static/huisstijl.js"></script>
+<script src="/static/shared_vocab.js"></script>
+<style>
+main { max-width: 1120px; margin: 0 auto; padding: 20px 22px 40px; }
+h1 { font-size: 22px; letter-spacing: -0.02em; margin: 2px 0 6px; }
+.lead { font-size: 13.5px; color: var(--text-dim); line-height: 1.6; max-width: 78ch; margin: 4px 0 14px; }
+.kop .vraag { font-size: 14px; color: var(--text); margin: 4px 0 10px; max-width: 80ch; line-height: 1.55; }
+.kop .acties { margin-top: 10px; }
+.hash { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-muted); }
+.statusbadge.m-opzet { background: color-mix(in srgb, var(--goud) 20%, transparent); color: var(--goud); }
+.statusbadge.m-vastgelegd { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.statusbadge.m-afgerond { background: rgba(61,220,132,0.14); color: var(--ok); }
+.statusbadge { font-size: 11px; padding: 2px 9px; }
+.tabs { position: sticky; top: var(--topbal-h); z-index: 5; background: var(--bg);
+  padding: 10px 0 11px; margin: 14px 0 14px; border-bottom: 1px solid var(--border); }
+section[data-pane] { display: none; }
+section[data-pane].actief { display: block; }
+.hint { font-size: 12.5px; color: var(--text-dim); margin: 0 0 12px; max-width: 78ch; line-height: 1.55; }
+.hint b { color: var(--text); font-weight: 600; }
+/* Checklist */
+.punten { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+.punt { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg-card); }
+.punt.ok { border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.punt.open { border-color: color-mix(in srgb, var(--goud) 40%, transparent); }
+.punt-kop { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.punt-icoon { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; font-size: 12px; flex-shrink: 0; }
+.punt.ok .punt-icoon { background: rgba(61,220,132,0.18); color: var(--ok); }
+.punt.open .punt-icoon { background: color-mix(in srgb, var(--goud) 22%, transparent); color: var(--goud); }
+.punt.nvt .punt-icoon { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+.punt-uitleg { font-size: 12px; color: var(--text-dim); margin: 6px 0 0; line-height: 1.5; }
+.punt ul { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-dim); }
+.punt li { margin: 2px 0; }
+.punt .waarsch { color: var(--warn); }
+/* Tabellen */
+table.uitslag { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 6px 0 14px; }
+table.uitslag th, table.uitslag td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border-zwak); vertical-align: top; }
+table.uitslag th { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+table.uitslag td.getal { font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.uitslag tr.totaal td { color: var(--text-dim); border-top: 1px solid var(--border); }
+.tabel-wrap { overflow-x: auto; }
+.balk { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); vertical-align: middle; margin-left: 6px; opacity: 0.7; }
+.regels { list-style: none; padding: 0; margin: 6px 0; }
+.regels li { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 6px 8px; border: 1px solid var(--border-zwak);
+  border-radius: 7px; margin: 5px 0; display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.regels li span { flex: 1; }
+.regels li button { font-family: inherit; font-size: 11px; padding: 3px 8px; flex-shrink: 0; }
+/* Formulieren */
+.raster { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.raster .vol { grid-column: 1 / -1; }
+@media (max-width: 700px) { .raster { grid-template-columns: 1fr; } .punten { grid-template-columns: 1fr; } }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip-x { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 4px 3px 10px;
+  border: 1px solid var(--border); border-radius: 11px; color: var(--text); }
+.chip-x button { padding: 0 6px; border: none; background: none; color: var(--text-muted); font-size: 14px; line-height: 1; }
+.kiezer { position: relative; }
+.kiezer-lijst { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin-top: 2px; max-height: 260px; overflow-y: auto;
+  background: #16161f; border: 1px solid var(--border-light); border-radius: 8px; box-shadow: var(--shadow); }
+.kiezer-lijst:empty { display: none; }
+.kiezer-item { display: block; width: 100%; text-align: left; background: none; border: none; border-radius: 0;
+  padding: 7px 10px; font-size: 12.5px; color: var(--text-dim); cursor: pointer; }
+.kiezer-item:hover, .kiezer-item:focus-visible { background: rgba(255,255,255,.07); color: var(--text); }
+.kiezer-item small { color: var(--text-muted); margin-left: 6px; }
+.blok { border: 1px solid var(--border-zwak); border-radius: 9px; padding: 10px 12px; margin: 8px 0; background: rgba(0,0,0,0.15); }
+.blok-kop { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.fouten { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--fout); }
+.knoppen { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+/* Waarnemingen */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.filters select, .filters input { width: auto; min-width: 140px; }
+.wn { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: var(--bg-card); }
+.wn-kop { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; font-size: 12px; color: var(--text-dim); }
+.wn-kop b { color: var(--text); font-weight: 600; }
+.wn blockquote, blockquote.citaat-blok { margin: 6px 0; padding: 4px 0 4px 10px; border-left: 2px solid var(--border-light); font-size: 13px; color: var(--text); }
+.wn .codes { font-size: 12px; color: var(--text-dim); }
+.wn .codes b { color: var(--text); font-weight: 600; }
+.tag.ok { background: rgba(61,220,132,0.14); color: var(--ok); }
+.tag.fout { background: rgba(224,99,95,0.16); color: var(--fout); }
+.tag.open { background: color-mix(in srgb, var(--goud) 18%, transparent); color: var(--goud); }
+.commando { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.commando code { padding: 5px 8px; font-size: 12px; }
+/* Controle */
+.vergelijk { font-size: 12.5px; margin: 8px 0; }
+.vergelijk .gelijk { color: var(--ok); }
+.vergelijk .anders { color: var(--warn); }
+.klassen { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin: 8px 0; }
+.klasse { display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px;
+  font-size: 12.5px; cursor: pointer; background: var(--bg-inzet); }
+.klasse input { width: auto; margin-top: 3px; }
+.klasse.niet { opacity: 0.45; cursor: not-allowed; }
+.klasse .gewicht { font-variant-numeric: tabular-nums; color: var(--goud); font-weight: 600; }
+.klasse small { display: block; color: var(--text-muted); font-size: 11px; }
+.klasse:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.lijst-kaart h3 a { color: var(--text); }
+.toets-ok { color: var(--ok); font-size: 12px; }
+.toets-fout { color: var(--fout); font-size: 12px; }
+</style>
+</head>
+<body>
+<header class="topbal" data-actief="metingen"></header>
+<main id="main"><div class="leeg">Laden…</div></main>
+
+<script>
+// Eigen metingen (eigenaarsbesluit 2026-10-16). Eén pagina, twee standen: /metingen (lijst) en
+// /meting/<id> (één meting). Alle data via /api/metingen…; zie metingen.py en server.py.
+const RECTIFICATIE = '/tip?betreft=meting:';
+const esc = hsEsc;
+const M_ID = (() => { const x = location.pathname.match(/^\/meting\/(\d+)/); return x ? +x[1] : null; })();
+const ONDERWERP_LABEL = { nl_systeem: 'Nederlands systeem', algemeen: 'Algemeen (landneutraal)',
+  buitenlands: 'Buitenlands', onbepaald: 'Onbepaald' };
+const STATUS_UITLEG = {
+  opzet: 'De opzet is nog te bewerken. Leg haar vast vóór de eerste waarneming.',
+  vastgelegd: 'De opzet ligt vast. Voer waarnemingen in, laat ze blind controleren en vraag wederhoor.',
+  afgerond: 'De dataset en de samenvatting liggen vast. De meting is publiek en kan als bewijs dienen.',
+};
+let ME = null, M = null, GRAAF = null, GRAAF_LAAD = null;
+let TAB = (location.hash || '').replace('#', '') || 'overzicht';
+let OPZET = null;                 // bewerkbare kopie van de opzet (status 'opzet')
+let INVOER = {};                  // waarden van het invoerformulier (blijven staan na opslaan)
+let BEWERK_ID = null;             // waarneming die in het formulier bewerkt wordt
+let FILTER = { groep: '', medium: '', citaat: '', controle: '', zoek: '' };
+let CONTROLE = null, CONTROLE_UITSLAG = null;
+let BEWIJS = { soort: 'relation', doel: null, regel: null, claim: '', stance: 'supporting', invloed: false };
+let CLAIM_TIMER = null;
+
+async function api(method, pad, body) {
+  const opties = { method, headers: {} };
+  if (body !== undefined) { opties.headers['Content-Type'] = 'application/json'; opties.body = JSON.stringify(body); }
+  let r;
+  try { r = await fetch(pad, opties); } catch (e) { return { ok: false, status: 0, j: { error: 'Netwerkfout: ' + e.message } }; }
+  let j = {};
+  try { j = await r.json(); } catch (e) { j = {}; }
+  return { ok: r.ok, status: r.status, j };
+}
+function foutLijst(j) {
+  const regels = (j && (j.fouten || j.open)) || [];
+  return `${esc((j && j.error) || 'Er ging iets mis')}${regels.length ? '<ul class="fouten">' + regels.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>' : ''}`;
+}
+function toonFout(el, j) { if (el) el.innerHTML = `<div class="fout-tekst">${foutLijst(j)}</div>`; else melding((j && j.error) || 'Er ging iets mis', 'fout'); }
+function tijd(s) {
+  if (!s) return '';
+  const d = new Date(String(s).replace(' ', 'T') + (String(s).length <= 19 ? 'Z' : ''));
+  if (isNaN(d)) return esc(s);
+  return d.toLocaleString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function statusBadge(s) { return `<span class="statusbadge m-${esc(s)}">${esc(s)}</span>`; }
+function uitleg(tekst) { return `<button type="button" class="uitleg" data-uitleg="${esc(tekst)}" aria-label="Uitleg">ⓘ</button>`; }
+function naam(id) { return (M && M.namen && M.namen[String(id)]) || (GRAAF && GRAAF.ent.get(id) && GRAAF.ent.get(id).name) || `knoop #${id}`; }
+function getal(x) { return x == null ? '–' : String(x).replace('.', ','); }
+function relLabel(t) { return (typeof RELATION_LABELS !== 'undefined' && RELATION_LABELS[t]) || weergaveNaam(t); }
+function kopieer(tekst) {
+  navigator.clipboard.writeText(tekst).then(() => melding('Gekopieerd', 'ok', 1800), () => melding('Kopiëren lukte niet', 'fout'));
+}
+function commando(tekst) {
+  return `<div class="commando"><code>${esc(tekst)}</code><button type="button" data-kopieer="${esc(tekst)}">Kopieer</button></div>`;
+}
+// Knoppen met tekst uit de data: via data-attributen, nooit in een inline handler
+document.addEventListener('click', e => {
+  const el = e.target instanceof Element ? e.target.closest('[data-kopieer],[data-als-bewijs],[data-menu-waarneming]') : null;
+  if (!el) return;
+  if (el.dataset.kopieer !== undefined) kopieer(el.dataset.kopieer);
+  else if (el.dataset.alsBewijs !== undefined) regelAlsBewijs(el.dataset.alsBewijs);
+  else {
+    const id = +el.dataset.menuWaarneming;
+    hsMenu(el, [{ label: 'Bewerk', onClick: () => bewerkWaarneming(id) }, '---',
+                { label: 'Verwijder', gevaar: true, onClick: () => verwijderWaarneming(id) }]);
+  }
+});
+
+// ── Knopen zoeken (de bestaande graafdata, één keer geladen) ──────────────
+function norm(s) { return String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+async function laadGraaf() {
+  if (GRAAF) return GRAAF;
+  if (!GRAAF_LAAD) {
+    GRAAF_LAAD = fetch('/api/graph_data/viz').then(r => r.json()).then(d => {
+      const ent = new Map((d.entities || []).map(e => [e.id, e]));
+      GRAAF = { ent, entities: d.entities || [], relations: d.relations || [], mechanisms: d.mechanisms || [] };
+      return GRAAF;
+    }).catch(() => { GRAAF_LAAD = null; return null; });
+  }
+  return GRAAF_LAAD;
+}
+function zoek(soort, q) {
+  if (!GRAAF) return [];
+  const n = norm(q).trim();
+  if (n.length < 2) return [];
+  const score = s => { const x = norm(s); const i = x.indexOf(n); return i < 0 ? -1 : (i === 0 ? 0 : 1) * 1000 + x.length; };
+  let uit = [];
+  if (soort === 'entity') {
+    uit = GRAAF.entities.map(e => ({ id: e.id, label: e.name, sub: weergaveNaam(e.type), s: score(e.name) }));
+  } else if (soort === 'relation') {
+    uit = GRAAF.relations.map(r => {
+      const a = GRAAF.ent.get(r.source_id), b = GRAAF.ent.get(r.target_id);
+      const label = `${a ? a.name : '#' + r.source_id} → ${b ? b.name : '#' + r.target_id}`;
+      const s = Math.min(...[score(a ? a.name : ''), score(b ? b.name : '')].map(x => x < 0 ? 1e9 : x));
+      return { id: r.id, label, sub: relLabel(r.relation_type) + (r.status && r.status !== 'goedgekeurd' ? ' · ' + r.status : ''), s: s >= 1e9 ? -1 : s };
+    });
+  } else {
+    uit = GRAAF.mechanisms.map(m => ({ id: m.id, label: weergaveNaam(m.name), sub: weergaveNaam(m.filter), s: Math.max(score(m.name), score(weergaveNaam(m.name))) }));
+  }
+  return uit.filter(x => x.s >= 0).sort((a, b) => a.s - b.s).slice(0, 14);
+}
+// kiezer: invoerveld + uitklaplijst; onKies(item) bij een keuze
+function kiezer(id, placeholder) {
+  return `<div class="kiezer"><input class="veld" type="text" id="${id}" placeholder="${esc(placeholder)}" autocomplete="off"><div class="kiezer-lijst" id="${id}-lijst"></div></div>`;
+}
+const KIEZERS = {};
+function koppelKiezer(id, soort, onKies) {
+  const inp = document.getElementById(id), lijst = document.getElementById(id + '-lijst');
+  if (!inp || !lijst) return;
+  KIEZERS[id] = { soort: typeof soort === 'function' ? soort : () => soort, onKies };
+  inp.addEventListener('focus', () => laadGraaf());
+  inp.addEventListener('input', async () => {
+    await laadGraaf();
+    if (!GRAAF) { lijst.innerHTML = '<div class="kiezer-item">Graafdata niet te laden</div>'; return; }
+    const res = zoek(KIEZERS[id].soort(), inp.value);
+    lijst.innerHTML = res.map((x, i) => `<button type="button" class="kiezer-item" data-i="${i}">${esc(x.label)}<small>${esc(x.sub || '')} · #${x.id}</small></button>`).join('');
+    lijst.querySelectorAll('.kiezer-item').forEach(b => b.addEventListener('click', () => {
+      const item = res[+b.dataset.i];
+      lijst.innerHTML = ''; inp.value = '';
+      onKies(item);
+    }));
+  });
+  const sluitAlsWeg = () => setTimeout(() => {
+    if (document.activeElement !== inp && !lijst.contains(document.activeElement)) lijst.innerHTML = '';
+  }, 150);
+  inp.addEventListener('blur', sluitAlsWeg);
+  lijst.addEventListener('focusout', sluitAlsWeg);
+  lijst.addEventListener('mousedown', e => e.preventDefault());   // een klik op een treffer laat de focus staan
+  inp.addEventListener('keydown', e => {
+    const eerste = lijst.querySelector('.kiezer-item');
+    if (e.key === 'ArrowDown' && eerste) { e.preventDefault(); eerste.focus(); }
+    else if (e.key === 'Enter' && eerste) { e.preventDefault(); eerste.click(); }
+    else if (e.key === 'Escape') lijst.innerHTML = '';
+  });
+  lijst.addEventListener('keydown', e => {
+    const items = [...lijst.querySelectorAll('.kiezer-item')], i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' && i < items.length - 1) { e.preventDefault(); items[i + 1].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? items[i - 1] : inp).focus(); }
+    else if (e.key === 'Escape') { lijst.innerHTML = ''; inp.focus(); }
+  });
+}
+
+// ── Lijst (/metingen) ──────────────────────────────────────────────────────
+async function laadLijst() {
+  const { ok, j } = await api('GET', '/api/metingen');
+  const main = document.getElementById('main');
+  const lijst = ok ? j.metingen : [];
+  main.innerHTML = `
+    <h1>Eigen metingen</h1>
+    <p class="lead">Een eigen meting is een telling die je vooraf vastlegt: welke organisatie of deskundige
+    komt in welk medium aan het woord, over welk onderwerp, met welk standpunt, en wordt de financiering
+    vermeld. De opzet ligt vast vóór de eerste waarneming, elk citaat wordt op zijn url teruggezocht, een
+    ander codeert een steekproef blind opnieuw, en de betrokken partijen krijgen wederhoor. Een afgeronde
+    meting wordt een bron waarop een argument in het model kan steunen; hoe zwaar die weegt, bepaalt de
+    eigenaar. ${uitleg('De journalistieke codes (Leidraad van de Raad voor de Journalistiek, NVJ-code) zijn harde voorwaarden: methode vooraf, volledigheid, juistheid en herleidbaarheid, verificatie door een ander, hoor en wederhoor, feit en mening gescheiden, privacy, en correctie. Afronden eist de eerste vier, een meting als bewijs gebruiken alle acht.')}</p>
+    ${ME ? `<div class="form" style="max-width:760px">
+      <h4>Nieuwe meting</h4>
+      <label for="nTitel">Titel</label><input id="nTitel" type="text" maxlength="200" placeholder="bv. Denktanks over defensie-uitgaven bij NOS en RTL">
+      <label for="nVraag">Onderzoeksvraag</label><textarea id="nVraag" maxlength="2000" placeholder="Welke vraag beantwoordt de telling?"></textarea>
+      <div class="knoppen"><button class="prim" type="button" onclick="nieuweMeting()">Opzet beginnen</button><span id="nFout"></span></div>
+    </div>` : `<div class="banner">Je ziet de afgeronde metingen. <a href="/login?next=/metingen">Log in</a> om zelf een meting te beginnen.</div>`}
+    <h2 class="sectie">${ME ? 'Alle metingen' : 'Afgeronde metingen'} (${lijst.length})</h2>
+    ${lijst.length ? lijst.map(x => `<div class="kaart lijst-kaart">
+        <h3><a href="${esc(x.url)}">${esc(x.titel)}</a> ${statusBadge(x.status)}</h3>
+        <div class="hint" style="margin:2px 0 6px">${esc(x.vraag)}</div>
+        <div class="meta"><span>#${x.id}</span><span>${x.n_waarnemingen} waarneming(en)</span><span>door ${esc(x.contributed_by)}</span>
+          <span>${x.afgerond_at ? 'afgerond ' + tijd(x.afgerond_at) : x.vastgelegd_at ? 'vastgelegd ' + tijd(x.vastgelegd_at) : 'begonnen ' + tijd(x.created_at)}</span></div>
+      </div>`).join('') : `<div class="leeg">${ME ? 'Nog geen metingen.' : 'Nog geen afgeronde metingen.'}</div>`}`;
+}
+async function nieuweMeting() {
+  const titel = document.getElementById('nTitel').value.trim(), vraag = document.getElementById('nVraag').value.trim();
+  const { ok, j } = await api('POST', '/api/metingen', { titel, vraag, opzet: {} });
+  if (!ok) { toonFout(document.getElementById('nFout'), j); return; }
+  location.href = j.url + '#opzet';
+}
+
+// ── Eén meting (/meting/<id>) ─────────────────────────────────────────────
+async function herlaad() {
+  const { ok, status, j } = await api('GET', `/api/metingen/${M_ID}`);
+  const main = document.getElementById('main');
+  if (!ok) {
+    main.innerHTML = `<h1>Meting #${M_ID}</h1><div class="banner waarschuwing">${status === 404 ? 'Deze meting bestaat niet.' : esc(j.error || 'Niet te laden')}
+      ${status === 401 ? ` <a href="/login?next=/meting/${M_ID}">Log in</a>.` : ''}</div><p><a href="/metingen">← Alle metingen</a></p>`;
+    return;
+  }
+  M = j;
+  document.title = `${M.titel} — eigen meting — Propagandamodel`;
+  if (M.status === 'opzet' && (!OPZET || OPZET._id !== M.id)) { OPZET = JSON.parse(JSON.stringify(M.opzet || {})); OPZET._id = M.id; }
+  render();
+}
+
+function render() {
+  const main = document.getElementById('main');
+  const tabs = [['overzicht', 'Overzicht'], ['opzet', 'Opzet'], ['waarnemingen', `Waarnemingen <span class="telb">${M.waarnemingen.length}</span>`],
+    ['controle', `Controle <span class="${M.gecontroleerd >= M.nodig_controles ? 'telb' : 'badge'}">${M.gecontroleerd}/${M.nodig_controles}</span>`],
+    ['wederhoor', `Wederhoor <span class="${M.wederhoor_eisen.every(e => e.voldaan) ? 'telb' : 'badge'}">${M.wederhoor.length}</span>`],
+    ['bewijs', `Bewijs <span class="telb">${M.argumenten.length}</span>`]];
+  if (!tabs.some(t => t[0] === TAB)) TAB = 'overzicht';
+  main.innerHTML = `
+    <p style="margin:0 0 6px"><a href="/metingen">← Alle metingen</a></p>
+    <div class="kop">
+      <h1>${esc(M.titel)} ${statusBadge(M.status)}</h1>
+      <div class="vraag">${esc(M.vraag)}</div>
+      <div class="meta">
+        <span>Meting #${M.id} · door ${esc(M.contributed_by)}</span>
+        <span>begonnen ${tijd(M.created_at)}</span>
+        ${M.vastgelegd_at ? `<span>opzet vastgelegd ${tijd(M.vastgelegd_at)} <span class="hash" title="sha256 van de opzet">${esc((M.opzet_hash || '').slice(0, 12))}…</span></span>` : ''}
+        ${M.afgerond_at ? `<span>afgerond ${tijd(M.afgerond_at)} <span class="hash" title="sha256 van de dataset">${esc((M.data_hash || '').slice(0, 12))}…</span></span>` : ''}
+        ${M.voorspelling ? `<span>toetst voorspelling #${M.voorspelling.id}</span>` : ''}
+        <span><a href="${RECTIFICATIE}${M.id}&soort=rectificatie">Onjuistheid melden</a></span>
+      </div>
+      <div class="hint" style="margin-top:8px">${esc(STATUS_UITLEG[M.status] || '')}</div>
+      <div class="acties">
+        ${M.mag.vastleggen ? `<button class="prim" type="button" onclick="vastleggen()">Opzet vastleggen</button>` : ''}
+        ${M.mag.afronden ? `<button class="${M.afronden_kan ? 'akkoord' : ''}" type="button" onclick="afronden()" ${M.afronden_kan ? '' : 'title="Eerst moeten de punten a–d in orde zijn"'}>Afronden</button>` : ''}
+        ${M.mag.als_bewijs ? `<button class="prim" type="button" onclick="kiesTab('bewijs')">Gebruik als bewijs</button>` : ''}
+        ${M.mag.verwijderen ? `<button class="gevaar" type="button" onclick="verwijderMeting()">Opzet weggooien</button>` : ''}
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" class="tab ${k === TAB ? 'actief' : ''}" role="tab" onclick="kiesTab('${k}')">${l}</button>`).join('')}</nav>
+    <section data-pane="overzicht" class="${TAB === 'overzicht' ? 'actief' : ''}">${paneelOverzicht()}</section>
+    <section data-pane="opzet" class="${TAB === 'opzet' ? 'actief' : ''}">${paneelOpzet()}</section>
+    <section data-pane="waarnemingen" class="${TAB === 'waarnemingen' ? 'actief' : ''}">${paneelWaarnemingen()}</section>
+    <section data-pane="controle" class="${TAB === 'controle' ? 'actief' : ''}">${paneelControle()}</section>
+    <section data-pane="wederhoor" class="${TAB === 'wederhoor' ? 'actief' : ''}">${paneelWederhoor()}</section>
+    <section data-pane="bewijs" class="${TAB === 'bewijs' ? 'actief' : ''}">${paneelBewijs()}</section>`;
+  naRender();
+}
+function kiesTab(k) {
+  TAB = k;
+  history.replaceState(null, '', '#' + k);
+  render();
+  if (k === 'controle') laadControle();
+}
+function naRender() {
+  if (TAB === 'opzet' && M.mag.opzet_bewerken) koppelOpzet();
+  if (TAB === 'waarnemingen' && M.mag.waarnemen) koppelInvoer();
+  if (TAB === 'bewijs' && M.mag.als_bewijs) koppelBewijs();
+}
+
+// ── Overzicht: checklist, uitslag, overeenstemming ─────────────────────────
+function paneelOverzicht() {
+  const punten = M.code_check.map(p => {
+    const klasse = p.ok === true ? 'ok' : p.ok === false ? 'open' : 'nvt';
+    const icoon = p.ok === true ? '✓' : p.ok === false ? '○' : '–';
+    return `<div class="punt ${klasse}">
+      <div class="punt-kop"><span class="punt-icoon">${icoon}</span>${esc(p.sleutel)}. ${esc(p.titel)} ${uitleg(p.regel)}</div>
+      <div class="punt-uitleg">${esc(p.uitleg)}</div>
+      ${p.open && p.open.length ? `<ul>${p.open.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${p.waarschuwingen && p.waarschuwingen.length ? `<ul>${p.waarschuwingen.map(x => `<li class="waarsch">⚠ ${esc(x)}</li>`).join('')}</ul>` : ''}
+    </div>`;
+  }).join('');
+  return `
+    <h2 class="sectie">Journalistieke codes ${uitleg('Afronden eist a–d. Een meting als bewijs gebruiken eist a–h; punt f toetst de claim van dat argument.')}</h2>
+    <div class="punten">${punten}</div>
+    ${uitslagHtml()}
+    ${overeenstemmingHtml()}
+    ${meldingenHtml()}
+    ${M.mag.beheren && M.status === 'vastgelegd' ? `<h2 class="sectie">Citaten nu laten terugzoeken</h2>
+      <p class="hint">De uurronde zoekt elk citaat op zijn url (metingcheck, stap 2c). Wil je niet wachten, draai dan:</p>${commando(M.commando_check)}` : ''}`;
+}
+function uitslagHtml() {
+  const s = M.samenvatting;
+  if (!s) {
+    return `<h2 class="sectie">Uitslag</h2><div class="leeg">${M.status === 'afgerond' ? 'Geen samenvatting.' :
+      'De uitslag ziet alleen de maker zolang de meting niet afgerond is (de controle blijft blind).'}</div>`;
+  }
+  const vragen = (M.opzet.vragen || []);
+  const blokken = s.groepen.concat(s.totaal ? [Object.assign({}, s.totaal, { totaal: true })] : []);
+  const perVraag = vragen.map(v => {
+    const kop = `<tr><th>Groep</th><th>n</th>${v.opties.map(o => `<th>${esc(o)}</th>`).join('')}</tr>`;
+    const rijen = blokken.map(b => {
+      const bv = (b.vragen || []).find(x => x.sleutel === v.sleutel) || { n: 0, opties: [] };
+      return `<tr class="${b.totaal ? 'totaal' : ''}"><td>${esc(b.naam)}</td><td class="getal">${bv.n}</td>${v.opties.map(o => {
+        const t = (bv.opties || []).find(x => x.optie === o) || { aantal: 0, pct: 0 };
+        return `<td class="getal">${t.aantal} (${t.pct}%)<span class="balk" style="width:${Math.round(t.pct * 0.5)}px"></span></td>`;
+      }).join('')}</tr>`;
+    }).join('');
+    return `<h3 style="font-size:13px;margin:12px 0 2px">${esc(weergaveNaam(v.sleutel))} <span class="hint">— ${esc(v.vraag)}</span></h3>
+      <div class="tabel-wrap"><table class="uitslag">${kop}${rijen}</table></div>`;
+  }).join('');
+  const media = (blokken[0] && blokken[0].media || []).map(x => x.naam);
+  const perMedium = `<h3 style="font-size:13px;margin:12px 0 2px">Per medium</h3><div class="tabel-wrap"><table class="uitslag">
+    <tr><th>Groep</th><th>n</th>${media.map(x => `<th>${esc(x)}</th>`).join('')}</tr>
+    ${blokken.map(b => `<tr class="${b.totaal ? 'totaal' : ''}"><td>${esc(b.naam)}</td><td class="getal">${b.n}</td>${media.map(x => {
+      const t = (b.media || []).find(y => y.naam === x); return `<td class="getal">${t ? t.aantal : 0}</td>`; }).join('')}</tr>`).join('')}
+  </table></div>`;
+  const regels = (M.regels || []).map(r => `<li><span>${esc(r)}</span>${M.mag.als_bewijs ? `<button type="button" data-als-bewijs="${esc(r)}">Als bewijs</button>` : `<button type="button" data-kopieer="${esc(r)}">Kopieer</button>`}</li>`).join('');
+  return `<h2 class="sectie">Uitslag ${M.status === 'afgerond' ? '(bevroren)' : '(voorlopig, alleen voor de maker)'}</h2>
+    ${perVraag}${perMedium}
+    <h3 style="font-size:13px;margin:14px 0 2px">Samenvattingsregels ${uitleg('Vaste tekstregels. Een argument citeert er letterlijk één; metingcheck controleert dat de regel in de bevroren samenvatting staat.')}</h3>
+    <ul class="regels">${regels}</ul>`;
+}
+function overeenstemmingHtml() {
+  const o = M.overeenstemming || {};
+  const ks = Object.keys(o);
+  if (!ks.length) return '';
+  return `<h2 class="sectie">Overeenstemming eerste codering en blinde controle ${uitleg("Per vraag het percentage gelijke codes en Cohen's kappa (overeenstemming gecorrigeerd voor toeval). Onder 80% is dat een waarschuwing.")}</h2>
+    <div class="tabel-wrap"><table class="uitslag"><tr><th>Vraag</th><th>Controles</th><th>Gelijk</th><th>%</th><th style="text-transform:none">κ</th><th>Afwijkingen</th></tr>
+    ${ks.map(s => { const x = o[s]; return `<tr><td>${esc(weergaveNaam(s))}</td><td class="getal">${x.n}</td><td class="getal">${x.gelijk}</td>
+      <td class="getal" style="${x.waarschuwing ? 'color:var(--warn)' : ''}">${x.pct == null ? '–' : getal(x.pct) + '%'}</td>
+      <td class="getal">${x.kappa == null ? 'n.v.t.' : getal(x.kappa)}</td>
+      <td>${(x.afwijkingen || []).map(a => `#${a.waarneming_id}: ${esc(a.eerste)} / ${esc(a.controle)}`).join('; ') || '–'}</td></tr>`; }).join('')}
+    </table></div>`;
+}
+function meldingenHtml() {
+  if (!M.meldingen || !M.meldingen.length) return '';
+  return `<h2 class="sectie">Meldingen over deze meting (${M.meldingen.length}) ${uitleg('Via de link “Onjuistheid melden”. Een melding over een meting gaat naar de maker, niet naar een agent.')}</h2>
+    ${M.meldingen.map(l => `<div class="kaart"><div class="meta"><span>melding #${l.id}</span><span>${tijd(l.created_at)}</span><span class="statusbadge">${esc(l.status)}</span></div>
+      <div style="margin:6px 0;white-space:pre-wrap">${esc(l.claim)}</div>
+      ${l.bron_url ? `<div class="hint">Bron: <a href="${esc(l.bron_url)}" rel="noopener noreferrer" target="_blank">${esc(l.bron_url)}</a></div>` : ''}
+      ${l.quote ? `<blockquote class="hint">${esc(l.quote)}</blockquote>` : ''}
+      ${l.triage_reden ? `<div class="hint">${esc(l.triage_reden)}</div>` : ''}
+      ${M.mag.meldingen_afhandelen && l.status === 'binnengekomen' ? `<div class="knoppen">
+        <button class="akkoord" type="button" onclick="meldingAf(${l.id}, 'gecorroboreerd')">Klopt, verwerkt</button>
+        <button type="button" onclick="meldingAf(${l.id}, 'afgewezen')">Geen correctie nodig</button></div>` : ''}
+    </div>`).join('')}`;
+}
+async function meldingAf(id, status) {
+  const reden = await vraagTekst(status === 'gecorroboreerd' ? 'Wat is er gecorrigeerd?' : 'Waarom is geen correctie nodig?',
+    { titel: 'Melding afhandelen', okTekst: 'Opslaan' });
+  if (reden === null) return;
+  const { ok, j } = await api('PATCH', `/api/leads/${id}`, { status, triage_reden: `meting: ${reden}` });
+  if (!ok) { melding(j.error || 'Mislukt', 'fout'); return; }
+  melding('Melding afgehandeld', 'ok');
+  herlaad();
+}
+
+// ── Opzet ───────────────────────────────────────────────────────────────────
+function paneelOpzet() {
+  if (M.mag.opzet_bewerken) return opzetFormulier();
+  const o = M.opzet || {}, sel = o.selectie || {}, p = sel.periode || {};
+  return `<div class="kaart">
+    <h3>Selectieregel</h3>
+    <div class="meta"><span>Media: ${(sel.media || []).map(id => esc(naam(id))).join(', ') || '–'}</span>
+      <span>Periode: ${esc(p.van || '…')} – ${esc(p.tot || '…')}</span>
+      ${sel.zoektermen ? `<span>Zoektermen: ${esc(sel.zoektermen)}</span>` : ''}</div>
+    <p class="hint" style="margin-top:8px;white-space:pre-wrap">${esc(sel.regel || 'Geen regel.')}</p>
+    <h3>Groepen</h3>
+    ${(o.groepen || []).map(g => `<div class="meta"><b>${esc(g.naam)}</b><span>${(g.entity_ids || []).map(id => esc(naam(id))).join(', ') || 'geen knoop'}</span></div>`).join('') || '<div class="leeg">Geen groepen.</div>'}
+    <h3 style="margin-top:12px">Vragen</h3>
+    ${(o.vragen || []).map(v => `<div style="margin:4px 0"><b>${esc(weergaveNaam(v.sleutel))}</b> <span class="hash">${esc(v.sleutel)}</span> — ${esc(v.vraag)}<div class="tags">${(v.opties || []).map(x => `<span class="tag">${esc(x)}</span>`).join('')}</div></div>`).join('') || '<div class="leeg">Geen vragen.</div>'}
+    <h3 style="margin-top:12px">Uitkomstmaat</h3><p class="hint" style="white-space:pre-wrap">${esc(o.uitkomst || '–')}</p>
+    <h3>Stopregel</h3><p class="hint" style="white-space:pre-wrap">${esc(o.stopregel || '–')}</p>
+    ${M.opzet_hash ? `<div class="hash">sha256 van de opzet: ${esc(M.opzet_hash)}</div>` : ''}
+  </div>`;
+}
+function opzetFormulier() {
+  const o = OPZET, sel = o.selectie = o.selectie || {}, p = sel.periode = sel.periode || {};
+  o.groepen = o.groepen || []; o.vragen = o.vragen || []; sel.media = sel.media || [];
+  return `<p class="hint">Leg vast <b>wat</b> je telt vóór je begint: welke media, welke periode, hoe je de artikelen vindt,
+    welke groepen, welke vragen met welke antwoordopties, de uitkomstmaat en wanneer je stopt. Na het vastleggen ligt dit vast
+    (sha256); een andere opzet is een nieuwe meting.</p>
+  <div class="form">
+    <div class="raster">
+      <div class="vol"><label for="oTitel">Titel</label><input id="oTitel" type="text" maxlength="200" value="${esc(M.titel)}"></div>
+      <div class="vol"><label for="oVraag">Onderzoeksvraag</label><textarea id="oVraag" maxlength="2000">${esc(M.vraag)}</textarea></div>
+    </div>
+    <h4 style="margin-top:14px">Selectieregel</h4>
+    <label>Media</label>
+    <div class="chips">${sel.media.map((id, i) => `<span class="chip-x">${esc(naam(id))}<button type="button" aria-label="Weg" onclick="opzetWeg('media', ${i})">×</button></span>`).join('') || '<span class="hint">Nog geen media.</span>'}</div>
+    ${kiezer('oMedium', 'Zoek een medium (NOS, RTL Nieuws, …)')}
+    <div class="raster">
+      <div><label for="oVan">Periode van</label><input id="oVan" type="date" value="${esc(p.van || '')}"></div>
+      <div><label for="oTot">Periode tot en met (leeg = open)</label><input id="oTot" type="date" value="${esc(p.tot || '')}"></div>
+      <div class="vol"><label for="oZoek">Zoektermen</label><input id="oZoek" type="text" value="${esc(sel.zoektermen || '')}" placeholder="bv. defensie, NAVO, defensie-uitgaven"></div>
+      <div class="vol"><label for="oRegel">Hoe vind je de artikelen? ${uitleg('Volledigheid (geen cherry-picking): beschrijf de bron (archief, zoekfunctie, LexisNexis), de zoekopdracht en de volgorde, zodat een ander dezelfde artikelen vindt. Minstens 20 tekens.')}</label>
+        <textarea id="oRegel" placeholder="bv. Alle artikelen op nos.nl en rtl.nl met 'defensie' in de periode, via de zoekfunctie, op volgorde van datum">${esc(sel.regel || '')}</textarea></div>
+    </div>
+    <h4 style="margin-top:14px">Groepen ${uitleg('Wie tel je? Een groep is bijvoorbeeld een denktank of een soort deskundige. Koppel de organisatie als knoop: dan weet de meting ook wie wederhoor moet krijgen.')}</h4>
+    ${o.groepen.map((g, i) => `<div class="blok">
+      <div class="blok-kop"><input class="veld" type="text" value="${esc(g.naam || '')}" placeholder="Naam van de groep" oninput="OPZET.groepen[${i}].naam=this.value">
+        <button type="button" onclick="opzetWeg('groepen', ${i})">Weg</button></div>
+      <div class="chips">${(g.entity_ids || []).map((id, k) => `<span class="chip-x">${esc(naam(id))}<button type="button" aria-label="Weg" onclick="OPZET.groepen[${i}].entity_ids.splice(${k},1);render()">×</button></span>`).join('')}</div>
+      ${kiezer('oGroep' + i, 'Koppel een organisatie (optioneel)')}
+    </div>`).join('')}
+    <button type="button" onclick="OPZET.groepen.push({naam:'',entity_ids:[]});render()">+ Groep</button>
+    <h4 style="margin-top:14px">Vragen ${uitleg('Elke waarneming krijgt per vraag één optie. De sleutel is een korte naam van kleine letters (bv. standpunt); de opties één per regel.')}</h4>
+    ${o.vragen.map((v, i) => `<div class="blok">
+      <div class="raster">
+        <div><label>Sleutel</label><input class="veld" type="text" value="${esc(v.sleutel || '')}" placeholder="standpunt" oninput="OPZET.vragen[${i}].sleutel=this.value"></div>
+        <div><label>Vraag</label><input class="veld" type="text" value="${esc(v.vraag || '')}" placeholder="Welk standpunt neemt de geciteerde in?" oninput="OPZET.vragen[${i}].vraag=this.value"></div>
+        <div class="vol"><label>Opties (één per regel)</label><textarea class="veld" rows="3" oninput="OPZET.vragen[${i}].opties=this.value.split('\\n').map(x=>x.trim()).filter(Boolean)">${esc((v.opties || []).join('\n'))}</textarea></div>
+      </div>
+      <div class="knoppen" style="margin-top:6px"><button type="button" onclick="opzetWeg('vragen', ${i})">Vraag weg</button></div>
+    </div>`).join('')}
+    <div class="knoppen" style="margin-top:6px"><button type="button" onclick="OPZET.vragen.push({sleutel:'',vraag:'',opties:[]});render()">+ Vraag</button>
+      <button type="button" onclick="standaardVragen()">Standaardvragen</button></div>
+    <h4 style="margin-top:14px">Uitkomst en stop</h4>
+    <label for="oUitkomst">Uitkomstmaat</label><textarea id="oUitkomst" placeholder="bv. aandeel 'tegen' per groep en per medium">${esc(o.uitkomst || '')}</textarea>
+    <label for="oStop">Stopregel</label><textarea id="oStop" placeholder="bv. alle artikelen in de periode; ik stop niet eerder">${esc(o.stopregel || '')}</textarea>
+    <div class="knoppen"><button class="prim" type="button" onclick="opzetOpslaan()">Opslaan</button>
+      <button type="button" onclick="vastleggen()">Opslaan en vastleggen</button><span id="oFout"></span></div>
+  </div>`;
+}
+function koppelOpzet() {
+  const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('input', () => fn(el.value)); };
+  bind('oVan', v => { OPZET.selectie.periode.van = v || null; });
+  bind('oTot', v => { OPZET.selectie.periode.tot = v || null; });
+  bind('oZoek', v => { OPZET.selectie.zoektermen = v; });
+  bind('oRegel', v => { OPZET.selectie.regel = v; });
+  bind('oUitkomst', v => { OPZET.uitkomst = v; });
+  bind('oStop', v => { OPZET.stopregel = v; });
+  koppelKiezer('oMedium', 'entity', item => {
+    if (!OPZET.selectie.media.includes(item.id)) OPZET.selectie.media.push(item.id);
+    M.namen[String(item.id)] = item.label; render();
+  });
+  OPZET.groepen.forEach((g, i) => koppelKiezer('oGroep' + i, 'entity', item => {
+    g.entity_ids = g.entity_ids || [];
+    if (!g.entity_ids.includes(item.id)) g.entity_ids.push(item.id);
+    if (!g.naam) g.naam = item.label;
+    M.namen[String(item.id)] = item.label; render();
+  }));
+}
+function opzetWeg(soort, i) {
+  if (soort === 'media') OPZET.selectie.media.splice(i, 1); else OPZET[soort].splice(i, 1);
+  render();
+}
+function standaardVragen() {
+  const er = new Set(OPZET.vragen.map(v => v.sleutel));
+  if (!er.has('standpunt')) OPZET.vragen.push({ sleutel: 'standpunt', vraag: 'Welk standpunt neemt de geciteerde in over het onderwerp?', opties: ['voor', 'tegen', 'neutraal', 'gemengd'] });
+  if (!er.has('onderwerp')) OPZET.vragen.push({ sleutel: 'onderwerp', vraag: 'Waarover spreekt de geciteerde?', opties: ['onderwerp van de meting', 'iets anders'] });
+  if (!er.has('financiering_vermeld')) OPZET.vragen.push({ sleutel: 'financiering_vermeld', vraag: 'Vermeldt het artikel hoe de organisatie van de geciteerde gefinancierd wordt?', opties: ['ja', 'nee'] });
+  render();
+}
+function opzetSchoon() {
+  const o = JSON.parse(JSON.stringify(OPZET)); delete o._id;
+  o.groepen = (o.groepen || []).map(g => ({ naam: (g.naam || '').trim(), entity_ids: g.entity_ids || [] }))
+    .filter(g => g.naam || g.entity_ids.length);
+  o.vragen = (o.vragen || []).map(v => ({ sleutel: (v.sleutel || '').trim(), vraag: (v.vraag || '').trim(), opties: v.opties || [] }))
+    .filter(v => v.sleutel || v.vraag || v.opties.length);
+  const sel = o.selectie || {};
+  o.selectie = { media: sel.media || [], periode: { van: (sel.periode || {}).van || null, tot: (sel.periode || {}).tot || null },
+    zoektermen: sel.zoektermen || '', regel: sel.regel || '' };
+  return o;
+}
+async function opzetOpslaan(stil) {
+  const body = { titel: document.getElementById('oTitel').value, vraag: document.getElementById('oVraag').value, opzet: opzetSchoon() };
+  const { ok, j } = await api('PATCH', `/api/metingen/${M.id}`, body);
+  if (!ok) { toonFout(document.getElementById('oFout'), j); return false; }
+  if (!stil) melding('Opzet opgeslagen', 'ok');
+  OPZET = null; M = j; OPZET = JSON.parse(JSON.stringify(M.opzet)); OPZET._id = M.id; render();
+  return true;
+}
+async function vastleggen() {
+  if (M.status === 'opzet' && TAB === 'opzet' && document.getElementById('oTitel')) {
+    if (!(await opzetOpslaan(true))) return;
+  }
+  const ja = await bevestig('Na het vastleggen ligt de opzet vast (sha256): selectieregel, groepen, vragen, uitkomstmaat en stopregel. Pas daarna voer je waarnemingen in. Een andere opzet is een nieuwe meting.',
+    { titel: 'Opzet vastleggen', okTekst: 'Vastleggen' });
+  if (!ja) return;
+  const { ok, j } = await api('POST', `/api/metingen/${M.id}/vastleggen`);
+  if (!ok) { TAB = 'opzet'; render(); toonFout(document.getElementById('oFout'), j); return; }
+  melding('Opzet vastgelegd', 'ok');
+  M = j; TAB = 'waarnemingen'; history.replaceState(null, '', '#waarnemingen'); render();
+}
+async function afronden() {
+  if (!M.afronden_kan) {
+    melding('Eerst moeten de punten a–d in orde zijn (zie de checklist).', 'warn'); kiesTab('overzicht'); return;
+  }
+  const ja = await bevestig(`Na het afronden liggen de ${M.waarnemingen.length} waarnemingen, de controles en de samenvatting vast (sha256). De meting wordt publiek.`,
+    { titel: 'Meting afronden', okTekst: 'Afronden' });
+  if (!ja) return;
+  const { ok, j } = await api('POST', `/api/metingen/${M.id}/afronden`);
+  if (!ok) { melding(j.error || 'Afronden lukte niet', 'fout'); herlaad(); return; }
+  melding('Meting afgerond', 'ok');
+  M = j; TAB = 'overzicht'; render();
+}
+async function verwijderMeting() {
+  const ja = await bevestig('Deze opzet weggooien? Hij blijft in het logboek staan.', { titel: 'Opzet weggooien', okTekst: 'Weggooien', gevaar: true });
+  if (!ja) return;
+  const { ok, j } = await api('DELETE', `/api/metingen/${M.id}`);
+  if (!ok) { melding(j.error || 'Mislukt', 'fout'); return; }
+  location.href = '/metingen';
+}
+
+// ── Waarnemingen ────────────────────────────────────────────────────────────
+function paneelWaarnemingen() {
+  const groepen = (M.opzet.groepen || []).map(g => g.naam), media = ((M.opzet.selectie || {}).media || []);
+  const vragen = M.opzet.vragen || [];
+  const ws = M.waarnemingen.filter(w =>
+    (!FILTER.groep || w.groep === FILTER.groep) && (!FILTER.medium || String(w.medium_entity_id) === FILTER.medium)
+    && (!FILTER.citaat || (FILTER.citaat === 'gevonden' ? w.citaat_gevonden === 1 : FILTER.citaat === 'niet' ? w.citaat_gevonden === 0 : w.citaat_gevonden == null))
+    && (!FILTER.controle || (FILTER.controle === 'ja' ? w.n_controles > 0 : w.n_controles === 0))
+    && (!FILTER.zoek || norm(w.wie + ' ' + w.citaat + ' ' + (w.notitie || '')).includes(norm(FILTER.zoek))));
+  const opt = (waarde, label, huidig) => `<option value="${esc(waarde)}" ${String(huidig) === String(waarde) ? 'selected' : ''}>${esc(label)}</option>`;
+  return `
+    ${M.status === 'opzet' ? '<div class="banner">Waarnemingen voer je in nadat de opzet is vastgelegd.</div>' : ''}
+    ${M.mag.waarnemen ? invoerFormulier(groepen, media, vragen) : ''}
+    <div class="filters">
+      <select class="veld" onchange="FILTER.groep=this.value;render()">${opt('', 'Alle groepen', FILTER.groep)}${groepen.map(g => opt(g, g, FILTER.groep)).join('')}</select>
+      <select class="veld" onchange="FILTER.medium=this.value;render()">${opt('', 'Alle media', FILTER.medium)}${media.map(id => opt(id, naam(id), FILTER.medium)).join('')}</select>
+      <select class="veld" onchange="FILTER.citaat=this.value;render()">${opt('', 'Citaat: alle', FILTER.citaat)}${opt('gevonden', 'Citaat teruggevonden', FILTER.citaat)}${opt('niet', 'Citaat niet gevonden', FILTER.citaat)}${opt('open', 'Nog niet gezocht', FILTER.citaat)}</select>
+      <select class="veld" onchange="FILTER.controle=this.value;render()">${opt('', 'Controle: alle', FILTER.controle)}${opt('ja', 'Blind gecontroleerd', FILTER.controle)}${opt('nee', 'Nog niet gecontroleerd', FILTER.controle)}</select>
+      <input class="veld" type="search" placeholder="Zoek in wie, citaat, notitie" value="${esc(FILTER.zoek)}" oninput="FILTER.zoek=this.value;clearTimeout(window._zt);window._zt=setTimeout(()=>{render();const z=document.querySelector('.filters input[type=search]');if(z){z.focus();z.setSelectionRange(z.value.length,z.value.length);}},250)">
+    </div>
+    <div class="hint">${ws.length} van ${M.waarnemingen.length} waarnemingen</div>
+    ${ws.map(w => waarnemingHtml(w, vragen)).join('') || '<div class="leeg">Geen waarnemingen.</div>'}`;
+}
+function waarnemingHtml(w, vragen) {
+  const citaat = w.citaat_gevonden === 1 ? '<span class="tag ok">citaat teruggevonden</span>' : w.citaat_gevonden === 0 ? '<span class="tag fout">citaat niet gevonden</span>' : '<span class="tag open">citaat nog niet gezocht</span>';
+  const codes = w.codes_verborgen ? '<span class="hint">Codering verborgen: je controleert deze waarneming blind.</span>'
+    : vragen.map(v => `${esc(weergaveNaam(v.sleutel))}: <b>${esc((w.codes || {})[v.sleutel] ?? '—')}</b>`).join(' · ');
+  return `<div class="wn" id="wn-${w.id}">
+    <div class="wn-kop"><span><b>#${w.id}</b> · ${esc(w.datum)} · ${esc(w.medium || '')} · ${esc(w.groep)} — <b>${esc(w.wie)}</b>${w.entity_naam ? ` <span class="hint">(${esc(w.entity_naam)})</span>` : ''}</span>
+      <span>${citaat} ${w.n_controles ? `<span class="tag ok">${w.n_controles} controle${w.n_controles > 1 ? 's' : ''}</span>` : '<span class="tag">niet gecontroleerd</span>'}
+        ${w.mag_bewerken ? `<button type="button" class="hs-menu-knop" aria-label="Acties voor waarneming #${w.id}" aria-haspopup="menu" data-menu-waarneming="${w.id}">⋯</button>` : ''}</span></div>
+    <blockquote>“${esc(w.citaat)}”</blockquote>
+    <div class="codes">${codes}</div>
+    <div class="meta" style="margin-top:4px"><a href="${esc(w.url)}" target="_blank" rel="noopener noreferrer">artikel</a>${w.archief_url ? ` · <a href="${esc(w.archief_url)}" target="_blank" rel="noopener noreferrer">archief</a>` : ''}
+      ${w.notitie ? `<span>${esc(w.notitie)}</span>` : ''}<span>door ${esc(w.contributed_by)}</span></div>
+  </div>`;
+}
+function invoerFormulier(groepen, media, vragen) {
+  const v = INVOER;
+  const opt = (waarde, label, huidig) => `<option value="${esc(waarde)}" ${String(huidig ?? '') === String(waarde) ? 'selected' : ''}>${esc(label)}</option>`;
+  return `<div class="form" id="invoer">
+    <h4>${BEWERK_ID ? `Waarneming #${BEWERK_ID} bewerken` : 'Nieuwe waarneming'} <span class="hint">— Ctrl+Enter slaat op; url, datum, medium en groep blijven staan</span></h4>
+    <div class="raster">
+      <div class="vol"><label for="iUrl">Url van het artikel</label><input id="iUrl" type="url" value="${esc(v.url || '')}" placeholder="https://nos.nl/artikel/…"></div>
+      <div><label for="iDatum">Datum van het artikel</label><input id="iDatum" type="date" value="${esc(v.datum || '')}"></div>
+      <div><label for="iArchief">Archiefkopie (optioneel)</label><input id="iArchief" type="url" value="${esc(v.archief_url || '')}" placeholder="https://web.archive.org/…"></div>
+      <div><label for="iMedium">Medium</label><select id="iMedium">${opt('', '— kies —', v.medium_entity_id)}${media.map(id => opt(id, naam(id), v.medium_entity_id)).join('')}</select></div>
+      <div><label for="iGroep">Groep</label><select id="iGroep">${opt('', '— kies —', v.groep)}${groepen.map(g => opt(g, g, v.groep)).join('')}</select></div>
+      <div class="vol"><label for="iWie">Wie (naam en functie zoals in het artikel) ${uitleg('Privacy: alleen mensen in een publieke rol. Schrijf de functie erbij zoals het artikel die noemt (“Dick Zandee, onderzoeker Clingendael”), of koppel een knoop uit het model.')}</label>
+        <input id="iWie" type="text" maxlength="300" value="${esc(v.wie || '')}" placeholder="Naam, functie"></div>
+      <div class="vol"><label>Knoop (optioneel)</label>
+        <div class="chips">${v.entity_id ? `<span class="chip-x">${esc(naam(v.entity_id))}<button type="button" aria-label="Weg" onclick="INVOER.entity_id=null;bewaarInvoer();render()">×</button></span>` : ''}</div>
+        ${kiezer('iKnoop', 'Zoek de geciteerde of zijn organisatie in het model')}</div>
+      <div class="vol"><label for="iCitaat">Citaat (letterlijk uit het artikel) ${uitleg('Juistheid: metingcheck zoekt dit citaat letterlijk terug op de url of de archiefkopie. Kopieer het precies.')}</label>
+        <textarea id="iCitaat" maxlength="3000">${esc(v.citaat || '')}</textarea></div>
+      ${vragen.map(q => `<div><label for="iCode-${esc(q.sleutel)}">${esc(weergaveNaam(q.sleutel))} ${uitleg(q.vraag)}</label>
+        <select id="iCode-${esc(q.sleutel)}" data-sleutel="${esc(q.sleutel)}" class="iCode">${opt('', '— nog niet —', (v.codes || {})[q.sleutel])}${(q.opties || []).map(o => opt(o, o, (v.codes || {})[q.sleutel])).join('')}</select></div>`).join('')}
+      <div class="vol"><label for="iNotitie">Notitie (optioneel)</label><input id="iNotitie" type="text" maxlength="2000" value="${esc(v.notitie || '')}"></div>
+    </div>
+    <div class="knoppen"><button class="prim" type="button" onclick="waarnemingOpslaan()">${BEWERK_ID ? 'Wijziging opslaan' : 'Opslaan'}</button>
+      ${BEWERK_ID ? '<button type="button" onclick="BEWERK_ID=null;INVOER={url:INVOER.url,datum:INVOER.datum,medium_entity_id:INVOER.medium_entity_id,groep:INVOER.groep};render()">Annuleren</button>' : ''}
+      <span id="iFout"></span></div>
+  </div>`;
+}
+function bewaarInvoer() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  if (!document.getElementById('iUrl')) return;
+  const codes = {};
+  document.querySelectorAll('.iCode').forEach(s => { if (s.value) codes[s.dataset.sleutel] = s.value; });
+  Object.assign(INVOER, { url: val('iUrl').trim(), datum: val('iDatum'), archief_url: val('iArchief').trim(),
+    medium_entity_id: val('iMedium') ? +val('iMedium') : null, groep: val('iGroep'), wie: val('iWie'),
+    citaat: val('iCitaat'), notitie: val('iNotitie'), codes });
+}
+function koppelInvoer() {
+  const form = document.getElementById('invoer');
+  if (!form) return;
+  form.addEventListener('input', bewaarInvoer);
+  form.addEventListener('change', bewaarInvoer);
+  form.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); waarnemingOpslaan(); } });
+  koppelKiezer('iKnoop', 'entity', item => { bewaarInvoer(); INVOER.entity_id = item.id; M.namen[String(item.id)] = item.label; render(); });
+}
+async function waarnemingOpslaan() {
+  bewaarInvoer();
+  const v = INVOER;
+  const body = { url: v.url, datum: v.datum, archief_url: v.archief_url || null, medium_entity_id: v.medium_entity_id,
+    groep: v.groep, wie: v.wie, entity_id: v.entity_id || null, citaat: v.citaat, codes: v.codes || {}, notitie: v.notitie || null };
+  const pad = BEWERK_ID ? `/api/metingen/${M.id}/waarnemingen/${BEWERK_ID}` : `/api/metingen/${M.id}/waarnemingen`;
+  const { ok, j } = await api(BEWERK_ID ? 'PATCH' : 'POST', pad, body);
+  if (!ok) { toonFout(document.getElementById('iFout'), j); return; }
+  melding(BEWERK_ID ? `Waarneming #${j.id} bijgewerkt` : `Waarneming #${j.id} opgeslagen`, 'ok', 2200);
+  BEWERK_ID = null;
+  INVOER = { url: v.url, datum: v.datum, medium_entity_id: v.medium_entity_id, groep: v.groep };
+  await herlaad();
+  const wie = document.getElementById('iWie'); if (wie) wie.focus();
+}
+function bewerkWaarneming(id) {
+  const w = M.waarnemingen.find(x => x.id === id); if (!w) return;
+  BEWERK_ID = id;
+  INVOER = { url: w.url, datum: w.datum, archief_url: w.archief_url, medium_entity_id: w.medium_entity_id, groep: w.groep,
+    wie: w.wie, entity_id: w.entity_id, citaat: w.citaat, notitie: w.notitie, codes: Object.assign({}, w.codes || {}) };
+  render();
+  document.getElementById('invoer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function verwijderWaarneming(id) {
+  const w = M.waarnemingen.find(x => x.id === id); if (!w) return;
+  let body = {};
+  if (w.n_controles) {
+    const reden = await vraagTekst('Deze waarneming is al blind gecontroleerd. Waarom verwijder je haar? (Dit blijft in het logboek.)', { titel: 'Waarneming verwijderen', okTekst: 'Verwijderen', gevaar: true });
+    if (reden === null) return;
+    body = { reden };
+  } else if (!(await bevestig(`Waarneming #${id} verwijderen? Ze blijft in het logboek staan.`, { titel: 'Verwijderen', okTekst: 'Verwijderen', gevaar: true }))) return;
+  const { ok, j } = await api('DELETE', `/api/metingen/${M.id}/waarnemingen/${id}`, body);
+  if (!ok) { melding(j.error || 'Mislukt', 'fout'); return; }
+  melding(`Waarneming #${id} verwijderd`, 'ok');
+  herlaad();
+}
+
+// ── Controle (blind) ────────────────────────────────────────────────────────
+function paneelControle() {
+  const kop = `<p class="hint">Punt d: minstens 20% van de waarnemingen (minimaal 5, of alle bij minder dan 5) wordt <b>blind</b>
+    opnieuw gecodeerd door een ander account dan de invoerder. Je ziet de eerste codering pas nadat je zelf codeerde.
+    Nu: <b>${M.gecontroleerd}</b> van de <b>${M.nodig_controles}</b> nodige controles.</p>`;
+  const agent = `<h2 class="sectie">Controle door de agent ${uitleg('Werk je alleen, laat dan de agent metingcontrole een steekproef blind coderen (Claude Sonnet; hij leest het artikel, niet jouw codering). Standaard een droogloop; met --indienen dient hij in.')}</h2>${commando(M.commando_controle)}`;
+  if (M.status !== 'vastgelegd') return kop + `<div class="banner">${M.status === 'opzet' ? 'Controleren kan zodra de opzet vastligt en er waarnemingen zijn.' : 'De meting is afgerond; de controles liggen vast.'}</div>` + overeenstemmingHtml();
+  if (!ME) return kop + `<div class="banner"><a href="/login?next=/meting/${M.id}%23controle">Log in</a> om blind te controleren.</div>`;
+  let blok = '<div class="leeg">Laden…</div>';
+  if (CONTROLE) {
+    if (CONTROLE_UITSLAG) {
+      const u = CONTROLE_UITSLAG;
+      blok = `<div class="kaart"><h3>Waarneming #${u.waarneming_id}: jouw codering naast de eerste</h3>
+        <div class="vergelijk">${Object.keys(u.codes).map(s => `<div>${esc(weergaveNaam(s))}: jij <b>${esc(u.codes[s])}</b>, eerste <b>${esc((u.eerste || {})[s] ?? '—')}</b>
+          <span class="${u.gelijk[s] ? 'gelijk' : 'anders'}">${u.gelijk[s] ? '✓ gelijk' : '≠ anders'}</span></div>`).join('')}</div>
+        <div class="knoppen"><button class="prim" type="button" onclick="CONTROLE_UITSLAG=null;laadControle()">Volgende</button></div></div>`;
+    } else if (!CONTROLE.te_controleren.length) {
+      blok = `<div class="banner">${CONTROLE.eigen_waarnemingen === M.waarnemingen.length && M.waarnemingen.length
+        ? 'Alle waarnemingen zijn van jou: je controleert je eigen werk niet. Laat een ander account of de agent controleren.'
+        : 'Er is niets meer voor jou om blind te coderen.'} (door jou gecontroleerd: ${CONTROLE.door_mij})</div>`;
+    } else {
+      const w = CONTROLE.te_controleren[0];
+      blok = `<div class="kaart" id="controleKaart">
+        <div class="meta"><span>Waarneming #${w.id}</span><span>${esc(w.datum)}</span><span>${esc(w.medium || '')}</span><span>groep ${esc(w.groep)}</span>
+          <span>nog ${CONTROLE.te_controleren.length} voor jou</span></div>
+        <h3 style="margin-top:8px">${esc(w.wie)}</h3>
+        <blockquote class="citaat-blok">“${esc(w.citaat)}”</blockquote>
+        <div class="meta"><a href="${esc(w.url)}" target="_blank" rel="noopener noreferrer">Lees het artikel</a>${w.archief_url ? ` · <a href="${esc(w.archief_url)}" target="_blank" rel="noopener noreferrer">archiefkopie</a>` : ''}</div>
+        <div class="raster" style="margin-top:8px">${CONTROLE.vragen.map(v => `<div><label class="veldlabel" for="c-${esc(v.sleutel)}">${esc(weergaveNaam(v.sleutel))} ${uitleg(v.vraag)}</label>
+          <select class="veld cCode" id="c-${esc(v.sleutel)}" data-sleutel="${esc(v.sleutel)}"><option value="">— kies —</option>${v.opties.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select></div>`).join('')}</div>
+        <div class="knoppen"><button class="prim" type="button" onclick="controleIndienen(${w.id})">Codeer blind</button><span id="cFout"></span></div>
+      </div>`;
+    }
+  }
+  return kop + `<div id="controleBlok">${blok}</div>` + agent + overeenstemmingHtml();
+}
+async function laadControle() {
+  if (!ME || !M || M.status !== 'vastgelegd') return;
+  const { ok, j } = await api('GET', `/api/metingen/${M.id}/controle`);
+  if (!ok) { melding(j.error || 'Controle niet te laden', 'fout'); return; }
+  CONTROLE = j;
+  if (TAB === 'controle') render();
+}
+async function controleIndienen(wid) {
+  const codes = {};
+  let leeg = false;
+  document.querySelectorAll('.cCode').forEach(s => { if (s.value) codes[s.dataset.sleutel] = s.value; else leeg = true; });
+  if (leeg) { document.getElementById('cFout').innerHTML = '<span class="fout-tekst">Codeer elke vraag.</span>'; return; }
+  const { ok, j } = await api('POST', `/api/metingen/${M.id}/waarnemingen/${wid}/controle`, { codes });
+  if (!ok) { toonFout(document.getElementById('cFout'), j); return; }
+  CONTROLE_UITSLAG = j;
+  const { ok: ok2, j: j2 } = await api('GET', `/api/metingen/${M.id}`);
+  if (ok2) M = j2;
+  render();
+}
+
+// ── Wederhoor ───────────────────────────────────────────────────────────────
+function paneelWederhoor() {
+  const eisen = M.wederhoor_eisen || [];
+  return `<p class="hint">Punt e: elke groep met een benoemde organisatie en elk medium krijgt wederhoor — een reactie,
+    een verzoek zonder reactie (met de datum van het verzoek) of een gepubliceerd standpunt (met bron).
+    Een reactie kan ook na het afronden nog komen.</p>
+    <div class="chips">${eisen.map(e => `<span class="chip-x" style="padding-right:10px;${e.voldaan ? 'border-color:color-mix(in srgb,var(--ok) 45%,transparent)' : 'border-color:color-mix(in srgb,var(--goud) 50%,transparent)'}">${e.voldaan ? '✓' : '○'} ${esc(e.label)} <small class="hint">${e.soort}</small></span>`).join('') || '<span class="hint">Geen partijen die wederhoor nodig hebben (nog geen media of gekoppelde groepen).</span>'}</div>
+    ${M.wederhoor.length ? `<div class="tabel-wrap"><table class="uitslag"><tr><th>Partij</th><th>Soort</th><th>Datum</th><th>Inhoud</th><th>Bron</th></tr>
+      ${M.wederhoor.map(r => `<tr><td>${esc(r.partij)}</td><td>${esc(weergaveNaam(r.soort))}</td><td class="getal">${esc(r.datum || '–')}</td>
+        <td style="white-space:pre-wrap">${esc(r.tekst || '–')}</td><td>${r.bron_url ? `<a href="${esc(r.bron_url)}" target="_blank" rel="noopener noreferrer">bron</a>` : '–'}</td></tr>`).join('')}
+    </table></div>` : '<div class="leeg">Nog geen wederhoor vastgelegd.</div>'}
+    ${M.mag.wederhoor ? `<div class="form">
+      <h4>Wederhoor vastleggen</h4>
+      <div class="raster">
+        <div><label for="wPartij">Partij</label><select id="wPartij">${eisen.map((e, i) => `<option value="${i}">${esc(e.label)} (${e.soort})</option>`).join('')}<option value="ander">Een andere partij…</option></select></div>
+        <div><label for="wSoort">Soort</label><select id="wSoort" onchange="wederhoorHint()">
+          <option value="reactie">Reactie</option><option value="verzoek_zonder_reactie">Verzoek zonder reactie</option><option value="gepubliceerd_standpunt">Gepubliceerd standpunt</option></select></div>
+        <div class="vol" id="wAnderBlok" style="display:none"><label for="wAnder">Naam van de partij</label><input id="wAnder" type="text"></div>
+        <div><label for="wDatum">Datum</label><input id="wDatum" type="date"></div>
+        <div><label for="wBron">Bron (url)</label><input id="wBron" type="url" placeholder="https://…"></div>
+        <div class="vol"><label for="wTekst">Tekst</label><textarea id="wTekst" placeholder="De reactie, het verzoek of het standpunt"></textarea></div>
+      </div>
+      <div class="hint" id="wHint"></div>
+      <div class="knoppen"><button class="prim" type="button" onclick="wederhoorOpslaan()">Opslaan</button><span id="wFout"></span></div>
+    </div>` : ''}`;
+}
+function wederhoorHint() {
+  const s = (document.getElementById('wSoort') || {}).value;
+  const h = { reactie: 'Een reactie draagt de tekst van de reactie (en bij voorkeur de datum).',
+    verzoek_zonder_reactie: 'Een verzoek zonder reactie draagt de datum waarop je om een reactie vroeg.',
+    gepubliceerd_standpunt: 'Een gepubliceerd standpunt draagt de bron (url) waar het staat.' }[s] || '';
+  const el = document.getElementById('wHint'); if (el) el.textContent = h;
+  const p = document.getElementById('wPartij'), a = document.getElementById('wAnderBlok');
+  if (p && a) a.style.display = p.value === 'ander' ? '' : 'none';
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'wPartij') wederhoorHint(); });
+async function wederhoorOpslaan() {
+  const keuze = document.getElementById('wPartij').value, eisen = M.wederhoor_eisen || [];
+  const body = { soort: document.getElementById('wSoort').value, datum: document.getElementById('wDatum').value || null,
+    bron_url: document.getElementById('wBron').value.trim() || null, tekst: document.getElementById('wTekst').value.trim() || null };
+  if (keuze === 'ander') body.partij = document.getElementById('wAnder').value.trim();
+  else { const e = eisen[+keuze]; body.partij = e.label; body.entity_id = (e.ids || [])[0] || null; }
+  const { ok, j } = await api('POST', `/api/metingen/${M.id}/wederhoor`, body);
+  if (!ok) { toonFout(document.getElementById('wFout'), j); return; }
+  melding('Wederhoor vastgelegd', 'ok');
+  herlaad();
+}
+
+// ── Bewijs ──────────────────────────────────────────────────────────────────
+function paneelBewijs() {
+  const bron = M.bron;
+  const args = M.argumenten.length ? M.argumenten.map(a => `<div class="kaart">
+      <div class="meta"><span>argument #${a.id}</span><span class="statusbadge ${esc(a.status)}">${esc(a.status)}</span>
+        <span>${a.stance === 'supporting' ? 'steunt' : a.stance === 'contradicting' ? 'weerlegt' : esc(a.stance)}${a.property === 'influence' ? ' (invloed)' : ''}</span>
+        <span>doel: ${esc(a.doel || '')}${a.doel_relatietype ? ' (' + esc(relLabel(a.doel_relatietype)) + ')' : ''}</span><span>door ${esc(a.contributed_by)}</span></div>
+      <div style="margin:6px 0">${esc(a.claim)}</div><div class="hash">“${esc(a.quote || '')}”</div></div>`).join('')
+    : '<div class="leeg">Nog geen argument steunt op deze meting.</div>';
+  return `
+    ${M.status !== 'afgerond' ? '<div class="banner">Pas na het afronden kan een meting als bewijs dienen. Dan moeten alle journalistieke codes a–h in orde zijn.</div>' : ''}
+    ${M.mag.als_bewijs ? bewijsFormulier() : ''}
+    ${bron ? gewichtHtml(bron) : ''}
+    <h2 class="sectie">Argumenten die op deze meting steunen</h2>${args}`;
+}
+function bewijsFormulier() {
+  const regels = M.regels || [];
+  const doel = BEWIJS.doel;
+  const voorstel = BEWIJS.regel ? standaardClaim(BEWIJS.regel) : '';
+  return `<div class="form" id="bewijsForm">
+    <h4>Gebruik als bewijs ${uitleg('Er komt een bron “Eigen meting #… ” (dataset) met deze pagina als vindplaats, en een argument met één citatie: de gekozen samenvattingsregel, letterlijk. Een argument van een maintainer telt meteen; anders landt het als voorstel en gaat het langs de automatische beoordeling. metingcheck geeft het onafhankelijke A1-oordeel.')}</h4>
+    <div class="raster">
+      <div><label for="bSoort">Soort doel</label><select id="bSoort">
+        <option value="relation" ${BEWIJS.soort === 'relation' ? 'selected' : ''}>Verband</option>
+        <option value="entity" ${BEWIJS.soort === 'entity' ? 'selected' : ''}>Knoop</option>
+        <option value="mechanism" ${BEWIJS.soort === 'mechanism' ? 'selected' : ''}>Mechanisme</option></select></div>
+      <div><label>Doel</label>${doel ? `<div class="chips"><span class="chip-x">${esc(doel.label)} <small class="hint">#${doel.id}</small><button type="button" aria-label="Weg" onclick="BEWIJS.doel=null;render()">×</button></span></div>` : kiezer('bDoel', 'Zoek op naam')}</div>
+      <div><label for="bStance">Richting</label><select id="bStance"><option value="supporting">Steunt het doel</option><option value="contradicting" ${BEWIJS.stance === 'contradicting' ? 'selected' : ''}>Weerlegt het doel</option></select></div>
+      <div><label class="veldlabel" style="margin-top:8px"><input type="checkbox" id="bInvloed" style="width:auto" ${BEWIJS.invloed ? 'checked' : ''}> Gaat over de sterkte van de invloed ${uitleg("property 'influence': het argument zegt iets over hoe sterk het verband doorwerkt, niet over het bestaan ervan.")}</label></div>
+      <div class="vol"><label for="bRegel">Samenvattingsregel (het citaat)</label><select id="bRegel"><option value="">— kies een regel —</option>${regels.map(r => `<option ${r === BEWIJS.regel ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div>
+      <div class="vol"><label for="bClaim">Claim ${uitleg('Feit en mening gescheiden (punt f): de claim beschrijft alleen wat gemeten is — wie, waar, hoe vaak, in welke periode — zonder oordeel (“eenzijdig”, “ondermijnt”). Een oordeel van een ander mag alleen als citaat met naam.')}</label>
+        <textarea id="bClaim" rows="3">${esc(BEWIJS.claim || voorstel)}</textarea><div id="bToets"></div></div>
+    </div>
+    <div class="knoppen"><button class="prim" type="button" onclick="bewijsIndienen()">Indienen als bewijs</button><span id="bFout"></span></div>
+  </div>`;
+}
+function standaardClaim(regel) {
+  const sel = (M.opzet.selectie || {}), p = sel.periode || {};
+  const media = (sel.media || []).map(naam).join(' en ');
+  return `In eigen meting #${M.id} (${media}, ${p.van || '…'} tot en met ${p.tot || '…'}): ${regel}`;
+}
+function koppelBewijs() {
+  const soort = document.getElementById('bSoort');
+  if (soort) soort.addEventListener('change', () => { BEWIJS.soort = soort.value; BEWIJS.doel = null; bewaarBewijs(); render(); });
+  koppelKiezer('bDoel', () => BEWIJS.soort, item => { bewaarBewijs(); BEWIJS.doel = item; render(); });
+  const regel = document.getElementById('bRegel'), claim = document.getElementById('bClaim');
+  if (regel) regel.addEventListener('change', () => {
+    const oud = BEWIJS.regel ? standaardClaim(BEWIJS.regel) : '';
+    BEWIJS.regel = regel.value || null;
+    if (claim && (!claim.value.trim() || claim.value === oud)) claim.value = BEWIJS.regel ? standaardClaim(BEWIJS.regel) : '';
+    BEWIJS.claim = claim ? claim.value : '';
+    claimToets();
+  });
+  if (claim) { claim.addEventListener('input', () => { BEWIJS.claim = claim.value; clearTimeout(CLAIM_TIMER); CLAIM_TIMER = setTimeout(claimToets, 350); }); claimToets(); }
+}
+function bewaarBewijs() {
+  const claim = document.getElementById('bClaim'), regel = document.getElementById('bRegel');
+  const stance = document.getElementById('bStance'), invloed = document.getElementById('bInvloed');
+  if (claim) BEWIJS.claim = claim.value;
+  if (regel) BEWIJS.regel = regel.value || null;
+  if (stance) BEWIJS.stance = stance.value;
+  if (invloed) BEWIJS.invloed = invloed.checked;
+}
+async function claimToets() {
+  const claim = document.getElementById('bClaim'), uit = document.getElementById('bToets');
+  if (!claim || !uit) return;
+  if (!claim.value.trim()) { uit.innerHTML = ''; return; }
+  const { ok, j } = await api('GET', '/api/metingen/claimtoets?claim=' + encodeURIComponent(claim.value));
+  if (!ok) return;
+  uit.innerHTML = j.ok ? '<span class="toets-ok">✓ Beschrijft wat gemeten is: geen oordeel in de eigen stem gevonden.</span>'
+    : `<span class="toets-fout">✗ Oordeel of etiket in de eigen stem: ${j.treffers.map(esc).join(', ')}. Beschrijf alleen wat gemeten is, of citeer het oordeel met naam.</span>`;
+}
+async function regelAlsBewijs(regel) {
+  BEWIJS.regel = regel; BEWIJS.claim = standaardClaim(regel);
+  kiesTab('bewijs');
+}
+async function bewijsIndienen() {
+  bewaarBewijs();
+  const fout = document.getElementById('bFout');
+  if (!BEWIJS.doel) { fout.innerHTML = '<span class="fout-tekst">Kies een doel.</span>'; return; }
+  const body = { stance: document.getElementById('bStance').value, property: document.getElementById('bInvloed').checked ? 'influence' : null,
+    claim: (document.getElementById('bClaim').value || '').trim(), regel: BEWIJS.regel };
+  body[{ relation: 'relation_id', entity: 'entity_id', mechanism: 'mechanism_id' }[BEWIJS.soort]] = BEWIJS.doel.id;
+  let { ok, status, j } = await api('POST', `/api/metingen/${M.id}/als_bewijs`, body);
+  if (status === 409 && j.duplicaat_kandidaten) {
+    const verder = await bevestig('Op dit doel staat al een argument dat hierop lijkt:\n\n' + j.duplicaat_kandidaten.map(k => `#${k.id}: ${k.claim}`).join('\n') + '\n\nToch indienen als nieuw argument?',
+      { titel: 'Mogelijk dubbel', okTekst: 'Toch indienen' });
+    if (!verder) return;
+    ({ ok, status, j } = await api('POST', `/api/metingen/${M.id}/als_bewijs`, Object.assign(body, { negeer_duplicaten: true })));
+  }
+  if (!ok) { toonFout(fout, j); return; }
+  melding(`Argument #${j.argument_id} ingediend (${j.argument_status}) op bron #${j.source_id}`, 'ok', 5000);
+  BEWIJS = { soort: BEWIJS.soort, doel: null, regel: null, claim: '', stance: 'supporting', invloed: false };
+  await herlaad();
+  const g = document.getElementById('gewicht'); if (g) g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function gewichtHtml(bron) {
+  const mag = M.mag.classificeren;
+  return `<div class="kaart" id="gewicht">
+    <h3>Hoe zwaar weegt deze meting? ${uitleg('De bron telt mee met het gewicht van haar betrouwbaarheidsklasse (scoring.RELIABILITY_WEIGHT) maal de relevantiefactor van het onderwerp. Een dataset mag geen “academisch” zijn. Alleen de eigenaar (maintainer) kiest het gewicht van een eigen meting.')}</h3>
+    <div class="meta"><span>bron #${bron.id}: ${esc(bron.title)}</span><span>nu: <b>${esc(weergaveNaam(bron.reliability))}</b> (gewicht ${getal(bron.gewicht)})</span>
+      <span>onderwerp: ${esc(ONDERWERP_LABEL[bron.onderwerp] || bron.onderwerp)} (×${getal(bron.relevantie)})</span></div>
+    <div class="klassen">${M.bronklassen.map(k => `<label class="klasse ${k.toegestaan ? '' : 'niet'}" ${k.toegestaan ? '' : `title="${esc(k.probleem)}"`}>
+      <input type="radio" name="klasse" value="${esc(k.klasse)}" ${k.klasse === bron.reliability ? 'checked' : ''} ${(!mag || !k.toegestaan) ? 'disabled' : ''}>
+      <span>${esc(weergaveNaam(k.klasse))} <span class="gewicht">${getal(k.gewicht)}</span>${k.toegestaan ? '' : '<small>past niet bij een dataset</small>'}</span></label>`).join('')}</div>
+    ${mag ? `<div class="raster"><div><label for="gOnderwerp" class="veldlabel">Onderwerp</label><select class="veld" id="gOnderwerp">${M.onderwerpen.map(o => `<option value="${esc(o.onderwerp)}" ${o.onderwerp === bron.onderwerp ? 'selected' : ''}>${esc(ONDERWERP_LABEL[o.onderwerp] || o.onderwerp)} (×${getal(o.factor)})</option>`).join('')}</select></div>
+      <div><label for="gMotivatie" class="veldlabel">Motivatie</label><input class="veld" id="gMotivatie" type="text" placeholder="Waarom dit gewicht?"></div></div>
+      <div class="knoppen"><button class="prim" type="button" onclick="gewichtOpslaan(${bron.id})">Gewicht vastleggen</button><span id="gFout"></span></div>`
+    : '<p class="hint">Het gewicht van een eigen meting bepaalt de eigenaar.</p>'}
+  </div>`;
+}
+async function gewichtOpslaan(sid) {
+  const klasse = (document.querySelector('input[name="klasse"]:checked') || {}).value;
+  if (!klasse) { document.getElementById('gFout').innerHTML = '<span class="fout-tekst">Kies een klasse.</span>'; return; }
+  const { ok, j } = await api('PATCH', `/api/sources/${sid}/classificatie`, { reliability: klasse,
+    onderwerp: document.getElementById('gOnderwerp').value, motivatie: document.getElementById('gMotivatie').value.trim() || 'gewicht van een eigen meting' });
+  if (!ok) { toonFout(document.getElementById('gFout'), j); return; }
+  melding(`Gewicht vastgelegd: ${weergaveNaam(j.reliability)}`, 'ok');
+  herlaad();
+}
+
+// ── Start ───────────────────────────────────────────────────────────────────
+(async function () {
+  ME = await hsMe();
+  if (ME && ME.error) ME = null;
+  if (M_ID) { await herlaad(); if (TAB === 'controle') laadControle(); }
+  else laadLijst();
+})();
+</script>
+</body>
+</html>

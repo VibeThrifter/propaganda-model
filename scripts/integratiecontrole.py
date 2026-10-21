@@ -10,7 +10,7 @@ Meerdere sessies en agents passen tegelijk code en data aan. Dit script draait e
   2. **De modelvalidatie** (`validate_model.py --strict`): geen fout boven de baseline, en het
      golden snapshot van de scores.
   3. **Een rooktest tegen de live server.** Alleen lezen. De pagina's en API's antwoorden (/, /partijen,
-     /methode, /api/health, /api/partijen, /api/graph_data). Het laatst goedgekeurde verband staat
+     /methode, /api/health, /api/partijen, /api/graph_data, /metingen, /api/metingen). Het laatst goedgekeurde verband staat
      in graph_data, en de laatst goedgekeurde partijband staat in /api/partijen/<partij>. Zo blijkt
      dat afgeleide overzichten echt live uit dezelfde database komen.
 
@@ -38,7 +38,8 @@ DB_PATH = ROOT / "data" / "propaganda_model.db"
 UIT_PAD = ROOT / "data" / "integratiecontrole.json"
 LOG_PAD = ROOT / "data" / "integratiecontrole_log.jsonl"
 SUITE_TIMEOUT_S = 1200
-PAGINAS = ["/", "/partijen", "/methode", "/api/health", "/api/partijen", "/api/graph_data"]
+PAGINAS = ["/", "/partijen", "/methode", "/api/health", "/api/partijen", "/api/graph_data",
+           "/metingen", "/api/metingen"]   # eigen metingen (2026-10-16); test_metingen.py draait mee
 PARTIJBANDEN = ("lidmaatschap", "bestuurder", "adviseur", "personeel", "dienstverband",
                 "woordvoerder_van", "draaideur")
 

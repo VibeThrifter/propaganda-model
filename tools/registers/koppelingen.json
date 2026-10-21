@@ -191,5 +191,56 @@
    "type": "vakbond",
    "rol": "sociale_partner"
   }
+ },
+ "cbs_gemeenten": {
+  "_toelichting": "CBS 'Gebieden in Nederland' (cbs.py): gemeentecode → oo-id voor gemeenten die in het register van overheidsorganisaties geen tooi-code hebben (de heringedeelde van 2018–2019). Met de hand nagelopen op 2026-10-15: precies één register-gemeente met de naam 'Gemeente <CBS-naam>', en die staat met haar oo-id in het model.",
+  "GM1949": {
+   "oo": "23087139",
+   "naam": "Gemeente Waadhoeke"
+  },
+  "GM1950": {
+   "oo": "23087133",
+   "naam": "Gemeente Westerwolde"
+  },
+  "GM1952": {
+   "oo": "23087145",
+   "naam": "Gemeente Midden-Groningen"
+  },
+  "GM1954": {
+   "oo": "27465412",
+   "naam": "Gemeente Beekdaelen"
+  },
+  "GM1959": {
+   "oo": "27465406",
+   "naam": "Gemeente Altena"
+  },
+  "GM1960": {
+   "oo": "27465448",
+   "naam": "Gemeente West Betuwe"
+  },
+  "GM1961": {
+   "oo": "27465442",
+   "naam": "Gemeente Vijfheerenlanden"
+  },
+  "GM1963": {
+   "oo": "27465424",
+   "naam": "Gemeente Hoeksche Waard"
+  },
+  "GM1966": {
+   "oo": "27465418",
+   "naam": "Gemeente Het Hogeland"
+  },
+  "GM1969": {
+   "oo": "27465454",
+   "naam": "Gemeente Westerkwartier"
+  },
+  "GM1970": {
+   "oo": "27465436",
+   "naam": "Gemeente Noardeast-Fryslân"
+  },
+  "GM1978": {
+   "oo": "27465430",
+   "naam": "Gemeente Molenlanden"
+  }
  }
 }

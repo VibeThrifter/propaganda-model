@@ -188,6 +188,9 @@ def main():
     gd = c.get("/api/graph_data").get_json()
     ids = {a["id"] for a in gd["arguments"]}
     eis(persoon_arg not in ids, "smaad_hold-argument staat NIET in graph_data")
+    dis = c.get(f"/api/graph_data/discussie?entity_id={PERSOON_ID}").get_json()
+    eis(persoon_arg not in {a["id"] for a in dis["arguments"]},
+        "smaad_hold-argument staat NIET in /api/graph_data/discussie")
 
     # (b) identieke lading over een ORGANISATIE → geen smaad_hold, wél in graph_data
     r = c.post("/api/arguments", headers=kop_agent, json={
@@ -216,6 +219,9 @@ def main():
     gd = c.get("/api/graph_data").get_json()
     eis(persoon_arg in {a["id"] for a in gd["arguments"]},
         "vrijgegeven argument is nu wél zichtbaar in graph_data")
+    dis = c.get(f"/api/graph_data/discussie?entity_id={PERSOON_ID}").get_json()
+    eis(persoon_arg in {a["id"] for a in dis["arguments"]},
+        "vrijgegeven argument is nu wél zichtbaar in /api/graph_data/discussie")
 
     print("7. Lead-wachtrij + PATCH (agent-lane) + anomalie-check")
     r = c.get("/api/leads")  # anoniem

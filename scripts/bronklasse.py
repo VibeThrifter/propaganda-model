@@ -20,6 +20,10 @@ vindplaats) blijft gelden; past de keuze niet, dan de eerstvolgende lagere klass
 Het besluit gaat via PATCH /api/sources/<id>/classificatie (merge-service, reviewer-tier), met
 beide oordelen in de motivatie (edit_log). Een mens kan het altijd wijzigen.
 
+Een eigen meting (bron met cluster_key 'meting:<id>', eigenaarsbesluit 2026-10-16) slaat dit
+script over: hoe zwaar die weegt, bepaalt de eigenaar zelf (de server laat alleen een maintainer
+haar classificeren).
+
 Gebruik:
     python3 scripts/bronklasse.py --droog --max 40     # oordelen tonen, niets schrijven
     python3 scripts/bronklasse.py --max 160 --json     # echt
@@ -136,6 +140,7 @@ def kandidaten(conn, ids=None) -> list[dict]:
                     AND a.status NOT IN ('verworpen', 'verouderd')) AS n_levend
         FROM sources s
         WHERE s.reliability <> 'eigen_synthese'
+          AND COALESCE(s.cluster_key, '') NOT LIKE 'meting:%'
           AND (s.classificatie_voorgesteld_door IS NOT NULL
                OR s.reliability = 'onbeoordeeld'){filt}""", params)]  # noqa: S608
     rijen = [r for r in rijen if r["classificatie_voorgesteld_door"] or r["n_levend"]]
@@ -185,7 +190,8 @@ def herzien_kandidaten(conn, ids=None) -> list[dict]:
                   AND l.location_type = 'url' ORDER BY l.id LIMIT 1) AS url,
                EXISTS (SELECT 1 FROM source_locations l WHERE l.source_id = s.id) AS heeft_loc,
                0 AS n_levend, 1 AS voorrang
-        FROM sources s WHERE s.id IN ({','.join('?' * len(eigen))})""", eigen)]  # noqa: S608
+        FROM sources s WHERE s.id IN ({','.join('?' * len(eigen))})
+          AND COALESCE(s.cluster_key, '') NOT LIKE 'meting:%'""", eigen)]  # noqa: S608
     for r in rijen:
         r["voorstel_toen"] = toen.get(r["id"])
     return rijen
